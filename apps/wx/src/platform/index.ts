@@ -6,6 +6,8 @@ export type { CanvasShimHandle } from './shim.js';
 export { getWx } from './wxTypes.js';
 export type { WxLike, WxRawCanvas, WxTouchEvent, WxTouch } from './wxTypes.js';
 export { createWxStorage } from './storage.js';
+export { createWxAudio } from './audio.js';
+export type { WxInnerAudioContext } from './wxTypes.js';
 export { wxFetchJson, wxReadJson, wxReadBinary } from './network.js';
 export { createWxExtras } from './extras.js';
 export { createWxCanvasFactory } from './canvasFactory.js';

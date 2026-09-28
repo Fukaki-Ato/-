@@ -7,6 +7,7 @@
  * ——runnerScene 的固定步长循环用 now() 与帧时间戳混算，基准漂移会直接表现为 dt 尖峰。
  */
 import type { PlatformAdapter } from '@tr/framework/platform/platformAdapter.js';
+import { createWxAudio } from './audio.js';
 import { createWxCanvasFactory } from './canvasFactory.js';
 import { createWxInput } from './input.js';
 import { createWxStorage } from './storage.js';
@@ -63,5 +64,6 @@ export function createWxAdapter(options: WxAdapterOptions = {}): PlatformAdapter
 
     now,
     extras: createWxExtras(wx, storage),
+    audio: createWxAudio(wx),
   };
 }

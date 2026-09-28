@@ -12,6 +12,8 @@ import { buildLoadout } from '@tr/game/core/sim/character.js';
 import { RunnerSim } from '@tr/game/core/sim/runnerSim.js';
 import { createSceneMachine } from '@tr/game/core/scene/sceneMachine.js';
 import type { SceneName } from '@tr/game/core/scene/sceneMachine.js';
+import { createAudioDirector } from '@tr/game/core/audio/audioDirector.js';
+import type { AudioDirector } from '@tr/game/core/audio/audioDirector.js';
 import { hashSeed } from '@tr/game/core/rng.js';
 import { createRunnerScene } from '@tr/game/render/runnerScene.js';
 import type { PlatformAdapter } from '@tr/framework/platform/platformAdapter.js';
@@ -47,6 +49,8 @@ export function createGameFlow(deps: GameFlowDeps): GameFlow {
   let scene: { dispose(): void } | null = null;
   let hud: ReturnType<GameViews['mountHud']> | null = null;
   let lastSeed = 0;
+  /** 音频导演：配置加载成功后创建；game.params.audio 缺省时为空操作（不阻塞玩法） */
+  let audio: AudioDirector | null = null;
 
   /**
    * 历史最佳分（v2 修正）：
@@ -87,6 +91,7 @@ export function createGameFlow(deps: GameFlowDeps): GameFlow {
     run: {
       onEnter: () => {
         if (!content) return;
+        audio?.enterRun();
         lastSeed = hashSeed('run-' + Date.now());
         const sim: RunnerSim = new RunnerSim(content, lastSeed, charId);
         // v2：主画布幂等单例 + 即时窗口尺寸（S10 §7.2；跨局复用同一画布，不新建）
@@ -96,10 +101,11 @@ export function createGameFlow(deps: GameFlowDeps): GameFlow {
         scene = createRunnerScene(host, adapter, sim, content, {
           onHud: h => hud?.update(h),
           onEnd: summary => machine.go('result', summary),
+          onDeath: () => audio?.onDeath(),
           debug: deps.debug,
         });
       },
-      onExit: () => { scene?.dispose(); scene = null; hud?.dispose(); hud = null; },
+      onExit: () => { scene?.dispose(); scene = null; hud?.dispose(); hud = null; audio?.exitRun(); },
     },
     result: {
       onEnter: ctx => {
@@ -141,6 +147,7 @@ export function createGameFlow(deps: GameFlowDeps): GameFlow {
       return;
     }
     content = report.content;
+    audio = createAudioDirector(adapter, content.game.params);
     machine.go('login');
   }
 

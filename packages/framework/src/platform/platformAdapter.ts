@@ -10,6 +10,7 @@
  * - storage / fetchJson / requestFrame / cancelFrame / onVisibility / now 六项签名与 v1 逐字一致（D6）
  * - 新增 version: 2（运行时探测）、canvas.onResize、extras?: WxExtras（D9/D10/D7）
  */
+import type { AudioService } from './audio.js';
 import type { CanvasFactory, FrameHandle, Unsubscribe } from './canvas.js';
 import type { InputEvent } from './input.js';
 import type { WxExtras } from './extras.js';
@@ -45,6 +46,9 @@ export interface PlatformAdapter {
 
   /** wx 专属能力（可选注入，见 extras.ts）；wx 实现必供，web 壳给 no-op/兜底实现。 */
   readonly extras?: WxExtras;
+
+  /** 音频播放（web/wx 均提供，见 audio.ts）；纯逻辑测试壳可缺省，业务代码须容忍 undefined。 */
+  readonly audio?: AudioService;
 }
 
 // 共享类型统一从包内各模块再导出：消费方 import '@tr/framework/platform/platformAdapter.js' 即可拿齐。
@@ -56,3 +60,4 @@ export type {
 } from './input.js';
 export { GESTURE_DEFAULTS, createGestureClassifier } from './gestureClassifier.js';
 export type { CloudBridge, ShareOptions, WxExtras, WxIdentity } from './extras.js';
+export type { AudioOptions, AudioService } from './audio.js';

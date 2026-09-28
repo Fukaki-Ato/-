@@ -92,7 +92,35 @@
             },
             "additionalProperties": true
           },
-          "ui": { "type": "object" }
+          "ui": { "type": "object" },
+          "audio": {
+            "type": "object",
+            "properties": {
+              "volume": {
+                "type": "object",
+                "properties": {
+                  "music": { "type": "number" },
+                  "sfx": { "type": "number" }
+                },
+                "additionalProperties": true
+              },
+              "bgm": {
+                "type": "object",
+                "properties": {
+                  "run": { "type": "string" }
+                },
+                "additionalProperties": true
+              },
+              "sfx": {
+                "type": "object",
+                "properties": {
+                  "death": { "type": "string" }
+                },
+                "additionalProperties": true
+              }
+            },
+            "additionalProperties": true
+          }
         },
         "additionalProperties": true
       }

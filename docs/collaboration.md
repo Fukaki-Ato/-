@@ -30,6 +30,9 @@ architecture boundaries live in [architecture.md](architecture.md).
 - `packages/game/src/core/effects/buffEngine.ts` (`PRIMITIVES`) must stay exactly in sync
   with the schema `primitive` enum. `effectTypes.ts` defines `FxState` (the derived view) and
   `EffectWorld` (the capabilities instant primitives call into).
+- Audio content (music / one-shot cues) is registered in `game.json → params.audio` with files
+  under `assets/audio/`; playback is already wired through
+  `packages/game/src/core/audio/audioDirector.ts`. See [audio.md](audio.md).
 - Some source comments reference the upstream design spec `docs/03`; that document is not
   part of this repository. The in-repo authorities are the schema, the validator, and the
   existing entries in `config/`.

@@ -9,6 +9,10 @@ const MIME: Record<string, string> = {
   '.png': 'image/png',
   '.json': 'application/json; charset=utf-8',
   '.txt': 'text/plain; charset=utf-8',
+  // 音频：dev 中间件按真实 MIME 下发，避免 <audio> 依赖嗅探
+  '.mp3': 'audio/mpeg',
+  '.m4a': 'audio/mp4',
+  '.ogg': 'audio/ogg',
 };
 
 function trAssets(): Plugin {

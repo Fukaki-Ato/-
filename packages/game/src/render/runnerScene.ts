@@ -25,6 +25,8 @@ export interface RunCallbacks {
     skill: { label: string; energy: number; cd: number; ready: boolean } | null;
   }): void;
   onEnd(summary: ReturnType<RunnerSim['summary']>): void;
+  /** 死亡瞬间回调（音频等表现层用；endTimer 计时与 onEnd 节奏不变） */
+  onDeath?(): void;
   debug?: boolean;
 }
 
@@ -135,7 +137,7 @@ export function createRunnerScene(
       if (ev.type === 'coin') fireAtPlayer();
       else if (ev.type === 'helmetSave') { fireAtPlayer(); shakeT = 0.2; } // 头盔挡刀是关键时刻，给一次反馈
       else if (ev.type === 'hit') shakeT = 0.25;
-      else if (ev.type === 'death') endTimer = 0;
+      else if (ev.type === 'death') { endTimer = 0; cb.onDeath?.(); }
       // 施放技能：爆点 + 轻微震屏，拖尾/光环等完整表现在 M4 T4.4
       else if (ev.type === 'cast') { fireAtPlayer(); shakeT = 0.12; }
       else if (ev.type === 'shieldBreak' || ev.type === 'boardBreak') { fireAtPlayer(); shakeT = 0.18; }
