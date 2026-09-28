@@ -1,0 +1,11 @@
+{
+  "name": "@tr/wx",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "微信小游戏运行入口与平台适配。",
+  "dependencies": {
+    "@tr/framework": "*",
+    "@tr/game": "*"
+  }
+}

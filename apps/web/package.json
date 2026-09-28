@@ -1,0 +1,20 @@
+{
+  "name": "@tr/web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "网页运行入口（Vite）。",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@tr/framework": "*",
+    "@tr/game": "*",
+    "three": "0.160.1"
+  },
+  "devDependencies": {
+    "@types/three": "0.160.0"
+  }
+}

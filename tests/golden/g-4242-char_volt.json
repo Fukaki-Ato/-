@@ -1,0 +1,888 @@
+{
+  "goldenVersion": 1,
+  "replay": {
+    "version": 1,
+    "seed": 4242,
+    "charId": "char_volt",
+    "dtMs": 16.666666666666668,
+    "maxFrames": 3600,
+    "inputs": [
+      {
+        "frame": 24,
+        "type": "swipe",
+        "payload": {
+          "dir": "up"
+        }
+      },
+      {
+        "frame": 63,
+        "type": "swipe",
+        "payload": {
+          "dir": "down"
+        }
+      },
+      {
+        "frame": 111,
+        "type": "key",
+        "payload": {
+          "code": "ArrowUp"
+        }
+      },
+      {
+        "frame": 137,
+        "type": "key",
+        "payload": {
+          "code": "ArrowLeft"
+        }
+      },
+      {
+        "frame": 181,
+        "type": "swipe",
+        "payload": {
+          "dir": "down"
+        }
+      },
+      {
+        "frame": 194,
+        "type": "doubleTap",
+        "payload": {
+          "x": 491,
+          "y": 1132
+        }
+      },
+      {
+        "frame": 212,
+        "type": "key",
+        "payload": {
+          "code": "ShiftLeft"
+        }
+      },
+      {
+        "frame": 237,
+        "type": "swipe",
+        "payload": {
+          "dir": "up"
+        }
+      },
+      {
+        "frame": 284,
+        "type": "doubleTap",
+        "payload": {
+          "x": 640,
+          "y": 876
+        }
+      },
+      {
+        "frame": 327,
+        "type": "swipe",
+        "payload": {
+          "dir": "left"
+        }
+      },
+      {
+        "frame": 338,
+        "type": "key",
+        "payload": {
+          "code": "ArrowRight"
+        }
+      },
+      {
+        "frame": 372,
+        "type": "key",
+        "payload": {
+          "code": "ArrowDown"
+        }
+      },
+      {
+        "frame": 382,
+        "type": "swipe",
+        "payload": {
+          "dir": "up"
+        }
+      },
+      {
+        "frame": 429,
+        "type": "key",
+        "payload": {
+          "code": "ArrowDown"
+        }
+      },
+      {
+        "frame": 466,
+        "type": "key",
+        "payload": {
+          "code": "ArrowDown"
+        }
+      },
+      {
+        "frame": 504,
+        "type": "key",
+        "payload": {
+          "code": "ArrowLeft"
+        }
+      },
+      {
+        "frame": 528,
+        "type": "doubleTap",
+        "payload": {
+          "x": 366,
+          "y": 1036
+        }
+      },
+      {
+        "frame": 543,
+        "type": "swipe",
+        "payload": {
+          "dir": "left"
+        }
+      },
+      {
+        "frame": 560,
+        "type": "swipe",
+        "payload": {
+          "dir": "right"
+        }
+      },
+      {
+        "frame": 570,
+        "type": "swipe",
+        "payload": {
+          "dir": "right"
+        }
+      },
+      {
+        "frame": 595,
+        "type": "key",
+        "payload": {
+          "code": "KeyE"
+        }
+      },
+      {
+        "frame": 613,
+        "type": "doubleTap",
+        "payload": {
+          "x": 541,
+          "y": 933
+        }
+      },
+      {
+        "frame": 639,
+        "type": "key",
+        "payload": {
+          "code": "ArrowUp"
+        }
+      },
+      {
+        "frame": 679,
+        "type": "swipe",
+        "payload": {
+          "dir": "up"
+        }
+      },
+      {
+        "frame": 712,
+        "type": "key",
+        "payload": {
+          "code": "KeyE"
+        }
+      },
+      {
+        "frame": 751,
+        "type": "swipe",
+        "payload": {
+          "dir": "right"
+        }
+      },
+      {
+        "frame": 788,
+        "type": "key",
+        "payload": {
+          "code": "ArrowLeft"
+        }
+      },
+      {
+        "frame": 798,
+        "type": "key",
+        "payload": {
+          "code": "ArrowUp"
+        }
+      },
+      {
+        "frame": 834,
+        "type": "swipe",
+        "payload": {
+          "dir": "right"
+        }
+      },
+      {
+        "frame": 866,
+        "type": "key",
+        "payload": {
+          "code": "ArrowLeft"
+        }
+      },
+      {
+        "frame": 909,
+        "type": "key",
+        "payload": {
+          "code": "ArrowRight"
+        }
+      },
+      {
+        "frame": 923,
+        "type": "key",
+        "payload": {
+          "code": "ArrowLeft"
+        }
+      },
+      {
+        "frame": 965,
+        "type": "key",
+        "payload": {
+          "code": "ArrowLeft"
+        }
+      },
+      {
+        "frame": 981,
+        "type": "swipe",
+        "payload": {
+          "dir": "left"
+        }
+      },
+      {
+        "frame": 994,
+        "type": "key",
+        "payload": {
+          "code": "Space"
+        }
+      },
+      {
+        "frame": 1035,
+        "type": "key",
+        "payload": {
+          "code": "Space"
+        }
+      },
+      {
+        "frame": 1049,
+        "type": "swipe",
+        "payload": {
+          "dir": "left"
+        }
+      },
+      {
+        "frame": 1082,
+        "type": "key",
+        "payload": {
+          "code": "ArrowRight"
+        }
+      },
+      {
+        "frame": 1105,
+        "type": "key",
+        "payload": {
+          "code": "ArrowLeft"
+        }
+      },
+      {
+        "frame": 1151,
+        "type": "swipe",
+        "payload": {
+          "dir": "down"
+        }
+      },
+      {
+        "frame": 1182,
+        "type": "doubleTap",
+        "payload": {
+          "x": 429,
+          "y": 337
+        }
+      },
+      {
+        "frame": 1224,
+        "type": "key",
+        "payload": {
+          "code": "KeyE"
+        }
+      },
+      {
+        "frame": 1264,
+        "type": "key",
+        "payload": {
+          "code": "ArrowDown"
+        }
+      },
+      {
+        "frame": 1299,
+        "type": "key",
+        "payload": {
+          "code": "KeyE"
+        }
+      },
+      {
+        "frame": 1347,
+        "type": "swipe",
+        "payload": {
+          "dir": "right"
+        }
+      },
+      {
+        "frame": 1363,
+        "type": "swipe",
+        "payload": {
+          "dir": "up"
+        }
+      },
+      {
+        "frame": 1379,
+        "type": "key",
+        "payload": {
+          "code": "ArrowLeft"
+        }
+      },
+      {
+        "frame": 1391,
+        "type": "key",
+        "payload": {
+          "code": "ArrowUp"
+        }
+      },
+      {
+        "frame": 1408,
+        "type": "swipe",
+        "payload": {
+          "dir": "down"
+        }
+      },
+      {
+        "frame": 1444,
+        "type": "key",
+        "payload": {
+          "code": "ArrowRight"
+        }
+      },
+      {
+        "frame": 1465,
+        "type": "swipe",
+        "payload": {
+          "dir": "down"
+        }
+      },
+      {
+        "frame": 1493,
+        "type": "key",
+        "payload": {
+          "code": "ArrowDown"
+        }
+      },
+      {
+        "frame": 1520,
+        "type": "key",
+        "payload": {
+          "code": "ArrowUp"
+        }
+      },
+      {
+        "frame": 1568,
+        "type": "swipe",
+        "payload": {
+          "dir": "right"
+        }
+      },
+      {
+        "frame": 1616,
+        "type": "doubleTap",
+        "payload": {
+          "x": 236,
+          "y": 1081
+        }
+      },
+      {
+        "frame": 1626,
+        "type": "swipe",
+        "payload": {
+          "dir": "up"
+        }
+      },
+      {
+        "frame": 1647,
+        "type": "key",
+        "payload": {
+          "code": "ArrowRight"
+        }
+      },
+      {
+        "frame": 1681,
+        "type": "key",
+        "payload": {
+          "code": "ArrowRight"
+        }
+      },
+      {
+        "frame": 1693,
+        "type": "key",
+        "payload": {
+          "code": "ArrowLeft"
+        }
+      },
+      {
+        "frame": 1720,
+        "type": "swipe",
+        "payload": {
+          "dir": "right"
+        }
+      },
+      {
+        "frame": 1757,
+        "type": "key",
+        "payload": {
+          "code": "ShiftLeft"
+        }
+      },
+      {
+        "frame": 1795,
+        "type": "key",
+        "payload": {
+          "code": "ArrowLeft"
+        }
+      },
+      {
+        "frame": 1818,
+        "type": "swipe",
+        "payload": {
+          "dir": "right"
+        }
+      },
+      {
+        "frame": 1855,
+        "type": "key",
+        "payload": {
+          "code": "ArrowDown"
+        }
+      },
+      {
+        "frame": 1885,
+        "type": "swipe",
+        "payload": {
+          "dir": "down"
+        }
+      },
+      {
+        "frame": 1903,
+        "type": "key",
+        "payload": {
+          "code": "ArrowLeft"
+        }
+      },
+      {
+        "frame": 1920,
+        "type": "key",
+        "payload": {
+          "code": "ArrowDown"
+        }
+      },
+      {
+        "frame": 1938,
+        "type": "key",
+        "payload": {
+          "code": "ArrowLeft"
+        }
+      },
+      {
+        "frame": 1965,
+        "type": "key",
+        "payload": {
+          "code": "ArrowDown"
+        }
+      },
+      {
+        "frame": 1994,
+        "type": "swipe",
+        "payload": {
+          "dir": "down"
+        }
+      },
+      {
+        "frame": 2031,
+        "type": "key",
+        "payload": {
+          "code": "ArrowRight"
+        }
+      },
+      {
+        "frame": 2075,
+        "type": "swipe",
+        "payload": {
+          "dir": "up"
+        }
+      },
+      {
+        "frame": 2116,
+        "type": "swipe",
+        "payload": {
+          "dir": "down"
+        }
+      },
+      {
+        "frame": 2129,
+        "type": "swipe",
+        "payload": {
+          "dir": "right"
+        }
+      },
+      {
+        "frame": 2156,
+        "type": "swipe",
+        "payload": {
+          "dir": "right"
+        }
+      },
+      {
+        "frame": 2204,
+        "type": "swipe",
+        "payload": {
+          "dir": "down"
+        }
+      },
+      {
+        "frame": 2229,
+        "type": "swipe",
+        "payload": {
+          "dir": "right"
+        }
+      },
+      {
+        "frame": 2248,
+        "type": "key",
+        "payload": {
+          "code": "ArrowDown"
+        }
+      },
+      {
+        "frame": 2291,
+        "type": "swipe",
+        "payload": {
+          "dir": "up"
+        }
+      },
+      {
+        "frame": 2327,
+        "type": "key",
+        "payload": {
+          "code": "ArrowLeft"
+        }
+      },
+      {
+        "frame": 2342,
+        "type": "key",
+        "payload": {
+          "code": "ArrowUp"
+        }
+      },
+      {
+        "frame": 2376,
+        "type": "key",
+        "payload": {
+          "code": "ArrowDown"
+        }
+      },
+      {
+        "frame": 2423,
+        "type": "swipe",
+        "payload": {
+          "dir": "right"
+        }
+      },
+      {
+        "frame": 2461,
+        "type": "key",
+        "payload": {
+          "code": "ArrowLeft"
+        }
+      },
+      {
+        "frame": 2506,
+        "type": "key",
+        "payload": {
+          "code": "ArrowLeft"
+        }
+      },
+      {
+        "frame": 2549,
+        "type": "key",
+        "payload": {
+          "code": "ArrowRight"
+        }
+      },
+      {
+        "frame": 2563,
+        "type": "key",
+        "payload": {
+          "code": "Space"
+        }
+      },
+      {
+        "frame": 2575,
+        "type": "key",
+        "payload": {
+          "code": "ArrowDown"
+        }
+      },
+      {
+        "frame": 2608,
+        "type": "doubleTap",
+        "payload": {
+          "x": 150,
+          "y": 1055
+        }
+      },
+      {
+        "frame": 2645,
+        "type": "key",
+        "payload": {
+          "code": "ArrowDown"
+        }
+      },
+      {
+        "frame": 2683,
+        "type": "swipe",
+        "payload": {
+          "dir": "left"
+        }
+      },
+      {
+        "frame": 2703,
+        "type": "key",
+        "payload": {
+          "code": "ArrowDown"
+        }
+      },
+      {
+        "frame": 2732,
+        "type": "key",
+        "payload": {
+          "code": "ArrowRight"
+        }
+      },
+      {
+        "frame": 2766,
+        "type": "key",
+        "payload": {
+          "code": "ArrowLeft"
+        }
+      },
+      {
+        "frame": 2814,
+        "type": "key",
+        "payload": {
+          "code": "ArrowUp"
+        }
+      },
+      {
+        "frame": 2856,
+        "type": "key",
+        "payload": {
+          "code": "ArrowDown"
+        }
+      },
+      {
+        "frame": 2877,
+        "type": "swipe",
+        "payload": {
+          "dir": "right"
+        }
+      },
+      {
+        "frame": 2918,
+        "type": "key",
+        "payload": {
+          "code": "ArrowLeft"
+        }
+      },
+      {
+        "frame": 2932,
+        "type": "key",
+        "payload": {
+          "code": "ArrowDown"
+        }
+      },
+      {
+        "frame": 2968,
+        "type": "swipe",
+        "payload": {
+          "dir": "down"
+        }
+      },
+      {
+        "frame": 2994,
+        "type": "key",
+        "payload": {
+          "code": "ArrowLeft"
+        }
+      },
+      {
+        "frame": 3004,
+        "type": "key",
+        "payload": {
+          "code": "ArrowDown"
+        }
+      },
+      {
+        "frame": 3031,
+        "type": "swipe",
+        "payload": {
+          "dir": "right"
+        }
+      },
+      {
+        "frame": 3074,
+        "type": "key",
+        "payload": {
+          "code": "ArrowLeft"
+        }
+      },
+      {
+        "frame": 3111,
+        "type": "key",
+        "payload": {
+          "code": "ArrowLeft"
+        }
+      },
+      {
+        "frame": 3129,
+        "type": "swipe",
+        "payload": {
+          "dir": "down"
+        }
+      },
+      {
+        "frame": 3159,
+        "type": "swipe",
+        "payload": {
+          "dir": "down"
+        }
+      },
+      {
+        "frame": 3181,
+        "type": "key",
+        "payload": {
+          "code": "ArrowLeft"
+        }
+      },
+      {
+        "frame": 3227,
+        "type": "key",
+        "payload": {
+          "code": "ArrowDown"
+        }
+      },
+      {
+        "frame": 3252,
+        "type": "key",
+        "payload": {
+          "code": "ArrowDown"
+        }
+      },
+      {
+        "frame": 3298,
+        "type": "key",
+        "payload": {
+          "code": "ArrowRight"
+        }
+      },
+      {
+        "frame": 3340,
+        "type": "swipe",
+        "payload": {
+          "dir": "left"
+        }
+      },
+      {
+        "frame": 3388,
+        "type": "swipe",
+        "payload": {
+          "dir": "right"
+        }
+      },
+      {
+        "frame": 3401,
+        "type": "key",
+        "payload": {
+          "code": "ArrowLeft"
+        }
+      },
+      {
+        "frame": 3423,
+        "type": "key",
+        "payload": {
+          "code": "ArrowRight"
+        }
+      },
+      {
+        "frame": 3440,
+        "type": "swipe",
+        "payload": {
+          "dir": "right"
+        }
+      },
+      {
+        "frame": 3463,
+        "type": "key",
+        "payload": {
+          "code": "ArrowLeft"
+        }
+      },
+      {
+        "frame": 3488,
+        "type": "key",
+        "payload": {
+          "code": "KeyE"
+        }
+      },
+      {
+        "frame": 3509,
+        "type": "key",
+        "payload": {
+          "code": "ArrowUp"
+        }
+      },
+      {
+        "frame": 3549,
+        "type": "key",
+        "payload": {
+          "code": "ArrowLeft"
+        }
+      },
+      {
+        "frame": 3596,
+        "type": "swipe",
+        "payload": {
+          "dir": "right"
+        }
+      }
+    ]
+  },
+  "expected": {
+    "frames": 914,
+    "summary": {
+      "t": 15.23,
+      "distance": 189.95,
+      "coins": 15,
+      "nearMiss": 0,
+      "hits": 1,
+      "score": 2115,
+      "alive": false,
+      "casts": 1,
+      "charId": "char_volt"
+    },
+    "eventCounts": {
+      "cast": 1,
+      "coin": 15,
+      "death": 1,
+      "hit": 1
+    },
+    "eventsSha256": "d998126511e7cc5ee198a3c6b0e41a7e2ecad9d53fce5750e6f94fb99baadf4f",
+    "inputsSha256": "0afbb178e286d03bffa75c41afb1ae623cfd78d13235854b0db91edb4142f5ba"
+  }
+}

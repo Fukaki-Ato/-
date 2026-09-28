@@ -1,0 +1,106 @@
+{
+  "$schema": "../schema/config.schema.json#/characters",
+  "configVersion": "1.0.0",
+  "minEngineVersion": "1.0.0",
+  "updatedAt": "2026-09-22",
+  "items": [
+    {
+      "id": "char_volt", "status": "live",
+      "name": { "zh-CN": "小电", "en-US": "Volt" },
+      "tagline": { "zh-CN": "最便宜的伙伴，最稳的发挥" },
+      "rarity": "R", "unlock": { "type": "free" },
+      "skins": ["skin_volt_default", "skin_volt_thunder"],
+      "skillRef": "skill_thunder_dash", "talentRef": "talent_volt_coin",
+      "growth": { "maxLevel": 10,
+        "costPerLevel": [
+          { "level": 2, "coin": 800, "shards": "shard_volt:10" },
+          { "level": 3, "coin": 1200, "shards": "shard_volt:15" },
+          { "level": 4, "coin": 1800, "shards": "shard_volt:20" },
+          { "level": 5, "coin": 2600, "shards": "shard_volt:30" },
+          { "level": 6, "coin": 3600, "shards": "shard_volt:40" },
+          { "level": 7, "coin": 4800, "shards": "shard_volt:55" },
+          { "level": 8, "coin": 6200, "shards": "shard_volt:70" },
+          { "level": 9, "coin": 8000, "shards": "shard_volt:90" },
+          { "level": 10, "coin": 10000, "shards": "shard_volt:120" }
+        ],
+        "effectPerLevel": { "target": "skillRef", "paramScalePerLevel": 0.05 } },
+      "model": { "prefab": "assets/characters/volt.glb", "scale": 1.0, "lod": [2, 6, 12] },
+      "audio": { "voDir": "assets/audio/vo/volt/", "footstep": "step_sneaker" },
+      "tint": "#FFD84D",
+      "versions": [ { "ver": "1.0.0", "date": "2026-09-22", "change": "首发" } ]
+    },
+    {
+      "id": "char_ama", "status": "live",
+      "name": { "zh-CN": "阿玛拉", "en-US": "Amara" },
+      "tagline": { "zh-CN": "金币见了她，自己会排队" },
+      "rarity": "SR", "unlock": { "type": "coin", "cost": 4500 },
+      "skins": ["skin_ama_default"],
+      "skillRef": "skill_magnet_pulse", "talentRef": "talent_ama_duration",
+      "growth": { "maxLevel": 10, "costPerLevel": [], "effectPerLevel": { "target": "skillRef", "paramScalePerLevel": 0.05 } },
+      "model": { "prefab": "assets/characters/ama.glb", "scale": 1.02, "lod": [2, 6, 12] },
+      "audio": { "voDir": "assets/audio/vo/ama/", "footstep": "step_boot" },
+      "tint": "#43D9A3",
+      "versions": [ { "ver": "1.0.0", "date": "2026-09-22", "change": "首发" } ]
+    },
+    {
+      "id": "char_kaze", "status": "live",
+      "name": { "zh-CN": "风剃", "en-US": "Kaze" },
+      "tagline": { "zh-CN": "别人绕路，他抄近路" },
+      "rarity": "SR", "unlock": { "type": "coin", "cost": 6000 },
+      "skins": ["skin_kaze_default"],
+      "skillRef": "skill_blink_smash", "talentRef": "talent_kaze_slide",
+      "growth": { "maxLevel": 10, "costPerLevel": [], "effectPerLevel": { "target": "skillRef", "paramScalePerLevel": 0.05 } },
+      "model": { "prefab": "assets/characters/kaze.glb", "scale": 0.98, "lod": [2, 6, 12] },
+      "audio": { "voDir": "assets/audio/vo/kaze/", "footstep": "step_skate" },
+      "tint": "#7FD1FF",
+      "versions": [ { "ver": "1.0.0", "date": "2026-09-22", "change": "首发" } ]
+    },
+    {
+      "id": "char_rina", "status": "live",
+      "name": { "zh-CN": "莉娜", "en-US": "Rina" },
+      "tagline": { "zh-CN": "地面太挤，她走天上" },
+      "rarity": "SSR", "unlock": { "type": "loot", "lootRef": "loot_thunder_box" },
+      "skins": ["skin_rina_default"],
+      "skillRef": "skill_thunder_wings", "talentRef": "talent_rina_shield",
+      "growth": { "maxLevel": 10, "costPerLevel": [], "effectPerLevel": { "target": "skillRef", "paramScalePerLevel": 0.05 } },
+      "model": { "prefab": "assets/characters/rina.glb", "scale": 1.0, "lod": [2, 6, 12] },
+      "audio": { "voDir": "assets/audio/vo/rina/", "footstep": "step_boot" },
+      "tint": "#FF5FA2",
+      "versions": [ { "ver": "1.0.0", "date": "2026-09-22", "change": "首发" } ]
+    },
+    {
+      "id": "char_bolt", "status": "live",
+      "name": { "zh-CN": "博尔特警长", "en-US": "Sheriff Bolt" },
+      "tagline": { "zh-CN": "退休前最后一次执勤" },
+      "rarity": "SSR", "unlock": { "type": "event", "eventRef": "event_thunder_beast_siege" },
+      "skins": ["skin_bolt_default", "skin_bolt_storm"],
+      "skillRef": "skill_storm_domain", "talentRef": "talent_bolt_cool",
+      "growth": { "maxLevel": 10, "costPerLevel": [], "effectPerLevel": { "target": "skillRef", "paramScalePerLevel": 0.05 } },
+      "model": { "prefab": "assets/characters/bolt.glb", "scale": 1.05, "lod": [2, 6, 12] },
+      "audio": { "voDir": "assets/audio/vo/bolt/", "footstep": "step_boot" },
+      "tint": "#B48CFF",
+      "versions": [ { "ver": "1.0.0", "date": "2026-09-22", "change": "首发（活动限定）" } ]
+    },
+    {
+      "id": "skin_volt_default", "kind": "skin", "status": "live", "baseRef": "char_volt",
+      "name": { "zh-CN": "默认涂装" }, "rarity": "R",
+      "materialOverrides": { "bodyTint": "#F2F4F8", "emissive": "#FFD84D" },
+      "model": { "prefab": "assets/characters/volt.glb" },
+      "unlock": { "type": "free" }, "statMods": [],
+      "versions": [ { "ver": "1.0.0", "date": "2026-09-22", "change": "首发" } ]
+    },
+    {
+      "id": "skin_volt_thunder", "kind": "skin", "status": "live", "baseRef": "char_volt",
+      "name": { "zh-CN": "雷暴形态" }, "rarity": "SR",
+      "materialOverrides": { "bodyTint": "#3A5FAF", "emissive": "#7FD1FF", "trailVfx": "vfx_trail_thunder" },
+      "model": { "prefab": "assets/skins/volt_thunder.glb" },
+      "unlock": { "type": "loot", "lootRef": "loot_thunder_box" }, "statMods": [],
+      "versions": [ { "ver": "1.0.0", "date": "2026-09-22", "change": "首发" } ]
+    },
+    { "id": "skin_ama_default", "kind": "skin", "status": "live", "baseRef": "char_ama", "name": { "zh-CN": "默认涂装" }, "rarity": "SR", "materialOverrides": { "bodyTint": "#E8F6EE", "emissive": "#43D9A3" }, "model": { "prefab": "assets/characters/ama.glb" }, "unlock": { "type": "free" }, "statMods": [], "versions": [ { "ver": "1.0.0", "date": "2026-09-22", "change": "首发" } ] },
+    { "id": "skin_kaze_default", "kind": "skin", "status": "live", "baseRef": "char_kaze", "name": { "zh-CN": "默认涂装" }, "rarity": "SR", "materialOverrides": { "bodyTint": "#EAF4FF", "emissive": "#7FD1FF" }, "model": { "prefab": "assets/characters/kaze.glb" }, "unlock": { "type": "free" }, "statMods": [], "versions": [ { "ver": "1.0.0", "date": "2026-09-22", "change": "首发" } ] },
+    { "id": "skin_rina_default", "kind": "skin", "status": "live", "baseRef": "char_rina", "name": { "zh-CN": "默认涂装" }, "rarity": "SSR", "materialOverrides": { "bodyTint": "#FBE7F1", "emissive": "#FF5FA2" }, "model": { "prefab": "assets/characters/rina.glb" }, "unlock": { "type": "free" }, "statMods": [], "versions": [ { "ver": "1.0.0", "date": "2026-09-22", "change": "首发" } ] },
+    { "id": "skin_bolt_default", "kind": "skin", "status": "live", "baseRef": "char_bolt", "name": { "zh-CN": "警长制服" }, "rarity": "SSR", "materialOverrides": { "bodyTint": "#E8E6F8", "emissive": "#B48CFF" }, "model": { "prefab": "assets/characters/bolt.glb" }, "unlock": { "type": "free" }, "statMods": [], "versions": [ { "ver": "1.0.0", "date": "2026-09-22", "change": "首发" } ] },
+    { "id": "skin_bolt_storm", "kind": "skin", "status": "draft", "baseRef": "char_bolt", "name": { "zh-CN": "风暴警长" }, "rarity": "SSR", "materialOverrides": { "bodyTint": "#2A3350", "emissive": "#7FD1FF", "trailVfx": "vfx_trail_thunder" }, "model": { "prefab": "assets/skins/bolt_storm.glb" }, "unlock": { "type": "key", "cost": 12 }, "statMods": [], "versions": [ { "ver": "1.0.0", "date": "2026-09-22", "change": "围城活动商店（上线前 draft）" } ] }
+  ]
+}

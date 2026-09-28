@@ -1,0 +1,9 @@
+{
+  "files": [],
+  "references": [
+    { "path": "packages/framework" },
+    { "path": "packages/game" },
+    { "path": "apps/web" },
+    { "path": "apps/wx" }
+  ]
+}

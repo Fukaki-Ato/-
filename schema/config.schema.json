@@ -1,0 +1,129 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Fukaki-Ato/-/schema/config.schema.json",
+  "title": "Thunder Run configuration envelope and primitive contract",
+  "description": "Runtime validation owns cross-file references and detailed gameplay rules.",
+  "$defs": {
+    "catalog": {
+      "type": "object",
+      "required": ["configVersion", "items"],
+      "properties": {
+        "$schema": { "type": "string" },
+        "configVersion": { "type": "string" },
+        "minEngineVersion": { "type": "string" },
+        "updatedAt": { "type": "string" },
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id", "versions"],
+            "properties": {
+              "id": { "type": "string", "minLength": 1 },
+              "versions": { "type": "array", "minItems": 1 },
+              "effects": { "type": "array", "items": { "$ref": "#/$defs/effect" } }
+            },
+            "additionalProperties": true
+          }
+        }
+      },
+      "additionalProperties": true
+    },
+    "effect": {
+      "type": "object",
+      "required": ["primitive"],
+      "properties": {
+        "primitive": {
+          "enum": [
+            "invincible",
+            "speedMul",
+            "magnet",
+            "fly",
+            "lifeAdd",
+            "jumpBoost",
+            "dash",
+            "blink",
+            "timeSlow",
+            "shieldAdd",
+            "buffDurationAdd",
+            "coinValueAdd",
+            "scoreAdd",
+            "spawnCoinsRow",
+            "laneAutoAvoid",
+            "pickupAll",
+            "slideExtend",
+            "cooldownMul",
+            "boardArmor",
+            "xpMul"
+          ]
+        }
+      },
+      "additionalProperties": true
+    }
+  },
+  "game": {
+    "type": "object",
+    "required": ["configVersion", "params"],
+    "properties": {
+      "$schema": { "type": "string" },
+      "configVersion": { "type": "string" },
+      "minEngineVersion": { "type": "string" },
+      "updatedAt": { "type": "string" },
+      "params": {
+        "type": "object",
+        "properties": {
+          "runner": {
+            "type": "object",
+            "properties": {
+              "baseSpeed": { "type": "number" },
+              "maxSpeed": { "type": "number" },
+              "speedRampPer100M": { "type": "number" },
+              "gravity": { "type": "number" },
+              "jumpVelocity": { "type": "number" },
+              "holdJumpMaxMs": { "type": "number" },
+              "slideS": { "type": "number" },
+              "slideCooldownS": { "type": "number" },
+              "lives": { "type": "number" },
+              "laneWidth": { "type": "number" },
+              "laneChangeS": { "type": "number" },
+              "hitStunS": { "type": "number" },
+              "invulnS": { "type": "number" },
+              "spawnGraceS": { "type": "number" },
+              "coinCollectM": { "type": "number" }
+            },
+            "additionalProperties": true
+          },
+          "ui": { "type": "object" }
+        },
+        "additionalProperties": true
+      }
+    },
+    "additionalProperties": true
+  },
+  "characters": { "$ref": "#/$defs/catalog" },
+  "skills": { "$ref": "#/$defs/catalog" },
+  "items": { "$ref": "#/$defs/catalog" },
+  "themes": { "$ref": "#/$defs/catalog" },
+  "events": { "$ref": "#/$defs/catalog" },
+  "economy": {
+    "type": "object",
+    "required": ["configVersion", "params"],
+    "properties": {
+      "$schema": { "type": "string" },
+      "configVersion": { "type": "string" },
+      "params": { "type": "object" }
+    },
+    "additionalProperties": true
+  },
+  "obstacles": {
+    "type": "object",
+    "required": ["configVersion", "defs", "patterns", "difficultyCurve"],
+    "properties": {
+      "$schema": { "type": "string" },
+      "configVersion": { "type": "string" },
+      "defs": { "type": "array" },
+      "patterns": { "type": "array" },
+      "difficultyCurve": { "type": "array" }
+    },
+    "additionalProperties": true
+  }
+}

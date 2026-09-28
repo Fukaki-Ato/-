@@ -1,0 +1,47 @@
+{
+  "$schema": "../schema/config.schema.json#/events",
+  "configVersion": "1.0.0",
+  "minEngineVersion": "1.0.0",
+  "updatedAt": "2026-09-22",
+  "items": [
+    {
+      "id": "event_thunder_beast_siege", "kind": "mode", "status": "draft",
+      "name": { "zh-CN": "雷暴围城" },
+      "banner": { "image": "assets/ui/events/siege.png", "menuSlot": 1 },
+      "window": { "start": "2026-10-01T10:00:00+08:00", "end": "2026-10-08T23:59:59+08:00" },
+      "entryGate": { "minAccountLevel": 3 },
+      "overrides": {
+        "obstaclePoolShift": { "pat_beast_chase": 35 },
+        "beastSpeedMul": 1.25,
+        "themeRef": "theme_storm",
+        "scoreMul": 1.2
+      },
+      "missions": [
+        { "id": "mission_siege_1", "type": "accumulate", "metric": "distanceM", "target": 15000, "reward": { "coin": 2000 } },
+        { "id": "mission_siege_2", "type": "count", "metric": "skillCasts", "target": 30, "reward": { "shard": "shard_bolt:5" } },
+        { "id": "mission_siege_3", "type": "count", "metric": "nearMiss", "target": 120, "reward": { "key": 2 } },
+        { "id": "mission_siege_4", "type": "bestScore", "metric": "score", "target": 60000, "reward": { "coin": 5000, "key": 1 } }
+      ],
+      "leaderboard": { "scope": "event", "resetAt": "2026-10-08T23:59:59+08:00", "topReward": { "key": 10, "shard": "shard_bolt:20" } },
+      "shopExtras": [ { "offerRef": "offer_skin_bolt_storm" } ],
+      "versions": [ { "ver": "1.0.0", "date": "2026-09-22", "change": "首个活动，上线前置 live 并灰度" } ]
+    },
+    {
+      "id": "event_week_login_nov", "kind": "login", "status": "draft",
+      "name": { "zh-CN": "十一月签到周" },
+      "banner": { "image": "assets/ui/events/login_nov.png", "menuSlot": 2 },
+      "window": { "start": "2026-11-01T00:00:00+08:00", "end": "2026-11-07T23:59:59+08:00" },
+      "entryGate": { "minAccountLevel": 1 },
+      "loginRewards": [
+        { "day": 1, "reward": { "coin": 500 } },
+        { "day": 2, "reward": { "shard": "shard_volt:5" } },
+        { "day": 3, "reward": { "coin": 1000 } },
+        { "day": 4, "reward": { "item": "item_xp_card:1" } },
+        { "day": 5, "reward": { "key": 1 } },
+        { "day": 6, "reward": { "shard": "shard_ama:8" } },
+        { "day": 7, "reward": { "key": 2, "coin": 2000 } }
+      ],
+      "versions": [ { "ver": "1.0.0", "date": "2026-09-22", "change": "模板示例" } ]
+    }
+  ]
+}

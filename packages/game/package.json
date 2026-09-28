@@ -1,0 +1,15 @@
+{
+  "name": "@tr/game",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "雷霆酷跑游戏域：模拟、场景表现、页面与流程。零宿主全局。",
+  "exports": { "./*": "./dist/*" },
+  "dependencies": {
+    "@tr/framework": "*",
+    "three": "0.160.1"
+  },
+  "devDependencies": {
+    "@types/three": "0.160.0"
+  }
+}

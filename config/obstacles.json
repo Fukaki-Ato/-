@@ -1,0 +1,698 @@
+{
+  "$schema": "../schema/config.schema.json#/obstacles",
+  "configVersion": "1.6.0",
+  "minEngineVersion": "1.0.0",
+  "updatedAt": "2026-09-28",
+  "defs": [
+    {
+      "id": "obs_box",
+      "class": "low",
+      "status": "live",
+      "size": [
+        2.0,
+        1.2,
+        1.2
+      ],
+      "jumpable": true,
+      "slideUnder": false,
+      "model": {
+        "prefab": "assets/obstacles/box.glb"
+      },
+      "hitVfx": "vfx_spark_small",
+      "themes": [
+        "theme_neon_city"
+      ],
+      "versions": [
+        {
+          "ver": "1.0.0",
+          "date": "2026-09-22",
+          "change": "首发"
+        }
+      ]
+    },
+    {
+      "id": "obs_gate_low",
+      "class": "high",
+      "status": "live",
+      "size": [
+        2.0,
+        2.6,
+        0.6
+      ],
+      "jumpable": false,
+      "slideUnder": true,
+      "model": {
+        "prefab": "assets/obstacles/gate.glb"
+      },
+      "hitVfx": "vfx_spark_small",
+      "themes": [
+        "theme_neon_city"
+      ],
+      "versions": [
+        {
+          "ver": "1.0.0",
+          "date": "2026-09-22",
+          "change": "首发"
+        }
+      ]
+    },
+    {
+      "id": "obs_adwall",
+      "class": "full",
+      "status": "live",
+      "size": [
+        2.0,
+        2.6,
+        0.8
+      ],
+      "jumpable": false,
+      "slideUnder": false,
+      "model": {
+        "prefab": "assets/obstacles/adwall.glb"
+      },
+      "hitVfx": "vfx_spark_big",
+      "themes": [
+        "theme_neon_city"
+      ],
+      "versions": [
+        {
+          "ver": "1.0.0",
+          "date": "2026-09-22",
+          "change": "首发"
+        }
+      ]
+    },
+    {
+      "id": "obs_train_static",
+      "class": "vehicle",
+      "status": "live",
+      "size": [
+        2.0,
+        2.4,
+        24.0
+      ],
+      "jumpable": true,
+      "rideTop": true,
+      "slideUnder": false,
+      "model": {
+        "prefab": "assets/obstacles/train24.glb"
+      },
+      "hitVfx": "vfx_spark_big",
+      "themes": [
+        "theme_neon_city",
+        "theme_storm"
+      ],
+      "versions": [
+        {
+          "ver": "1.0.0",
+          "date": "2026-09-22",
+          "change": "首发"
+        }
+      ]
+    },
+    {
+      "id": "obs_train_slow",
+      "class": "vehicle",
+      "status": "live",
+      "size": [
+        2.0,
+        2.4,
+        24.0
+      ],
+      "jumpable": true,
+      "rideTop": true,
+      "moveZ": -3.5,
+      "model": {
+        "prefab": "assets/obstacles/train24.glb"
+      },
+      "hitVfx": "vfx_spark_big",
+      "themes": [
+        "theme_neon_city"
+      ],
+      "versions": [
+        {
+          "ver": "1.0.0",
+          "date": "2026-09-22",
+          "change": "首发"
+        }
+      ]
+    },
+    {
+      "id": "obs_pendulum",
+      "class": "moving",
+      "status": "live",
+      "size": [
+        1.2,
+        1.2,
+        1.2
+      ],
+      "swing": {
+        "axis": "x",
+        "amplitudeM": 4.4,
+        "periodS": 3.2
+      },
+      "jumpable": true,
+      "model": {
+        "prefab": "assets/obstacles/pendulum.glb"
+      },
+      "hitVfx": "vfx_spark_big",
+      "themes": [
+        "theme_neon_city"
+      ],
+      "versions": [
+        {
+          "ver": "1.0.0",
+          "date": "2026-09-22",
+          "change": "首发"
+        }
+      ]
+    },
+    {
+      "id": "obs_arc_floor",
+      "class": "hazard",
+      "status": "live",
+      "size": [
+        2.0,
+        0.1,
+        4.0
+      ],
+      "damageZoneS": 1.5,
+      "model": {
+        "prefab": "assets/obstacles/arc_floor.glb"
+      },
+      "hitVfx": "vfx_aura_electric",
+      "themes": [
+        "theme_neon_city",
+        "theme_storm"
+      ],
+      "versions": [
+        {
+          "ver": "1.0.0",
+          "date": "2026-09-22",
+          "change": "首发"
+        }
+      ]
+    },
+    {
+      "id": "obs_barrier_low",
+      "class": "low",
+      "status": "live",
+      "size": [
+        2.0,
+        0.8,
+        0.5
+      ],
+      "jumpable": true,
+      "model": {
+        "prefab": "assets/obstacles/barrier.glb"
+      },
+      "hitVfx": "vfx_spark_small",
+      "themes": [
+        "theme_neon_city"
+      ],
+      "versions": [
+        {
+          "ver": "1.0.0",
+          "date": "2026-09-22",
+          "change": "首发"
+        }
+      ]
+    }
+  ],
+  "patterns": [
+    {
+      "id": "pat_intro_straight",
+      "minDifficulty": 0,
+      "weight": 30,
+      "lengthSegments": 2,
+      "cells": [
+        {
+          "segment": 0,
+          "lane": 0,
+          "offsetM": 10,
+          "obsRef": "obs_barrier_low"
+        },
+        {
+          "segment": 1,
+          "lane": 0,
+          "offsetM": 8,
+          "coins": 8
+        }
+      ],
+      "guarantee": {
+        "safeLanePattern": [
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "id": "pat_easy_single",
+      "minDifficulty": 0,
+      "weight": 40,
+      "lengthSegments": 1,
+      "cells": [
+        {
+          "segment": 0,
+          "lane": -1,
+          "offsetM": 12,
+          "obsRef": "obs_box"
+        },
+        {
+          "segment": 0,
+          "lane": 1,
+          "offsetM": 6,
+          "coins": 6
+        }
+      ],
+      "guarantee": {
+        "safeLanePattern": [
+          0,
+          1
+        ]
+      }
+    },
+    {
+      "id": "pat_easy_barrier_hop",
+      "minDifficulty": 1,
+      "weight": 20,
+      "lengthSegments": 1,
+      "cells": [
+        {
+          "segment": 0,
+          "lane": 0,
+          "offsetM": 12,
+          "obsRef": "obs_barrier_low"
+        },
+        {
+          "segment": 0,
+          "lane": 0,
+          "offsetM": 5,
+          "coins": 6
+        }
+      ],
+      "guarantee": {
+        "safeLanePattern": [
+          0
+        ]
+      }
+    },
+    {
+      "id": "pat_easy_pair",
+      "minDifficulty": 1,
+      "weight": 30,
+      "lengthSegments": 1,
+      "cells": [
+        {
+          "segment": 0,
+          "lane": -1,
+          "offsetM": 10,
+          "obsRef": "obs_box"
+        },
+        {
+          "segment": 0,
+          "lane": 1,
+          "offsetM": 10,
+          "obsRef": "obs_box"
+        },
+        {
+          "segment": 0,
+          "lane": 0,
+          "offsetM": 4,
+          "coins": 8
+        }
+      ],
+      "guarantee": {
+        "safeLanePattern": [
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "id": "pat_gate_slide",
+      "minDifficulty": 1,
+      "weight": 26,
+      "lengthSegments": 1,
+      "cells": [
+        {
+          "segment": 0,
+          "lane": 0,
+          "offsetM": 12,
+          "obsRef": "obs_gate_low"
+        },
+        {
+          "segment": 0,
+          "lane": 0,
+          "offsetM": 16,
+          "coins": 5
+        }
+      ],
+      "guarantee": {
+        "safeLanePattern": [
+          0
+        ]
+      }
+    },
+    {
+      "id": "pat_mid_gate_combo",
+      "minDifficulty": 3,
+      "weight": 18,
+      "lengthSegments": 2,
+      "cells": [
+        {
+          "segment": 0,
+          "lane": 0,
+          "offsetM": 8,
+          "obsRef": "obs_gate_low"
+        },
+        {
+          "segment": 0,
+          "lane": -1,
+          "offsetM": 16,
+          "obsRef": "obs_box"
+        },
+        {
+          "segment": 1,
+          "lane": 1,
+          "offsetM": 4,
+          "obsRef": "obs_train_static"
+        },
+        {
+          "segment": 1,
+          "lane": 1,
+          "offsetM": 4,
+          "surface": "trainTop",
+          "coins": 6
+        }
+      ],
+      "guarantee": {
+        "safeLanePattern": [
+          1,
+          -1,
+          0
+        ]
+      }
+    },
+    {
+      "id": "pat_mid_wall_dodge",
+      "minDifficulty": 5,
+      "weight": 16,
+      "lengthSegments": 2,
+      "cells": [
+        {
+          "segment": 0,
+          "lane": -1,
+          "offsetM": 8,
+          "obsRef": "obs_adwall"
+        },
+        {
+          "segment": 0,
+          "lane": 0,
+          "offsetM": 8,
+          "obsRef": "obs_adwall"
+        },
+        {
+          "segment": 1,
+          "lane": 1,
+          "offsetM": 10,
+          "obsRef": "obs_adwall"
+        },
+        {
+          "segment": 1,
+          "lane": 0,
+          "offsetM": 10,
+          "obsRef": "obs_adwall"
+        }
+      ],
+      "guarantee": {
+        "safeLanePattern": [
+          1,
+          -1
+        ]
+      }
+    },
+    {
+      "id": "pat_mid_single_wall",
+      "minDifficulty": 3,
+      "weight": 22,
+      "lengthSegments": 2,
+      "cells": [
+        {
+          "segment": 0,
+          "lane": -1,
+          "offsetM": 10,
+          "obsRef": "obs_adwall"
+        },
+        {
+          "segment": 1,
+          "lane": 1,
+          "offsetM": 8,
+          "obsRef": "obs_adwall"
+        }
+      ],
+      "guarantee": {
+        "safeLanePattern": [
+          1,
+          -1
+        ]
+      }
+    },
+    {
+      "id": "pat_mid_wall_gauntlet",
+      "minDifficulty": 5,
+      "weight": 18,
+      "lengthSegments": 2,
+      "cells": [
+        {
+          "segment": 0,
+          "lane": 0,
+          "offsetM": 10,
+          "obsRef": "obs_adwall"
+        },
+        {
+          "segment": 1,
+          "lane": -1,
+          "offsetM": 8,
+          "obsRef": "obs_adwall"
+        }
+      ],
+      "guarantee": {
+        "safeLanePattern": [
+          1,
+          1
+        ]
+      }
+    },
+    {
+      "id": "pat_train_top_run",
+      "minDifficulty": 4,
+      "weight": 14,
+      "lengthSegments": 2,
+      "cells": [
+        {
+          "segment": 0,
+          "lane": 0,
+          "offsetM": 2,
+          "obsRef": "obs_train_slow"
+        },
+        {
+          "segment": 0,
+          "lane": 0,
+          "offsetM": 2,
+          "surface": "trainTop",
+          "coins": 12
+        },
+        {
+          "segment": 1,
+          "lane": -1,
+          "offsetM": 12,
+          "obsRef": "obs_box"
+        }
+      ],
+      "guarantee": {
+        "safeLanePattern": [
+          0,
+          0,
+          -1
+        ]
+      }
+    },
+    {
+      "id": "pat_hazard_weave",
+      "minDifficulty": 7,
+      "weight": 12,
+      "lengthSegments": 2,
+      "cells": [
+        {
+          "segment": 0,
+          "lane": 0,
+          "offsetM": 6,
+          "obsRef": "obs_arc_floor"
+        },
+        {
+          "segment": 0,
+          "lane": -1,
+          "offsetM": 16,
+          "obsRef": "obs_arc_floor"
+        },
+        {
+          "segment": 1,
+          "lane": 1,
+          "offsetM": 8,
+          "obsRef": "obs_pendulum"
+        }
+      ],
+      "guarantee": {
+        "safeLanePattern": [
+          1,
+          0,
+          -1
+        ]
+      }
+    },
+    {
+      "id": "pat_beast_chase",
+      "minDifficulty": 8,
+      "weight": 0,
+      "lengthSegments": 2,
+      "cells": [
+        {
+          "segment": 0,
+          "lane": -1,
+          "offsetM": 4,
+          "obsRef": "obs_box"
+        },
+        {
+          "segment": 0,
+          "lane": 0,
+          "offsetM": 12,
+          "obsRef": "obs_gate_low"
+        },
+        {
+          "segment": 0,
+          "lane": 1,
+          "offsetM": 4,
+          "obsRef": "obs_box"
+        },
+        {
+          "segment": 1,
+          "lane": 0,
+          "offsetM": 8,
+          "obsRef": "obs_adwall"
+        },
+        {
+          "segment": 1,
+          "lane": -1,
+          "offsetM": 8,
+          "obsRef": "obs_adwall"
+        }
+      ],
+      "guarantee": {
+        "safeLanePattern": [
+          1,
+          0,
+          -1
+        ]
+      }
+    }
+  ],
+  "difficultyCurve": [
+    {
+      "by": 0,
+      "poolWeights": {
+        "pat_intro_straight": 30,
+        "pat_easy_single": 50,
+        "pat_easy_pair": 20
+      },
+      "coinDensity": 1.0,
+      "pickupRate": 0.7
+    },
+    {
+      "by": 1,
+      "poolWeights": {
+        "pat_easy_single": 25,
+        "pat_easy_pair": 25,
+        "pat_gate_slide": 30,
+        "pat_easy_barrier_hop": 20
+      },
+      "coinDensity": 1.0,
+      "pickupRate": 0.8
+    },
+    {
+      "by": 3,
+      "poolWeights": {
+        "pat_easy_pair": 14,
+        "pat_gate_slide": 22,
+        "pat_mid_gate_combo": 28,
+        "pat_train_top_run": 16,
+        "pat_mid_single_wall": 20
+      },
+      "coinDensity": 1.1,
+      "pickupRate": 1.0
+    },
+    {
+      "by": 5,
+      "poolWeights": {
+        "pat_gate_slide": 12,
+        "pat_mid_gate_combo": 24,
+        "pat_mid_wall_dodge": 14,
+        "pat_train_top_run": 16,
+        "pat_mid_single_wall": 16,
+        "pat_mid_wall_gauntlet": 18
+      },
+      "coinDensity": 1.15,
+      "pickupRate": 1.0
+    },
+    {
+      "by": 7,
+      "poolWeights": {
+        "pat_mid_gate_combo": 14,
+        "pat_mid_wall_dodge": 22,
+        "pat_train_top_run": 14,
+        "pat_hazard_weave": 18,
+        "pat_mid_single_wall": 14,
+        "pat_mid_wall_gauntlet": 18
+      },
+      "coinDensity": 1.2,
+      "pickupRate": 1.1
+    },
+    {
+      "by": 9,
+      "poolWeights": {
+        "pat_mid_wall_dodge": 24,
+        "pat_train_top_run": 16,
+        "pat_hazard_weave": 26,
+        "pat_mid_single_wall": 16,
+        "pat_mid_wall_gauntlet": 18
+      },
+      "coinDensity": 1.25,
+      "pickupRate": 1.15
+    }
+  ],
+  "dropTable": {
+    "weights": {
+      "item_magnet": 22,
+      "item_boots": 18,
+      "item_helmet": 14,
+      "item_jetpack": 8,
+      "item_shield": 16,
+      "item_board": 14
+    },
+    "segmentM": 200,
+    "countWeights": {
+      "1": 50,
+      "2": 30,
+      "3": 20
+    },
+    "edgeMarginM": 8,
+    "minBoxGapM": 30
+  },
+  "laneBlock": {
+    "fromDifficulty": 4,
+    "weights": {
+      "1": 80,
+      "2": 20
+    }
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "deviceOrientation": "portrait",
+  "iOSHighPerformance": true,
+  "networkTimeout": {
+    "request": 10000,
+    "downloadFile": 30000
+  },
+  "subpackages": [
+    { "name": "pkg-assets", "root": "pkg-assets" }
+  ]
+}

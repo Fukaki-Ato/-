@@ -1,0 +1,66 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  check:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: 安装依赖
+        run: npm ci
+
+      - name: 完整检查
+        run: npm run check
+
+      - name: 网页端生产构建
+        run: npm run build:web
+
+      - name: 上传 web 产物
+        if: matrix.os == 'ubuntu-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-dist
+          path: apps/web/dist
+          retention-days: 7
+
+  wx-build:
+    needs: check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: 安装依赖
+        run: npm ci
+
+      - name: 小游戏产物构建（minify）
+        run: npm run build:wx -- --minify
+
+      - name: 包体门禁（主包 >4MB fail，打印体积表）
+        run: node tools/check-wx-size.mjs
+
+      - name: 上传 wx 产物（开发者工具导入 apps/wx/dist 即此包）
+        uses: actions/upload-artifact@v4
+        with:
+          name: wx-dist
+          path: apps/wx/dist
+          retention-days: 7

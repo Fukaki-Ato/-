@@ -1,0 +1,159 @@
+{
+  "$schema": "../schema/config.schema.json#/game",
+  "configVersion": "1.0.0",
+  "minEngineVersion": "1.0.0",
+  "updatedAt": "2026-09-28",
+  "params": {
+    "runner": {
+      "baseSpeed": 12,
+      "maxSpeed": 26,
+      "speedRampPer100M": 0.18,
+      "gravity": -38,
+      "jumpVelocity": 13.5,
+      "holdJumpMaxMs": 350,
+      "slideS": 0.6,
+      "slideCooldownS": 0.3,
+      "lives": 1,
+      "laneWidth": 2.2,
+      "laneChangeS": 0.18,
+      "hitStunS": 0.8,
+      "invulnS": 1.4,
+      "spawnGraceS": 15,
+      "coinCollectM": 1.1
+    },
+    "input": {
+      "bufferMs": 120,
+      "doubleTapWindowMs": 280,
+      "doubleTapMaxDistPx": 40
+    },
+    "score": {
+      "perMeter": 10,
+      "perCoin": 5,
+      "perSkillCast": 150,
+      "perNearMiss": 25
+    },
+    "revive": {
+      "maxPerRun": 2,
+      "invincibleS": 3,
+      "webFreeRevivePerRun": 1
+    },
+    "beast": {
+      "baseGap": 3,
+      "hitLossGap": 1,
+      "catchGap": 0,
+      "speedRecoverS": 6
+    },
+    "track": {
+      "segmentLengthM": 24,
+      "coinMinGapM": 1.4,
+      "pickupMinGapM": 36,
+      "forkEveryM": [
+        900,
+        1400
+      ],
+      "restGapM": [
+        6,
+        14
+      ]
+    },
+    "coins": {
+      "chainBuckets": [
+        {
+          "min": 5,
+          "max": 10,
+          "weight": 75
+        },
+        {
+          "min": 11,
+          "max": 13,
+          "weight": 20
+        },
+        {
+          "min": 14,
+          "max": 16,
+          "weight": 5
+        }
+      ],
+      "spacingM": 1.5,
+      "spawnEveryM": 26,
+      "laneGroupWeights": {
+        "1": 70,
+        "2": 25,
+        "3": 5
+      },
+      "laneGapM": 90
+    },
+    "fork": {
+      "gates": [
+        "coin",
+        "shield",
+        "key"
+      ],
+      "keyRate": 0.06
+    },
+    "tutorial": {
+      "protectionS": 15
+    },
+    "antiCheat": {
+      "maxScorePerRun": 9999999,
+      "maxRunS": 1800,
+      "maxCoinsPerMeter": 0.9,
+      "maxSkillCastsPerMin": 8,
+      "replaySampleRate": 10
+    },
+    "quality": {
+      "high": {
+        "particleMul": 1.0,
+        "shadow": true,
+        "lodBias": 0,
+        "dprCap": 2.0
+      },
+      "medium": {
+        "particleMul": 0.6,
+        "shadow": false,
+        "lodBias": 1,
+        "dprCap": 1.5
+      },
+      "low": {
+        "particleMul": 0.3,
+        "shadow": false,
+        "lodBias": 2,
+        "dprCap": 1.0
+      }
+    },
+    "ui": {
+      "scroll": {
+        "frictionPerS": 4.2,
+        "minVelocityPxS": 12,
+        "flingMaxPxS": 6000,
+        "overscrollResist": 0.35,
+        "bounceStiffness": 170,
+        "bounceDamping": 26,
+        "settleEpsPx": 0.5,
+        "settleEpsPxS": 8
+      },
+      "press": {
+        "slopPx": 8,
+        "tapMaxMs": 350
+      },
+      "doubleTap": {
+        "windowMs": 280,
+        "maxDistPx": 40
+      },
+      "text": {
+        "fontSizePx": 16,
+        "lineHeightMul": 1.2
+      }
+    },
+    "flight": {
+      "heightM": 4.6,
+      "speedMul": 2.5,
+      "glideSpeedMul": 1.6,
+      "glideS": 1.8,
+      "cloudEveryM": [
+        30,
+        46
+      ]
+    }
+  }
+}

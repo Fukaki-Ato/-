@@ -1,0 +1,6 @@
+# The first charset line is the literal space glyph, not accidental whitespace.
+assets/fonts/charset.txt -whitespace
+
+# Keep source and configuration diffs consistent across Windows and CI.
+* text=auto eol=lf
+*.png binary

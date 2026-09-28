@@ -1,0 +1,68 @@
+{
+  "$schema": "../schema/config.schema.json#/economy",
+  "configVersion": "1.0.0",
+  "minEngineVersion": "1.0.0",
+  "updatedAt": "2026-09-22",
+  "params": {
+    "shards": [
+      { "id": "shard_volt", "grants": "char_volt", "need": { "1": 50, "2": 80, "3": 120, "4": 180, "5": 260 } },
+      { "id": "shard_ama", "grants": "char_ama", "need": { "1": 60, "2": 90, "3": 140, "4": 200, "5": 300 } },
+      { "id": "shard_kaze", "grants": "char_kaze", "need": { "1": 60, "2": 90, "3": 140, "4": 200, "5": 300 } },
+      { "id": "shard_rina", "grants": "char_rina", "need": { "1": 80, "2": 120, "3": 180, "4": 260, "5": 360 } },
+      { "id": "shard_bolt", "grants": "char_bolt", "need": { "1": 80, "2": 120, "3": 180, "4": 260, "5": 360 } }
+    ],
+    "lootTables": [
+      { "id": "loot_coin_chest", "cost": { "coin": 2000 },
+        "pity": { "everyN": 10, "guarantee": "rarity_sr_plus" },
+        "entries": [
+          { "ref": "coin:300", "weight": 300, "rarity": "common" },
+          { "ref": "coin:800", "weight": 150, "rarity": "common" },
+          { "ref": "item_xp_card:1", "weight": 120, "rarity": "rare" },
+          { "ref": "shard_volt:10", "weight": 150, "rarity": "rare" },
+          { "ref": "shard_ama:10", "weight": 120, "rarity": "rare" },
+          { "ref": "shard_kaze:10", "weight": 120, "rarity": "rare" },
+          { "ref": "skin_volt_thunder", "weight": 20, "rarity": "sr" },
+          { "ref": "shard_rina:15", "weight": 15, "rarity": "sr" },
+          { "ref": "key:2", "weight": 5, "rarity": "ssr" }
+        ] },
+      { "id": "loot_thunder_box", "cost": { "key": 3 },
+        "pity": { "everyN": 5, "guarantee": "rarity_sr_plus" },
+        "entries": [
+          { "ref": "shard_ama:15", "weight": 200, "rarity": "rare" },
+          { "ref": "shard_kaze:15", "weight": 200, "rarity": "rare" },
+          { "ref": "skin_volt_thunder", "weight": 60, "rarity": "sr" },
+          { "ref": "shard_rina:25", "weight": 40, "rarity": "sr" },
+          { "ref": "char_rina", "weight": 8, "rarity": "ssr" }
+        ] }
+    ],
+    "shop": {
+      "offers": [
+        { "id": "offer_refill_coin", "give": [{ "item": "coin", "n": 1500 }], "price": { "key": 1 }, "limit": { "perDay": 5 } },
+        { "id": "offer_xp_card", "give": [{ "item": "item_xp_card", "n": 1 }], "price": { "coin": 1200 }, "limit": { "perDay": 3 } },
+        { "id": "offer_shard_volt", "give": [{ "item": "shard_volt", "n": 5 }], "price": { "coin": 600 }, "limit": { "perDay": 5 } },
+        { "id": "offer_skin_bolt_storm", "give": [{ "item": "skin_bolt_storm", "n": 1 }], "price": { "key": 12 }, "limit": { "once": true }, "requiresEvent": "event_thunder_beast_siege" }
+      ]
+    },
+    "missions": {
+      "daily": { "pick": 3,
+        "pool": [
+          { "id": "mdist", "tier": "easy", "type": "accumulate", "metric": "distanceM", "target": 3000, "reward": { "coin": 400 } },
+          { "id": "mcoin", "tier": "easy", "type": "accumulate", "metric": "coins", "target": 500, "reward": { "coin": 400 } },
+          { "id": "mslide", "tier": "easy", "type": "count", "metric": "slides", "target": 30, "reward": { "coin": 450 } },
+          { "id": "mruns", "tier": "easy", "type": "count", "metric": "runs", "target": 5, "reward": { "coin": 400 } },
+          { "id": "mskill", "tier": "mid", "type": "count", "metric": "skillCasts", "target": 10, "reward": { "shard": "shard_volt:5" } },
+          { "id": "mnear", "tier": "mid", "type": "count", "metric": "nearMiss", "target": 40, "reward": { "coin": 900 } },
+          { "id": "mnohit", "tier": "hard", "type": "count", "metric": "cleanRuns", "target": 2, "reward": { "key": 1 } },
+          { "id": "mscore", "tier": "hard", "type": "bestScore", "metric": "score", "target": 40000, "reward": { "shard": "shard_ama:8" } }
+        ],
+        "rule": "one easy + one mid + one hard" },
+      "weekly": { "pick": 4, "pool": [
+          { "id": "wdist", "tier": "mid", "type": "accumulate", "metric": "distanceM", "target": 30000, "reward": { "coin": 3000 } },
+          { "id": "wskill", "tier": "mid", "type": "count", "metric": "skillCasts", "target": 80, "reward": { "shard": "shard_kaze:15" } },
+          { "id": "wpickup", "tier": "easy", "type": "count", "metric": "itemPickups", "target": 50, "reward": { "coin": 2000 } },
+          { "id": "wchars", "tier": "hard", "type": "count", "metric": "charactersPlayed", "target": 3, "reward": { "key": 2 } }
+        ] }
+    },
+    "accountLevels": { "xpPerRunBase": 50, "xpCurve": "n*120", "rewards": { "3": { "unlock": "mode_challenge" }, "5": { "unlock": "mode_friend_race" }, "10": { "grant": { "key": 3 } } } }
+  }
+}

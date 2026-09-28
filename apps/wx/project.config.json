@@ -1,0 +1,20 @@
+{
+  "description": "雷霆酷跑 · 微信小游戏工程壳（S3 骨架，构建产物见 dist/）",
+  "projectname": "thunder-run-wx",
+  "appid": "touristappid",
+  "compileType": "game",
+  "libVersion": "latest",
+  "packOptions": {
+    "ignore": [
+      { "type": "file", "value": "README.md" }
+    ]
+  },
+  "setting": {
+    "es6": false,
+    "postcss": false,
+    "minified": false,
+    "urlCheck": false,
+    "compileHotReLoad": false
+  },
+  "condition": {}
+}

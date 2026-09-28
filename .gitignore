@@ -1,0 +1,20 @@
+# Build output
+dist/
+/apps/*/build/
+*.tsbuildinfo
+/out/
+
+# Dependencies
+node_modules/
+
+# Local tools
+__pycache__/
+*.pyc
+
+# Editors and operating systems
+.vscode/
+.idea/
+Thumbs.db
+Desktop.ini
+.DS_Store
+*.log

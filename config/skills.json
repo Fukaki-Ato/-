@@ -1,0 +1,103 @@
+{
+  "$schema": "../schema/config.schema.json#/skills",
+  "configVersion": "1.0.0",
+  "minEngineVersion": "1.0.0",
+  "updatedAt": "2026-09-22",
+  "items": [
+    {
+      "id": "skill_thunder_dash", "kind": "active", "status": "live",
+      "name": { "zh-CN": "雷霆冲刺", "en-US": "Thunder Dash" },
+      "desc": { "zh-CN": "2.5 秒无敌并自动避开前方障碍" },
+      "trigger": "double_tap", "cooldownS": 18,
+      "energy": { "mode": "distance", "perMeter": 0.02, "max": 1 },
+      "vfx": { "cast": "vfx_thunder_dash", "loop": "vfx_aura_electric" },
+      "effects": [
+        { "primitive": "invincible", "durationS": 2.5 },
+        { "primitive": "laneAutoAvoid", "durationS": 2.5, "lookaheadM": 18 },
+        { "primitive": "speedMul", "durationS": 2.5, "mul": 1.15 }
+      ],
+      "versions": [ { "ver": "1.0.0", "date": "2026-09-22", "change": "首发" } ]
+    },
+    {
+      "id": "skill_magnet_pulse", "kind": "active", "status": "live",
+      "name": { "zh-CN": "磁暴脉冲" },
+      "desc": { "zh-CN": "6 秒全屏金币吸附" },
+      "trigger": "double_tap", "cooldownS": 20,
+      "energy": { "mode": "distance", "perMeter": 0.02, "max": 1 },
+      "vfx": { "cast": "vfx_pickup_pop", "loop": "vfx_aura_electric" },
+      "effects": [ { "primitive": "magnet", "durationS": 6, "radiusM": 99 } ],
+      "versions": [ { "ver": "1.0.0", "date": "2026-09-22", "change": "首发" } ]
+    },
+    {
+      "id": "skill_blink_smash", "kind": "active", "status": "live",
+      "name": { "zh-CN": "瞬闪" },
+      "desc": { "zh-CN": "向前瞬移 12 米并撞碎路径障碍" },
+      "trigger": "double_tap", "cooldownS": 16,
+      "energy": { "mode": "distance", "perMeter": 0.02, "max": 1 },
+      "vfx": { "cast": "vfx_thunder_dash" },
+      "effects": [
+        { "primitive": "dash", "distanceM": 12, "destroyObstacles": true },
+        { "primitive": "invincible", "durationS": 0.5 }
+      ],
+      "versions": [ { "ver": "1.0.0", "date": "2026-09-22", "change": "首发" } ]
+    },
+    {
+      "id": "skill_thunder_wings", "kind": "active", "status": "live",
+      "name": { "zh-CN": "雷神之翼" },
+      "desc": { "zh-CN": "8 秒空中飞行，自动拾取空中金币" },
+      "trigger": "double_tap", "cooldownS": 24,
+      "energy": { "mode": "distance", "perMeter": 0.02, "max": 1 },
+      "vfx": { "cast": "vfx_thunder_dash", "loop": "vfx_trail_thunder" },
+      "effects": [ { "primitive": "fly", "durationS": 8 }, { "primitive": "magnet", "durationS": 8, "radiusM": 8 } ],
+      "versions": [ { "ver": "1.0.0", "date": "2026-09-22", "change": "首发" } ]
+    },
+    {
+      "id": "skill_storm_domain", "kind": "active", "status": "live",
+      "name": { "zh-CN": "时缓领域" },
+      "desc": { "zh-CN": "3 秒世界减速 30%，只有你不慌" },
+      "trigger": "double_tap", "cooldownS": 22,
+      "energy": { "mode": "distance", "perMeter": 0.02, "max": 1 },
+      "vfx": { "cast": "vfx_aura_electric" },
+      "effects": [
+        { "primitive": "timeSlow", "durationS": 3, "worldMul": 0.7 },
+        { "primitive": "invincible", "durationS": 1 }
+      ],
+      "versions": [ { "ver": "1.0.0", "date": "2026-09-22", "change": "首发" } ]
+    },
+    {
+      "id": "talent_volt_coin", "kind": "passive", "status": "live",
+      "name": { "zh-CN": "静电收藏家" }, "desc": { "zh-CN": "金币收益 +5%" },
+      "trigger": "run_start",
+      "effects": [ { "primitive": "coinValueAdd", "durationS": 3600, "pct": 5 } ],
+      "versions": [ { "ver": "1.0.0", "date": "2026-09-22", "change": "首发" } ]
+    },
+    {
+      "id": "talent_ama_duration", "kind": "passive", "status": "live",
+      "name": { "zh-CN": "磁场余韵" }, "desc": { "zh-CN": "道具持续时间 +15%" },
+      "trigger": "run_start",
+      "effects": [ { "primitive": "buffDurationAdd", "durationS": 3600, "pct": 15 } ],
+      "versions": [ { "ver": "1.0.0", "date": "2026-09-22", "change": "首发" } ]
+    },
+    {
+      "id": "talent_kaze_slide", "kind": "passive", "status": "live",
+      "name": { "zh-CN": "贴地飞行" }, "desc": { "zh-CN": "滑铲时长 +0.2 秒" },
+      "trigger": "run_start",
+      "effects": [ { "primitive": "slideExtend", "durationS": 3600, "addS": 0.2 } ],
+      "versions": [ { "ver": "1.0.0", "date": "2026-09-22", "change": "首发" } ]
+    },
+    {
+      "id": "talent_rina_shield", "kind": "passive", "status": "live",
+      "name": { "zh-CN": "静电护体" }, "desc": { "zh-CN": "开局自带 1 层护盾" },
+      "trigger": "run_start",
+      "effects": [ { "primitive": "shieldAdd", "layers": 1 } ],
+      "versions": [ { "ver": "1.0.0", "date": "2026-09-22", "change": "首发" } ]
+    },
+    {
+      "id": "talent_bolt_cool", "kind": "passive", "status": "live",
+      "name": { "zh-CN": "老警长的节奏" }, "desc": { "zh-CN": "技能冷却 -20%" },
+      "trigger": "run_start",
+      "effects": [ { "primitive": "cooldownMul", "durationS": 3600, "mul": 0.8 } ],
+      "versions": [ { "ver": "1.0.0", "date": "2026-09-22", "change": "首发" } ]
+    }
+  ]
+}

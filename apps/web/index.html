@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>雷霆酷跑 · 网页版</title>
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <!-- S5 起页面全部自绘（packages/game/src/ui）：这里只剩挂载点与静态占位文案（UI 就绪即清） -->
+  <main id="screen">正在加载资源…</main>
+  <!-- Vite resolves workspace and npm dependencies. -->
+  <script type="module" src="/src/bootstrap.ts"></script>
+  <!-- S4 自绘 UI 演示页（?ui=demo 时接管屏幕；独立于 bootstrap，平时立即返回） -->
+  <script type="module" src="/src/uiDemo.ts"></script>
+</body>
+</html>
