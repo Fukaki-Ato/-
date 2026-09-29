@@ -1,35 +1,50 @@
 /**
- * 主流程最佳分测试（对应 M2 审计：键名笔误迁移 + 脏值兜底）
- * 通过 createGameFlow + 场景机直接进入 result 场景，用内存 storage mock 观察读写行为。
+ * 主流程测试（fake views，无 UI/GL）：
+ * - 最佳分（对应 M2 审计：键名笔误迁移 + 脏值兜底）；
+ * - 页面流转接线：start 两入口（微信登录仅 env==='wx' 可用、失败停留 + 反馈）、入口方式本机记忆、
+ *   结算/局内 Esc 回选角页。content 未加载时 run/select 的 onEnter 空转，可直接驱动场景机。
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createGameFlow, BEST_KEY } from '../packages/game/dist/flow/mainFlow.js';
+import { ENTRY_KEY } from '../packages/game/dist/flow/session.js';
 
 const LEGACY_KEY = 'thunderrun:b\u2026st'; // 旧版笔误键：b + U+2026 省略号 + st
 
-function makeFlow(initial) {
+function makeFlow(initial, { env, extras } = {}) {
   const store = new Map(Object.entries(initial ?? {}));
-  const seen = { best: null, summary: null };
+  const seen = { best: null, summary: null, start: null, result: null, busy: [], feedback: [] };
+  const inputs = [];
   const adapter = {
+    env,
+    extras,
     storage: {
       get: k => (store.has(k) ? store.get(k) : null),
       set: (k, v) => { store.set(k, v); },
       remove: k => { store.delete(k); },
     },
-    onInput: () => () => {},
+    onInput: cb => { inputs.push(cb); return () => {}; },
   };
   const views = {
     renderBoot: () => ({ setStatus() {} }),
-    renderLogin: () => ({ submit() {} }),
-    renderMenu: () => {},
+    renderStart: actions => {
+      seen.start = actions;
+      return {
+        setBusy: b => seen.busy.push(b),
+        setFeedback: (text, isError) => seen.feedback.push({ text, isError }),
+      };
+    },
+    renderSelect: () => {},
     mountHud: () => ({ update() {}, dispose() {} }),
-    renderResult: (summary, best) => { seen.summary = summary; seen.best = best; },
+    renderResult: (summary, best, actions) => { seen.summary = summary; seen.best = best; seen.result = actions; },
     toast: () => {},
   };
   const flow = createGameFlow({ adapter, views, configResolve: n => `./${n}.json` });
-  return { flow, store, seen };
+  const key = code => inputs.forEach(cb => cb({ type: 'key', code, phase: 'down' }));
+  return { flow, store, seen, key };
 }
+
+const tick = () => new Promise(r => setImmediate(r));
 
 const summaryOf = score => ({
   t: 1, distance: 10, coins: 0, nearMiss: 0, hits: 0, score, alive: true, casts: 0, charId: 'char_volt',
@@ -71,4 +86,78 @@ test('平纪录不覆盖好值：score <= best 时不重写存储，best 原样�
   flow.machine.go('result', summaryOf(100));
   assert.equal(seen.best, 100);
   assert.equal(store.get(BEST_KEY), '100'); // 未被旧键 5 覆盖，也未因平纪录重写
+});
+
+// ---------------- 页面流转接线 ----------------
+
+test('start：web 环境微信登录不可用（即便注入了 extras.login 游客兜底），onWechat 空转', async () => {
+  let calls = 0;
+  const { flow, store, seen } = makeFlow({}, { env: 'web', extras: { login: async () => { calls++; return { openid: 'g', isGuest: true }; } } });
+  flow.machine.go('start');
+  assert.equal(seen.start.wechatAvailable, false);
+  seen.start.onWechat();
+  await tick();
+  assert.equal(calls, 0);
+  assert.equal(flow.machine.current(), 'start');
+  assert.equal(store.has(ENTRY_KEY), false);
+});
+
+test('start：游客登录 → select 并记住 guest', () => {
+  const { flow, store, seen } = makeFlow();
+  flow.machine.go('start');
+  seen.start.onGuest();
+  assert.equal(flow.machine.current(), 'select');
+  assert.equal(store.get(ENTRY_KEY), 'guest');
+});
+
+test('start：wx 微信登录成功 → select 并记住 wechat；登录中重复点击不重复调用', async () => {
+  let calls = 0;
+  const { flow, store, seen } = makeFlow({}, { env: 'wx', extras: { login: async () => { calls++; return { openid: 'wx-guest-1', isGuest: true }; } } });
+  flow.machine.go('start');
+  assert.equal(seen.start.wechatAvailable, true);
+  seen.start.onWechat();
+  seen.start.onWechat();
+  seen.start.onGuest(); // 登录进行中：游客入口也被锁
+  assert.deepEqual(seen.busy, [true]);
+  await tick();
+  assert.equal(calls, 1);
+  assert.equal(flow.machine.current(), 'select');
+  assert.equal(store.get(ENTRY_KEY), 'wechat');
+});
+
+test('start：wx 微信登录失败 → 停留 start、错误反馈、解锁；不记入口', async () => {
+  const { flow, store, seen } = makeFlow({}, { env: 'wx', extras: { login: async () => { throw new Error('boom'); } } });
+  flow.machine.go('start');
+  seen.start.onWechat();
+  await tick();
+  assert.equal(flow.machine.current(), 'start');
+  assert.deepEqual(seen.busy, [true, false]);
+  const last = seen.feedback.at(-1);
+  assert.equal(last.isError, true);
+  assert.ok(last.text.includes('微信登录失败') && last.text.includes('boom'), last.text);
+  assert.equal(store.has(ENTRY_KEY), false);
+});
+
+test('start：登录返回前已离开开始页 → 结果丢弃，不强行跳转', async () => {
+  let resolve;
+  const { flow, store, seen } = makeFlow({}, { env: 'wx', extras: { login: () => new Promise(r => { resolve = r; }) } });
+  flow.machine.go('start');
+  seen.start.onWechat();
+  flow.machine.go('result', summaryOf(1));
+  resolve({ openid: 'x', isGuest: true });
+  await tick();
+  assert.equal(flow.machine.current(), 'result');
+  assert.equal(store.has(ENTRY_KEY), false);
+});
+
+test('导航：局内 Esc 与结算「返回选角」都回 select', () => {
+  const { flow, seen, key } = makeFlow();
+  flow.machine.go('run'); // content 未加载：run.onEnter 空转
+  key('Escape');
+  assert.equal(flow.machine.current(), 'select');
+  flow.machine.go('result', summaryOf(3));
+  seen.result.onSelect();
+  assert.equal(flow.machine.current(), 'select');
+  key('Escape'); // 非 run 场景 Esc 无效
+  assert.equal(flow.machine.current(), 'select');
 });
