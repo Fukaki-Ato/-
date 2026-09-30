@@ -122,7 +122,8 @@
       "configVersion": { "type": "string" },
       "defs": { "type": "array" },
       "patterns": { "type": "array" },
-      "difficultyCurve": { "type": "array" }
+      "difficultyCurve": { "type": "array" },
+      "zap": { "type": "object" }
     },
     "additionalProperties": true
   }

@@ -41,6 +41,8 @@ const SHAKE_DECAY = 1 / 60, SHAKE_AMP = 0.24;
 const END_DELAY_S = 1.2, HUD_INTERVAL_S = 0.15;
 /** 爆点的画面深度（角色身体前方 0.62m，胸口高度由 chestY 提供）；穿云用白色 */
 const BURST_Z = -0.62, CLOUD_BURST_COLOR = 0xdfe9f5;
+/** 闪电圈触电爆点用黄色 */
+const ZAP_BURST_COLOR = 0xffe14d;
 /** 雾视距：障碍在约 3 秒外可见（地铁酷跑式远望） */
 const FOG_NEAR = 22, FOG_FAR = 120;
 
@@ -89,7 +91,7 @@ export function createRunnerScene(
   const speedLines = createSpeedLines(scene, tint);
   /** 胸口位置缓存：爆点与吸入动画对齐到身体，而不是脚底原点 */
   let chestX = 0, chestY = avatar.chestY;
-  const fireAtPlayer = () => bursts.fireAt(chestX, chestY, BURST_Z);
+  const fireAtPlayer = (color?: number) => bursts.fireAt(chestX, chestY, BURST_Z, color);
 
   // ---------- 输入 → sim（v2：手势与键盘合并为单个 onInput 订阅，§7.8） ----------
   const offInput = adapter.onInput(e => {
@@ -138,6 +140,7 @@ export function createRunnerScene(
       // 施放技能：爆点 + 轻微震屏，拖尾/光环等完整表现在 M4 T4.4
       else if (ev.type === 'cast') { fireAtPlayer(); shakeT = 0.12; }
       else if (ev.type === 'shieldBreak' || ev.type === 'boardBreak') { fireAtPlayer(); shakeT = 0.18; }
+      else if (ev.type === 'zap') { fireAtPlayer(ZAP_BURST_COLOR); shakeT = 0.32; } // 触电：黄光爆点+明显震屏
       // pickup：按用户要求不加特效与震动，仅 HUD 显示 buff 倒计时
     }
   }
