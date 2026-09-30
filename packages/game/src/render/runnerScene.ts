@@ -33,7 +33,8 @@ export interface RunCallbacks {
  *  跳跃时前方金币仍在画面内，人物略靠后。 */
 const CAM_Z = 8.4, CAM_Y_BASE = 2.7, CAM_FOLLOW = 0.25, CAM_Y_RATIO = 0.5, LOOK_AHEAD_Z = -11;
 /** 飞行/滑翔机位（审计 T2）：独立目标，更高更远、注视点抬高，保证金币与云在画面里；过渡仍走 CAM_FOLLOW */
-const CAM_AIR_Y_RATIO = 0.55, CAM_AIR_Y_BASE = 2.2, LOOK_AIR_Y_RATIO = 0.35, LOOK_AIR_Y_BASE = 0.4;
+/** 用户反馈「飞到天上时视角往上挪一点」：空中机位与注视点整体上抬，看得见更远的空中金币带 */
+const CAM_AIR_Y_RATIO = 0.55, CAM_AIR_Y_BASE = 2.6, LOOK_AIR_Y_RATIO = 0.35, LOOK_AIR_Y_BASE = 1.0;
 const FOV_GROUND = 55, FOV_AIR = 64, FOV_LERP = 0.06;
 /** 加速（speedMul>1）的视野扩张：按 (speedMul-1) 线性加宽并封顶（雷霆冲刺一类技能要看得见加速） */
 const SPEED_FOV_PER_MUL = 70, SPEED_FOV_MAX = 10;

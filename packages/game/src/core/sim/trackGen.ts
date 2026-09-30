@@ -11,6 +11,8 @@
 import type { RunRng } from '../rng.js';
 import type { GameContent, NamedEntry } from '../config/configTypes.js';
 import { BLOCKING_CLASSES, normalizeSwing, type SwingSpec } from './trackDefs.js';
+import { layCoinChains } from './trackCoins.js';
+import { spawnSkyContent } from './trackSky.js';
 
 export interface ObstacleEntity {
   obsRef: string;
@@ -19,6 +21,7 @@ export interface ObstacleEntity {
   lane: number;
   worldZ: number;
   swing?: SwingSpec;
+  clearT?: number;      // 软清除时刻（渲染下沉动画；配合 done 防重复判负）
   done?: boolean;      // 已命中（避免同一障碍重复判负）
   passed?: boolean;    // 已掠过角色面（近失判定一次性）
 }
@@ -91,28 +94,17 @@ export class TrackGen {
   difficulty(z: number): number { return Math.floor(z / 300); }
 
   /**
-   * 铺设空中内容（飞行器触发/续时）：在 [fromZ,toZ] 生成三条车道的加密金币带（悬浮在飞行
-   * 高度）与随机分布的云团。地面内容（障碍/地面金币/道具箱）不受影响、照常生成——飞行只是
-   * 从上方掠过，玩家要求「天上也能看到地面障碍」；着陆安全由滑翔段的动态清道保证。
+   * 铺设空中内容（飞行器触发/续时）：在 [fromZ,toZ] 生成悬浮在飞行高度的金币带（本组车道数
+   * 按地面同款 laneGroupWeights 抽 1/2/3 道，不再条条铺满三条路——用户反馈）与随机分布的云团。
+   * 地面内容（障碍/地面金币/道具箱）不受影响、照常生成——飞行只是从上方掠过，
+   * 玩家要求「天上也能看到地面障碍」；着陆安全由滑翔段的动态清道保证。
    */
   spawnSky(fromZ: number, toZ: number, skyY: number, coins: CoinEntity[], clouds: CloudEntity[]) {
-    const spacing = this.coinSpacing * 0.65; // 空中金币带：间距再收紧、链间空档缩短（"金币会变多"）
-    for (const lane of [-1, 0, 1]) {
-      let z = fromZ + 8 + this.rng.range(0, 10);
-      while (z < toZ - 8) {
-        const bucket = this.rng.weighted(this.chainBuckets, b => b.weight);
-        const len = this.rng.int(bucket.min, bucket.max);
-        const id = ++this.chainSeq;
-        for (let i = 0; i < len; i++) {
-          const cz = z + i * spacing;
-          if (cz < toZ - 4) coins.push({ lane, worldZ: cz, y: skyY, chain: id });
-        }
-        z += len * spacing + this.rng.range(10, 18); // 链间留空档，密度可控
-      }
-    }
-    for (let z = fromZ + 12; z < toZ - 6; z += this.rng.range(30, 46)) {
-      clouds.push({ worldZ: z, x: this.rng.pick([-1, 0, 1]) * this.laneWidthRef + this.rng.range(-0.6, 0.6), y: this.rng.range(skyY - 0.5, skyY + 0.9) });
-    }
+    spawnSkyContent({
+      rng: this.rng, chainBuckets: this.chainBuckets, spacing: this.coinSpacing,
+      laneWeights: this.laneWeights, laneWidth: this.laneWidthRef,
+      fromZ, toZ, skyY, coins, clouds, seq: () => ++this.chainSeq,
+    });
   }
 
   /** 保证赛道铺到 distance + aheadM；新障碍/金币/道具箱追加进传入数组（sim 持有所有权） */
@@ -136,59 +128,17 @@ export class TrackGen {
           });
         }
       }
-      // 金币链：主链优先铺在模板安全线（docs/01：金币即教学），
-      // 再按 laneGroupWeights 抽本组车道数（单道 70% > 双道 25% > 三道 5%）。
-      // 关键约束：链完整落在本模板窗口内（不跨窗口 => 未来障碍永远压不到已投链），
-      // 且与窗口内任何障碍同车道深度不重叠；放不下就整链放弃（宁缺毋残，保证 5~16 完整）。
+      // 金币链：主链优先铺在模板安全线（docs/01：金币即教学），再按 laneGroupWeights
+      // 抽本组车道数；链不跨窗、不与障碍同车道深度重叠（细则见 trackCoins.ts）。
       const safeLane = pat.guarantee?.safeLanePattern?.[0] ?? 0;
       const newObs = obstacles.slice(patStart); // 本轮新障碍（兜底反向清理用）
-      const laneCount = this.rng.weighted([1, 2, 3], k => this.laneWeights[k] ?? 0);
-      const others = [-1, 0, 1].filter(l => l !== safeLane);
-      this.rng.shuffle(others);
-      const lanes = [safeLane, ...others.slice(0, laneCount - 1)];
-      // 反“金币荒漠”：某车道断档超过 coins.laneGapM（默认 120m）就强制补一条，
-      // 保证玩家任意车道都不会长时间见不到金币（用户反馈：左右两条跑道看不到金币）。
-      for (const l of [-1, 0, 1]) {
-        if (!lanes.includes(l) && this.genZ - this.lastCoinZ[l] > this.laneGapM) lanes.push(l);
-      }
-      const winStart = this.genZ;
-      const winEnd = this.genZ + pat.lengthSegments * this.segLen;
-      /** 某车道在 [from,to] 内避开所有障碍深度区间后的连续空段列表 */
-      const freeSegments = (lane: number, from: number, to: number): Array<[number, number]> => {
-        const cuts: Array<[number, number]> = [];
-        for (const o of obstacles) {
-          if (o.lane !== lane) continue;
-          const a = Math.max(from, o.worldZ - o.d / 2 - 0.8);
-          const b = Math.min(to, o.worldZ + o.d / 2 + 0.8);
-          if (b > from && a < to) cuts.push([a, b]);
-        }
-        cuts.sort((x, y) => x[0] - y[0]);
-        const segs: Array<[number, number]> = [];
-        let cur = from;
-        for (const [a, b] of cuts) {
-          if (a > cur + 0.01) segs.push([cur, a]);
-          cur = Math.max(cur, b);
-        }
-        if (cur < to - 0.01) segs.push([cur, to]);
-        return segs;
-      };
-      for (const lane of lanes) {
-        const bucket = this.rng.weighted(this.chainBuckets, b => b.weight);
-        const wantLen = this.rng.int(bucket.min, bucket.max);
-        const segs = freeSegments(lane, winStart + 3, winEnd - 14); // 后缘让出 14m：24m 长列车的尾部会向后探约 13m
-        // 选能容纳最长链的空段；长度按空段容量截断，仍不足 5 枚则放弃本车道
-        let best: [number, number] | null = null;
-        for (const s of segs) if (!best || (s[1] - s[0]) > (best[1] - best[0])) best = s;
-        if (!best) continue;
-        const capacity = Math.floor((best[1] - best[0]) / this.coinSpacing) + 1;
-        const len = Math.min(wantLen, capacity, bucket.max);
-        if (len < 5) continue;
-        const maxStart = best[1] - (len - 1) * this.coinSpacing;
-        const chainStart = this.rng.range(best[0], Math.max(best[0], maxStart));
-        const id = ++this.chainSeq;
-        for (let i = 0; i < len; i++) coins.push({ lane, worldZ: chainStart + i * this.coinSpacing, chain: id });
-        this.lastCoinZ[lane] = chainStart + (len - 1) * this.coinSpacing; // 记录本车道最近投币位置
-      }
+      layCoinChains({
+        rng: this.rng, obstacles, coins,
+        winStart: this.genZ, winEnd: this.genZ + pat.lengthSegments * this.segLen,
+        safeLane, laneWeights: this.laneWeights, chainBuckets: this.chainBuckets,
+        spacing: this.coinSpacing, laneGapM: this.laneGapM, lastCoinZ: this.lastCoinZ,
+        seq: () => ++this.chainSeq,
+      });
       // 兜底反向清理（理论上不触发：链不跨窗；防御未来模板长度参数改小）
       if (newObs.length) {
         const killChains = new Set<number>();
@@ -287,6 +237,23 @@ export class TrackGen {
       if (o.worldZ + o.d / 2 < fromZ || o.worldZ - o.d / 2 > toZ) continue;
       obstacles[i] = obstacles[obstacles.length - 1];
       obstacles.pop();
+      n++;
+    }
+    return n;
+  }
+
+  /** 软清空与 [fromZ,toZ] 相交的障碍（滑翔/着陆走廊用）：不摘数组，改标 done+clearT，
+   *  渲染层播下沉消散、身后由 cull 回收——落地瞬间不再「场景刷新式」整批消失（用户反馈）。
+   *  已 done 的不再重复标记；返回本次软清除数。 */
+  softClearObstacles(obstacles: ObstacleEntity[], fromZ: number, toZ: number, nowT: number): number {
+    let n = 0;
+    for (let i = obstacles.length - 1; i >= 0; i--) {
+      const o = obstacles[i];
+      if (o.done) continue;
+      if (o.worldZ + o.d / 2 < fromZ || o.worldZ - o.d / 2 > toZ) continue;
+      o.done = true;
+      o.passed = true;
+      o.clearT = nowT;
       n++;
     }
     return n;

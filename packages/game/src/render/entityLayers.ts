@@ -22,6 +22,8 @@ const LOW_VISUAL_H = 0.75;
 const HAZARD_BAND_H = 0.35;
 /** 穿云判定：横向距离阈值与冲散动画时长（越宽越容易吃到穿云反馈；动画更快更明显） */
 const CLOUD_HIT_X = 2.6, CLOUD_SCATTER_T = 0.45;
+/** 软清除下沉动画：时长（秒）与下沉深度（米）——滑翔/着陆走廊清场不再整批瞬移消失 */
+const SINK_T = 0.45, SINK_DROP_M = 1.6;
 
 export function createObstacleLayer(scene: THREE.Scene, laneWidth: number) {
   const boxGeo = new THREE.BoxGeometry(1, 1, 1);
@@ -44,6 +46,12 @@ export function createObstacleLayer(scene: THREE.Scene, laneWidth: number) {
     units.push({ bar, posts, band });
   }
 
+  const hideUnit = (u: ObsUnit) => {
+    u.bar.visible = false;
+    u.band.visible = false;
+    for (const p of u.posts) p.visible = false;
+  };
+
   return {
     update(list: ObstacleEntity[], dist: number, t: number) {
       let i = 0;
@@ -52,6 +60,10 @@ export function createObstacleLayer(scene: THREE.Scene, laneWidth: number) {
         const z = dist - o.worldZ;
         if (z < OBS_FAR || z > OBS_NEAR) continue;
         const u = units[i++];
+        // 软清除（滑翔/着陆走廊）播下沉消散：不再一帧整批消失（用户反馈「场景会刷新一次」）
+        const sink = o.clearT != null ? Math.min((t - o.clearT) / SINK_T, 1) : 0;
+        if (sink >= 1) { hideUnit(u); continue; }
+        const sinkY = sink * SINK_DROP_M;
         const m = u.bar;
         m.visible = true;
         const mat = m.material as THREE.MeshStandardMaterial;
@@ -60,7 +72,7 @@ export function createObstacleLayer(scene: THREE.Scene, laneWidth: number) {
         mat.roughness = 0.6;
         // 高杆横杆（obs_gate_low）半透明化：下方的金币与障碍要能透出来，只留立柱提示轮廓
         mat.transparent = o.cls === 'high';
-        mat.opacity = o.cls === 'high' ? GATE_OPACITY : 1;
+        mat.opacity = (o.cls === 'high' ? GATE_OPACITY : 1) * (1 - sink);
         mat.depthWrite = o.cls !== 'high';
         let sx = o.w, sy = o.h, sz = o.d, py = o.h / 2;
         if (o.cls === 'high') { sy = Math.max(0.5, o.h - BAR_LOW_Y); py = BAR_LOW_Y + sy / 2; } // 顶部横杆，下方可钻
@@ -72,28 +84,24 @@ export function createObstacleLayer(scene: THREE.Scene, laneWidth: number) {
         const ox = o.cls === 'moving'
           ? o.lane * laneWidth + Math.sin(t * Math.PI * 2 / (o.swing?.periodS ?? 3.2)) * (o.swing?.ampM ?? 0) * 0.5
           : o.lane * laneWidth;
-        m.position.set(ox, py, z);
+        m.position.set(ox, py - sinkY, z);
         const band = u.band;
         band.visible = o.cls === 'hazard';
         if (band.visible) { // 电弧光带：0.35m 高，缓慢闪烁提示可跳高度
           band.scale.set(o.w, HAZARD_BAND_H, o.d);
-          band.position.set(ox, HAZARD_BAND_H / 2, z);
-          (band.material as THREE.MeshBasicMaterial).opacity = 0.3 + 0.12 * Math.sin(t * 8 + ox * 1.7);
+          band.position.set(ox, HAZARD_BAND_H / 2 - sinkY, z);
+          (band.material as THREE.MeshBasicMaterial).opacity = (0.3 + 0.12 * Math.sin(t * 8 + ox * 1.7)) * (1 - sink);
         }
         for (let pi = 0; pi < 2; pi++) { // 高杆支撑柱：立在横杆两端，从地面顶到杆顶
           const post = u.posts[pi];
           post.visible = o.cls === 'high';
           if (post.visible) {
             post.scale.set(0.14, o.h, 0.14);
-            post.position.set(ox + (pi === 0 ? -1 : 1) * (o.w / 2 - 0.07), o.h / 2, z);
+            post.position.set(ox + (pi === 0 ? -1 : 1) * (o.w / 2 - 0.07), o.h / 2 - sinkY, z);
           }
         }
       }
-      for (; i < OBS_MAX; i++) {
-        units[i].bar.visible = false;
-        units[i].band.visible = false;
-        for (const p of units[i].posts) p.visible = false;
-      }
+      for (; i < OBS_MAX; i++) hideUnit(units[i]);
     },
   };
 }

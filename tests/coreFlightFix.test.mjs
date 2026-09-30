@@ -2,7 +2,8 @@
  * 飞行链路修复回归（用户反馈：天上地面没障碍 / 飞行结束直接摔死 / 续飞断档）：
  * 1. 起飞只清同车道 12m 窄带（缓升不穿模），其余地面障碍保持原样（可俯瞰地面内容）
  * 2. 飞行期生成不停：生成线随飞行继续前进，落地后地面内容连续
- * 3. 滑翔着陆走廊：下滑路径（剩余时长×速度+余量）内无障碍；落地帧前方 30m 净空
+ * 3. 滑翔着陆走廊：下滑路径（剩余时长×速度+余量）内无可判负障碍（软清除：done+clearT 下沉消散）；
+ *    落地帧前方 30m 净空（软清除实体保留在数组，仅 !done 的才可能判负）
  * 4. 续飞延展：飞行中再吃飞行道具，空中金币/云团补铺到新的终点之后
  */
 import test from 'node:test';
@@ -77,14 +78,15 @@ test('滑翔着陆走廊：下滑路径无障碍，落地帧前方 30m 净空', 
         glideFrames++;
         const speed = (s.distance - s.prevDistance) * 60;
         const reach = (s.y / fallMps) * speed + 20; // 略小于实现的 26m 余量
-        const inPath = sim.obstacles.filter(o => (o.worldZ - s.distance) > -o.d / 2 && (o.worldZ - s.distance) < reach + o.d / 2);
+        // 软清除后实体仍留在数组（渲染播下沉动画）：只统计未软清除、仍可判负的障碍
+        const inPath = sim.obstacles.filter(o => !o.done && (o.worldZ - s.distance) > -o.d / 2 && (o.worldZ - s.distance) < reach + o.d / 2);
         assert.equal(inPath.length, 0,
           `seed=${seed} 滑翔路径被障碍占据：${inPath.map(o => `${o.obsRef}@+${(o.worldZ - s.distance).toFixed(1)}m`).join(' ')}（y=${s.y.toFixed(2)}）`);
       }
       if (wasGliding && !s.gliding && s.y === 0) { landed = s.distance; break; }
     }
     assert.ok(glideFrames > 60 && landed > 0, `seed=${seed} 未观测到完整滑翔落地（frames=${glideFrames}）`);
-    const blockAhead = sim.obstacles.filter(o => o.worldZ > landed && o.worldZ < landed + 30).length;
+    const blockAhead = sim.obstacles.filter(o => !o.done && o.worldZ > landed && o.worldZ < landed + 30).length;
     assert.equal(blockAhead, 0, `seed=${seed} 落地帧前方 30m 应净空，实际 ${blockAhead}`);
     landedCount++;
   }
