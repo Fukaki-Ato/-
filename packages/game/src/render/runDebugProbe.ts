@@ -34,6 +34,7 @@ export function installRunProbe(
       const s = sim.state;
       return {
         ...sim.summary(), sliding: s.sliding, y: r2(s.y), fx: fxOf(),
+        shocks: s.shocks,
         energy: r2(s.energy), cd: r2(s.skillCd), gliding: s.gliding, cam: camera(), draw: renderInfo(),
         burstFired: bursts.fired,
         obstacles: sim.obstacles.length, coins: sim.coinsArr.length,
@@ -49,7 +50,7 @@ export function installRunProbe(
       for (const c of sim.coinsArr) if (!c.taken && c.worldZ > s.distance && c.worldZ < s.distance + COIN_LOOKAHEAD_M) perLane[c.lane]++;
       return {
         obs: sim.obstacles.filter(o => !o.done && rel(o.worldZ) > 0 && rel(o.worldZ) < OBS_LOOKAHEAD_M)
-          .slice(0, 8).map(o => ({ lane: o.lane, z: r2(rel(o.worldZ)), cls: o.cls })),
+          .slice(0, 8).map(o => ({ lane: o.lane, z: r2(rel(o.worldZ)), cls: o.cls, zap: o.zap === true })),
         pk: sim.pickupsArr.filter(p => !p.taken && rel(p.worldZ) > 0 && rel(p.worldZ) < PICKUP_LOOKAHEAD_M)
           .slice(0, 3).map(p => ({ lane: p.lane, z: r2(rel(p.worldZ)), item: p.itemRef })),
         coinsAhead: perLane,

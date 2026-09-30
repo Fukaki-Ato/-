@@ -23,15 +23,19 @@ export function relZ(o: ObstacleEntity, distance: number): number {
 export function obstacleX(o: ObstacleEntity, t: number, laneWidth: number): number {
   const center = o.lane * laneWidth;
   const sw = o.swing;
+  let x = center;
   if (sw) {
     const amp = Number.isFinite(sw.ampM) ? sw.ampM : 0;
     const period = Number.isFinite(sw.periodS) && sw.periodS > 0 ? sw.periodS : 0;
     if (period > 0) {
-      const x = center + Math.sin(t * Math.PI * 2 / period) * amp * 0.5;
-      return Number.isFinite(x) ? x : center;
+      x = center + Math.sin(t * Math.PI * 2 / period) * amp * 0.5;
     }
   }
-  return Number.isFinite(center) ? center : 0;
+  // 横摆不得扫出路面（路宽=3·laneWidth+1.2，见 render/trackVisuals）：
+  // 中心限幅到 ±(路半宽-(o.w+HIT_BOX_W)/2)，极端相位仍压得到最外侧车道的碰撞盒（不至于躲到地图外）。
+  const maxAbs = (3 * laneWidth + 1.2) / 2 - (o.w + HIT_BOX_W) / 2;
+  if (Number.isFinite(maxAbs) && maxAbs > 0) x = Math.max(-maxAbs, Math.min(maxAbs, x));
+  return Number.isFinite(x) ? x : 0;
 }
 
 /** 角色与障碍是否处于同一深度层 */
@@ -51,6 +55,9 @@ export function isNearMiss(o: ObstacleEntity, s: RunnerState, laneWidth: number)
   return gap > 0 && gap < NEAR_MISS_M;
 }
 
+/** 可站立载具（rideTop）的车顶落顶判定余量（米）：低于车顶该值以上视为撞前脸而非落顶 */
+export const RIDE_TOP_EPS = 0.08;
+
 /** 纵向判定：低障要跳够、高杆要钻或跃顶、电弧地面要跳起、满格与载具只能换道 */
 export function hitsRunner(o: ObstacleEntity, s: RunnerState, laneWidth: number): boolean {
   if (lateralGap(o, s, laneWidth) > 0) return false;
@@ -58,7 +65,9 @@ export function hitsRunner(o: ObstacleEntity, s: RunnerState, laneWidth: number)
   if (o.cls === 'low') return s.y < o.h * 0.75;
   if (o.cls === 'high') return s.y < o.h && s.y + playerH > BAR_BOTTOM;
   if (o.cls === 'hazard') return s.y < 0.35;
-  return true; // full / vehicle / moving
+  if (o.cls === 'moving') return o.jumpable ? s.y < o.h * 0.75 : true; // 摆锤 jumpable=true：跳够高度即可越过
+  if (o.cls === 'vehicle') return !(o.rideTop === true && s.y >= o.h - RIDE_TOP_EPS); // 列车顶可落可站
+  return true; // full：满格墙只能换道
 }
 
 /** 判定「前方有威胁」的最小距离（米）：贴脸的障碍已经来不及换道，不计入 */

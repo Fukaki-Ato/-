@@ -50,6 +50,15 @@ export function validateFile(name: string, data: unknown): string[] {
         if (!patIds.has(key)) errors.push(`difficultyCurve.by=${curve.by}: 模板不存在 -> ${key}`);
       }
     }
+    // 闪电圈段（可选）：ref 必须指向 defs；everyM 为正数（缺省=不生成，不算错）
+    const zap = (file as { zap?: unknown }).zap;
+    if (zap !== undefined) {
+      if (!isRecord(zap)) errors.push('obstacles.zap: 应为对象');
+      else {
+        if (typeof zap.ref !== 'string' || !obsIds.has(zap.ref)) errors.push(`obstacles.zap: ref 不存在 -> ${String(zap.ref)}`);
+        if (typeof zap.everyM !== 'number' || !(zap.everyM > 0)) errors.push('obstacles.zap: everyM 应为正数');
+      }
+    }
     return errors;
   }
 
