@@ -8,12 +8,13 @@
  */
 
 /** 地面机位：T1 审计 Z 7.4→8.4、Y 1.9→2.7；用户两次要求「地上视角高一些」
- *  → 二轮 Y 2.7→3.3、Z 8.4→9.2；三轮 Y 3.3→4.6、Z 9.2→11.0
- *  （俯角 9.3°→11.8°：前方赛道/障碍更早入画，人物不放大、近处地面不翻出画面下沿） */
-export const CAM_Z_GROUND = 11.0, CAM_Y_BASE_GROUND = 4.6, CAM_Y_RATIO_GROUND = 0.5;
-/** 空中机位（飞行/滑翔）：4.6m 高度下 camY=8.75、camZ=13.2、lookY=2.09、FOV 68；
- *  地面机位三次上抬后同步上抬，保持空中/地面肉眼可辨（camY ≥+1.85m / camZ +2.2m / FOV +13°） */
-export const CAM_Z_AIR = 13.2, CAM_AIR_Y_BASE = 5.3, CAM_AIR_Y_RATIO = 0.75;
+ *  → 二轮 Y 2.7→3.3、Z 8.4→9.2；三轮 Y 3.3→4.6、Z 9.2→11.0（为俯角一路后拉）；
+ *  四轮反馈「高度够了但有点远」→ **只收纵深不降高度**：Z 11.0→9.2、Y 保持 4.6
+ *  （俯角 11.8°→12.8°：人物放大、远近层次更紧，前方赛道仍早入画） */
+export const CAM_Z_GROUND = 9.2, CAM_Y_BASE_GROUND = 4.6, CAM_Y_RATIO_GROUND = 0.5;
+/** 空中机位（飞行/滑翔）：4.6m 高度下 camY=8.75、camZ=11.4、lookY=2.09、FOV 68；
+ *  随地面机位同步收距，保持空中/地面肉眼可辨（camY ≥+1.85m / camZ +2.2m / FOV +13°） */
+export const CAM_Z_AIR = 11.4, CAM_AIR_Y_BASE = 5.3, CAM_AIR_Y_RATIO = 0.75;
 export const LOOK_AIR_Y_BASE = 0.8, LOOK_AIR_Y_RATIO = 0.28;
 /** 视野：地面 55°，空中 68°（高空广角） */
 export const FOV_GROUND = 55, FOV_AIR = 68;

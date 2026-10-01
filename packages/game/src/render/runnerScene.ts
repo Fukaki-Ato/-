@@ -33,7 +33,8 @@ export interface RunCallbacks {
 /** 相机参数（docs/02 §8：跟随人物但不 1:1 抬高，否则近处地面会翻出画面下沿）。
  *  机位/注视点/FOV 目标统一由 cameraRig.ts 纯函数派生（地面/空中两套，可回归测试），
  *  这里只保留平滑系数与注视点纵深；审计 T1/T2 的历史口径见 cameraRig.ts 注释。 */
-const CAM_FOLLOW = 0.25, FOV_LERP = 0.06, LOOK_AHEAD_Z = -11;
+/** 注视点纵深（米）：四轮反馈「视角有点远」后由 -11 收到 -9.5（构图更紧、人物不上移出画） */
+const CAM_FOLLOW = 0.25, FOV_LERP = 0.06, LOOK_AHEAD_Z = -9.5;
 /** 加速（speedMul>1）的视野扩张：按 (speedMul-1) 线性加宽并封顶（雷霆冲刺一类技能要看得见加速） */
 const SPEED_FOV_PER_MUL = 70, SPEED_FOV_MAX = 10;
 /** 震屏：每帧衰减量与随机幅度 */
@@ -173,9 +174,9 @@ export function createRunnerScene(
       (x, y, z) => bursts.fireAt(x, y, z, CLOUD_BURST_COLOR));
     track.update(dist);
 
-    // 相机：水平跟随人物，垂直按地面/空中两套目标平滑随动，注视点放远到 -11m。
-    // 目标全部由 cameraRig 派生：地面 s.y*0.5+4.6、camZ 11.0（俯角 11.8°，三轮抬高后的口径）；
-    // 空中（飞行/滑翔）机位抬到 s.y*0.75+5.3、后拉 z=13.2、注视点压回 s.y*0.28+0.8、
+    // 相机：水平跟随人物，垂直按地面/空中两套目标平滑随动，注视点前探 9.5m。
+    // 目标全部由 cameraRig 派生：地面 s.y*0.5+4.6、camZ 9.2（俯角 12.8°，四轮「高度够了但远」收距后的口径）；
+    // 空中（飞行/滑翔）机位抬到 s.y*0.75+5.3、后拉 z=11.4、注视点压回 s.y*0.28+0.8、
     // FOV 68°——同帧装下地面障碍、角色与空中金币带，且与地面机位差 1.85m/2.2m/13° 肉眼可辨。
     shakeT = Math.max(0, shakeT - SHAKE_DECAY);
     const sk = shakeT > 0 ? (Math.random() - 0.5) * SHAKE_AMP : 0;
