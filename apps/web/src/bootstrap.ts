@@ -3,9 +3,12 @@ import { createWebPlatform } from './platform/webPlatform.js';
 import { createGameFlow } from '@tr/game/flow/mainFlow.js';
 import { createOverlayViews } from '@tr/game/ui/overlayViews.js';
 import { createUiShell } from './uiShell.js';
+import { createTestPanel } from './testPanel.js';
 
 const mount = document.getElementById('screen')!;
 const debug = location.search.includes('debug');
+/** 测试模式：?debug 或 ?test 都开（左侧技能开关面板 + 局内 __trTest API） */
+const testMode = debug || location.search.includes('test');
 
 async function main(): Promise<void> {
   const adapter = createWebPlatform({ mount });
@@ -21,7 +24,12 @@ async function main(): Promise<void> {
     // config/*.json 由 Vite publicDir 挂载到站点根路径（重设计 §2：config 留仓库根，两端共用）
     configResolve: name => `./${name}.json`,
     debug,
+    test: testMode,
   });
+
+  // 测试模式面板（?debug/?test）：左侧技能开关，数据面为 __trTest（mainFlow 在 run 局挂载）
+  const testPanel = createTestPanel();
+  if (testMode) (globalThis as Record<string, unknown>).__trTestPanel = testPanel; // 调试期可手动 dispose
 
   // 键盘注入（仅 web 壳有物理键盘；wx 不发 key 事件，天然空转）
   adapter.onInput(e => {

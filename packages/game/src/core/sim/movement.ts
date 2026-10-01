@@ -7,7 +7,7 @@ import type { FxState } from '../effects/buffEngine.js';
 import { PENDING_STEPS, type RunnerState } from './simTypes.js';
 import { RIDE_TOP_EPS, inDepthWindow, lateralGap } from './collision.js';
 import { applyLandingSafety } from './landing.js';
-import type { ObstacleEntity, TrackGen } from './trackGen.js';
+import type { ObstacleEntity } from './trackGen.js';
 
 /** game.json runner 段中被运动学使用的键 */
 export interface MovementParams {
@@ -41,7 +41,6 @@ export class Movement {
   constructor(
     private readonly P: MovementParams,
     private readonly fly: FlightShape,
-    private readonly gen: TrackGen,
     private readonly obstacles: ObstacleEntity[],
   ) {}
 
@@ -108,8 +107,8 @@ export class Movement {
       s.y -= (this.fly.heightM / this.fly.glideS) * dt;              // 匀速滑翔下滑
       const landed = s.y <= 0;
       if (landed) { s.y = 0; s.gliding = false; }
-      // 着陆安全：滑翔期不清障（障碍全程保留）；落地帧只清落脚点一小段 + 短免伤缓冲
-      applyLandingSafety(this.gen, this.obstacles, s, landed);
+      // 着陆安全：滑翔期与落地帧都不清障（障碍全程保留）；落地只给 0.5s 免伤缓冲
+      applyLandingSafety(s, landed);
       return;
     }
     if (this.pendingJump > 0) { this.pendingJump--; if (s.y <= this.floorY + 0.05) { this.jump(s, fx); this.pendingJump = 0; } }

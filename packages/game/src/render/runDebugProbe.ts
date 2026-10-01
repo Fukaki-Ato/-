@@ -34,6 +34,7 @@ export function installRunProbe(
       const s = sim.state;
       return {
         ...sim.summary(), sliding: s.sliding, y: r2(s.y), fx: fxOf(),
+        lane: s.lane, x: r2(s.x),
         shocks: s.shocks,
         energy: r2(s.energy), cd: r2(s.skillCd), gliding: s.gliding, cam: camera(), draw: renderInfo(),
         burstFired: bursts.fired,

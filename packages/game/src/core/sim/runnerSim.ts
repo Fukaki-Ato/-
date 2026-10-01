@@ -82,7 +82,7 @@ export class RunnerSim {
         slideS: this.R.slideS ?? 0.6, slideCooldownS: this.R.slideCooldownS ?? 0.3, laneChangeS: this.R.laneChangeS ?? 0.18,
       },
       { heightM: this.fly.heightM, glideS: this.fly.glideS },
-      this.gen, this.obstacles,
+      this.obstacles,
     );
     this.buffs = new BuffEngine(createSimWorld({
       state: this.state, obstacles: this.obstacles, coins: this.coinsArr, pickups: this.pickupsArr,

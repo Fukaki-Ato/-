@@ -242,24 +242,27 @@ test('滑翔期不清障：远处障碍全程保留（不再「近处消失远�
   assert.ok(sim.state.alive, '滑翔末段免伤 + 落地缓冲下不应判死');
 });
 
-test('落地帧只清落脚点一小段：带内障碍软清除（done+clearT 渐隐），带外不动', () => {
+test('落地帧不清障：带内障碍原样保留（不软清除），落地 0.5s 免伤窗口内不判死', () => {
   const sim = new RunnerSim(content, 311, 'char_volt');
   for (let k = 0; k < 60; k++) sim.step();
   const s = sim.state;
   grant(sim, 'fly', { durationS: 2 });
   const inBand = { obsRef: 't_band', cls: 'full', w: 2, h: 2.6, d: 0.8, lane: s.lane, worldZ: 0 };
-  let pushed = false, landed = -1;
+  let pushed = false, landed = -1, invulnAtLanding = 0;
   for (let i = 0; i < 60 * 20; i++) {
     const wasGliding = s.gliding;
-    // 滑翔末段（高度已低于判定线、免伤生效）把障碍放到落脚点前 3m：验证它一路不被清、直到落地帧才被软清除
+    // 滑翔末段（高度已低于判定线、免伤生效）把障碍放到落脚点前 3m：验证它一路不被清、落地帧也不被清
     if (!pushed && s.gliding && s.y < 1.5 && s.y > 0.2) { inBand.worldZ = s.distance + 3; sim.obstacles.push(inBand); pushed = true; }
     sim.step();
     if (inBand.clearT != null && s.gliding) throw new Error('滑翔期不应软清除带内障碍');
-    if (wasGliding && !s.gliding && s.y === 0) { landed = s.distance; break; }
+    if (wasGliding && !s.gliding && s.y === 0) { landed = s.distance; invulnAtLanding = s.invulnT; break; }
   }
   assert.ok(pushed && landed > 0, '应完成滑翔落地');
-  assert.ok(inBand.done === true && inBand.clearT != null, '落地帧应把落脚点前后的障碍软清除（渐隐，不是整批摘除）');
-  assert.ok(sim.state.alive, '落地带内障碍被软清除后不应判死');
+  // 用户要求：落地时障碍自动消失这个行为移除——带内障碍保持原状（不下沉、不渐隐、不摘除）
+  assert.ok(inBand.done !== true && inBand.clearT == null, '落地帧不得软清除带内障碍（用户要求移除落地清障）');
+  assert.ok(sim.state.alive, '落地 0.5s 免伤窗口内不应判死');
+  assert.ok(invulnAtLanding >= 0.49, `落地应给 0.5s 免伤缓冲，实际 ${invulnAtLanding.toFixed(2)}`);
+  assert.ok(sim.obstacles.includes(inBand), '带内障碍实体应仍在赛道数组中（不清障）');
 });
 
 // ---------------- 8. 登车板（step）：赤脚也能上静止火车 ----------------

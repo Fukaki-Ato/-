@@ -21,10 +21,13 @@ export const VACUUM_RANGE_M = 60;
 
 export type SimAction = 'jump' | 'slide' | 'laneL' | 'laneR' | 'skill';
 export type SimEvent =
-  | { type: 'coin' } | { type: 'hit' } | { type: 'protected' } | { type: 'nearMiss' } | { type: 'death' }
+  | { type: 'coin' } | { type: 'hit' } | { type: 'protected' } | { type: 'nearMiss' }
+  /** death 可带打击位置（闪电圈致死时）：渲染层据此把雷电画在致死点 */
+  | { type: 'death'; lane?: number; worldZ?: number }
   | { type: 'pickup'; itemRef: string } | { type: 'helmetSave' }
   | { type: 'cast'; skillRef: string } | { type: 'shieldBreak'; layers: number } | { type: 'boardBreak' }
-  | { type: 'zap'; gear: 'shield' | 'board' | 'helmet' | null };
+  /** zap 带打击位置（lane/worldZ）：渲染层据此把雷电特效画到闪电圈所在车道与深度 */
+  | { type: 'zap'; gear: 'shield' | 'board' | 'helmet' | null; lane: number; worldZ: number };
 
 export interface RunnerState {
   t: number; distance: number; prevDistance: number;

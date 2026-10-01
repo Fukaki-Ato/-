@@ -2,8 +2,8 @@
  * 飞行链路修复回归（用户反馈：天上地面没障碍 / 飞行结束直接摔死 / 续飞断档）：
  * 1. 起飞只清同车道 12m 窄带（缓升不穿模），其余地面障碍保持原样（可俯瞰地面内容）
  * 2. 飞行期生成不停：生成线随飞行继续前进，落地后地面内容连续
- * 3. 滑翔期完全不清障（用户反馈「近处消失远处不动」修正版）：障碍全程保留，下滑末段短免伤防贴障致死；
- *    落地帧只清落脚点 ±8~14m 一小段（软清除：done+clearT 下沉消散，实体保留在数组）
+ * 3. 滑翔期与落地帧都不清障（用户反馈「近处消失远处不动」+「落地时障碍自动消失」两轮修正）：
+ *    障碍全程保留，落地只给 0.5s 免伤缓冲；落地后由玩家正常观察与规避
  * 4. 续飞延展：飞行中再吃飞行道具，空中金币/云团补铺到新的终点之后
  */
 import test from 'node:test';
@@ -65,15 +65,17 @@ test('起飞窄带：同车道前方 12m 清空、更远与其他车道保留（
   assert.ok(sim.obstacles.includes(side), '其他车道障碍应保留（只清玩家跑道）');
 });
 
-test('滑翔着陆走廊：下滑路径无障碍，落地帧前方 30m 净空', () => {
-  let landedCount = 0;
+test('滑翔→落地全程：零软清除，落地后落脚带障碍保留（用户要求移除落地清障）', () => {
+  let landedCount = 0, retainedTotal = 0;
   for (const seed of [91001, 92003, 93007, 94009, 95021]) {
     const sim = flyingSim(seed);
     const s = sim.state;
     let glideFrames = 0, landed = -1, newClearsInGlide = 0;
-    const clearAt = new Map(); // 实体 → 首见时的 clearT（用于识别「滑翔期内新增软清除」）
+    const clearAt = new Map(); // 实体 → 首见时的 clearT（用于识别「新增软清除」）
+    let bandBefore = 0;
     for (let k = 0; k < 60 * 30; k++) {
       const wasGliding = s.gliding;
+      if (wasGliding) bandBefore = sim.obstacles.length; // 落地帧前快照实体集合
       sim.step();
       if (s.gliding) {
         glideFrames++;
@@ -87,11 +89,17 @@ test('滑翔着陆走廊：下滑路径无障碍，落地帧前方 30m 净空', 
     }
     assert.ok(glideFrames > 60 && landed > 0, `seed=${seed} 未观测到完整滑翔落地（frames=${glideFrames}）`);
     assert.equal(newClearsInGlide, 0, `seed=${seed} 滑翔期不得新增任何软清除（不清障设计），实际 ${newClearsInGlide}`);
-    const bandHits = sim.obstacles.filter(o => !o.done && o.worldZ - o.d / 2 < landed + 14 && o.worldZ + o.d / 2 > landed - 8).length;
-    assert.equal(bandHits, 0, `seed=${seed} 落地帧落脚带 ±8~14m 应净空，实际 ${bandHits}`);
+    // 落地帧同样不清障：本帧新出现的 clearT 必须为 0（旧版落地帧会清 ±8~14m，用户要求移除）
+    const landingClears = sim.obstacles.filter(o => o.clearT != null && o.clearT >= s.t - 1 / 60).length;
+    assert.equal(landingClears, 0, `seed=${seed} 落地帧不得清除任何障碍，实际 ${landingClears}`);
+    assert.ok(bandBefore > 0, `seed=${seed} 落地前赛道应有障碍实体`);
+    const retained = sim.obstacles.filter(o => !o.done && o.worldZ - o.d / 2 < landed + 14 && o.worldZ + o.d / 2 > landed - 8).length;
+    retainedTotal += retained; // 落脚带障碍保留（不清障）：跨 seed 累计应 >0
+    assert.ok(s.invulnT > 0.3, `seed=${seed} 落地应给 0.5s 免伤缓冲，实际 ${s.invulnT.toFixed(2)}`);
     landedCount++;
   }
   assert.equal(landedCount, 5);
+  assert.ok(retainedTotal > 0, `落地帧落脚带应保留障碍而非清除，5 seed 合计 ${retainedTotal}`);
 });
 
 test('续飞延展：飞行中再吃飞行道具，金币带/云团补铺到首段终点之后', () => {
@@ -111,27 +119,31 @@ test('续飞延展：飞行中再吃飞行道具，金币带/云团补铺到首�
   }
 });
 
-test('无无敌 30 seed：飞行/滑翔期不判死（滑翔段跳过判负），落地帧落脚带净空', () => {
-  let landed = 0;
+test('无无敌 30 seed：飞行/滑翔期不判死（滑翔段跳过判负），落地帧不清障', () => {
+  let landed = 0, retainedTotal = 0;
   for (let i = 0; i < 30; i++) {
     const seed = 500000 + i * 137;
     const sim = new RunnerSim(content, seed, 'char_volt');
     for (let k = 0; k < 60; k++) sim.step();
     sim.buffs.add('fly', { durationS: FLY_D }, 'item_jetpack', { distance: sim.state.distance, lane: sim.state.lane });
     const s = sim.state;
-    let landing = -1, killedAt = '';
+    let landing = -1, killedAt = '', retainedAtLanding = -1;
     for (let k = 0; k < 60 * 60; k++) {
       const flyT = sim.fx.flyT, wasGlide = s.gliding;
       sim.step();
       if (!s.alive) { killedAt = flyT > 0 ? 'flight' : wasGlide ? 'glide' : 'ground'; break; }
-      if (wasGlide && !s.gliding && s.y === 0 && landing < 0) landing = s.distance;
+      if (wasGlide && !s.gliding && s.y === 0 && landing < 0) {
+        landing = s.distance;
+        // 落地帧当场取样：此后继续跑会把带内障碍甩到身后被回收，取不到数
+        retainedAtLanding = sim.obstacles.filter(o => !o.done && o.worldZ - o.d / 2 < landing + 14 && o.worldZ + o.d / 2 > landing - 8).length;
+      }
     }
     assert.notEqual(killedAt, 'flight', `seed=${seed} 飞行期不应判死`);
     assert.notEqual(killedAt, 'glide', `seed=${seed} 滑翔期不应判死（清道失效）`);
     assert.ok(landing > 0, `seed=${seed} 应完成落地（landing=${landing}）`);
-    const bandHits = sim.obstacles.filter(o => !o.done && o.worldZ - o.d / 2 < landing + 14 && o.worldZ + o.d / 2 > landing - 8).length;
-    assert.equal(bandHits, 0, `seed=${seed} 落地帧落脚带 ±8~14m 应净空，实际 ${bandHits}`);
+    if (retainedAtLanding >= 0) retainedTotal += retainedAtLanding; // 死亡 seed 未采样到落地帧，跳过
     landed++;
   }
   assert.equal(landed, 30);
+  assert.ok(retainedTotal > 0, `落地帧落脚带应保留障碍，30 seed 合计 ${retainedTotal}`);
 });

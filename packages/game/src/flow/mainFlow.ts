@@ -13,6 +13,7 @@ import { RunnerSim } from '@tr/game/core/sim/runnerSim.js';
 import { createSceneMachine } from '@tr/game/core/scene/sceneMachine.js';
 import type { SceneName } from '@tr/game/core/scene/sceneMachine.js';
 import { hashSeed } from '@tr/game/core/rng.js';
+import { installTestApi, uninstallTestApi } from './testApi.js';
 import { createRunnerScene } from '@tr/game/render/runnerScene.js';
 import type { PlatformAdapter } from '@tr/framework/platform/platformAdapter.js';
 import type { GameViews, RunSummary } from './views.js';
@@ -30,6 +31,8 @@ export interface GameFlowDeps {
   /** config 解析器：web 侧 './{name}.json'，wx 侧 'config/{name}.json'（extras.readJson 消费点，S6 接 CDN） */
   configResolve: (name: string) => string;
   debug?: boolean;
+  /** 测试模式（?debug/?test）：run 局内挂载 __trTest 技能开关 API，供左侧测试面板消费 */
+  test?: boolean;
 }
 
 export interface GameFlow {
@@ -98,8 +101,12 @@ export function createGameFlow(deps: GameFlowDeps): GameFlow {
           onEnd: summary => machine.go('result', summary),
           debug: deps.debug,
         });
+        if (deps.test) installTestApi(sim, content); // 测试面板数据面：?debug/?test 才挂
       },
-      onExit: () => { scene?.dispose(); scene = null; hud?.dispose(); hud = null; },
+      onExit: () => {
+        scene?.dispose(); scene = null; hud?.dispose(); hud = null;
+        if (deps.test) uninstallTestApi(); // 局结束即卸载，避免 __trTest 指向已销毁的 sim
+      },
     },
     result: {
       onEnter: ctx => {

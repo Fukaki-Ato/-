@@ -18,6 +18,7 @@ import { installRunProbe, uninstallRunProbe } from './runDebugProbe.js';
 import { createSpeedLines } from './speedLines.js';
 import { createTrackVisuals } from './trackVisuals.js';
 import { createBurstPool } from './vfxBurst.js';
+import { createLightningFx, FLASH_LIGHT_GAIN, FLASH_TINT } from './lightning.js';
 
 export interface RunCallbacks {
   onHud(h: {
@@ -76,10 +77,16 @@ export function createRunnerScene(
   const camera = new THREE.PerspectiveCamera(rig0.fov, width / height, 0.1, 160);
   camera.position.set(0, rig0.camY, rig0.camZ);
   camera.lookAt(0, rig0.lookY, LOOK_AHEAD_Z);
-  scene.add(new THREE.HemisphereLight(0x9fb8ff, 0x0c1020, 1.1));
+  const hemi = new THREE.HemisphereLight(0x9fb8ff, 0x0c1020, 1.1);
+  const HEMI_BASE = 1.1;
   const keyLight = new THREE.DirectionalLight(0xffffff, 1.6);
+  const KEY_BASE = 1.6;
+  scene.add(hemi);
   keyLight.position.set(3, 8, 4);
   scene.add(keyLight);
+  /** 闪白（雷电）：背景/雾色的基色与目标色缓存，逐帧按闪白强度插值 */
+  const skyBase = new THREE.Color(sky.baseColor), flashTint = new THREE.Color(FLASH_TINT);
+  const lightning = createLightningFx(scene);
 
   const track = createTrackVisuals(scene, laneWidth, { baseColor: sky.baseColor, flashColor: sky.flashColor, tint });
   const avatar = createAvatar(scene, laneWidth, sim.loadout);
@@ -136,16 +143,23 @@ export function createRunnerScene(
       if (ev.type === 'coin') fireAtPlayer();
       else if (ev.type === 'helmetSave') { fireAtPlayer(); shakeT = 0.2; } // 头盔挡刀是关键时刻，给一次反馈
       else if (ev.type === 'hit') shakeT = 0.25;
-      else if (ev.type === 'death') endTimer = 0;
+      else if (ev.type === 'death') {
+        endTimer = 0;
+        // 闪电圈致死：雷电落到致死点（普通致死无位置字段，不触发）
+        if (ev.lane !== undefined && ev.worldZ !== undefined) lightning.strike(ev.lane, ev.worldZ, laneWidth);
+      }
       // 施放技能：爆点 + 轻微震屏，拖尾/光环等完整表现在 M4 T4.4
       else if (ev.type === 'cast') { fireAtPlayer(); shakeT = 0.12; }
       else if (ev.type === 'shieldBreak' || ev.type === 'boardBreak') { fireAtPlayer(); shakeT = 0.18; }
-      else if (ev.type === 'zap') { fireAtPlayer(ZAP_BURST_COLOR); shakeT = 0.32; } // 触电：黄光爆点+明显震屏
+      else if (ev.type === 'zap') {
+        fireAtPlayer(ZAP_BURST_COLOR); shakeT = 0.32;
+        lightning.strike(ev.lane, ev.worldZ, laneWidth); // MC 式雷电：天→落点 + 全场闪白
+      }
       // pickup：按用户要求不加特效与震动，仅 HUD 显示 buff 倒计时
     }
   }
 
-  function renderSim(alpha: number) {
+  function renderSim(alpha: number, dt: number) {
     const s = sim.state;
     // 插值距离：消除固定步长与渲染帧率不同步的跳动
     const dist = s.prevDistance + (s.distance - s.prevDistance) * alpha;
@@ -160,14 +174,21 @@ export function createRunnerScene(
     track.update(dist);
 
     // 相机：水平跟随人物，垂直按地面/空中两套目标平滑随动，注视点放远到 -11m。
-    // 目标全部由 cameraRig 派生：地面 s.y*0.5+2.7（人物略靠后，跳跃时前方金币留在画面内）；
-    // 空中（飞行/滑翔）机位抬到 s.y*0.75+3.6、后拉 z=10.8、注视点压回 s.y*0.28+0.8、
-    // FOV 68°——同帧装下地面障碍、角色与空中金币带，且与地面机位差 2m/2.4m/13° 肉眼可辨。
+    // 目标全部由 cameraRig 派生：地面 s.y*0.5+4.6、camZ 11.0（俯角 11.8°，三轮抬高后的口径）；
+    // 空中（飞行/滑翔）机位抬到 s.y*0.75+5.3、后拉 z=13.2、注视点压回 s.y*0.28+0.8、
+    // FOV 68°——同帧装下地面障碍、角色与空中金币带，且与地面机位差 1.85m/2.2m/13° 肉眼可辨。
     shakeT = Math.max(0, shakeT - SHAKE_DECAY);
     const sk = shakeT > 0 ? (Math.random() - 0.5) * SHAKE_AMP : 0;
     const airborne = fx.flyT > 0 || s.gliding;
     const boost = Math.max(0, fx.speedMul - 1); // 雷霆冲刺等提速 buff 的表现强度
     speedLines.update(dist, boost);
+    // 雷电闪白：灯光增益 + 背景/雾色向冷白插值（MC 闪电式全场变亮，约 0.26s 回落）
+    const flash = lightning.update(dt, dist);
+    hemi.intensity = HEMI_BASE + flash * FLASH_LIGHT_GAIN;
+    keyLight.intensity = KEY_BASE + flash * FLASH_LIGHT_GAIN;
+    const bg = scene.background as THREE.Color;
+    bg.copy(skyBase).lerp(flashTint, 0.85 * flash);
+    (scene.fog as THREE.Fog).color.copy(bg);
     const rig = camTargets(s.y, airborne);
     camX += (s.x - camX) * CAM_FOLLOW;
     camY += (rig.camY - camY) * CAM_FOLLOW;
@@ -214,7 +235,7 @@ export function createRunnerScene(
       acc -= STEP_DT;
     }
     bursts.update(dt, fx.magnetT > 0);
-    renderSim(acc / STEP_DT);
+    renderSim(acc / STEP_DT, dt);
 
     hudTimer += dt;
     if (hudTimer >= HUD_INTERVAL_S) { hudTimer = 0; pushHud(); }
@@ -235,6 +256,7 @@ export function createRunnerScene(
     adapter.cancelFrame(raf);
     offInput(); offResize(); offVisibility();
     if (cb.debug) uninstallRunProbe(); // ?debug 探针随场景销毁卸载，避免 __trRun 指向已销毁的 sim
+    lightning.dispose();
     renderer.dispose();
     scene.traverse(o => {
       const m = o as THREE.Mesh;

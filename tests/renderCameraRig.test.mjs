@@ -14,14 +14,17 @@ const root = join(fileURLToPath(import.meta.url), '..', '..');
 const game = JSON.parse(readFileSync(join(root, 'config', 'game.json'), 'utf8'));
 const FLIGHT_H = (game.params.flight ?? {}).heightM ?? 4.6; // 飞行高度（items.json 飞行道具升至此高度）
 
-test('地面机位：本轮抬高后的口径（Z 9.2 / Y 3.3+0.5 随动 / lookY 0.5 随动 / FOV 55）', () => {
+test('地面机位：三轮抬高后的口径（Z 11.0 / Y 4.6+0.5 随动 / lookY 0.5 随动 / FOV 55）', () => {
   const g0 = camTargets(0, false);
-  assert.equal(g0.camZ, 9.2);
-  assert.equal(g0.camY, 3.3);
+  assert.equal(g0.camZ, 11.0);
+  assert.equal(g0.camY, 4.6);
   assert.equal(g0.lookY, 0);
   assert.equal(g0.fov, FOV_GROUND);
-  assert.equal(camTargets(2, false).camY, 4.3, '跳跃时机位随动 0.5 口径不变');
+  assert.equal(camTargets(2, false).camY, 5.6, '跳跃时机位随动 0.5 口径不变');
   assert.equal(camTargets(2, false).lookY, 1);
+  // 俯角口径：机位/注视点纵深差 − 高度差 = 有效俯角，第三轮必须显著大于上一轮（9.3°→11.8°）
+  const pitch = Math.atan2(g0.camY, 11.0 + 11) * 180 / Math.PI;
+  assert.ok(pitch >= 11, `地面俯角应 ≥11°，实际 ${pitch.toFixed(1)}°`);
 });
 
 test('空中机位：飞行高度下与地面机位有可感知差值（camY ≥ +1.8m / camZ ≥ +2m / FOV ≥ +10°）', () => {
