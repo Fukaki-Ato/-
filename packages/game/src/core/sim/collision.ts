@@ -55,8 +55,12 @@ export function isNearMiss(o: ObstacleEntity, s: RunnerState, laneWidth: number)
   return gap > 0 && gap < NEAR_MISS_M;
 }
 
-/** 可站立载具（rideTop）的车顶落顶判定余量（米）：低于车顶该值以上视为撞前脸而非落顶 */
-export const RIDE_TOP_EPS = 0.08;
+/** 可站立载具（rideTop）的车顶落顶判定余量（米）：低于车顶该值以上视为撞前脸而非落顶。
+ *  0.15m：用户反馈落地容错太低，放宽一档（换道途中擦到车头顶沿也算落顶） */
+export const RIDE_TOP_EPS = 0.15;
+/** 登车斜坡（obs_mount_step）末端平顶长度（米）：坡顶接火车顶，提前置满高度再过列车判定窗
+ *  （inDepthWindow 有 DEPTH_SLACK 前瞻，没有平顶会在坡中段被判「撞前脸」） */
+export const RAMP_TOP_FLAT_M = 0.8;
 
 /** 纵向判定：低障要跳够、高杆要钻或跃顶、电弧地面要跳起、满格与载具只能换道 */
 export function hitsRunner(o: ObstacleEntity, s: RunnerState, laneWidth: number): boolean {

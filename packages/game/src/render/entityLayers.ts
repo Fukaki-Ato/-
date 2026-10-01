@@ -4,7 +4,7 @@
  */
 import * as THREE from 'three';
 import type { CloudEntity, ObstacleEntity, PickupEntity } from '@tr/game/core/sim/trackGen.js';
-import { obstacleX } from '@tr/game/core/sim/collision.js';
+import { RAMP_TOP_FLAT_M, obstacleX } from '@tr/game/core/sim/collision.js';
 
 /** 障碍配色（docs/05 §2：敌对品红/警示黄，可交互蓝青） */
 const OBS_COLOR: Record<string, number> = { low: 0xd9a24a, high: 0x7fd1ff, full: 0xff5fa2, vehicle: 0x4a6fd9, hazard: 0xb48cff, moving: 0xff5fa2, step: 0x9fd8ff };
@@ -27,6 +27,27 @@ const CLOUD_HIT_X = 2.6, CLOUD_SCATTER_T = 0.45;
 const SINK_T = 0.45, SINK_DROP_M = 1.6;
 /** 闪电圈（obs_lightning_circle）配色：黑色圆盘 + 黄色闪电标志 */
 const ZAP_DISC_COLOR = 0x0b0e16, ZAP_BOLT_COLOR = 0xffe14d;
+/** 登车斜坡（obs_mount_step）配色：远处看得出的金属坡道 */
+const RAMP_COLOR = 0x9fd8ff;
+
+/**
+ * 单位斜坡几何（沿 +z 为坡底/玩家侧，-z 为坡顶/火车侧；y 0→1 线性升高）。
+ * 与 core/sim movement.supportHeight 的 step 截面同源（末端平顶另用盒体拼，见 update）。
+ */
+function createRampGeometry(): THREE.BufferGeometry {
+  const A = [-0.5, 0, 0.5], B = [0.5, 0, 0.5], C = [0.5, 0, -0.5], D = [-0.5, 0, -0.5];
+  const E = [-0.5, 1, -0.5], F = [0.5, 1, -0.5];
+  const tris = [
+    A, C, B, A, D, C,        // 底
+    A, B, F, A, F, E,        // 坡面（法线朝上/朝玩家）
+    D, F, C, D, E, F,        // 后端（接火车）
+    A, E, D, B, C, F,        // 左右三角侧面
+  ];
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(tris.flat(), 3));
+  g.computeVertexNormals();
+  return g;
+}
 
 export function createObstacleLayer(scene: THREE.Scene, laneWidth: number) {
   const boxGeo = new THREE.BoxGeometry(1, 1, 1);
@@ -42,7 +63,11 @@ export function createObstacleLayer(scene: THREE.Scene, laneWidth: number) {
   boltShape.lineTo(0.04, 0.06);
   boltShape.closePath();
   const boltGeo = new THREE.ShapeGeometry(boltShape);
-  interface ObsUnit { bar: THREE.Mesh; posts: THREE.Mesh[]; band: THREE.Mesh; disc: THREE.Mesh; bolt: THREE.Mesh }
+  interface ObsUnit { bar: THREE.Mesh; posts: THREE.Mesh[]; band: THREE.Mesh; disc: THREE.Mesh; bolt: THREE.Mesh; ramp: THREE.Mesh; rampTop: THREE.Mesh }
+  const rampGeo = createRampGeometry();
+  const rampMat = new THREE.MeshStandardMaterial({
+    color: RAMP_COLOR, roughness: 0.35, metalness: 0.55, emissive: 0x1d4a63, emissiveIntensity: 0.6, side: THREE.DoubleSide,
+  });
   const units: ObsUnit[] = [];
   for (let i = 0; i < OBS_MAX; i++) {
     const bar = new THREE.Mesh(boxGeo, new THREE.MeshStandardMaterial({ roughness: 0.6 }));
@@ -64,7 +89,12 @@ export function createObstacleLayer(scene: THREE.Scene, laneWidth: number) {
     }));
     bolt.rotation.x = -Math.PI / 2; bolt.scale.setScalar(0.85);
     bolt.visible = false; scene.add(bolt);
-    units.push({ bar, posts, band, disc, bolt });
+    // 登车斜坡 = 坡面楔体 + 坡顶平台两段（与 movement 的 step 截面同源）
+    const ramp = new THREE.Mesh(rampGeo, rampMat);
+    ramp.visible = false; scene.add(ramp);
+    const rampTop = new THREE.Mesh(boxGeo, rampMat);
+    rampTop.visible = false; scene.add(rampTop);
+    units.push({ bar, posts, band, disc, bolt, ramp, rampTop });
   }
 
   const hideUnit = (u: ObsUnit) => {
@@ -72,6 +102,8 @@ export function createObstacleLayer(scene: THREE.Scene, laneWidth: number) {
     u.band.visible = false;
     u.disc.visible = false;
     u.bolt.visible = false;
+    u.ramp.visible = false;
+    u.rampTop.visible = false;
     for (const p of u.posts) p.visible = false;
   };
 
@@ -91,7 +123,7 @@ export function createObstacleLayer(scene: THREE.Scene, laneWidth: number) {
         // moving（摆锤/挡板）横摆位置与 core 判定同源（obstacleX：含「不得扫出路面」限幅与脏数据防呆）
         const ox = o.cls === 'moving' ? obstacleX(o, t, laneWidth) : o.lane * laneWidth;
         const m = u.bar;
-        m.visible = !isZap; // 闪电圈用圆盘+闪电标志表现，不画通用方块
+        m.visible = !isZap && o.cls !== 'step'; // 闪电圈用圆盘+闪电标志、斜坡用坡道几何，不画通用方块
         if (m.visible) {
           const mat = m.material as THREE.MeshStandardMaterial;
           mat.color.setHex(OBS_COLOR[o.cls] ?? 0xd9a24a);
@@ -116,6 +148,19 @@ export function createObstacleLayer(scene: THREE.Scene, laneWidth: number) {
           band.scale.set(o.w, HAZARD_BAND_H, o.d);
           band.position.set(ox, HAZARD_BAND_H / 2 - sinkY, z);
           (band.material as THREE.MeshBasicMaterial).opacity = (0.3 + 0.12 * Math.sin(t * 8 + ox * 1.7)) * (1 - sink);
+        }
+        // 登车斜坡：坡底贴地（+z/玩家侧）线性抬升，末端 RAMP_TOP_FLAT_M 平顶接火车顶
+        const isStep = o.cls === 'step';
+        u.ramp.visible = isStep;
+        u.rampTop.visible = isStep;
+        if (isStep) {
+          const slopeLen = Math.max(0.1, o.d - RAMP_TOP_FLAT_M);
+          u.ramp.scale.set(o.w, o.h, slopeLen);
+          u.ramp.position.set(ox, -sinkY, z - o.d / 2 + slopeLen / 2);
+          u.rampTop.scale.set(o.w, o.h, RAMP_TOP_FLAT_M);
+          u.rampTop.position.set(ox, o.h / 2 - sinkY, z + o.d / 2 - RAMP_TOP_FLAT_M / 2);
+          rampMat.opacity = 1 - sink;
+          rampMat.transparent = sink > 0;
         }
         // 闪电圈：黑色圆盘 + 黄色闪电标志（加色混合、按帧闪烁）
         u.disc.visible = isZap;

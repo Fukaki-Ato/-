@@ -12,6 +12,7 @@ import { BuffEngine, type BuffView, type FxState } from '../effects/buffEngine.j
 import { buildLoadout, itemEffects, type EffectSpec, type Loadout } from './character.js';
 import { collectCoins, collectPickups, type CollectDeps } from './collect.js';
 import { hitsRunner, inDepthWindow, isNearMiss, relZ, safestLane } from './collision.js';
+import { clearSkyCoins } from './landing.js';
 import { Movement } from './movement.js';
 import { resolveHit, type HitCtx } from './resolveHit.js';
 import { TrackGen, type CloudEntity, type CoinEntity, type ObstacleEntity, type PickupEntity } from './trackGen.js';
@@ -215,6 +216,7 @@ export class RunnerSim {
     if (fx.avoidLookahead > 0) s.lane = safestLane(this.obstacles, s, fx.avoidLookahead);
     this.mv.advanceLateral(s, STEP_DT);
     this.mv.advanceVertical(s, fx, STEP_DT);
+    if (this.mv.landedThisStep) clearSkyCoins(this.coinsArr); // 着陆回收空中金币带（用户反馈：回地面后天上的金币应消失）
 
     this.gen.ensure(s.distance, GEN_AHEAD_M, this.obstacles, this.coinsArr, this.pickupsArr);
     this.collide();

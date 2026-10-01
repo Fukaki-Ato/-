@@ -7,7 +7,8 @@
  * 5. 闪电圈：无护具第一次受创、第二次致死（不走普通 hits）；有护盾/头盔先被电掉；跳跃可避
  * 6. 空中金币不再铺满三道（按 laneGroupWeights 抽 1/2/3 道）
  * 7. 落地走廊软清除：障碍保留在数组（done+clearT 下沉动画）但不再判负，掠过身后被回收
- * 8. 登车板（step）：赤脚无弹跳鞋也能登上静止火车——跑过自动上板、踏板起跳落顶
+ * 8. 登车斜坡（step）：赤脚无弹跳鞋也能登上静止火车——沿可走上去的斜坡走上车顶
+ * 8b. 弹跳鞋高度口径：配置 mul 下越 2.6m 高杆有充足时间窗口（用户反馈容错太低）
  * 9. 火车不撞火车：冲撞体沿途撞飞普通障碍，但撞不动 rideTop 列车
  * 10. 弹跳鞋跃过高杆：高度口径 <2.6 判中、≥顶可越；赤脚跳不过、穿鞋可越、滑铲可过
  */
@@ -38,6 +39,9 @@ function grant(sim, primitive, params) {
   sim.buffs.add(primitive, params, primitive, { distance: sim.state.distance, lane: sim.state.lane });
 }
 
+/** 弹跳鞋倍率读配置（不写死）：items.json item_boots 的 jumpBoost.mul */
+const BOOTS_MUL = content.items.items.find(i => i.id === 'item_boots').effects[0].mul;
+
 // ---------------- 1. 移动挡板可跳 + 限幅 ----------------
 
 test('移动挡板：跳够高度可越过（moving+jumpable）；横摆限幅不出路面且极端相位仍压到最外侧车道', () => {
@@ -65,7 +69,7 @@ test('弹跳鞋上车顶：列车顶可落可站（rideTop）；赤脚同一时�
     const sim = cleanSim(seed);
     const train = { obsRef: 'obs_train_static', cls: 'vehicle', w: 2.0, h: 2.4, d: 24, lane: 0, worldZ: sim.state.distance + 40, rideTop: true };
     sim.obstacles.push(train);
-    if (boots) grant(sim, 'jumpBoost', { durationS: 30, mul: 1.15 });
+    if (boots) grant(sim, 'jumpBoost', { durationS: 30, mul: BOOTS_MUL });
     const front = train.worldZ - train.d / 2;
     let jumped = false, rodeOn = false, hit = false;
     for (let i = 0; i < 60 * 8 && sim.state.alive; i++) {
@@ -267,25 +271,47 @@ test('落地帧不清障：带内障碍原样保留（不软清除），落地 0
 
 // ---------------- 8. 登车板（step）：赤脚也能上静止火车 ----------------
 
-test('登车板：跑过自动上板、踏板起跳落火车顶（无弹跳鞋）', () => {
+test('登车斜坡：赤脚不起跳，沿可走上去的斜坡走上火车顶（坡中高度随深度线性升高）', () => {
   const sim = cleanSim(311);
   const s = sim.state;
-  const step = { obsRef: 'obs_mount_step', cls: 'step', w: 2.0, h: 0.6, d: 3.0, lane: 0, worldZ: s.distance + 10 };
-  const train = { obsRef: 'obs_train_static', cls: 'vehicle', w: 2.0, h: 2.4, d: 24, lane: 0, worldZ: s.distance + 25, rideTop: true };
-  sim.obstacles.push(step, train);
-  let steppedUp = false, rodeOn = false;
-  for (let i = 0; i < 60 * 8 && sim.state.alive; i++) {
-    // 贴上板面（支撑面把 y 抬到 0.6、垂直速度归零）的那一刻从踏板起跳——不需要弹跳鞋
-    if (!steppedUp && Math.abs(s.y - 0.6) < 1e-6 && s.vy === 0 && s.distance >= step.worldZ - step.d / 2) {
-      steppedUp = true;
-      sim.applyAction('jump');
+  // 斜坡：坡底贴地、坡顶接火车前脸（与 pat_train_top_run 模板同构：坡远端 = 列车近端）
+  const ramp = { obsRef: 'obs_mount_step', cls: 'step', w: 2.0, h: 2.4, d: 6, lane: 0, worldZ: s.distance + 20 };
+  const train = { obsRef: 'obs_train_static', cls: 'vehicle', w: 2.0, h: 2.4, d: 24, lane: 0, worldZ: ramp.worldZ + ramp.d / 2 + 12, rideTop: true };
+  sim.obstacles.push(ramp, train);
+  let midRampY = -1, midRampZ = 0, midErr = 0, rodeOn = false;
+  for (let i = 0; i < 60 * 12 && sim.state.alive; i++) {
+    sim.step(); // 全程不给任何输入：能不能上车只靠「走」
+    const z = s.distance - ramp.worldZ;
+    if (midRampY < 0 && z > -0.5 && z < 0.5) { // 坡中取样：截面高度应≈2.4*(0.5+z/4)
+      midRampY = s.y; midRampZ = z;
+      midErr = Math.abs(s.y - ramp.h * Math.min(1, (z + ramp.d / 2) / (ramp.d - 0.8)));
     }
-    sim.step();
-    if (sim.obstacles.includes(train) && Math.abs(s.y - 2.4) < 1e-6 && s.vy === 0) rodeOn = true;
+    if (Math.abs(s.y - 2.4) < 1e-6 && s.vy === 0 && s.distance > train.worldZ - 12) rodeOn = true;
+    if (s.distance > train.worldZ + train.d / 2 + 1) break; // 骑过整列车即证明登车成功，不再往后跑（后续生成内容与本用例无关）
   }
-  assert.ok(steppedUp, '跑到板子上应自动贴上板面（y=0.6）');
-  assert.ok(rodeOn, '踏板起跳应落上火车顶（y=2.4）');
+  assert.ok(midRampY > 0.8 && midRampY < 1.6, `坡中应被抬到约 1.2m（0.8~1.6m），实际 ${midRampY.toFixed(2)}`);
+  assert.ok(midErr < 0.05, `坡中高度应贴合斜坡截面（z=${midRampZ.toFixed(2)}，实际 ${midRampY.toFixed(2)}）`);
+  assert.ok(rodeOn, '赤脚沿坡应走上火车顶（吸附 y=2.4 且 vy=0）');
   assert.ok(sim.state.alive, '登车全程不应判负');
+});
+
+// ---------------- 8b. 弹跳鞋高度口径 ----------------
+
+test('弹跳鞋高度口径：配置 mul 下顶点与越 2.6m 高杆的时间窗口都富裕（用户反馈高度不够、容错太低）', () => {
+  const { gravity, jumpVelocity } = content.game.params.runner;
+  const g = -gravity;
+  const apex = (jumpVelocity * BOOTS_MUL) ** 2 / (2 * g);
+  assert.ok(BOOTS_MUL >= 1.4, `弹跳鞋倍率应 ≥1.4（实际 ${BOOTS_MUL}）`);
+  assert.ok(apex > 4, `弹跳鞋顶点应 >4m（实际 ${apex.toFixed(2)}m）`);
+  // 越杆窗口：抛物线上高于 2.6m 的持续时间（秒）——容错的量化口径
+  const v = jumpVelocity * BOOTS_MUL, h = 2.6;
+  const disc = v * v - 2 * g * h;
+  assert.ok(disc > 0, '弹跳鞋顶点必须高于杆顶');
+  const win = 2 * Math.sqrt(disc) / g;
+  assert.ok(win >= 0.6, `越杆时间窗口应 ≥0.6s（实际 ${win.toFixed(2)}s）`);
+  // 赤脚顶点必须仍低于杆顶：否则弹跳鞋失去存在意义
+  const bareApex = jumpVelocity ** 2 / (2 * g);
+  assert.ok(bareApex < h, `赤脚顶点应 <2.6m（实际 ${bareApex.toFixed(2)}m）`);
 });
 
 // ---------------- 9. 火车不撞火车 ----------------
@@ -316,17 +342,17 @@ test('弹跳鞋跃过高杆：赤脚跳不过、穿鞋可越、滑铲可过', ()
   const runner = (y, sliding = false) => ({ x: 0, y, sliding, t: 0 });
   assert.equal(hitsRunner(gate, runner(1.0), 2.2), true, '杆体区间（1.2~2.6m）站立必中');
   assert.equal(hitsRunner(gate, runner(2.4), 2.2), true, '赤脚跳顶点 2.4 < 2.6 仍判中');
-  assert.equal(hitsRunner(gate, runner(3.2), 2.2), false, '弹跳鞋顶点约 3.2 > 2.6 可越过高杆');
+  assert.equal(hitsRunner(gate, runner(3.2), 2.2), false, '弹跳鞋顶点 > 2.6 可越过高杆');
   assert.equal(hitsRunner(gate, runner(0, true), 2.2), false, '滑铲从杆下通过');
 
   const run = (boots, seed) => {
     const sim = cleanSim(seed);
     const g = { obsRef: 'obs_gate_low', cls: 'high', w: 2, h: 2.6, d: 0.6, lane: 0, worldZ: sim.state.distance + 40 };
     sim.obstacles.push(g);
-    if (boots) grant(sim, 'jumpBoost', { durationS: 30, mul: 1.15 });
+    if (boots) grant(sim, 'jumpBoost', { durationS: 30, mul: BOOTS_MUL });
     let jumped = false, hit = false;
     for (let i = 0; i < 60 * 6 && sim.state.alive; i++) {
-      // 弹跳鞋 y≥2.6 的窗口只覆盖起跳点前方约 2.3~7.5m：在 4.5m 处起跳，过杆时仍在杆顶之上
+      // 弹跳鞋 y≥2.6 的窗口覆盖起跳点前方一段：在 4.5m 处起跳，过杆时仍在杆顶之上
       const gap = g.worldZ - sim.state.distance;
       if (!jumped && gap <= 4.5 && gap > 0.5) { sim.applyAction('jump'); jumped = true; }
       sim.step();

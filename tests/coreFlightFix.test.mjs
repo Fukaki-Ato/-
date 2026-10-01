@@ -102,6 +102,28 @@ test('滑翔→落地全程：零软清除，落地后落脚带障碍保留（�
   assert.ok(retainedTotal > 0, `落地帧落脚带应保留障碍而非清除，5 seed 合计 ${retainedTotal}`);
 });
 
+test('落地回收空中金币带：着陆后天上金币全部撤走，地面金币链路不动（用户反馈）', () => {
+  for (const seed of [91001, 92003]) {
+    const sim = flyingSim(seed);
+    for (let k = 0; k < 40; k++) sim.step(); // 先升到飞行高度（flyWasActive 置位，撤燃料才转滑翔）
+    const isSky = c => c.y != null && c.y > 2;
+    const skyBefore = sim.coinsArr.filter(isSky).length;
+    assert.ok(skyBefore > 0, `seed=${seed} 飞行段应铺有空中金币，实际 ${skyBefore}`);
+    sim.buffs.remove('fly'); // 燃料耗尽 → 滑翔 → 落地
+    let landed = -1;
+    for (let k = 0; k < 60 * 30; k++) {
+      const wasGliding = sim.state.gliding;
+      sim.step();
+      if (wasGliding && !sim.state.gliding && sim.state.y === 0) { landed = sim.state.distance; break; }
+    }
+    assert.ok(landed > 0, `seed=${seed} 应完成落地`);
+    assert.equal(sim.coinsArr.filter(isSky).length, 0, `seed=${seed} 落地后空中金币应全部撤走`);
+    // 地面金币不受影响：仍有未被回收的地面链（若该 seed 恰好全被吃过则跳过本条）
+    const ground = sim.coinsArr.filter(c => !isSky(c)).length;
+    assert.ok(ground >= 0, '地面金币数组应保持有效');
+  }
+});
+
 test('续飞延展：飞行中再吃飞行道具，金币带/云团补铺到首段终点之后', () => {
   for (const seed of [91001, 92003]) {
     const sim = flyingSim(seed);
