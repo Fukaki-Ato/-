@@ -7,10 +7,12 @@
  * 地面与角色之间形成俯角，同帧装下地面赛道、角色与空中金币带。
  */
 
-/** 地面机位（审计 T1：机位抬高后拉 Z 7.4→8.4、Y 1.9→2.7，lookY 随动 0.5） */
-export const CAM_Z_GROUND = 8.4, CAM_Y_BASE_GROUND = 2.7, CAM_Y_RATIO_GROUND = 0.5;
-/** 空中机位（飞行/滑翔）：4.6m 高度下 camY=7.05、camZ=10.8、lookY=2.09、FOV 68 */
-export const CAM_Z_AIR = 10.8, CAM_AIR_Y_BASE = 3.6, CAM_AIR_Y_RATIO = 0.75;
+/** 地面机位：T1 审计 Z 7.4→8.4、Y 1.9→2.7；本轮用户要求「地上视角再高一些」
+ *  → Y 2.7→3.3、Z 8.4→9.2（俯角 7.9°→9.3°，前方赛道/障碍更早入画，人物不放大） */
+export const CAM_Z_GROUND = 9.2, CAM_Y_BASE_GROUND = 3.3, CAM_Y_RATIO_GROUND = 0.5;
+/** 空中机位（飞行/滑翔）：4.6m 高度下 camY=7.65、camZ=11.6、lookY=2.09、FOV 68；
+ *  地面机位抬高后同步上抬，保持空中/地面肉眼可辨（camY +2.05m / camZ +2.4m / FOV +13°） */
+export const CAM_Z_AIR = 11.6, CAM_AIR_Y_BASE = 4.2, CAM_AIR_Y_RATIO = 0.75;
 export const LOOK_AIR_Y_BASE = 0.8, LOOK_AIR_Y_RATIO = 0.28;
 /** 视野：地面 55°，空中 68°（高空广角） */
 export const FOV_GROUND = 55, FOV_AIR = 68;

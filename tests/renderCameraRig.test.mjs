@@ -14,13 +14,13 @@ const root = join(fileURLToPath(import.meta.url), '..', '..');
 const game = JSON.parse(readFileSync(join(root, 'config', 'game.json'), 'utf8'));
 const FLIGHT_H = (game.params.flight ?? {}).heightM ?? 4.6; // 飞行高度（items.json 飞行道具升至此高度）
 
-test('地面机位：历史口径不变（Z 8.4 / Y 2.7+0.5 随动 / lookY 0.5 随动 / FOV 55）', () => {
+test('地面机位：本轮抬高后的口径（Z 9.2 / Y 3.3+0.5 随动 / lookY 0.5 随动 / FOV 55）', () => {
   const g0 = camTargets(0, false);
-  assert.equal(g0.camZ, 8.4);
-  assert.equal(g0.camY, 2.7);
+  assert.equal(g0.camZ, 9.2);
+  assert.equal(g0.camY, 3.3);
   assert.equal(g0.lookY, 0);
   assert.equal(g0.fov, FOV_GROUND);
-  assert.equal(camTargets(2, false).camY, 3.7, '跳跃时机位随动 0.5 口径不变');
+  assert.equal(camTargets(2, false).camY, 4.3, '跳跃时机位随动 0.5 口径不变');
   assert.equal(camTargets(2, false).lookY, 1);
 });
 
