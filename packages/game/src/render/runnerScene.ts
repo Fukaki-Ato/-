@@ -55,9 +55,13 @@ export function createRunnerScene(
   /** 滑翔倒计时换算：core 以 heightM/glideS 匀速下降（movement.ts），HUD 显示与 s.gliding 一致的真实剩余秒数 */
   const flight = (content.game.params.flight ?? {}) as Record<string, number>;
   const glideFallMps = (flight.heightM ?? 4.6) / (flight.glideS ?? 1.8);
-  const theme = (content.themes.items ?? []).find(t => t.id === 'theme_neon_city');
-  const sky = (theme?.sky ?? { baseColor: '#0B1226', flashColor: '#9FD8FF' }) as { baseColor: string; flashColor: string };
-  const tint = (theme?.vfxTint as string | undefined) ?? '#7FD1FF';
+  // 默认主题 = 首个 live 条目（主题切换尚未做，先不硬编码 id，避免删主题时漏改）
+  const themeItems = (content.themes.items ?? []) as Record<string, unknown>[];
+  const theme = themeItems.find(t => t['status'] === 'live') ?? themeItems[0];
+  const sky = (theme?.sky ?? { baseColor: '#8ED0F2', flashColor: '#FFF3C4' }) as { baseColor: string; flashColor: string };
+  const fogColor = ((theme?.fog as Record<string, unknown> | undefined)?.color as string | undefined) ?? sky.baseColor;
+  const tint = (theme?.vfxTint as string | undefined) ?? '#FFD98A';
+  const groundColor = (theme?.groundColor as string | undefined) ?? '#E3CFA4';
   /** buff 派生视图：引擎原地更新同一个对象，渲染层缓存引用安全（docs/09 T2.2） */
   const fx = sim.fx;
 
@@ -71,16 +75,20 @@ export function createRunnerScene(
   renderer.setSize(width, height, false);
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(sky.baseColor);
-  scene.fog = new THREE.Fog(sky.baseColor, FOG_NEAR, FOG_FAR);
+  scene.fog = new THREE.Fog(fogColor, FOG_NEAR, FOG_FAR);
   const camera = new THREE.PerspectiveCamera(FOV_GROUND, width / height, 0.1, 160);
   camera.position.set(0, CAM_Y_BASE, CAM_Z);
   camera.lookAt(0, 0, LOOK_AHEAD_Z);
-  scene.add(new THREE.HemisphereLight(0x9fb8ff, 0x0c1020, 1.1));
-  const keyLight = new THREE.DirectionalLight(0xffffff, 1.6);
+  // 白天海滨的光：半球光天空浅蓝/地面暖沙，主光偏暖阳色（夜景那套冷光会让晴天发灰）
+  scene.add(new THREE.HemisphereLight(0xbfe3ff, 0xd8c39a, 1.15));
+  const keyLight = new THREE.DirectionalLight(0xfff2d0, 1.9);
   keyLight.position.set(3, 8, 4);
   scene.add(keyLight);
 
-  const track = createTrackVisuals(scene, laneWidth, { baseColor: sky.baseColor, flashColor: sky.flashColor, tint });
+  const track = createTrackVisuals(scene, laneWidth, {
+    baseColor: sky.baseColor, flashColor: sky.flashColor, tint, groundColor,
+    sky: { zenith: sky.baseColor, horizon: fogColor },
+  });
   const avatar = createAvatar(scene, laneWidth, sim.loadout);
   const coinField = createCoinField(scene, laneWidth);
   const obstacleLayer = createObstacleLayer(scene, laneWidth);
