@@ -243,11 +243,12 @@ test('滑翔期不清障：远处障碍全程保留（不再「近处消失远�
   assert.ok(glided && landed > 0, '应完成滑翔落地');
   assert.ok(!clearedDuringGlide, '滑翔期不得清除任何障碍（用户要求：滑翔完全不清障）');
   assert.ok(marker.done !== true, '落地带（±8~14m）之外的障碍应原样保留，不被清除');
-  assert.ok(sim.state.alive, '滑翔末段免伤 + 落地缓冲下不应判死');
+  assert.ok(sim.state.alive, '滑翔期不判负（落地后判罚另见下条用例）');
 });
 
-test('落地帧不清障：带内障碍原样保留（不软清除），落地 0.5s 免伤窗口内不判死', () => {
+test('落地帧不清障不给无敌：带内障碍原样保留，落地即恢复判定（无免伤窗口）', () => {
   const sim = new RunnerSim(content, 311, 'char_volt');
+  sim.state.t = 20; // 越过新手保护（protectionS）：只测落地判定，不吃教程保护
   for (let k = 0; k < 60; k++) sim.step();
   const s = sim.state;
   grant(sim, 'fly', { durationS: 2 });
@@ -255,17 +256,22 @@ test('落地帧不清障：带内障碍原样保留（不软清除），落地 0
   let pushed = false, landed = -1, invulnAtLanding = 0;
   for (let i = 0; i < 60 * 20; i++) {
     const wasGliding = s.gliding;
-    // 滑翔末段（高度已低于判定线、免伤生效）把障碍放到落脚点前 3m：验证它一路不被清、落地帧也不被清
-    if (!pushed && s.gliding && s.y < 1.5 && s.y > 0.2) { inBand.worldZ = s.distance + 3; sim.obstacles.push(inBand); pushed = true; }
+    // 滑翔末段（即将贴地）把障碍放到落脚点前 4m：落地时还没接触到（本帧不撞），
+    // 之后无无敌护着，再跑约 2m 就应撞上判负
+    if (!pushed && s.gliding && s.y < 0.35 && s.y > 0.05) { inBand.worldZ = s.distance + 4; sim.obstacles.push(inBand); pushed = true; }
     sim.step();
     if (inBand.clearT != null && s.gliding) throw new Error('滑翔期不应软清除带内障碍');
     if (wasGliding && !s.gliding && s.y === 0) { landed = s.distance; invulnAtLanding = s.invulnT; break; }
   }
   assert.ok(pushed && landed > 0, '应完成滑翔落地');
+  // 用户要求「飞行落下的时候不要无敌」：落地瞬间无免伤窗口
+  assert.equal(invulnAtLanding, 0, `落地帧不应给无敌，实际 ${invulnAtLanding}`);
   // 用户要求：落地时障碍自动消失这个行为移除——带内障碍保持原状（不下沉、不渐隐、不摘除）
   assert.ok(inBand.done !== true && inBand.clearT == null, '落地帧不得软清除带内障碍（用户要求移除落地清障）');
-  assert.ok(sim.state.alive, '落地 0.5s 免伤窗口内不应判死');
-  assert.ok(invulnAtLanding >= 0.49, `落地应给 0.5s 免伤缓冲，实际 ${invulnAtLanding.toFixed(2)}`);
+  // 落地后无保护：再往前走几步就会撞上带内障碍判负（证明判定已恢复）
+  let died = false;
+  for (let i = 0; i < 60; i++) { sim.step(); if (!sim.state.alive) { died = true; break; } }
+  assert.ok(died, '落地后无无敌，撞上保留的障碍应判负');
   assert.ok(sim.obstacles.includes(inBand), '带内障碍实体应仍在赛道数组中（不清障）');
 });
 
@@ -312,6 +318,34 @@ test('弹跳鞋高度口径：配置 mul 下顶点与越 2.6m 高杆的时间窗
   // 赤脚顶点必须仍低于杆顶：否则弹跳鞋失去存在意义
   const bareApex = jumpVelocity ** 2 / (2 * g);
   assert.ok(bareApex < h, `赤脚顶点应 <2.6m（实际 ${bareApex.toFixed(2)}m）`);
+});
+
+// ---------------- 8c. 滑翔落火车顶 ----------------
+
+test('滑翔落到火车顶：下方是 rideTop 列车时正常落在车顶（不穿模、不判负、不给无敌）', () => {
+  const sim = cleanSim(313);
+  const s = sim.state;
+  // 火车的位置 = 滑翔末段下方：飞行 2s（2.5 倍速约 60m）+ 滑翔约 1.8s（滑翔速约 19m/s）
+  const train = { obsRef: 'obs_train_static', cls: 'vehicle', w: 2.0, h: 2.4, d: 24, lane: s.lane, worldZ: s.distance + 78, rideTop: true };
+  sim.obstacles.push(train);
+  grant(sim, 'fly', { durationS: 2 });
+  let landedY = -1, landedOnTrain = false;
+  for (let i = 0; i < 60 * 8 && sim.state.alive; i++) {
+    const wasGliding = s.gliding;
+    sim.step();
+    if (wasGliding && !s.gliding) {
+      landedY = s.y;
+      landedOnTrain = Math.abs(s.y - train.h) < 1e-6; // 支撑面吸附到车顶高度且 vy=0
+      break;
+    }
+  }
+  assert.ok(landedY >= 0, '应结束滑翔');
+  assert.ok(landedOnTrain, `应落在 2.4m 车顶上（实际 y=${landedY}）`);
+  assert.equal(s.invulnT, 0, '落在车顶同样不给无敌（用户要求：落下不要无敌）');
+  assert.ok(sim.state.alive, '落车顶不应判负');
+  // 站在车顶上继续跑：支撑面保持，仍存活
+  for (let i = 0; i < 60; i++) sim.step();
+  assert.ok(sim.state.alive && Math.abs(s.y - 2.4) < 1e-6, '应继续站在车顶');
 });
 
 // ---------------- 9. 火车不撞火车 ----------------

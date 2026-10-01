@@ -149,16 +149,19 @@ export function createObstacleLayer(scene: THREE.Scene, laneWidth: number) {
           band.position.set(ox, HAZARD_BAND_H / 2 - sinkY, z);
           (band.material as THREE.MeshBasicMaterial).opacity = (0.3 + 0.12 * Math.sin(t * 8 + ox * 1.7)) * (1 - sink);
         }
-        // 登车斜坡：坡底贴地（+z/玩家侧）线性抬升，末端 RAMP_TOP_FLAT_M 平顶接火车顶
+        // 登车斜坡：坡面 + 末端平顶两段，位置与 movement 的 step 截面同源。
+        // 坡面覆盖偏移 w∈[-d/2, d/2-flat]（入口贴地→出口满高），渲染上低端在近玩家侧、高端在火车侧；
+        // 平顶覆盖 w∈[d/2-flat, d/2]（火车侧），必须画在 -z 端——写反会变成一堵竖在入口的
+        // 2.4m 高挡板（用户反馈「上火车这块的挡板」的根因）。
         const isStep = o.cls === 'step';
         u.ramp.visible = isStep;
         u.rampTop.visible = isStep;
         if (isStep) {
           const slopeLen = Math.max(0.1, o.d - RAMP_TOP_FLAT_M);
           u.ramp.scale.set(o.w, o.h, slopeLen);
-          u.ramp.position.set(ox, -sinkY, z - o.d / 2 + slopeLen / 2);
+          u.ramp.position.set(ox, -sinkY, z + o.d / 2 - slopeLen / 2);
           u.rampTop.scale.set(o.w, o.h, RAMP_TOP_FLAT_M);
-          u.rampTop.position.set(ox, o.h / 2 - sinkY, z + o.d / 2 - RAMP_TOP_FLAT_M / 2);
+          u.rampTop.position.set(ox, o.h / 2 - sinkY, z - o.d / 2 + RAMP_TOP_FLAT_M / 2);
           rampMat.opacity = 1 - sink;
           rampMat.transparent = sink > 0;
         }

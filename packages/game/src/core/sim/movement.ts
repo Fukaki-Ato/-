@@ -105,10 +105,18 @@ export class Movement {
     }
     if (s.gliding) {
       this.decayPending();
+      // 滑翔中也认支撑面：下方是火车顶/坡顶就正常落上去（用户要求「下面有火车就落在火车上面」）。
+      // rideTop 需已到顶面附近（RIDE_TOP_EPS）才给支撑，因此不会从火车侧面穿进车体。
+      const glideFloor = this.supportHeight(s);
+      if (s.y <= glideFloor + 1e-4) {
+        s.y = glideFloor; s.vy = 0; s.gliding = false; this.landedThisStep = true;
+        applyLandingSafety(s, true);
+        return;
+      }
       s.y -= (this.fly.heightM / this.fly.glideS) * dt;              // 匀速滑翔下滑
       const landed = s.y <= 0;
       if (landed) { s.y = 0; s.gliding = false; this.landedThisStep = true; }
-      // 着陆安全：滑翔期与落地帧都不清障（障碍全程保留）；落地只给 0.5s 免伤缓冲
+      // 着陆安全：滑翔期与落地帧都不清障、不给无敌（用户要求：落下时不要无敌）
       applyLandingSafety(s, landed);
       return;
     }

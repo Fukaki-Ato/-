@@ -85,6 +85,7 @@ test('滑翔→落地全程：零软清除，落地后落脚带障碍保留（�
           if (o.clearT != null) newClearsInGlide++;
         }
       }
+      if (s.gliding && s.y < 0.2) s.invulnT = 0; // 本用例自带 1e9 无敌只用于防误判死：落地前清零，才能验证「落地不给无敌」
       if (wasGliding && !s.gliding && s.y === 0) { landed = s.distance; break; }
     }
     assert.ok(glideFrames > 60 && landed > 0, `seed=${seed} 未观测到完整滑翔落地（frames=${glideFrames}）`);
@@ -95,7 +96,7 @@ test('滑翔→落地全程：零软清除，落地后落脚带障碍保留（�
     assert.ok(bandBefore > 0, `seed=${seed} 落地前赛道应有障碍实体`);
     const retained = sim.obstacles.filter(o => !o.done && o.worldZ - o.d / 2 < landed + 14 && o.worldZ + o.d / 2 > landed - 8).length;
     retainedTotal += retained; // 落脚带障碍保留（不清障）：跨 seed 累计应 >0
-    assert.ok(s.invulnT > 0.3, `seed=${seed} 落地应给 0.5s 免伤缓冲，实际 ${s.invulnT.toFixed(2)}`);
+    assert.equal(s.invulnT, 0, `seed=${seed} 落地不应给无敌（用户要求：飞行落下不要无敌），实际 ${s.invulnT.toFixed(2)}`);
     landedCount++;
   }
   assert.equal(landedCount, 5);
