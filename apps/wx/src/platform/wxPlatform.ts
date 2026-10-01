@@ -35,6 +35,10 @@ export function createWxAdapter(options: WxAdapterOptions = {}): PlatformAdapter
 
   const storage = createWxStorage(wx);
   const input = createWxInput(wx, now);
+  // 小游戏的 requestAnimationFrame/cancelAnimationFrame 是 GameGlobal 上的全局函数，不在 wx 上
+  // （开发者工具实测 wx.requestAnimationFrame 为 undefined）；单测走 options.wx 注入的那份 mock。
+  const globalFrame = globalThis as unknown as WxLike;
+  const frame = typeof globalFrame.requestAnimationFrame === 'function' ? globalFrame : wx;
 
   return {
     version: 2,
@@ -44,8 +48,8 @@ export function createWxAdapter(options: WxAdapterOptions = {}): PlatformAdapter
     storage,
     fetchJson: url => wxFetchJson(wx, url),
 
-    requestFrame: cb => wx.requestAnimationFrame(() => cb(now())), // 忽略原生入参（K12/D12）
-    cancelFrame: handle => wx.cancelAnimationFrame(handle),
+    requestFrame: cb => frame.requestAnimationFrame(() => cb(now())), // 忽略原生入参（K12/D12）
+    cancelFrame: handle => frame.cancelAnimationFrame(handle),
 
     onVisibility(cb) {
       const show = () => cb(false);

@@ -240,3 +240,47 @@ test('extras.share 透传 wx.shareAppMessage（S9 编排带分口令）', () => 
   assert.equal(m.shareArg.title, '我跑了 1234 分');
   assert.equal(m.shareArg.query, 'score=1234');
 });
+
+// 微信小游戏实测：rAF/cAF 在 GameGlobal 上，wx 对象上根本没有这两个方法。
+// 下面的 mock 特意保留了 wx.requestAnimationFrame，用来验证「有全局就用全局」这条优先级。
+test('requestFrame 优先用 GameGlobal 的 rAF，不用 wx.requestAnimationFrame', () => {
+  const m = makeWxMock();
+  let globalCalls = 0;
+  globalThis.requestAnimationFrame = () => { globalCalls++; return 9999; };
+  globalThis.cancelAnimationFrame = () => {};
+  try {
+    createWxAdapter({ wx: m.wx }).requestFrame(() => {});
+    assert.equal(globalCalls, 1, '必须走全局 rAF');
+    assert.equal(m.raf.cbs.size, 0, '不该再走 wx.requestAnimationFrame');
+  } finally {
+    delete globalThis.requestAnimationFrame;
+    delete globalThis.cancelAnimationFrame;
+  }
+});
+
+test('无全局 rAF 时回落注入的 wx（node 单测与旧基础库路径）', () => {
+  const m = makeWxMock();
+  createWxAdapter({ wx: m.wx }).requestFrame(() => {});
+  assert.equal(m.raf.cbs.size, 1, '回落时仍由注入的 wx 驱动');
+});
+
+// three 判定 isWebGL2 用的是「全局类存在 && 上下文构造器名 === WebGL2RenderingContext」，
+// 而微信不暴露那个全局类 → 适配器必须补，但只能补真 WebGL2 上下文。
+test('mainCanvas 仅在上下文构造器名匹配时暴露 WebGL2RenderingContext', () => {
+  const saved = globalThis.WebGL2RenderingContext;
+  delete globalThis.WebGL2RenderingContext;
+  try {
+    const neg = makeWxMock();
+    createWxAdapter({ wx: neg.wx }).canvas.mainCanvas();
+    assert.equal(globalThis.WebGL2RenderingContext, undefined, '普通对象不能被当成 WebGL2 上下文暴露出去');
+
+    const FakeCtor = { name: 'WebGL2RenderingContext' };
+    const pos = makeWxMock();
+    pos.wx.createCanvas = () => ({ width: 300, height: 150, getContext: () => ({ constructor: FakeCtor }) });
+    createWxAdapter({ wx: pos.wx }).canvas.mainCanvas();
+    assert.equal(globalThis.WebGL2RenderingContext, FakeCtor, '真 WebGL2 上下文必须补上全局类');
+  } finally {
+    if (saved) globalThis.WebGL2RenderingContext = saved;
+    else delete globalThis.WebGL2RenderingContext;
+  }
+});
