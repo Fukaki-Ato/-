@@ -11,6 +11,7 @@ import type { RunnerSim } from '@tr/game/core/sim/runnerSim.js';
 import type { GameContent } from '@tr/game/core/config/configTypes.js';
 import type { GLCanvas, PlatformAdapter, WindowSize } from '@tr/framework/platform/platformAdapter.js';
 import { createAvatar } from './avatarRig.js';
+import { camTargets } from './cameraRig.js';
 import { createCoinField } from './coinField.js';
 import { createCloudLayer, createObstacleLayer, createPickupLayer } from './entityLayers.js';
 import { installRunProbe, uninstallRunProbe } from './runDebugProbe.js';
@@ -28,14 +29,10 @@ export interface RunCallbacks {
   debug?: boolean;
 }
 
-/** 相机参数（docs/02 §8：跟随人物但不 1:1 抬高，否则近处地面会翻出画面下沿）
- *  审计 T1：机位抬高后拉（Z 7.4→8.4、Y 1.9→2.7）并把 lookY 随动降到 0.5，
- *  跳跃时前方金币仍在画面内，人物略靠后。 */
-const CAM_Z = 8.4, CAM_Y_BASE = 2.7, CAM_FOLLOW = 0.25, CAM_Y_RATIO = 0.5, LOOK_AHEAD_Z = -11;
-/** 飞行/滑翔机位（审计 T2）：独立目标，更高更远、注视点抬高，保证金币与云在画面里；过渡仍走 CAM_FOLLOW */
-/** 用户反馈「飞到天上时视角往上挪一点」：空中机位与注视点整体上抬，看得见更远的空中金币带 */
-const CAM_AIR_Y_RATIO = 0.55, CAM_AIR_Y_BASE = 2.6, LOOK_AIR_Y_RATIO = 0.35, LOOK_AIR_Y_BASE = 1.0;
-const FOV_GROUND = 55, FOV_AIR = 64, FOV_LERP = 0.06;
+/** 相机参数（docs/02 §8：跟随人物但不 1:1 抬高，否则近处地面会翻出画面下沿）。
+ *  机位/注视点/FOV 目标统一由 cameraRig.ts 纯函数派生（地面/空中两套，可回归测试），
+ *  这里只保留平滑系数与注视点纵深；审计 T1/T2 的历史口径见 cameraRig.ts 注释。 */
+const CAM_FOLLOW = 0.25, FOV_LERP = 0.06, LOOK_AHEAD_Z = -11;
 /** 加速（speedMul>1）的视野扩张：按 (speedMul-1) 线性加宽并封顶（雷霆冲刺一类技能要看得见加速） */
 const SPEED_FOV_PER_MUL = 70, SPEED_FOV_MAX = 10;
 /** 震屏：每帧衰减量与随机幅度 */
@@ -73,9 +70,10 @@ export function createRunnerScene(
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(sky.baseColor);
   scene.fog = new THREE.Fog(sky.baseColor, FOG_NEAR, FOG_FAR);
-  const camera = new THREE.PerspectiveCamera(FOV_GROUND, width / height, 0.1, 160);
-  camera.position.set(0, CAM_Y_BASE, CAM_Z);
-  camera.lookAt(0, 0, LOOK_AHEAD_Z);
+  const rig0 = camTargets(0, false);
+  const camera = new THREE.PerspectiveCamera(rig0.fov, width / height, 0.1, 160);
+  camera.position.set(0, rig0.camY, rig0.camZ);
+  camera.lookAt(0, rig0.lookY, LOOK_AHEAD_Z);
   scene.add(new THREE.HemisphereLight(0x9fb8ff, 0x0c1020, 1.1));
   const keyLight = new THREE.DirectionalLight(0xffffff, 1.6);
   keyLight.position.set(3, 8, 4);
@@ -122,7 +120,7 @@ export function createRunnerScene(
 
   // ---------- 主循环：固定步长推进 + 插值渲染 ----------
   let raf = 0, last = adapter.now(), acc = 0, hudTimer = 0, shakeT = 0, endTimer = -1, ended = false, running = true;
-  let camY = CAM_Y_BASE, lookY = 0, camX = 0; // 相机平滑状态（初值=稳态，避免首帧俯仰跳动）
+  let camY = rig0.camY, lookY = rig0.lookY, camX = 0; // 相机平滑状态（初值=稳态，避免首帧俯仰跳动）
   let paused = false; // 后台暂停位（见下方 onVisibility）
 
   // ---------- 后台可见性（§7.9）：进后台冻结 tick 累计，回前台把 last 对齐避免 dt 尖峰 ----------
@@ -159,23 +157,23 @@ export function createRunnerScene(
     track.update(dist);
 
     // 相机：水平跟随人物，垂直按地面/空中两套目标平滑随动，注视点放远到 -11m。
-    // 地面目标：s.y*0.5 + 2.7 / lookY s.y*0.5（人物略靠后，跳跃时前方金币留在画面内）。
-    // 空中目标（飞行或滑翔）：s.y*0.55 + 2.2 / lookY s.y*0.35 + 0.4，配合 FOV_AIR 保持开阔。
+    // 目标全部由 cameraRig 派生：地面 s.y*0.5+2.7（人物略靠后，跳跃时前方金币留在画面内）；
+    // 空中（飞行/滑翔）机位抬到 s.y*0.75+3.6、后拉 z=10.8、注视点压回 s.y*0.28+0.8、
+    // FOV 68°——同帧装下地面障碍、角色与空中金币带，且与地面机位差 2m/2.4m/13° 肉眼可辨。
     shakeT = Math.max(0, shakeT - SHAKE_DECAY);
     const sk = shakeT > 0 ? (Math.random() - 0.5) * SHAKE_AMP : 0;
     const airborne = fx.flyT > 0 || s.gliding;
     const boost = Math.max(0, fx.speedMul - 1); // 雷霆冲刺等提速 buff 的表现强度
     speedLines.update(dist, boost);
-    const tgtCamY = airborne ? s.y * CAM_AIR_Y_RATIO + CAM_AIR_Y_BASE : s.y * CAM_Y_RATIO + CAM_Y_BASE;
-    const tgtLookY = airborne ? s.y * LOOK_AIR_Y_RATIO + LOOK_AIR_Y_BASE : s.y * CAM_Y_RATIO;
+    const rig = camTargets(s.y, airborne);
     camX += (s.x - camX) * CAM_FOLLOW;
-    camY += (tgtCamY - camY) * CAM_FOLLOW;
-    lookY += (tgtLookY - lookY) * CAM_FOLLOW;
+    camY += (rig.camY - camY) * CAM_FOLLOW;
+    lookY += (rig.lookY - lookY) * CAM_FOLLOW;
     camera.position.x = camX + sk;
     camera.position.y = camY + sk;
-    camera.position.z = CAM_Z;
+    camera.position.z = rig.camZ;
     camera.lookAt(camX, lookY, LOOK_AHEAD_Z);
-    const targetFov = (airborne ? FOV_AIR : FOV_GROUND) + Math.min(SPEED_FOV_MAX, boost * SPEED_FOV_PER_MUL); // 空中视野略广；加速再扩
+    const targetFov = rig.fov + Math.min(SPEED_FOV_MAX, boost * SPEED_FOV_PER_MUL); // 空中视野更广；加速再扩
     if (Math.abs(camera.fov - targetFov) > 0.1) {
       camera.fov += (targetFov - camera.fov) * FOV_LERP;
       camera.updateProjectionMatrix();
