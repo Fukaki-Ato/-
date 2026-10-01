@@ -7,6 +7,9 @@
  * 5. 闪电圈：无护具第一次受创、第二次致死（不走普通 hits）；有护盾/头盔先被电掉；跳跃可避
  * 6. 空中金币不再铺满三道（按 laneGroupWeights 抽 1/2/3 道）
  * 7. 落地走廊软清除：障碍保留在数组（done+clearT 下沉动画）但不再判负，掠过身后被回收
+ * 8. 登车板（step）：赤脚无弹跳鞋也能登上静止火车——跑过自动上板、踏板起跳落顶
+ * 9. 火车不撞火车：冲撞体沿途撞飞普通障碍，但撞不动 rideTop 列车
+ * 10. 弹跳鞋跃过高杆：高度口径 <2.6 判中、≥顶可越；赤脚跳不过、穿鞋可越、滑铲可过
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -233,4 +236,77 @@ test('着陆走廊软清除：障碍保留在数组（done+clearT 下沉）但�
   assert.ok(observedSoft, '着陆走廊障碍应被软清除（done+clearT），而不是整批一帧消失');
   assert.ok(removed, '软清除实体应在被掠过后由 cull 回收');
   assert.ok(sim.state.alive, '软清除后走廊内不应再有可判负障碍');
+});
+
+// ---------------- 8. 登车板（step）：赤脚也能上静止火车 ----------------
+
+test('登车板：跑过自动上板、踏板起跳落火车顶（无弹跳鞋）', () => {
+  const sim = cleanSim(311);
+  const s = sim.state;
+  const step = { obsRef: 'obs_mount_step', cls: 'step', w: 2.0, h: 0.6, d: 3.0, lane: 0, worldZ: s.distance + 10 };
+  const train = { obsRef: 'obs_train_static', cls: 'vehicle', w: 2.0, h: 2.4, d: 24, lane: 0, worldZ: s.distance + 25, rideTop: true };
+  sim.obstacles.push(step, train);
+  let steppedUp = false, rodeOn = false;
+  for (let i = 0; i < 60 * 8 && sim.state.alive; i++) {
+    // 贴上板面（支撑面把 y 抬到 0.6、垂直速度归零）的那一刻从踏板起跳——不需要弹跳鞋
+    if (!steppedUp && Math.abs(s.y - 0.6) < 1e-6 && s.vy === 0 && s.distance >= step.worldZ - step.d / 2) {
+      steppedUp = true;
+      sim.applyAction('jump');
+    }
+    sim.step();
+    if (sim.obstacles.includes(train) && Math.abs(s.y - 2.4) < 1e-6 && s.vy === 0) rodeOn = true;
+  }
+  assert.ok(steppedUp, '跑到板子上应自动贴上板面（y=0.6）');
+  assert.ok(rodeOn, '踏板起跳应落上火车顶（y=2.4）');
+  assert.ok(sim.state.alive, '登车全程不应判负');
+});
+
+// ---------------- 9. 火车不撞火车 ----------------
+
+test('火车不撞火车：冲撞体撞飞普通障碍，但撞不动 rideTop 列车', () => {
+  const sim = cleanSim(312);
+  const s = sim.state;
+  const rusher = { obsRef: 'obs_rusher_long', cls: 'vehicle', w: 2.0, h: 2.4, d: 8, lane: 0, worldZ: s.distance + 90, moveZ: -8 };
+  const victim = { obsRef: 'obs_box', cls: 'low', w: 2.0, h: 1.2, d: 1.2, lane: 0, worldZ: s.distance + 78 };
+  const train = { obsRef: 'obs_train_static', cls: 'vehicle', w: 2.0, h: 2.4, d: 24, lane: 0, worldZ: s.distance + 60, rideTop: true };
+  sim.obstacles.push(rusher, victim, train);
+  let sawSmash = false, moved = false;
+  for (let i = 0; i < 60 * 12 && sim.state.alive; i++) {
+    const before = rusher.worldZ;
+    sim.step();
+    if (rusher.worldZ < before) moved = true;
+    if (victim.done && victim.clearT != null) sawSmash = true;
+    assert.ok(train.clearT == null, '列车不得被冲撞体撞飞（火车不撞火车）');
+  }
+  assert.ok(moved, '冲撞体应向玩家逼近');
+  assert.ok(sawSmash, '冲撞体仍应撞飞沿途普通障碍');
+});
+
+// ---------------- 10. 弹跳鞋跃过高杆 ----------------
+
+test('弹跳鞋跃过高杆：赤脚跳不过、穿鞋可越、滑铲可过', () => {
+  const gate = { obsRef: 'obs_gate_low', cls: 'high', w: 2, h: 2.6, d: 0.6, lane: 0, worldZ: 0 };
+  const runner = (y, sliding = false) => ({ x: 0, y, sliding, t: 0 });
+  assert.equal(hitsRunner(gate, runner(1.0), 2.2), true, '杆体区间（1.2~2.6m）站立必中');
+  assert.equal(hitsRunner(gate, runner(2.4), 2.2), true, '赤脚跳顶点 2.4 < 2.6 仍判中');
+  assert.equal(hitsRunner(gate, runner(3.2), 2.2), false, '弹跳鞋顶点约 3.2 > 2.6 可越过高杆');
+  assert.equal(hitsRunner(gate, runner(0, true), 2.2), false, '滑铲从杆下通过');
+
+  const run = (boots, seed) => {
+    const sim = cleanSim(seed);
+    const g = { obsRef: 'obs_gate_low', cls: 'high', w: 2, h: 2.6, d: 0.6, lane: 0, worldZ: sim.state.distance + 40 };
+    sim.obstacles.push(g);
+    if (boots) grant(sim, 'jumpBoost', { durationS: 30, mul: 1.15 });
+    let jumped = false, hit = false;
+    for (let i = 0; i < 60 * 6 && sim.state.alive; i++) {
+      // 弹跳鞋 y≥2.6 的窗口只覆盖起跳点前方约 2.3~7.5m：在 4.5m 处起跳，过杆时仍在杆顶之上
+      const gap = g.worldZ - sim.state.distance;
+      if (!jumped && gap <= 4.5 && gap > 0.5) { sim.applyAction('jump'); jumped = true; }
+      sim.step();
+      for (const e of sim.drainEvents()) if (e.type === 'hit' || e.type === 'death') hit = true;
+    }
+    return { alive: sim.state.alive, hit };
+  };
+  assert.ok(run(true, 321).alive && !run(true, 321).hit, '穿弹跳鞋应能跃过高杆');
+  assert.ok(run(false, 322).hit || !run(false, 322).alive, '赤脚跳不高杆必中');
 });

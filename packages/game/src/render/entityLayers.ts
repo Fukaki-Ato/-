@@ -7,7 +7,7 @@ import type { CloudEntity, ObstacleEntity, PickupEntity } from '@tr/game/core/si
 import { obstacleX } from '@tr/game/core/sim/collision.js';
 
 /** 障碍配色（docs/05 §2：敌对品红/警示黄，可交互蓝青） */
-const OBS_COLOR: Record<string, number> = { low: 0xd9a24a, high: 0x7fd1ff, full: 0xff5fa2, vehicle: 0x4a6fd9, hazard: 0xb48cff, moving: 0xff5fa2 };
+const OBS_COLOR: Record<string, number> = { low: 0xd9a24a, high: 0x7fd1ff, full: 0xff5fa2, vehicle: 0x4a6fd9, hazard: 0xb48cff, moving: 0xff5fa2, step: 0x9fd8ff };
 /** 道具箱配色（未列出的道具用白色；正式贴图见 docs/05 §6） */
 const PICKUP_COLOR: Record<string, number> = { item_magnet: 0xb48cff, item_boots: 0x43d9a3 };
 const OBS_MAX = 40, PICKUP_MAX = 8, CLOUD_MAX = 12;

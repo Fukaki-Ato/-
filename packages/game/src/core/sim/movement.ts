@@ -24,6 +24,8 @@ const DIVE_VY = -20;
 const RISE_LERP = 3.2;
 /** 判定「仍在空中」的高度阈值（米） */
 const AIRBORNE_Y = 0.2;
+/** 板子（step）可踏上升级的容差（米）：板高 0.6 内、地面起跑即视为可踏面，跑过自动上板 */
+const STEP_UP_TOL = 0.8;
 
 export class Movement {
   /** 起身后的滑铲冷却（禁止连续下滑） */
@@ -113,22 +115,25 @@ export class Movement {
     if (this.pendingJump > 0) { this.pendingJump--; if (s.y <= this.floorY + 0.05) { this.jump(s, fx); this.pendingJump = 0; } }
     if (this.pendingSlide > 0) { this.pendingSlide--; if (s.y <= 0) { this.slide(s, fx); this.pendingSlide = 0; } }
     this.floorY = this.supportHeight(s); // 先判支撑后积分：用位移前的 y 判定，避免穿入车体
-    if (s.y > 0 || s.vy > 0) {
+    // floorY>s.y（地面起跑踏上板子）也要进积分：否则贴不上支撑面，会从板子上穿过去
+    if (s.y > 0 || s.vy > 0 || this.floorY > s.y) {
       s.vy += this.P.gravity * dt;
       s.y += s.vy * dt;
-      if (s.y <= this.floorY) { s.y = this.floorY; s.vy = 0; } // 落到地面或列车顶
+      if (s.y <= this.floorY) { s.y = this.floorY; s.vy = 0; } // 落到/贴上地面、板子或列车顶
     }
     if (s.sliding) { s.slideT -= dt; if (s.slideT <= 0) this.cancelSlide(s); }
   }
 
-  /** 可站立支撑面：与玩家横向/深度重叠、且玩家已在顶面之上的 rideTop 障碍（列车）取最高者 */
+  /** 可站立支撑面：rideTop 列车（需已到顶面附近）或 step 板子（地面起跑即可踏上）取最高者 */
   private supportHeight(s: RunnerState): number {
     let h = 0;
     for (const o of this.obstacles) {
-      if (o.rideTop !== true || o.done) continue;
+      if (o.done) continue;
+      const tol = o.rideTop === true ? RIDE_TOP_EPS : o.cls === 'step' ? STEP_UP_TOL : 0;
+      if (tol <= 0) continue;
       if (!inDepthWindow(o, s.distance - o.worldZ)) continue;
       if (lateralGap(o, s, this.P.laneWidth) > 0) continue;
-      if (s.y >= o.h - RIDE_TOP_EPS) h = Math.max(h, o.h);
+      if (s.y >= o.h - tol) h = Math.max(h, o.h);
     }
     return h;
   }

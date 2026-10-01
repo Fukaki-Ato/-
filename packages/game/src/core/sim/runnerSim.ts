@@ -252,6 +252,7 @@ export class RunnerSim {
     const s = this.state;
     for (const b of this.obstacles) {
       if (b === rusher || b.done) continue;
+      if (b.rideTop === true) continue; // 火车不撞火车：rideTop 载具（列车）不可被冲撞体撞飞
       if (b.lane !== rusher.lane) continue;
       if (Math.abs(b.worldZ - rusher.worldZ) >= (rusher.d + b.d) / 2 + 0.2) continue;
       b.done = true;

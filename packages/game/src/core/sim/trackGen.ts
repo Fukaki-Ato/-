@@ -16,7 +16,7 @@ import { spawnSkyContent } from './trackSky.js';
 
 export interface ObstacleEntity {
   obsRef: string;
-  cls: 'low' | 'high' | 'full' | 'moving' | 'hazard' | 'vehicle';
+  cls: 'low' | 'high' | 'full' | 'moving' | 'hazard' | 'vehicle' | 'step';
   w: number; h: number; d: number;
   lane: number;
   worldZ: number;
