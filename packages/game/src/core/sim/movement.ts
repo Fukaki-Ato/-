@@ -5,7 +5,7 @@
  */
 import type { FxState } from '../effects/buffEngine.js';
 import { PENDING_STEPS, type RunnerState } from './simTypes.js';
-import { clearLandingPath } from './landing.js';
+import { applyLandingSafety } from './landing.js';
 import type { ObstacleEntity, TrackGen } from './trackGen.js';
 
 /** game.json runner 段中被运动学使用的键 */
@@ -103,8 +103,8 @@ export class Movement {
       s.y -= (this.fly.heightM / this.fly.glideS) * dt;              // 匀速滑翔下滑
       const landed = s.y <= 0;
       if (landed) { s.y = 0; s.gliding = false; }
-      // 着陆安全：清「剩余下滑路径」；落地帧清净空缓冲（用户反馈：飞行结束直接摔死）
-      clearLandingPath(this.gen, this.obstacles, s, this.fly.heightM / this.fly.glideS, (s.distance - s.prevDistance) / dt, landed);
+      // 着陆安全：滑翔期不清障（障碍全保留）；落地帧只清落脚点一小段 + 短免伤缓冲
+      applyLandingSafety(this.gen, this.obstacles, s, landed);
       return;
     }
     if (this.pendingJump > 0) { this.pendingJump--; if (s.y <= 0) { this.jump(s, fx); this.pendingJump = 0; } }
