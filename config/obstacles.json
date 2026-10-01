@@ -121,7 +121,6 @@
       ],
       "jumpable": true,
       "rideTop": true,
-      "moveZ": -3.5,
       "model": {
         "prefab": "assets/obstacles/train24.glb"
       },
@@ -134,6 +133,35 @@
           "ver": "1.0.0",
           "date": "2026-09-22",
           "change": "首发"
+        },
+        {
+          "ver": "1.8.0",
+          "date": "2026-10-01",
+          "change": "静止化：用户反馈火车不该在视野里移动撞到别的障碍/火车（moveZ 移除）"
+        }
+      ]
+    },
+    {
+      "id": "obs_mount_step",
+      "class": "step",
+      "status": "live",
+      "size": [
+        2.0,
+        0.6,
+        3.0
+      ],
+      "jumpable": true,
+      "model": {
+        "prefab": "assets/obstacles/board.glb"
+      },
+      "themes": [
+        "theme_neon_city"
+      ],
+      "versions": [
+        {
+          "ver": "1.8.0",
+          "date": "2026-10-01",
+          "change": "新增：登车板（地铁逃生式板子）。纯支撑面不判负，跑过自动踏上升级，踏板上起跳即可登上火车顶"
         }
       ]
     },
@@ -568,20 +596,26 @@
       "minDifficulty": 4,
       "weight": 14,
       "lengthSegments": 2,
-      "cells": [
-        {
-          "segment": 0,
-          "lane": 0,
-          "offsetM": 2,
-          "obsRef": "obs_train_slow"
-        },
-        {
-          "segment": 0,
-          "lane": 0,
-          "offsetM": 2,
-          "surface": "trainTop",
-          "coins": 12
-        },
+  "cells": [
+    {
+      "segment": 0,
+      "lane": 0,
+      "offsetM": 0,
+      "obsRef": "obs_mount_step"
+    },
+    {
+      "segment": 0,
+      "lane": 0,
+      "offsetM": 14,
+      "obsRef": "obs_train_slow"
+    },
+    {
+      "segment": 0,
+      "lane": 0,
+      "offsetM": 14,
+      "surface": "trainTop",
+      "coins": 12
+    },
         {
           "segment": 1,
           "lane": -1,

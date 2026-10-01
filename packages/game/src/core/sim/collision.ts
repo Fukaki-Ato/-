@@ -63,6 +63,7 @@ export function hitsRunner(o: ObstacleEntity, s: RunnerState, laneWidth: number)
   if (lateralGap(o, s, laneWidth) > 0) return false;
   const playerH = s.sliding ? 0.7 : 1.7;
   if (o.cls === 'low') return s.y < o.h * 0.75;
+  if (o.cls === 'step') return false; // 板子：纯支撑面，永不判负（用于无弹跳鞋登火车）
   if (o.cls === 'high') return s.y < o.h && s.y + playerH > BAR_BOTTOM;
   if (o.cls === 'hazard') return s.y < 0.35;
   if (o.cls === 'moving') return o.jumpable ? s.y < o.h * 0.75 : true; // 摆锤 jumpable=true：跳够高度即可越过
