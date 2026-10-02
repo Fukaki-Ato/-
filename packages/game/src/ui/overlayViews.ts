@@ -6,18 +6,21 @@
  */
 import type { GameContent } from '@tr/game/core/config/configTypes.js';
 import type {
-  BootHandle, GameViews, HudHandle, ResultActions, RunSummary, SelectActions, StartActions, StartHandle,
+  BootHandle, GameViews, HudHandle, ResultActions, RunSummary, SelectActions, SelectExtras, StartActions, StartHandle,
 } from '../flow/views.js';
 import type { EntryMethod } from '../flow/session.js';
 import type { UiHost } from '@tr/framework/ui/host.js';
 import { buildBootPage } from './bootView.js';
 import { buildStartPage } from './startView.js';
-import { buildSelectPage } from './menuView.js';
+import { buildLobbyPage } from './lobbyView.js';
 import { buildHudPage } from './hudView.js';
 import { buildResultPage } from './resultView.js';
+import type { IconSet } from './icons.js';
 
 export interface OverlayViewsDeps {
   host: UiHost;
+  /** 大厅图标贴图（壳侧加载注入；缺省时图标位退化为空槽） */
+  icons?: IconSet;
 }
 
 export type OverlayViews = GameViews;
@@ -43,8 +46,15 @@ export function createOverlayViews(deps: OverlayViewsDeps): OverlayViews {
       actions: SelectActions,
       currentCharId: string,
       entry: EntryMethod | null,
+      extras?: SelectExtras,
     ): void {
-      host.mount(buildSelectPage(host, { content, actions, currentCharId, entry }).view);
+      host.mount(buildLobbyPage(host, {
+        content,
+        actions,
+        currentCharId,
+        entry,
+        extras: { coins: extras?.coins ?? 0, diamonds: extras?.diamonds ?? 0, icons: deps.icons },
+      }).view);
     },
 
     mountHud(): HudHandle {

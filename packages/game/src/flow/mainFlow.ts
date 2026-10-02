@@ -27,6 +27,12 @@ export const BEST_KEY = 'thunderrun:best';
 const LEGACY_BEST_KEY = 'thunderrun:b\u2026st';
 export const CHAR_KEY = 'thunderrun:character';
 export const DEFAULT_CHAR = 'char_volt';
+/** 累计金币（大厅顶栏展示；结算时累加写入） */
+export const COINS_KEY = 'thunderrun:coins-total';
+/** 钻石总和（大厅顶栏展示；获取渠道待后续玩法接入，先预留键） */
+export const DIAMOND_KEY = 'thunderrun:diamonds-total';
+/** 大厅「场景切换」所选主题 id（run 进局时消费） */
+export const THEME_KEY = 'thunderrun:theme';
 
 export interface GameFlowDeps {
   adapter: PlatformAdapter;
@@ -79,6 +85,11 @@ export function createGameFlow(deps: GameFlowDeps): GameFlow {
   };
   /** 上次选的角色（本机记忆；账号级保存在 S9 接 extras.cloud 后端） */
   let charId = adapter.storage.get(CHAR_KEY) ?? DEFAULT_CHAR;
+  /** 本机累计计数读取（脏值按 0，不把 NaN 带进大厅展示） */
+  const readCount = (key: string): number => {
+    const n = Number(adapter.storage.get(key) ?? '0');
+    return Number.isFinite(n) && n > 0 ? n : 0;
+  };
   /** 上次在开始页选的入口（本机记忆，选角页展示） */
   let entry: EntryMethod | null = readEntry(adapter.storage);
   /** 开始页进入代次：登录 promise 回来时若已离开/重进开始页则丢弃结果 */
@@ -125,7 +136,7 @@ export function createGameFlow(deps: GameFlowDeps): GameFlow {
         if (content) views.renderSelect(content, {
           onStartRun: id => { charId = id; adapter.storage.set(CHAR_KEY, id); machine.go('run'); },
           onBack: () => machine.go('start'),
-        }, charId, entry);
+        }, charId, entry, { coins: readCount(COINS_KEY), diamonds: readCount(DIAMOND_KEY) });
       },
     },
     run: {
@@ -145,7 +156,7 @@ export function createGameFlow(deps: GameFlowDeps): GameFlow {
           onCast: () => audio?.onCast(),
           onPickup: () => audio?.onPickup(),
           debug: deps.debug,
-        });
+        }, { themeId: adapter.storage.get(THEME_KEY) ?? undefined });
       },
       // 已死亡时 exitRun 保留死亡 BGM 到结算页；中途退出则停 run BGM
       onExit: () => { scene?.dispose(); scene = null; hud?.dispose(); hud = null; audio?.exitRun(); },
@@ -157,6 +168,8 @@ export function createGameFlow(deps: GameFlowDeps): GameFlow {
         if (content && summary.charId) summary.charName = buildLoadout(content, summary.charId).name;
         const best = bestScore();
         if (summary.score > best) adapter.storage.set(BEST_KEY, String(summary.score));
+        const coinsGot = summary.coins ?? 0;
+        if (coinsGot > 0) adapter.storage.set(COINS_KEY, String(readCount(COINS_KEY) + coinsGot));
         views.renderResult(summary, best, {
           onRetry: () => machine.go('run'),
           onSelect: () => machine.go('select'),

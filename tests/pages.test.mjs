@@ -1,15 +1,15 @@
 /**
  * S5 页面流转测试（node 端 view model：不渲染像素、不建 WebGL 上下文）。
  * 覆盖：UiHost+页面构造器（headless，three 对象只建不画）、页面信息与交互断言
- * （开始页恰好两个入口 + web 置灰微信登录、选角页可滑动 List/返回/入口方式、HUD onHud 推送、
+ * （开始页恰好两个入口 + web 置灰微信登录、大厅四段布局/角色弹层 List/入口方式、HUD onHud 推送、
  * 结算含技能释放次数）、createGameFlow 真实主流程（boot→start→select→result→select，run 需 GL 不进 node）。
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { Button, Label, List, defaultUiConfig, findBox } from '../packages/framework/dist/ui/index.js';
+import { Box, Button, Label, List, defaultUiConfig, findBox } from '../packages/framework/dist/ui/index.js';
 import { UiHost } from '../packages/framework/dist/ui/host.js';
 import { createOverlayViews } from '../packages/game/dist/ui/overlayViews.js';
-import { createGameFlow, BEST_KEY, CHAR_KEY } from '../packages/game/dist/flow/mainFlow.js';
+import { createGameFlow, BEST_KEY, CHAR_KEY, COINS_KEY } from '../packages/game/dist/flow/mainFlow.js';
 import { ENTRY_KEY } from '../packages/game/dist/flow/session.js';
 import { loadAllConfig } from '../packages/game/dist/core/config/configLoader.js';
 import { CONTENT_NAMES } from '../packages/game/dist/core/config/configTypes.js';
@@ -82,8 +82,8 @@ function seedConfigCache(adapter) {
   }
 }
 
-function clickWidget(host, w) {
-  const box = findBox(host.overlay.tree, w.id);
+function clickWidget(host, w, tree = host.overlay.tree) {
+  const box = findBox(tree, w.id);
   const x = box.rect.x + box.rect.w / 2, y = box.rect.y + box.rect.h / 2;
   host.pushInput({ type: 'down', x, y, t: 0 });
   host.pushInput({ type: 'up', x, y, t: 0.05 });
@@ -147,9 +147,9 @@ test('start 页：setBusy 锁两个按钮、setFeedback 错误文案上树', () 
   assert.ok(texts(host).includes('微信登录失败：网络异常'));
 });
 
-// ---------------- select 页（可滑动 List） ----------------
+// ---------------- select 页（大厅：四段布局 + 角色弹层 List） ----------------
 
-test('select 页：List 渲染角色卡、点选换角色写本机、开始按钮回传所选', async () => {
+test('select 页（大厅）：四段布局齐全、角色弹层点选换角色写本机、开始按钮回传所选', async () => {
   const { host, adapter } = hostFixture();
   const report = await loadContent();
   const chars = playableCharacters(report.content);
@@ -162,39 +162,58 @@ test('select 页：List 渲染角色卡、点选换角色写本机、开始按�
   }, chars[0].id, 'guest');
   view2Pass(host);
 
+  const t0 = texts(host);
+  for (const s of ['商店', '角色', '宝箱', '福利手册', '成就', '任务', '活动', '登录方式：游客登录']) {
+    assert.ok(t0.includes(s), `大厅板块 ${s} 可见，实得 ${JSON.stringify(t0)}`);
+  }
+  for (const s of ['开始·酷跑', '场景切换']) {
+    assert.ok(allButtons(host).includes(s), `主动作按钮 ${s} 可见`);
+  }
+
+  // 点底部四联框「角色」格（Box onClick）开弹层
+  const charCell = findWidget(host, w => w instanceof Box && w.children.some(ch => ch instanceof Label && ch.getText() === '角色'));
+  assert.ok(charCell, '角色格存在');
+  clickWidget(host, charCell);
+  // 弹层是挂载后动态加入：overlay.tree 只在 mount/tick 更新，headless 取 relayout 返回值拿新树
+  host.overlay.current.relayout();
+  const tree = host.overlay.current.relayout();
+
   const list = findWidget(host, w => w instanceof List);
   assert.ok(list, '角色行 = List 控件');
   assert.ok(list.visibleWindow.end - list.visibleWindow.start >= 2, '横向窗口至少渲染 2 张卡');
-  assert.equal(adapter.storage.get(CHAR_KEY), chars[0].id);
 
   // 点第二张卡：内容坐标 = List 视口左缘 + itemExtent*1.5
-  const box = findBox(host.overlay.tree, list.id);
-  host.pushInput({ type: 'down', x: box.contentRect.x + 220 * 1.5, y: box.contentRect.y + 20, t: 0 });
-  host.pushInput({ type: 'up', x: box.contentRect.x + 220 * 1.5, y: box.contentRect.y + 20, t: 0.05 });
-  assert.equal(adapter.storage.get(CHAR_KEY), chars[1].id, '点卡片即写本机（与 DOM 版一致）');
-  assert.ok(texts(host).some(t => t.includes(`「${buildLoadout(report.content, chars[1].id).name}」`)), '技能提示行随所选刷新');
+  const box = findBox(tree, list.id);
+  host.pushInput({ type: 'down', x: box.contentRect.x + 150 * 1.5, y: box.contentRect.y + 20, t: 0 });
+  host.pushInput({ type: 'up', x: box.contentRect.x + 150 * 1.5, y: box.contentRect.y + 20, t: 0.05 });
+  assert.equal(adapter.storage.get(CHAR_KEY), chars[1].id, '点卡片即写本机');
+  assert.ok(texts(host).includes(buildLoadout(report.content, chars[1].id).name), '主体展示随所选刷新');
 
-  clickWidget(host, findButton(host, '开始 · 跑酷！'));
+  // 弹层开着时布局已变：取新树再点开始按钮
+  const tree2 = host.overlay.current.relayout();
+  clickWidget(host, findButton(host, '开始·酷跑'), tree2);
   assert.equal(started, chars[1].id);
 });
 
-test('select 页：显示入口方式与技能/被动详情、返回回调，无配置来源/清缓存杂项', async () => {
+test('select 页（大厅）：入口方式与技能/被动详情、预留板块 toast 占位、无旧返回/清缓存', async () => {
   const { host } = hostFixture();
   const report = await loadContent();
   const chars = playableCharacters(report.content);
-  let back = 0;
   const views = createOverlayViews({ host });
-  views.renderSelect(report.content, { onStartRun() {}, onBack: () => { back++; } }, chars[0].id, 'wechat');
+  views.renderSelect(report.content, { onStartRun() {}, onBack: () => {} }, chars[0].id, 'wechat');
   view2Pass(host);
   const t = texts(host);
-  assert.ok(t.includes('选择角色'));
   assert.ok(t.includes('登录方式：微信登录'), `入口方式可见，实得 ${JSON.stringify(t)}`);
-  assert.ok(t.some(x => x.startsWith('技能：')) && t.some(x => x.startsWith('被动：')), '卡片技能/被动详情');
+  assert.ok(t.some(x => x.startsWith('技能：')) && t.some(x => x.startsWith('被动：')), '展示区技能/被动详情');
   assert.ok(!t.some(x => x.includes('配置来源')), '无开发期配置来源行');
   assert.equal(findButton(host, '清除本机缓存'), null, '无清缓存按钮');
-  assert.deepEqual(allButtons(host).filter(b => b === '返回' || b === '开始 · 跑酷！'), ['返回', '开始 · 跑酷！']);
-  clickWidget(host, findButton(host, '返回'));
-  assert.equal(back, 1);
+  assert.equal(findButton(host, '返回'), null, '大厅不再带旧返回按钮');
+  assert.deepEqual(allButtons(host), ['开始·酷跑', '场景切换'], '初始仅两个主动作按钮');
+
+  // 预留板块：点「成就」格 → toast 占位（接口注入后替换）
+  const achieveTile = findWidget(host, w => w instanceof Box && w.children.some(ch => ch instanceof Label && ch.getText() === '成就'));
+  clickWidget(host, achieveTile);
+  assert.ok(texts(host).some(x => x.includes('开发中')), '预留板块 toast 占位');
 });
 
 function findWidget(host, pred) {
@@ -260,7 +279,7 @@ test('result：新纪录标题/大分/技能释放次数/历史最佳 + 两按�
 
 // ---------------- mainFlow 真实主流程（不进 run：node 无 GL） ----------------
 
-test('flow（web）：boot→start→(游客)→select→返回→start；result→返回选角', async () => {
+test('flow（web）：boot→start→(游客)→select 大厅；result→返回选角', async () => {
   const { host, adapter } = hostFixture();
   const views = createOverlayViews({ host });
   const flow = createGameFlow({ adapter, views, configResolve: name => `./${name}.json` });
@@ -277,19 +296,15 @@ test('flow（web）：boot→start→(游客)→select→返回→start；result
   clickWidget(host, findButton(host, '游客登录'));
   assert.equal(flow.machine.current(), 'select');
   assert.equal(adapter.storage.get(ENTRY_KEY), 'guest', '本机记住入口方式');
-  assert.ok(texts(host).includes('选择角色'));
+  assert.ok(allButtons(host).includes('开始·酷跑'), 'Button label 不进 texts，用 allButtons 断言');
   assert.ok(texts(host).includes('登录方式：游客登录'));
-
-  clickWidget(host, findButton(host, '返回'));
-  assert.equal(flow.machine.current(), 'start');
-  clickWidget(host, findButton(host, '游客登录'));
-  assert.equal(flow.machine.current(), 'select');
 
   flow.machine.go('result', {
     t: 10, distance: 300, coins: 5, nearMiss: 1, hits: 0, score: 120, alive: false, casts: 1, charId: 'char_volt',
   });
   assert.equal(flow.machine.current(), 'result');
   assert.equal(adapter.storage.get(BEST_KEY), '120', '结算写最佳');
+  assert.equal(adapter.storage.get(COINS_KEY), '5', '结算累加金币总和');
   clickWidget(host, findButton(host, '返回选角'));
   assert.equal(flow.machine.current(), 'select');
 });

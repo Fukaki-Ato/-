@@ -9,6 +9,7 @@
 import * as THREE from 'three';
 import { loadFontSet, resolveUiConfig, type UiConfig, type UiResources } from '@tr/framework/ui/index.js';
 import { UiHost } from '@tr/framework/ui/host.js';
+import { ICON_NAMES, type IconSet } from '@tr/game/ui/icons.js';
 import type { PlatformAdapter } from '@tr/framework/platform/platformAdapter.js';
 
 const resources: UiResources = {
@@ -29,6 +30,7 @@ export interface UiShell {
   renderer: THREE.WebGLRenderer;
   canvas: HTMLCanvasElement;
   config: UiConfig;
+  icons: IconSet;
   destroy(): void;
 }
 
@@ -50,6 +52,18 @@ export async function createUiShell(adapter: PlatformAdapter): Promise<UiShell> 
     resources.loadJson(`${import.meta.env.BASE_URL}game.json`),
   ]);
   const config = resolveUiConfig((gameJson as { params?: unknown }).params);
+
+  // 大厅图标：零 insets 九宫格 = 整图拉伸；缺文件降级为空槽，不阻塞启动
+  const icons: IconSet = {};
+  await Promise.all(ICON_NAMES.map(async n => {
+    try {
+      const bmp = await resources.loadImage(`${import.meta.env.BASE_URL}assets/ui/icons/${n}.png`);
+      // ImageLike 是框架跨端抽象；web 侧实为 ImageBitmap（uiShell 允许 DOM 类型）
+      const texture = new THREE.Texture(bmp as unknown as ImageBitmap);
+      texture.needsUpdate = true;
+      icons[n] = { texture, insets: { top: 0, right: 0, bottom: 0, left: 0 }, texSize: { w: bmp.width, h: bmp.height } };
+    } catch { /* 单图标缺失不阻塞页面 */ }
+  }));
 
   const host = new UiHost({
     adapter,
@@ -74,12 +88,13 @@ export async function createUiShell(adapter: PlatformAdapter): Promise<UiShell> 
   canvas.addEventListener('pointercancel', onCancel);
 
   return {
-    host, renderer, canvas, config,
+    host, renderer, canvas, config, icons,
     destroy() {
       canvas.removeEventListener('pointerdown', onDown);
       canvas.removeEventListener('pointermove', onMove);
       canvas.removeEventListener('pointerup', onUp);
       canvas.removeEventListener('pointercancel', onCancel);
+      for (const src of Object.values(icons)) src.texture?.dispose();
       host.dispose();
       renderer.dispose();
       canvas.remove();
