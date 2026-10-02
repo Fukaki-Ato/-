@@ -9,7 +9,7 @@
 import * as THREE from 'three';
 import { loadFontSet, resolveUiConfig, type NinePatchSource, type UiConfig, type UiResources } from '@tr/framework/ui/index.js';
 import { UiHost } from '@tr/framework/ui/host.js';
-import { ICON_NAMES, type IconSet } from '@tr/game/ui/icons.js';
+import { BADGE_NAMES, type BadgeSet } from '@tr/game/ui/badges.js';
 import type { PlatformAdapter } from '@tr/framework/platform/platformAdapter.js';
 
 const resources: UiResources = {
@@ -30,7 +30,7 @@ export interface UiShell {
   renderer: THREE.WebGLRenderer;
   canvas: HTMLCanvasElement;
   config: UiConfig;
-  icons: IconSet;
+  badges: BadgeSet;
   /** 大厅背景图贴图（assets/ui/lobby-bg.jpg，用户自备插画去水印版；缺文件时 undefined 回纯色底） */
   background?: NinePatchSource;
   destroy(): void;
@@ -55,17 +55,17 @@ export async function createUiShell(adapter: PlatformAdapter): Promise<UiShell> 
   ]);
   const config = resolveUiConfig((gameJson as { params?: unknown }).params);
 
-  // 大厅图标：零 insets 九宫格 = 整图拉伸；缺文件降级为空槽，不阻塞启动
-  const icons: IconSet = {};
-  await Promise.all(ICON_NAMES.map(async n => {
+  // 大厅徽标：normal + glow 两帧；零 insets 九宫格 = 整图拉伸；缺文件降级为空槽，不阻塞启动
+  const badges: BadgeSet = { normal: {}, glow: {} };
+  await Promise.all(BADGE_NAMES.flatMap(n => (['normal', 'glow'] as const).map(async sub => {
     try {
-      const bmp = await resources.loadImage(`${import.meta.env.BASE_URL}assets/ui/icons/${n}.png`);
+      const bmp = await resources.loadImage(`${import.meta.env.BASE_URL}assets/ui/badges/${sub}/${n}.png`);
       // ImageLike 是框架跨端抽象；web 侧实为 ImageBitmap（uiShell 允许 DOM 类型）
       const texture = new THREE.Texture(bmp as unknown as ImageBitmap);
       texture.needsUpdate = true;
-      icons[n] = { texture, insets: { top: 0, right: 0, bottom: 0, left: 0 }, texSize: { w: bmp.width, h: bmp.height } };
-    } catch { /* 单图标缺失不阻塞页面 */ }
-  }));
+      badges[sub][n] = { texture, insets: { top: 0, right: 0, bottom: 0, left: 0 }, texSize: { w: bmp.width, h: bmp.height } };
+    } catch { /* 单帧缺失不阻塞页面 */ }
+  })));
 
   // 大厅背景图：零 insets 整图拉伸铺满页面
   let background: NinePatchSource | undefined;
@@ -99,13 +99,13 @@ export async function createUiShell(adapter: PlatformAdapter): Promise<UiShell> 
   canvas.addEventListener('pointercancel', onCancel);
 
   return {
-    host, renderer, canvas, config, icons, background,
+    host, renderer, canvas, config, badges, background,
     destroy() {
       canvas.removeEventListener('pointerdown', onDown);
       canvas.removeEventListener('pointermove', onMove);
       canvas.removeEventListener('pointerup', onUp);
       canvas.removeEventListener('pointercancel', onCancel);
-      for (const src of Object.values(icons)) src.texture?.dispose();
+      for (const src of [...Object.values(badges.normal), ...Object.values(badges.glow)]) src.texture?.dispose();
       background?.texture.dispose();
       host.dispose();
       renderer.dispose();

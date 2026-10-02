@@ -15,13 +15,13 @@ import { buildStartPage } from './startView.js';
 import { buildLobbyPage } from './lobbyView.js';
 import { buildHudPage } from './hudView.js';
 import { buildResultPage } from './resultView.js';
-import type { IconSet } from './icons.js';
+import type { BadgeSet } from './badges.js';
 import type { NinePatchSource } from '@tr/framework/ui/index.js';
 
 export interface OverlayViewsDeps {
   host: UiHost;
-  /** 大厅图标贴图（壳侧加载注入；缺省时图标位退化为空槽） */
-  icons?: IconSet;
+  /** 大厅徽标贴图（壳侧加载注入；缺省时徽标位退化为空槽） */
+  badges?: BadgeSet;
   /** 大厅背景图贴图（壳侧加载注入；缺省回主题纯色底） */
   background?: NinePatchSource;
 }
@@ -56,7 +56,7 @@ export function createOverlayViews(deps: OverlayViewsDeps): OverlayViews {
         actions,
         currentCharId,
         entry,
-        extras: { coins: extras?.coins ?? 0, diamonds: extras?.diamonds ?? 0, icons: deps.icons, background: deps.background },
+        extras: { coins: extras?.coins ?? 0, diamonds: extras?.diamonds ?? 0, badges: deps.badges, background: deps.background },
       }).view);
     },
 

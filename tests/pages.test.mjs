@@ -162,12 +162,9 @@ test('select 页（大厅）：四段布局齐全、角色弹层点选换角色�
   }, chars[0].id, 'guest');
   view2Pass(host);
 
-  const t0 = texts(host);
-  for (const s of ['商店', '角色', '宝箱', '福利手册', '成就', '任务', '活动', '登录方式：游客登录']) {
+  const t0 = texts(host); // 徽标带不可见名牌 Label，texts 可断言板块名
+  for (const s of ['商店', '角色', '宝箱', '福利手册', '成就', '任务', '活动', '登录方式：游客登录', '开始·酷跑', '场景切换']) {
     assert.ok(t0.includes(s), `大厅板块 ${s} 可见，实得 ${JSON.stringify(t0)}`);
-  }
-  for (const s of ['开始·酷跑', '场景切换']) {
-    assert.ok(allButtons(host).includes(s), `主动作按钮 ${s} 可见`);
   }
 
   // 点底部四联框「角色」格（Box onClick）开弹层
@@ -191,7 +188,8 @@ test('select 页（大厅）：四段布局齐全、角色弹层点选换角色�
 
   // 弹层开着时布局已变：取新树再点开始按钮
   const tree2 = host.overlay.current.relayout();
-  clickWidget(host, findButton(host, '开始·酷跑'), tree2);
+  const startBadge = findWidget(host, w => w instanceof Box && w.children.some(ch => ch instanceof Label && ch.getText() === '开始酷跑'));
+  clickWidget(host, startBadge, tree2);
   assert.equal(started, chars[1].id);
 });
 
@@ -204,11 +202,17 @@ test('select 页（大厅）：入口方式与技能/被动详情、预留板块
   view2Pass(host);
   const t = texts(host);
   assert.ok(t.includes('登录方式：微信登录'), `入口方式可见，实得 ${JSON.stringify(t)}`);
-  assert.ok(t.some(x => x.startsWith('技能：')) && t.some(x => x.startsWith('被动：')), '展示区技能/被动详情');
   assert.ok(!t.some(x => x.includes('配置来源')), '无开发期配置来源行');
   assert.equal(findButton(host, '清除本机缓存'), null, '无清缓存按钮');
   assert.equal(findButton(host, '返回'), null, '大厅不再带旧返回按钮');
-  assert.deepEqual(allButtons(host), ['开始·酷跑', '场景切换'], '初始仅两个主动作按钮');
+  assert.ok(t.includes('开始·酷跑') && t.includes('场景切换'), '主动作标题可见');
+  assert.equal(findButton(host, '开始 · 跑酷！'), null, '旧文字按钮已换徽标');
+
+  // 角色弹层内展示技能/被动详情
+  const charCell = findWidget(host, w => w instanceof Box && w.children.some(ch => ch instanceof Label && ch.getText() === '角色'));
+  clickWidget(host, charCell);
+  const t2 = texts(host);
+  assert.ok(t2.some(x => x.includes('技能：') && x.includes('被动：')), '弹层技能/被动详情');
 
   // 预留板块：点「成就」格 → toast 占位（接口注入后替换）
   const achieveTile = findWidget(host, w => w instanceof Box && w.children.some(ch => ch instanceof Label && ch.getText() === '成就'));
@@ -296,7 +300,7 @@ test('flow（web）：boot→start→(游客)→select 大厅；result→返回�
   clickWidget(host, findButton(host, '游客登录'));
   assert.equal(flow.machine.current(), 'select');
   assert.equal(adapter.storage.get(ENTRY_KEY), 'guest', '本机记住入口方式');
-  assert.ok(allButtons(host).includes('开始·酷跑'), 'Button label 不进 texts，用 allButtons 断言');
+  assert.ok(texts(host).includes('开始·酷跑'));
   assert.ok(texts(host).includes('登录方式：游客登录'));
 
   flow.machine.go('result', {
