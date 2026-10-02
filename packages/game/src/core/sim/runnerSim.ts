@@ -215,7 +215,7 @@ export class RunnerSim {
 
   private collide() {
     const s = this.state;
-    if (this.fx.flyT > 0) return; // 空中段无障碍（滑翔段保留判定，落地区间已由生成器清空）
+    if (this.fx.flyT > 0 || s.gliding) return; // 飞行/滑翔段都跳过判负：空中在障碍上方；滑翔是有控降落演出（不清障），净空由落地帧清道保证
     for (const o of this.obstacles) {
       if (o.done) continue;
       const z = relZ(o, s.distance);
