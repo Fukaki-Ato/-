@@ -249,7 +249,7 @@ export function createRunnerScene(
   raf = adapter.requestFrame(tick);
 
   if (cb.debug) installRunProbe(sim, () => ({ x: +camX.toFixed(2), y: +camY.toFixed(2) }), bursts,
-    () => ({ calls: renderer.info.render.calls, triangles: renderer.info.render.triangles }));
+    () => ({ calls: renderer.info.render.calls, triangles: renderer.info.render.triangles }), coinField);
 
   // 只销毁本局资源：不销毁主画布/GL 上下文（wx 屏幕画布不可重建，S10 D1 跨局复用）。
   function dispose() {

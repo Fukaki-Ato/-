@@ -20,7 +20,7 @@ import { fileURLToPath } from 'node:url';
 import { RunnerSim } from '../packages/game/dist/core/sim/runnerSim.js';
 import { TrackGen } from '../packages/game/dist/core/sim/trackGen.js';
 import { RunRng } from '../packages/game/dist/core/rng.js';
-import { hitsRunner, lateralGap, obstacleX } from '../packages/game/dist/core/sim/collision.js';
+import { hitsRunner, lateralGap, obstacleX, HAZARD_HIT_Y } from '../packages/game/dist/core/sim/collision.js';
 import { pickAvatarMode } from '../packages/game/dist/render/avatarRig.js';
 
 const root = join(fileURLToPath(import.meta.url), '..', '..');
@@ -438,4 +438,37 @@ test('站在车顶是跑动姿态：supportY 写回 + pickAvatarMode 按支撑�
   assert.equal(pickAvatarMode(s), 'run', '站在车顶上应为跑动姿态（旧版 y>0.05 会误判空中）');
   assert.equal(pickAvatarMode({ ...s, y: 2.4 + 0.2 }), 'air', '离车顶 0.2m 才算腾空');
   assert.equal(pickAvatarMode({ ...s, y: 0, supportY: 0 }), 'run', '地面站立仍是跑动');
+});
+
+// ---------------- 13. 电弧地面可跳过（用户反馈「粉紫挡板跳不过去」） ----------------
+
+/** 只保留被测弧光：把 sim 每步生成的其它障碍摘掉，排除赛道噪声 */
+function onlyArc(sim, arc) {
+  for (let i = sim.obstacles.length - 1; i >= 0; i--) if (sim.obstacles[i] !== arc) sim.obstacles.splice(i, 1);
+}
+
+test('电弧地面：起跳窗口内可跳过（不跳必死；贴脸到 4m 起跳都活；太早起跳落地在弧内才死）', () => {
+  const run = (jumpGap, boots) => {
+    const sim = cleanSim(315);
+    const s = sim.state;
+    const arc = { obsRef: 'obs_arc_floor', cls: 'hazard', w: 2.0, h: 0.1, d: 4, lane: 0, worldZ: s.distance + 30 };
+    sim.obstacles.push(arc);
+    if (boots) grant(sim, 'jumpBoost', { durationS: 30, mul: BOOTS_MUL });
+    const front = arc.worldZ - arc.d / 2;
+    let jumped = false;
+    for (let i = 0; i < 60 * 6 && sim.state.alive; i++) {
+      if (!jumped && front - s.distance <= jumpGap) { sim.applyAction('jump'); jumped = true; }
+      onlyArc(sim, arc);
+      sim.step();
+      if (arc.done && s.y <= 0.001) break; // 弧光已判过且已落地
+    }
+    return sim.state.alive;
+  };
+  assert.equal(run(0, false), false, '不跳必死');
+  for (const gap of [0.5, 1, 2, 3, 4]) {
+    assert.equal(run(gap, false), true, `赤脚距弧 ${gap}m 起跳应能跳过（用户体感「跳不过去」的修复点）`);
+  }
+  assert.equal(run(5, false), false, '起跳太早（落地时仍在弧内）照旧判死：时机要求保留');
+  for (const gap of [1, 3, 6]) assert.equal(run(gap, true), true, `弹跳鞋距弧 ${gap}m 起跳应能跳过`);
+  assert.equal(HAZARD_HIT_Y, 0.15, '判定线口径 0.15m（原 0.35：与视觉光带等高，几乎跳不过）');
 });

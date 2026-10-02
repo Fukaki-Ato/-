@@ -55,6 +55,11 @@ export function isNearMiss(o: ObstacleEntity, s: RunnerState, laneWidth: number)
   return gap > 0 && gap < NEAR_MISS_M;
 }
 
+/** 电弧地面（hazard）判负高度线：低于该值判「踩进弧光」。0.15m（原 0.35）：
+ *  旧线与视觉光带等高（0.35m）且深度判定期带 0.4m 前瞻，起跳穿过该高度的帧极难全程保持在
+ *  线上方——实测最优时机仍以 0.005m 之差判死，用户体感「粉紫挡板跳不过去」。降到 0.15 后
+ *  越弧窗口（y≥0.15 约 0.69s）远宽于 4m 弧光的通过时间，起跳提前量不再卡秒。 */
+export const HAZARD_HIT_Y = 0.15;
 /** 可站立载具（rideTop）的车顶落顶判定余量（米）：低于车顶该值以上视为撞前脸而非落顶。
  *  0.30m（用户定稿口径）：2.4m 列车 → **y<2.1m 判撞死，y≥2.1m 算落顶/站顶**。
  *  同一常数同时用于碰撞判定与支撑面判定，两者口径一致不会「判死却吸不上顶」。 */
@@ -70,7 +75,7 @@ export function hitsRunner(o: ObstacleEntity, s: RunnerState, laneWidth: number)
   if (o.cls === 'low') return s.y < o.h * 0.75;
   if (o.cls === 'step') return false; // 板子：纯支撑面，永不判负（用于无弹跳鞋登火车）
   if (o.cls === 'high') return s.y < o.h && s.y + playerH > BAR_BOTTOM;
-  if (o.cls === 'hazard') return s.y < 0.35;
+  if (o.cls === 'hazard') return s.y < HAZARD_HIT_Y;
   if (o.cls === 'moving') return o.jumpable ? s.y < o.h * 0.75 : true; // 摆锤 jumpable=true：跳够高度即可越过
   if (o.cls === 'vehicle') return !(o.rideTop === true && s.y >= o.h - RIDE_TOP_EPS); // 列车顶可落可站
   return true; // full：满格墙只能换道

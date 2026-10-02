@@ -239,7 +239,11 @@ export class RunnerSim {
     for (const o of this.obstacles) {
       if (o.done) continue;
       const z = relZ(o, s.distance);
-      if (!inDepthWindow(o, z)) continue;
+      // 电弧地面不用 DEPTH_SLACK 前瞻：4m 弧 + 2×0.4 前瞻 = 4.8m 判定期，
+      // 「跳过弧心但擦到边缘判死」的体感根因之一（与判定线过高叠加，见 collision.HAZARD_HIT_Y）。
+      if (o.cls === 'hazard' && o.zap !== true) {
+        if (Math.abs(z) > o.d / 2) continue;
+      } else if (!inDepthWindow(o, z)) continue;
       if (!o.passed) {
         // 首次进入深度窗口的那一帧判一次擦身（先于命中判定；命中时 lateralGap<=0 自然不计）
         o.passed = true;
