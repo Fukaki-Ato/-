@@ -85,10 +85,10 @@ export function buildLobbyPage(host: UiHost, d: LobbyDeps): LobbyPage {
     return holder;
   };
 
-  /** 顶栏货币胶囊：棕色 pill + 徽标 + 动态数字 */
-  const currencyChip = (icon: 'coin' | 'gem', value: number, tint: string): Box => new Box(
+  /** 顶栏货币胶囊：纯色棕底（自动随数字扩容）+ 图标（按源比例定宽）+ 动态数字 */
+  const currencyChip = (icon: 'coin' | 'gem', iconW: number, value: number, tint: string): Box => new Box(
     { direction: 'row', background: host.solidSkin, backgroundColor: PILL_BG, padding: { top: 3, bottom: 3, left: 5, right: 10 }, gap: 5, align: 'center' },
-    [badgeImage(set, icon, 24, 24), new Label({ text: String(value), fontSizePx: 14, color: tint })],
+    [badgeImage(set, icon, iconW, 24), new Label({ text: String(value), fontSizePx: 14, color: tint })],
   );
 
   /** 中部大徽标组：标题字 + 徽标 */
@@ -186,15 +186,15 @@ export function buildLobbyPage(host: UiHost, d: LobbyDeps): LobbyPage {
   const topBar = new Box(
     { direction: 'row', align: 'center', gap: 8 },
     [
-      badge('avatar', 41, 41, slot('onSettings', '头像'), '头像'),
-      currencyChip('coin', d.extras?.coins ?? 0, c.gold),
-      currencyChip('gem', d.extras?.diamonds ?? 0, '#BFE3FF'),
+      badge('avatar', 46, 46, slot('onSettings', '头像'), '头像'),
+      currencyChip('coin', 17, d.extras?.coins ?? 0, c.gold),
+      currencyChip('gem', 23, d.extras?.diamonds ?? 0, '#BFE3FF'),
       new Box({ flex: 1 }),
       badge('settings', 36, 36, slot('onSettings', '设置'), '设置'),
     ],
   );
 
-  const leftCol = new Box({ direction: 'column', width: 61, gap: 10, align: 'center' }, [
+  const leftCol = new Box({ direction: 'column', width: 61, gap: 14, align: 'center' }, [
     badge('event', 55, 66, slot('onEvent', '活动'), '活动'),
     new Box({ direction: 'column', background: host.solidSkin, backgroundColor: PILL_BG, backgroundOpacity: 0.55, padding: { top: 3, bottom: 3, left: 4, right: 4 } },
       [new Label({ text: `登录方式：${entryLabel(d.entry)}`, fontSizePx: 10, color: '#FFE9A0', align: 'center' })]),
