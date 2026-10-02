@@ -13,7 +13,6 @@
       "overrides": {
         "obstaclePoolShift": { "pat_beast_chase": 35 },
         "beastSpeedMul": 1.25,
-        "themeRef": "theme_storm",
         "scoreMul": 1.2
       },
       "missions": [

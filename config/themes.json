@@ -1,30 +1,23 @@
 {
   "$schema": "../schema/config.schema.json#/themes",
-  "configVersion": "1.0.0",
+  "configVersion": "2.0.0",
   "minEngineVersion": "1.0.0",
-  "updatedAt": "2026-09-22",
+  "updatedAt": "2026-09-29",
   "items": [
     {
-      "id": "theme_neon_city", "status": "live",
-      "name": { "zh-CN": "霓虹下城" },
-      "sky": { "shader": "thunder_sky", "baseColor": "#0B1226", "flashColor": "#9FD8FF", "flashEveryS": [6, 14] },
-      "fog": { "color": "#101A33", "density": 0.011 },
-      "track": { "railMat": "mat_neon_rail", "groundTiles": ["tile_city_a", "tile_city_b"] },
-      "props": ["prop_billboard", "prop_drone", "prop_antenna"],
-      "music": "assets/audio/bgm/neon_city.ogg", "sfxSet": "city",
-      "vfxTint": "#7FD1FF",
-      "versions": [ { "ver": "1.0.0", "date": "2026-09-22", "change": "首发默认主题" } ]
-    },
-    {
-      "id": "theme_storm", "status": "live",
-      "name": { "zh-CN": "风暴上层" },
-      "sky": { "shader": "thunder_sky", "baseColor": "#160B26", "flashColor": "#C9A2FF", "flashEveryS": [3, 7] },
-      "fog": { "color": "#1A1033", "density": 0.014 },
-      "track": { "railMat": "mat_storm_rail", "groundTiles": ["tile_storm_a", "tile_storm_b"] },
-      "props": ["prop_lightning_rod", "prop_debris"],
-      "music": "assets/audio/bgm/storm.ogg", "sfxSet": "storm",
-      "vfxTint": "#B48CFF",
-      "versions": [ { "ver": "1.0.0", "date": "2026-09-22", "change": "围城活动 override 主题" } ]
+      "id": "theme_seaside_day", "status": "live",
+      "name": { "zh-CN": "晴湾小镇" },
+      "sky": { "shader": "thunder_sky", "baseColor": "#8ED0F2", "flashColor": "#FFF3C4", "flashEveryS": [9999, 9999] },
+      "fog": { "color": "#CFE9F7", "density": 0.011 },
+      "track": { "railMat": "mat_seaside_rail", "groundTiles": ["tile_beach_a", "tile_beach_b"] },
+      "props": [],
+      "groundColor": "#E3CFA4",
+      "music": "assets/audio/bgm/run.mp3", "sfxSet": "city",
+      "vfxTint": "#FFD98A",
+      "versions": [
+        { "ver": "1.0.0", "date": "2026-09-22", "change": "首发默认主题（霓虹下城）" },
+        { "ver": "2.0.0", "date": "2026-09-29", "change": "替换为白天海滨主题：删除霓虹下城与风暴上层，新增晴天天空/淡雾/暖沙地面配色" }
+      ]
     }
   ]
 }
