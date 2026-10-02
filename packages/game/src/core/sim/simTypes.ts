@@ -39,6 +39,9 @@ export interface RunnerState {
   gliding: boolean; // 飞行器燃料耗尽后的降落段
   /** 主动技能能量（0..skill.energyMax）、冷却剩余、本局释放次数 */
   energy: number; skillCd: number; casts: number;
+  /** 当前可站立支撑面高度（米，0=地面；>0=列车顶/坡道面）。每帧由 movement 算好后写回：
+   *  渲染层据此区分「站在支撑面上跑」与「真正离地」，sim→render 单向数据流 */
+  supportY: number;
 }
 
 /** 空装备：未指定角色时的默认手感（保持 M1 行为不变） */
@@ -56,5 +59,6 @@ export function initialRunnerState(): RunnerState {
     shocks: 0,
     coins: 0, nearMiss: 0, score: 0, gliding: false,
     energy: 0, skillCd: 0, casts: 0,
+    supportY: 0,
   };
 }

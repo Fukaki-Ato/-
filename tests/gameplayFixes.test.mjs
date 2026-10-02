@@ -21,6 +21,7 @@ import { RunnerSim } from '../packages/game/dist/core/sim/runnerSim.js';
 import { TrackGen } from '../packages/game/dist/core/sim/trackGen.js';
 import { RunRng } from '../packages/game/dist/core/rng.js';
 import { hitsRunner, lateralGap, obstacleX } from '../packages/game/dist/core/sim/collision.js';
+import { pickAvatarMode } from '../packages/game/dist/render/avatarRig.js';
 
 const root = join(fileURLToPath(import.meta.url), '..', '..');
 const NAMES = ['game', 'characters', 'skills', 'items', 'obstacles', 'themes', 'events', 'economy'];
@@ -396,4 +397,45 @@ test('弹跳鞋跃过高杆：赤脚跳不过、穿鞋可越、滑铲可过', ()
   };
   assert.ok(run(true, 321).alive && !run(true, 321).hit, '穿弹跳鞋应能跃过高杆');
   assert.ok(run(false, 322).hit || !run(false, 322).alive, '赤脚跳不高杆必中');
+});
+
+// ---------------- 11. 车顶判定 2.1m 口径 ----------------
+
+test('车顶判定口径：2.1m 以下判撞死、≥2.1m 算落顶/站顶（用户定稿）', () => {
+  const train = { obsRef: 'obs_train_static', cls: 'vehicle', w: 2.0, h: 2.4, d: 24, lane: 0, worldZ: 0, rideTop: true };
+  const mk = y => ({ x: 0, y, sliding: false, t: 0 });
+  assert.equal(hitsRunner(train, mk(2.0), 2.2), true, 'y=2.0（<2.1）应判撞前脸');
+  assert.equal(hitsRunner(train, mk(2.05), 2.2), true, 'y=2.05（<2.1）应判撞前脸');
+  assert.equal(hitsRunner(train, mk(2.1), 2.2), false, 'y=2.1 应算站顶（不判）');
+  assert.equal(hitsRunner(train, mk(2.39), 2.2), false, 'y=2.39（车顶下沿附近）应算站顶');
+  assert.equal(hitsRunner(train, mk(2.4), 2.2), false, 'y=2.4（满高）应算站顶');
+  // 非 rideTop 载具（冲撞长方体）不看高度：恒判
+  const rusher = { obsRef: 'obs_rusher_long', cls: 'vehicle', w: 2.0, h: 2.4, d: 8, lane: 0, worldZ: 0, moveZ: -8 };
+  assert.equal(hitsRunner(rusher, mk(5), 2.2), true, '冲撞长方体无 rideTop：任何高度都判');
+});
+
+// ---------------- 12. 火车顶跑动姿态（动画模式门） ----------------
+
+test('站在车顶是跑动姿态：supportY 写回 + pickAvatarMode 按支撑面判空', () => {
+  const sim = cleanSim(314);
+  const s = sim.state;
+  const train = { obsRef: 'obs_train_static', cls: 'vehicle', w: 2.0, h: 2.4, d: 24, lane: s.lane, worldZ: s.distance + 40, rideTop: true };
+  sim.obstacles.push(train);
+  grant(sim, 'jumpBoost', { durationS: 30, mul: BOOTS_MUL });
+  // 起跳落到车顶：y 应=2.4 且 supportY 同步=2.4（渲染层据此播跑动动画）
+  let jumped = false, sawStand = false;
+  for (let i = 0; i < 60 * 8 && sim.state.alive; i++) {
+    const front = train.worldZ - train.d / 2;
+    if (!jumped && front - s.distance <= 6.2) { sim.applyAction('jump'); jumped = true; }
+    sim.step();
+    if (jumped && Math.abs(s.y - 2.4) < 1e-6 && s.vy === 0) {
+      assert.equal(s.supportY, 2.4, `站顶时 supportY 应为 2.4，实际 ${s.supportY}`);
+      sawStand = true;
+      break;
+    }
+  }
+  assert.ok(sawStand, '应站上火车顶（y=2.4, vy=0）');
+  assert.equal(pickAvatarMode(s), 'run', '站在车顶上应为跑动姿态（旧版 y>0.05 会误判空中）');
+  assert.equal(pickAvatarMode({ ...s, y: 2.4 + 0.2 }), 'air', '离车顶 0.2m 才算腾空');
+  assert.equal(pickAvatarMode({ ...s, y: 0, supportY: 0 }), 'run', '地面站立仍是跑动');
 });

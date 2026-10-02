@@ -16,6 +16,17 @@ const FLASH_ON = 1.15, FLASH_OFF = 0.1, FLASH_HZ = 30;
 const LEAN_PER_M = -0.08, STUN_ROLL = 0.14;
 /** 滑翔与飞行时的俯角 */
 const PITCH_FLY = 0.85, PITCH_GLIDE = 0.5;
+/** 判定「离地」的高度余量（米）：站在支撑面上时 y=支撑面高度，跑动姿态；超出该余量才算腾空 */
+const AIRBORNE_EPS = 0.05;
+
+/**
+ * 姿态档选择（纯函数，可回归测试）：站在支撑面（地面/车顶/坡道）上就是**跑动**，
+ * 只有真正离地才算空中收腿。旧版用绝对高度 y>0.05 判空——站在 2.4m 车顶上会被当成
+ * 滞空，播放收腿前倾 Pose，就是用户反馈「在火车上走路动画不正常」的根因。
+ */
+export function pickAvatarMode(s: RunnerState): 'run' | 'air' {
+  return s.y > s.supportY + AIRBORNE_EPS ? 'air' : 'run';
+}
 
 export function createAvatar(scene: THREE.Scene, laneWidth: number, look: Loadout) {
   const model = createRunnerModel({ body: look.bodyTint, glow: look.emissive, scale: look.modelScale });
@@ -51,7 +62,7 @@ export function createAvatar(scene: THREE.Scene, laneWidth: number, look: Loadou
     get chestY() { return model.chestY; },
     update(s: RunnerState, fx: FxState) {
       const mode: 'run' | 'air' | 'slide' | 'fly' =
-        fx.flyT > 0 ? 'fly' : s.sliding ? 'slide' : s.y > 0.05 ? 'air' : 'run';
+        fx.flyT > 0 ? 'fly' : s.sliding ? 'slide' : pickAvatarMode(s);
       const stunned = s.stunT > 0;
       model.update(s.t, s.distance, mode, stunned ? 0.35 : 1, (s.invulnT > 0 || fx.invincible) ? (Math.sin(s.t * FLASH_HZ) > 0 ? FLASH_ON : FLASH_OFF) : 0);
 

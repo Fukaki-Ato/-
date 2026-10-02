@@ -56,8 +56,9 @@ export function isNearMiss(o: ObstacleEntity, s: RunnerState, laneWidth: number)
 }
 
 /** 可站立载具（rideTop）的车顶落顶判定余量（米）：低于车顶该值以上视为撞前脸而非落顶。
- *  0.15m：用户反馈落地容错太低，放宽一档（换道途中擦到车头顶沿也算落顶） */
-export const RIDE_TOP_EPS = 0.15;
+ *  0.30m（用户定稿口径）：2.4m 列车 → **y<2.1m 判撞死，y≥2.1m 算落顶/站顶**。
+ *  同一常数同时用于碰撞判定与支撑面判定，两者口径一致不会「判死却吸不上顶」。 */
+export const RIDE_TOP_EPS = 0.30;
 /** 登车斜坡（obs_mount_step）末端平顶长度（米）：坡顶接火车顶，提前置满高度再过列车判定窗
  *  （inDepthWindow 有 DEPTH_SLACK 前瞻，没有平顶会在坡中段被判「撞前脸」） */
 export const RAMP_TOP_FLAT_M = 0.8;

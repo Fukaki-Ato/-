@@ -96,6 +96,7 @@ export class Movement {
       this.decayPending();
       s.vy = 0;
       s.y += (this.fly.heightM - s.y) * Math.min(1, dt * RISE_LERP); // 平滑升至飞行高度（不高，可俯瞰地面）
+      s.supportY = this.supportHeight(s); // 写回支撑面：飞行段也汇报（下方可能是车顶，落地/滑翔接轨用）
       if (s.sliding) this.cancelSlide(s);
       return;
     }
@@ -108,6 +109,7 @@ export class Movement {
       // 滑翔中也认支撑面：下方是火车顶/坡顶就正常落上去（用户要求「下面有火车就落在火车上面」）。
       // rideTop 需已到顶面附近（RIDE_TOP_EPS）才给支撑，因此不会从火车侧面穿进车体。
       const glideFloor = this.supportHeight(s);
+      s.supportY = glideFloor;
       if (s.y <= glideFloor + 1e-4) {
         s.y = glideFloor; s.vy = 0; s.gliding = false; this.landedThisStep = true;
         applyLandingSafety(s, true);
@@ -123,6 +125,7 @@ export class Movement {
     if (this.pendingJump > 0) { this.pendingJump--; if (s.y <= this.floorY + 0.05) { this.jump(s, fx); this.pendingJump = 0; } }
     if (this.pendingSlide > 0) { this.pendingSlide--; if (s.y <= 0) { this.slide(s, fx); this.pendingSlide = 0; } }
     this.floorY = this.supportHeight(s); // 先判支撑后积分：用位移前的 y 判定，避免穿入车体
+    s.supportY = this.floorY; // 渲染层据此区分「站车顶跑」与「滞空」
     // floorY>s.y（地面起跑踏上板子）也要进积分：否则贴不上支撑面，会从板子上穿过去
     if (s.y > 0 || s.vy > 0 || this.floorY > s.y) {
       s.vy += this.P.gravity * dt;
