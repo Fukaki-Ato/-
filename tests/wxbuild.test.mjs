@@ -4,11 +4,16 @@
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { join, relative } from 'node:path';
 import { tmpdir } from 'node:os';
+import { fileURLToPath } from 'node:url';
 import { PKG_ASSETS, loadWxSubpackage, subpackageAssetPath } from '../apps/wx/build/platform/subpackage.js';
-import { MAIN_BUDGET, measureDist } from '../tools/check-wx-size.mjs';
+import { resolveWxAudioPath } from '../apps/wx/build/platform/audio.js';
+import { MAIN_BUDGET, TOTAL_BUDGET, measureDist } from '../tools/check-wx-size.mjs';
+import { AUDIO_FILE_RE, copyAudioAssets } from '../tools/build-wx.mjs';
+
+const root = join(fileURLToPath(import.meta.url), '..', '..');
 
 const baseWx = {
   createCanvas: () => ({ width: 300, height: 150, getContext: () => ({}) }),
@@ -86,6 +91,61 @@ test('measureDist：主包 >4MB → ok=false 且 violations 指明主包', () =>
     const m = measureDist(dir);
     assert.equal(m.ok, false);
     assert.match(m.violations.join('\n'), /主包 .* 超过 4MB 上限/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+/** 递归列出目录下文件 → { 相对路径: 字节数 } */
+function listFiles(dir, base = dir, out = {}) {
+  for (const name of readdirSync(dir)) {
+    const abs = join(dir, name);
+    if (statSync(abs).isDirectory()) listFiles(abs, base, out);
+    else out[relative(base, abs).split('\\').join('/')] = statSync(abs).size;
+  }
+  return out;
+}
+
+test('copyAudioAssets：真实 assets/audio 递归全部进分包 assets/audio，字节逐一一致并计入分包体积', () => {
+  const src = listFiles(join(root, 'assets/audio'));
+  const expected = Object.fromEntries(Object.entries(src).filter(([p]) => AUDIO_FILE_RE.test(p)));
+  const expectedBytes = Object.values(expected).reduce((a, b) => a + b, 0);
+  assert.ok(Object.keys(expected).length > 0, '仓库应有真实音频');
+  const dir = mkdtempSync(join(tmpdir(), 'tr-wx-audio-'));
+  try {
+    writeFileSync(join(dir, 'game.json'), JSON.stringify({ subpackages: [{ name: PKG_ASSETS, root: PKG_ASSETS }] }));
+    writeFileSync(join(dir, 'game.js'), 'x');
+    const pkg = join(dir, PKG_ASSETS);
+    const res = copyAudioAssets(root, pkg);
+    assert.equal(res.files, Object.keys(expected).length);
+    assert.equal(res.bytes, expectedBytes);
+    assert.deepEqual(listFiles(join(pkg, 'assets/audio')), expected); // README 等非音频不进包
+    const m = measureDist(dir);
+    const sub = m.pkgs.find(p => p.name === PKG_ASSETS);
+    assert.equal(sub.bytes, expectedBytes, '音频字节必须计入分包体积');
+    assert.ok(expectedBytes < TOTAL_BUDGET, '真实音频不得超出整包预算');
+    assert.ok(m.ok, m.violations.join());
+
+    // 配置引用的每条音频经 WX 解析后都落在构建产物里（无双重前缀）
+    const audio = JSON.parse(readFileSync(join(root, 'config/game.json'), 'utf8')).params.audio;
+    const refs = [
+      ...Object.values(audio.bgm), audio.sfx.start, ...[audio.sfx.death].flat(),
+      ...Object.values(audio.characters).flatMap(c => Object.values(c.sfx)),
+    ];
+    for (const ref of refs) {
+      const resolved = resolveWxAudioPath(ref);
+      assert.ok(resolved.startsWith(`${PKG_ASSETS}/assets/audio/`) && !resolved.includes(`${PKG_ASSETS}/${PKG_ASSETS}`), resolved);
+      assert.ok(existsSync(join(dir, resolved)), `构建产物缺少 ${resolved}`);
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('copyAudioAssets：仓库无 assets/audio 时安全返回 0', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'tr-wx-noaudio-'));
+  try {
+    assert.deepEqual(copyAudioAssets(dir, join(dir, 'out')), { files: 0, bytes: 0 });
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

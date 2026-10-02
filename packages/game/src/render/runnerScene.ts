@@ -27,6 +27,10 @@ export interface RunCallbacks {
   onEnd(summary: ReturnType<RunnerSim['summary']>): void;
   /** 死亡瞬间回调（音频等表现层用；endTimer 计时与 onEnd 节奏不变） */
   onDeath?(): void;
+  /** sim cast 事件（技能施放）回调：角色技能音效 */
+  onCast?(): void;
+  /** sim pickup 事件（道具箱，非金币）回调：角色拾取音效 */
+  onPickup?(): void;
   debug?: boolean;
 }
 
@@ -139,9 +143,10 @@ export function createRunnerScene(
       else if (ev.type === 'hit') shakeT = 0.25;
       else if (ev.type === 'death') { endTimer = 0; cb.onDeath?.(); }
       // 施放技能：爆点 + 轻微震屏，拖尾/光环等完整表现在 M4 T4.4
-      else if (ev.type === 'cast') { fireAtPlayer(); shakeT = 0.12; }
+      else if (ev.type === 'cast') { fireAtPlayer(); shakeT = 0.12; cb.onCast?.(); }
       else if (ev.type === 'shieldBreak' || ev.type === 'boardBreak') { fireAtPlayer(); shakeT = 0.18; }
-      // pickup：按用户要求不加特效与震动，仅 HUD 显示 buff 倒计时
+      // pickup：按用户要求不加特效与震动，仅 HUD 显示 buff 倒计时（只回调音频）
+      else if (ev.type === 'pickup') cb.onPickup?.();
     }
   }
 

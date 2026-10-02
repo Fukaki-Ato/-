@@ -6,8 +6,14 @@
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { createGameFlow, BEST_KEY } from '../packages/game/dist/flow/mainFlow.js';
 import { ENTRY_KEY } from '../packages/game/dist/flow/session.js';
+import { parseAudioConfig } from '../packages/game/dist/core/audio/audioDirector.js';
+
+const root = join(fileURLToPath(import.meta.url), '..', '..');
 
 const LEGACY_KEY = 'thunderrun:b\u2026st'; // 旧版笔误键：b + U+2026 省略号 + st
 
@@ -160,4 +166,132 @@ test('导航：局内 Esc 与结算「返回选角」都回 select', () => {
   assert.equal(flow.machine.current(), 'select');
   key('Escape'); // 非 run 场景 Esc 无效
   assert.equal(flow.machine.current(), 'select');
+});
+
+// ---------------- 音频 handoff（真实 config/*.json + 假场景，无 GL） ----------------
+
+const audioCfg = parseAudioConfig(JSON.parse(readFileSync(join(root, 'config', 'game.json'), 'utf8')).params);
+
+/** 真实配置启动的流程：假场景工厂捕获 RunCallbacks（cast/pickup/death 即 sim 事件回调），假音频记录调用。 */
+async function bootRealFlow({ withAudio = true } = {}) {
+  const calls = [];
+  const scenes = [];
+  const inputs = [];
+  const seen = { select: null, result: null };
+  const store = new Map();
+  const adapter = {
+    storage: { get: k => store.get(k) ?? null, set: (k, v) => store.set(k, v), remove: k => store.delete(k) },
+    fetchJson: async url => JSON.parse(readFileSync(join(root, 'config', `${url}.json`), 'utf8')),
+    canvas: { mainCanvas: () => ({}), windowSize: () => ({ width: 390, height: 844, dpr: 2 }) },
+    onInput: cb => { inputs.push(cb); return () => {}; },
+    audio: withAudio ? {
+      playMusic: (url, o) => calls.push(['playMusic', url, o]),
+      stopMusic: () => calls.push(['stopMusic']),
+      playSfx: (url, o) => calls.push(['playSfx', url, o]),
+      dispose: () => calls.push(['dispose']),
+    } : undefined,
+  };
+  const views = {
+    renderBoot: () => ({ setStatus() {} }),
+    renderStart: actions => { seen.start = actions; return { setBusy() {}, setFeedback() {} }; },
+    renderSelect: (_c, actions) => { seen.select = actions; },
+    mountHud: () => ({ update() {}, dispose() {} }),
+    renderResult: (_s, _b, actions) => { seen.result = actions; },
+    toast: () => {},
+  };
+  const createScene = (_host, _adapter, sim, _content, cb) => {
+    const s = { sim, cb, disposed: false, dispose() { s.disposed = true; } };
+    scenes.push(s);
+    return s;
+  };
+  const flow = createGameFlow({ adapter, views, configResolve: n => n, audioRandom: () => 0, createScene });
+  await flow.boot();
+  assert.equal(flow.machine.current(), 'start');
+  seen.start.onGuest();
+  const key = code => inputs.forEach(cb => cb({ type: 'key', code, phase: 'down' }));
+  return { flow, calls, scenes, seen, key };
+}
+
+const sfxOpt = { volume: audioCfg.sfxVolume };
+const runBgm = ['playMusic', audioCfg.bgmRun, { loop: true, volume: audioCfg.musicVolume }];
+const deathBgm = ['playMusic', audioCfg.bgmDeath, { loop: false, volume: audioCfg.musicVolume }];
+
+test('音频 handoff：选角开局 → run BGM+开局音效；cast/pickup 回调 → 所选角色音效；死亡 → 死亡 BGM+池音效+角色音效，延续到结算', async () => {
+  const { flow, calls, scenes, seen } = await bootRealFlow();
+  const volt = audioCfg.characters.get('char_volt');
+  seen.select.onStartRun('char_volt');
+  assert.equal(flow.machine.current(), 'run');
+  assert.equal(scenes[0].sim.loadout.charId, 'char_volt');
+  assert.deepEqual(calls, [runBgm, ['playSfx', audioCfg.startSfx, sfxOpt]]);
+  calls.length = 0;
+  scenes[0].cb.onCast();
+  scenes[0].cb.onPickup();
+  scenes[0].cb.onDeath();
+  assert.deepEqual(calls, [
+    ['playSfx', volt.cast, sfxOpt],
+    ['playSfx', volt.pickup, sfxOpt],
+    ['stopMusic'],
+    deathBgm,
+    ['playSfx', audioCfg.deathSfx[0], sfxOpt],
+    ['playSfx', volt.death, sfxOpt],
+  ]);
+  calls.length = 0;
+  scenes[0].cb.onEnd(summaryOf(5));
+  assert.equal(flow.machine.current(), 'result');
+  assert.equal(scenes[0].disposed, true);
+  assert.deepEqual(calls, [], '进入结算不应停掉死亡 BGM');
+});
+
+test('音频 handoff：结算「再来一局」先停死亡 BGM 再开新局；「返回选角」停死亡 BGM', async () => {
+  const { flow, calls, scenes, seen } = await bootRealFlow();
+  seen.select.onStartRun('char_volt');
+  scenes[0].cb.onDeath();
+  scenes[0].cb.onEnd(summaryOf(1));
+  calls.length = 0;
+  seen.result.onRetry();
+  assert.equal(flow.machine.current(), 'run');
+  assert.deepEqual(calls.slice(0, 2), [['stopMusic'], runBgm]);
+  assert.equal(calls.filter(c => c[0] === 'playMusic' && c[2].loop === false).length, 0, '新局不得残留死亡 BGM');
+  scenes[1].cb.onDeath();
+  scenes[1].cb.onEnd(summaryOf(1));
+  calls.length = 0;
+  seen.result.onSelect();
+  assert.equal(flow.machine.current(), 'select');
+  assert.deepEqual(calls, [['stopMusic']]);
+});
+
+test('音频 handoff：死亡后结算前 Esc 回选角 → 停死亡 BGM；未死亡 Esc → 停 run BGM', async () => {
+  const { flow, calls, scenes, seen, key } = await bootRealFlow();
+  seen.select.onStartRun('char_volt');
+  scenes[0].cb.onDeath();
+  calls.length = 0;
+  key('Escape');
+  assert.equal(flow.machine.current(), 'select');
+  assert.deepEqual(calls, [['stopMusic']]);
+  seen.select.onStartRun('char_volt');
+  calls.length = 0;
+  key('Escape');
+  assert.deepEqual(calls, [['stopMusic']]);
+});
+
+test('音频 handoff：选其它角色（无角色音效配置）→ cast/pickup 静默，死亡只响全局音效', async () => {
+  const { calls, scenes, seen } = await bootRealFlow();
+  seen.select.onStartRun('char_ama');
+  assert.equal(scenes[0].sim.loadout.charId, 'char_ama');
+  scenes[0].cb.onCast();
+  scenes[0].cb.onPickup();
+  scenes[0].cb.onDeath();
+  const sfx = calls.filter(c => c[0] === 'playSfx').map(c => c[1]);
+  assert.deepEqual(sfx, [audioCfg.startSfx, audioCfg.deathSfx[0]]);
+});
+
+test('音频 handoff：适配器无 audio 能力 → 整个流程照常，不抛错', async () => {
+  const { flow, scenes, seen } = await bootRealFlow({ withAudio: false });
+  seen.select.onStartRun('char_volt');
+  scenes[0].cb.onCast();
+  scenes[0].cb.onPickup();
+  scenes[0].cb.onDeath();
+  scenes[0].cb.onEnd(summaryOf(1));
+  seen.result.onRetry();
+  assert.equal(flow.machine.current(), 'run');
 });

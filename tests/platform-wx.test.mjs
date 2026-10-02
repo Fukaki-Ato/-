@@ -7,6 +7,12 @@ import assert from 'node:assert/strict';
 import { createWxAdapter } from '../apps/wx/build/platform/wxPlatform.js';
 import { installCanvasShim } from '../apps/wx/build/platform/shim.js';
 import { createWxStorage } from '../apps/wx/build/platform/storage.js';
+import { createWxAudio, resolveWxAudioPath } from '../apps/wx/build/platform/audio.js';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const root = join(fileURLToPath(import.meta.url), '..', '..');
 
 /** 可编程 wx mock：时钟、存储、触摸/生命周期回调、rAF、request、文件系统。 */
 function makeWxMock() {
@@ -283,4 +289,49 @@ test('mainCanvas 仅在上下文构造器名匹配时暴露 WebGL2RenderingConte
     if (saved) globalThis.WebGL2RenderingContext = saved;
     else delete globalThis.WebGL2RenderingContext;
   }
+});
+
+// ---------------- 音频：仓库相对路径 → 分包路径 ----------------
+
+test('resolveWxAudioPath：assets/audio/... → pkg-assets/assets/audio/...；分包路径/远程 URL/其它原样', () => {
+  assert.equal(resolveWxAudioPath('assets/audio/bgm/run.mp3'), 'pkg-assets/assets/audio/bgm/run.mp3');
+  assert.equal(resolveWxAudioPath('./assets/audio/sfx/start.mp3'), 'pkg-assets/assets/audio/sfx/start.mp3');
+  assert.equal(resolveWxAudioPath('/assets/audio/sfx/start.mp3'), 'pkg-assets/assets/audio/sfx/start.mp3');
+  assert.equal(resolveWxAudioPath('pkg-assets/assets/audio/bgm/run.mp3'), 'pkg-assets/assets/audio/bgm/run.mp3');
+  assert.equal(resolveWxAudioPath('https://cdn.example.com/assets/audio/a.mp3'), 'https://cdn.example.com/assets/audio/a.mp3');
+  assert.equal(resolveWxAudioPath('wxfile://usr/a.mp3'), 'wxfile://usr/a.mp3');
+  assert.equal(resolveWxAudioPath('assets/fonts/x.png'), 'assets/fonts/x.png');
+  // 幂等：二次解析不叠前缀
+  const once = resolveWxAudioPath('assets/audio/sfx/death-1.mp3');
+  assert.equal(resolveWxAudioPath(once), once);
+});
+
+test('createWxAudio：真实配置路径经解析写入 InnerAudioContext.src；音效结束即 destroy', () => {
+  const made = [];
+  const wx = {
+    ...makeWxMock().wx,
+    createInnerAudioContext() {
+      const ctx = {
+        src: '', loop: false, volume: 1, played: 0, destroyed: false, ended: null,
+        play() { this.played++; }, stop() {}, destroy() { this.destroyed = true; },
+        onEnded(cb) { this.ended = cb; }, onError() {},
+      };
+      made.push(ctx);
+      return ctx;
+    },
+  };
+  const game = JSON.parse(readFileSync(join(root, 'config', 'game.json'), 'utf8'));
+  const { bgm, sfx } = game.params.audio;
+  const audio = createWxAudio(wx);
+  audio.playMusic(bgm.run, { loop: true, volume: 0.7 });
+  audio.playSfx(sfx.start, { volume: 1 });
+  audio.playMusic(bgm.death, { loop: false, volume: 0.7 }); // 同一 BGM 实例换曲
+  assert.equal(made.length, 2);
+  assert.equal(made[0].src, `pkg-assets/${bgm.death}`);
+  assert.equal(made[0].loop, false);
+  assert.equal(made[1].src, `pkg-assets/${sfx.start}`);
+  made[1].ended();
+  assert.equal(made[1].destroyed, true);
+  audio.playMusic(`pkg-assets/${bgm.run}`, { loop: true });
+  assert.equal(made[0].src, `pkg-assets/${bgm.run}`, '已带分包前缀的路径不重复加前缀');
 });
