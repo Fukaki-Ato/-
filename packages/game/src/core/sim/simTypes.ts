@@ -23,13 +23,15 @@ export type SimAction = 'jump' | 'slide' | 'laneL' | 'laneR' | 'skill';
 export type SimEvent =
   | { type: 'coin' } | { type: 'hit' } | { type: 'protected' } | { type: 'nearMiss' } | { type: 'death' }
   | { type: 'pickup'; itemRef: string } | { type: 'helmetSave' }
-  | { type: 'cast'; skillRef: string } | { type: 'shieldBreak'; layers: number } | { type: 'boardBreak' };
+  | { type: 'cast'; skillRef: string } | { type: 'shieldBreak'; layers: number } | { type: 'boardBreak' }
+  | { type: 'zap'; gear: 'shield' | 'board' | 'helmet' | null };
 
 export interface RunnerState {
   t: number; distance: number; prevDistance: number;
   lane: number; x: number; y: number; vy: number;
   sliding: boolean; slideT: number;
   stunT: number; invulnT: number; hits: number; alive: boolean; topple: number;
+  shocks: number; // 已被闪电圈电到的次数（无护具时第二次直接致死）
   coins: number; nearMiss: number; score: number;
   gliding: boolean; // 飞行器燃料耗尽后的降落段
   /** 主动技能能量（0..skill.energyMax）、冷却剩余、本局释放次数 */
@@ -48,6 +50,7 @@ export function initialRunnerState(): RunnerState {
   return {
     t: 0, distance: 0, prevDistance: 0, lane: 0, x: 0, y: 0, vy: 0,
     sliding: false, slideT: 0, stunT: 0, invulnT: 0, hits: 0, alive: true, topple: 0,
+    shocks: 0,
     coins: 0, nearMiss: 0, score: 0, gliding: false,
     energy: 0, skillCd: 0, casts: 0,
   };

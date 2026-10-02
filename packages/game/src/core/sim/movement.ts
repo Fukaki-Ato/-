@@ -5,6 +5,7 @@
  */
 import type { FxState } from '../effects/buffEngine.js';
 import { PENDING_STEPS, type RunnerState } from './simTypes.js';
+import { RIDE_TOP_EPS, inDepthWindow, lateralGap } from './collision.js';
 import { applyLandingSafety } from './landing.js';
 import type { ObstacleEntity, TrackGen } from './trackGen.js';
 
@@ -23,6 +24,8 @@ const DIVE_VY = -20;
 const RISE_LERP = 3.2;
 /** 判定「仍在空中」的高度阈值（米） */
 const AIRBORNE_Y = 0.2;
+/** 板子（step）可踏上升级的容差（米）：板高 0.6 内、地面起跑即视为可踏面，跑过自动上板 */
+const STEP_UP_TOL = 0.8;
 
 export class Movement {
   /** 起身后的滑铲冷却（禁止连续下滑） */
@@ -32,6 +35,8 @@ export class Movement {
   pendingSlide = 0;
   /** 上一步是否处于飞行中：燃料耗尽的这一步据此决定是否转入滑翔降落 */
   flyWasActive = false;
+  /** 当前可站立支撑面高度（0=地面；>0=列车顶等 rideTop 表面），每帧重算 */
+  private floorY = 0;
 
   constructor(
     private readonly P: MovementParams,
@@ -43,7 +48,7 @@ export class Movement {
   /** ↑/空格：滑行中按跳=起身直接跳；空中按跳=进缓冲等落地 */
   jumpInput(s: RunnerState, fx: FxState) {
     if (s.sliding) { this.cancelSlide(s); this.jump(s, fx); }
-    else if (s.y <= 0) this.jump(s, fx);
+    else if (s.y <= 0 || Math.abs(s.y - this.floorY) < 0.05) this.jump(s, fx); // 车顶上也可直接起跳
     else this.pendingJump = PENDING_STEPS;
   }
 
@@ -55,7 +60,7 @@ export class Movement {
 
   private jump(s: RunnerState, fx: FxState) {
     s.vy = this.P.jumpVelocity * (fx.bootsT > 0 ? fx.jumpMul : 1); // 弹跳鞋：跳跃初速乘区
-    s.y = 0.001;
+    if (s.y <= 0) s.y = 0.001; // 从支撑面起跳：车顶（y>0）不重置高度
   }
 
   private slide(s: RunnerState, fx: FxState) {
@@ -107,13 +112,29 @@ export class Movement {
       applyLandingSafety(this.gen, this.obstacles, s, landed);
       return;
     }
-    if (this.pendingJump > 0) { this.pendingJump--; if (s.y <= 0) { this.jump(s, fx); this.pendingJump = 0; } }
+    if (this.pendingJump > 0) { this.pendingJump--; if (s.y <= this.floorY + 0.05) { this.jump(s, fx); this.pendingJump = 0; } }
     if (this.pendingSlide > 0) { this.pendingSlide--; if (s.y <= 0) { this.slide(s, fx); this.pendingSlide = 0; } }
-    if (s.y > 0 || s.vy > 0) {
+    this.floorY = this.supportHeight(s); // 先判支撑后积分：用位移前的 y 判定，避免穿入车体
+    // floorY>s.y（地面起跑踏上板子）也要进积分：否则贴不上支撑面，会从板子上穿过去
+    if (s.y > 0 || s.vy > 0 || this.floorY > s.y) {
       s.vy += this.P.gravity * dt;
       s.y += s.vy * dt;
-      if (s.y <= 0) { s.y = 0; s.vy = 0; }
+      if (s.y <= this.floorY) { s.y = this.floorY; s.vy = 0; } // 落到/贴上地面、板子或列车顶
     }
     if (s.sliding) { s.slideT -= dt; if (s.slideT <= 0) this.cancelSlide(s); }
+  }
+
+  /** 可站立支撑面：rideTop 列车（需已到顶面附近）或 step 板子（地面起跑即可踏上）取最高者 */
+  private supportHeight(s: RunnerState): number {
+    let h = 0;
+    for (const o of this.obstacles) {
+      if (o.done) continue;
+      const tol = o.rideTop === true ? RIDE_TOP_EPS : o.cls === 'step' ? STEP_UP_TOL : 0;
+      if (tol <= 0) continue;
+      if (!inDepthWindow(o, s.distance - o.worldZ)) continue;
+      if (lateralGap(o, s, this.P.laneWidth) > 0) continue;
+      if (s.y >= o.h - tol) h = Math.max(h, o.h);
+    }
+    return h;
   }
 }

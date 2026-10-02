@@ -10,17 +10,21 @@
  */
 import type { RunRng } from '../rng.js';
 import type { GameContent, NamedEntry } from '../config/configTypes.js';
-import { BLOCKING_CLASSES, normalizeSwing, type SwingSpec } from './trackDefs.js';
+import { BLOCKING_CLASSES, buildObstacleEntity, type SwingSpec } from './trackDefs.js';
 import { layCoinChains } from './trackCoins.js';
 import { spawnSkyContent } from './trackSky.js';
 
 export interface ObstacleEntity {
   obsRef: string;
-  cls: 'low' | 'high' | 'full' | 'moving' | 'hazard' | 'vehicle';
+  cls: 'low' | 'high' | 'full' | 'moving' | 'hazard' | 'vehicle' | 'step';
   w: number; h: number; d: number;
   lane: number;
   worldZ: number;
   swing?: SwingSpec;
+  jumpable?: boolean;   // 可跳越挡板（moving 类判定用；来自 def.jumpable）
+  rideTop?: boolean;    // 车顶可站立（列车；来自 def.rideTop）
+  moveZ?: number;       // 纵向漂移 m/s（负值=朝玩家冲来；来自 def.moveZ）
+  zap?: boolean;        // 闪电圈：命中走「触电」结算（破护具/两次致死）
   clearT?: number;      // 软清除时刻（渲染下沉动画；配合 done 防重复判负）
   done?: boolean;      // 已命中（避免同一障碍重复判负）
   passed?: boolean;    // 已掠过角色面（近失判定一次性）
@@ -58,6 +62,10 @@ export class TrackGen {
   private readonly pickupMinGapM: number;
   private readonly blockFromDiff: number;          // 封路概率规则生效的难度档
   private readonly blockWeights: Record<number, number>; // 封堵 1/2 条道的权重       // 同段两箱最小间隔
+  /** 闪电圈生成规则（obstacles.json zap 段）：引用 def / 间隔米 / 下一枚 z */
+  private readonly zapRef: string;
+  private readonly zapEveryM: number;
+  private nextZapZ: number;
   private nextPickupSeg = 200; // 首段从 200m 开始（新手段净空）
   private chainSeq = 0; // 链编号（整链撤回用）
   /** 上一个抽中的模板 id：pickPattern 用于避免连续同模板 */
@@ -89,6 +97,10 @@ export class TrackGen {
     const lb = (content.obstacles as unknown as { laneBlock?: { fromDifficulty?: number; weights?: Record<string, number> } }).laneBlock;
     this.blockFromDiff = lb?.fromDifficulty ?? 3;
     this.blockWeights = { 1: lb?.weights?.['1'] ?? 80, 2: lb?.weights?.['2'] ?? 20 };
+    const zapRaw = (ob as unknown as { zap?: { ref?: unknown; everyM?: unknown; fromM?: unknown } }).zap;
+    this.zapRef = typeof zapRaw?.ref === 'string' ? zapRaw.ref : '';
+    this.zapEveryM = typeof zapRaw?.everyM === 'number' && zapRaw.everyM > 0 ? zapRaw.everyM : 0;
+    this.nextZapZ = typeof zapRaw?.fromM === 'number' && zapRaw.fromM > 0 ? zapRaw.fromM : this.zapEveryM;
   }
 
   difficulty(z: number): number { return Math.floor(z / 300); }
@@ -118,14 +130,7 @@ export class TrackGen {
         if (cell.obsRef) {
           const def = this.defs.get(cell.obsRef);
           if (!def) continue; // validateRefs 已保证不会出现，防御一下
-          const size = (def.size as number[]) ?? [2, 1.2, 1.2];
-          obstacles.push({
-            obsRef: cell.obsRef,
-            cls: def.class as ObstacleEntity['cls'],
-            w: size[0], h: size[1], d: size[2],
-            lane: cell.lane, worldZ: z,
-            swing: normalizeSwing(def.swing),
-          });
+          obstacles.push(buildObstacleEntity(def, cell.lane, z));
         }
       }
       // 金币链：主链优先铺在模板安全线（docs/01：金币即教学），再按 laneGroupWeights
@@ -178,6 +183,20 @@ export class TrackGen {
           pickups.push({ itemRef: this.rng.weighted(refs, r => this.dropWeights[r] ?? 0), lane: this.rng.pick(freeLanes), worldZ: z });
         }
         this.nextPickupSeg += this.pickupSegmentM;
+      }
+      // 闪电圈：每 zapEveryM 一枚（用户需求：约 200m 一个黑色电圈）。落点车道须避开已生成
+      // 障碍与已投金币（链不跨窗，此处已可见）；三条道都被占则跳过本枚，保持可解。
+      while (this.zapEveryM > 0 && this.zapRef && this.nextZapZ + 14 <= this.genZ) {
+        const def = this.defs.get(this.zapRef);
+        if (def) {
+          const lanes = [-1, 0, 1];
+          this.rng.shuffle(lanes);
+          const lane = lanes.find(l =>
+            !obstacles.some(o => o.lane === l && Math.abs(o.worldZ - this.nextZapZ) < o.d / 2 + 1.6) &&
+            !coins.some(c => c.lane === l && Math.abs(c.worldZ - this.nextZapZ) < 2.0));
+          if (lane !== undefined) obstacles.push(buildObstacleEntity(def, lane, this.nextZapZ));
+        }
+        this.nextZapZ += this.zapEveryM;
       }
       this.genZ += pat.lengthSegments * this.segLen + this.rng.range(this.restGapM[0], this.restGapM[1]); // 模板后接喘息带
     }

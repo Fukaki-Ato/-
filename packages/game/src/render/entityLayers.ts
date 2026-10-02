@@ -4,9 +4,10 @@
  */
 import * as THREE from 'three';
 import type { CloudEntity, ObstacleEntity, PickupEntity } from '@tr/game/core/sim/trackGen.js';
+import { obstacleX } from '@tr/game/core/sim/collision.js';
 
 /** 障碍配色（docs/05 §2：敌对品红/警示黄，可交互蓝青） */
-const OBS_COLOR: Record<string, number> = { low: 0xd9a24a, high: 0x7fd1ff, full: 0xff5fa2, vehicle: 0x4a6fd9, hazard: 0xb48cff, moving: 0xff5fa2 };
+const OBS_COLOR: Record<string, number> = { low: 0xd9a24a, high: 0x7fd1ff, full: 0xff5fa2, vehicle: 0x4a6fd9, hazard: 0xb48cff, moving: 0xff5fa2, step: 0x9fd8ff };
 /** 道具箱配色（未列出的道具用白色；正式贴图见 docs/05 §6） */
 const PICKUP_COLOR: Record<string, number> = { item_magnet: 0xb48cff, item_boots: 0x43d9a3 };
 const OBS_MAX = 40, PICKUP_MAX = 8, CLOUD_MAX = 12;
@@ -24,11 +25,24 @@ const HAZARD_BAND_H = 0.35;
 const CLOUD_HIT_X = 2.6, CLOUD_SCATTER_T = 0.45;
 /** 软清除下沉动画：时长（秒）与下沉深度（米）——滑翔/着陆走廊清场不再整批瞬移消失 */
 const SINK_T = 0.45, SINK_DROP_M = 1.6;
+/** 闪电圈（obs_lightning_circle）配色：黑色圆盘 + 黄色闪电标志 */
+const ZAP_DISC_COLOR = 0x0b0e16, ZAP_BOLT_COLOR = 0xffe14d;
 
 export function createObstacleLayer(scene: THREE.Scene, laneWidth: number) {
   const boxGeo = new THREE.BoxGeometry(1, 1, 1);
   const postMat = new THREE.MeshStandardMaterial({ color: 0x8a93a8, roughness: 0.5, metalness: 0.3 });
-  interface ObsUnit { bar: THREE.Mesh; posts: THREE.Mesh[]; band: THREE.Mesh }
+  // 闪电圈专用几何：黑色圆盘（平放的圆柱薄片）与地面闪电标志（Shape 挤出的平面片）
+  const zapDiscGeo = new THREE.CylinderGeometry(1.0, 1.05, 0.06, 22);
+  const boltShape = new THREE.Shape();
+  boltShape.moveTo(0.10, 0.62);
+  boltShape.lineTo(-0.26, 0.02);
+  boltShape.lineTo(-0.02, 0.02);
+  boltShape.lineTo(-0.14, -0.62);
+  boltShape.lineTo(0.30, 0.06);
+  boltShape.lineTo(0.04, 0.06);
+  boltShape.closePath();
+  const boltGeo = new THREE.ShapeGeometry(boltShape);
+  interface ObsUnit { bar: THREE.Mesh; posts: THREE.Mesh[]; band: THREE.Mesh; disc: THREE.Mesh; bolt: THREE.Mesh }
   const units: ObsUnit[] = [];
   for (let i = 0; i < OBS_MAX; i++) {
     const bar = new THREE.Mesh(boxGeo, new THREE.MeshStandardMaterial({ roughness: 0.6 }));
@@ -43,12 +57,21 @@ export function createObstacleLayer(scene: THREE.Scene, laneWidth: number) {
       color: 0xb48cff, transparent: true, opacity: 0.3, blending: THREE.AdditiveBlending, depthWrite: false,
     }));
     band.visible = false; scene.add(band);
-    units.push({ bar, posts, band });
+    const disc = new THREE.Mesh(zapDiscGeo, new THREE.MeshBasicMaterial({ color: ZAP_DISC_COLOR, transparent: true, opacity: 0.96 }));
+    disc.visible = false; scene.add(disc);
+    const bolt = new THREE.Mesh(boltGeo, new THREE.MeshBasicMaterial({
+      color: ZAP_BOLT_COLOR, transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide,
+    }));
+    bolt.rotation.x = -Math.PI / 2; bolt.scale.setScalar(0.85);
+    bolt.visible = false; scene.add(bolt);
+    units.push({ bar, posts, band, disc, bolt });
   }
 
   const hideUnit = (u: ObsUnit) => {
     u.bar.visible = false;
     u.band.visible = false;
+    u.disc.visible = false;
+    u.bolt.visible = false;
     for (const p of u.posts) p.visible = false;
   };
 
@@ -64,33 +87,45 @@ export function createObstacleLayer(scene: THREE.Scene, laneWidth: number) {
         const sink = o.clearT != null ? Math.min((t - o.clearT) / SINK_T, 1) : 0;
         if (sink >= 1) { hideUnit(u); continue; }
         const sinkY = sink * SINK_DROP_M;
+        const isZap = o.zap === true;
+        // moving（摆锤/挡板）横摆位置与 core 判定同源（obstacleX：含「不得扫出路面」限幅与脏数据防呆）
+        const ox = o.cls === 'moving' ? obstacleX(o, t, laneWidth) : o.lane * laneWidth;
         const m = u.bar;
-        m.visible = true;
-        const mat = m.material as THREE.MeshStandardMaterial;
-        mat.color.setHex(OBS_COLOR[o.cls] ?? 0xd9a24a);
-        mat.emissive.setHex(o.cls === 'hazard' ? 0x7a3fd9 : 0x000000);
-        mat.roughness = 0.6;
-        // 高杆横杆（obs_gate_low）半透明化：下方的金币与障碍要能透出来，只留立柱提示轮廓
-        mat.transparent = o.cls === 'high';
-        mat.opacity = (o.cls === 'high' ? GATE_OPACITY : 1) * (1 - sink);
-        mat.depthWrite = o.cls !== 'high';
-        let sx = o.w, sy = o.h, sz = o.d, py = o.h / 2;
-        if (o.cls === 'high') { sy = Math.max(0.5, o.h - BAR_LOW_Y); py = BAR_LOW_Y + sy / 2; } // 顶部横杆，下方可钻
-        // low：可视高度按判定口径画到 h*0.75（碰撞盒仍为 o.h，见 core/sim collision.ts）
-        if (o.cls === 'low') { sy = o.h * LOW_VISUAL_H; py = sy / 2; }
-        if (o.cls === 'hazard') { sy = 0.06; py = 0.03; }
-        if (o.cls === 'moving') { sx = sy = sz = 1.1; py = 1.0; }
-        m.scale.set(sx, sy, sz);
-        const ox = o.cls === 'moving'
-          ? o.lane * laneWidth + Math.sin(t * Math.PI * 2 / (o.swing?.periodS ?? 3.2)) * (o.swing?.ampM ?? 0) * 0.5
-          : o.lane * laneWidth;
-        m.position.set(ox, py - sinkY, z);
+        m.visible = !isZap; // 闪电圈用圆盘+闪电标志表现，不画通用方块
+        if (m.visible) {
+          const mat = m.material as THREE.MeshStandardMaterial;
+          mat.color.setHex(OBS_COLOR[o.cls] ?? 0xd9a24a);
+          mat.emissive.setHex(o.cls === 'hazard' ? 0x7a3fd9 : 0x000000);
+          mat.roughness = 0.6;
+          // 高杆横杆（obs_gate_low）半透明化：下方的金币与障碍要能透出来，只留立柱提示轮廓
+          mat.transparent = o.cls === 'high';
+          mat.opacity = (o.cls === 'high' ? GATE_OPACITY : 1) * (1 - sink);
+          mat.depthWrite = o.cls !== 'high';
+          let sx = o.w, sy = o.h, sz = o.d, py = o.h / 2;
+          if (o.cls === 'high') { sy = Math.max(0.5, o.h - BAR_LOW_Y); py = BAR_LOW_Y + sy / 2; } // 顶部横杆，下方可钻
+          // low：可视高度按判定口径画到 h*0.75（碰撞盒仍为 o.h，见 core/sim collision.ts）
+          if (o.cls === 'low') { sy = o.h * LOW_VISUAL_H; py = sy / 2; }
+          if (o.cls === 'hazard') { sy = 0.06; py = 0.03; }
+          if (o.cls === 'moving') { sx = sy = sz = 1.1; py = 0.55; } // 挡板贴地滑动：跳起越过（判定 s.y < h*0.75）
+          m.scale.set(sx, sy, sz);
+          m.position.set(ox, py - sinkY, z);
+        }
         const band = u.band;
-        band.visible = o.cls === 'hazard';
+        band.visible = o.cls === 'hazard' && !isZap; // 普通电弧地面的可跳高度提示；zap 有专属电光
         if (band.visible) { // 电弧光带：0.35m 高，缓慢闪烁提示可跳高度
           band.scale.set(o.w, HAZARD_BAND_H, o.d);
           band.position.set(ox, HAZARD_BAND_H / 2 - sinkY, z);
           (band.material as THREE.MeshBasicMaterial).opacity = (0.3 + 0.12 * Math.sin(t * 8 + ox * 1.7)) * (1 - sink);
+        }
+        // 闪电圈：黑色圆盘 + 黄色闪电标志（加色混合、按帧闪烁）
+        u.disc.visible = isZap;
+        u.bolt.visible = isZap;
+        if (isZap) {
+          u.disc.position.set(ox, 0.05 - sinkY, z);
+          (u.disc.material as THREE.MeshBasicMaterial).opacity = 0.96 * (1 - sink);
+          u.bolt.position.set(ox, 0.08 - sinkY, z);
+          const flick = 0.5 + 0.5 * Math.sin(t * 12 + o.worldZ * 2.7);
+          (u.bolt.material as THREE.MeshBasicMaterial).opacity = (0.45 + 0.5 * flick) * (1 - sink);
         }
         for (let pi = 0; pi < 2; pi++) { // 高杆支撑柱：立在横杆两端，从地面顶到杆顶
           const post = u.posts[pi];

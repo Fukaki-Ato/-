@@ -944,25 +944,26 @@
     ]
   },
   "expected": {
-    "frames": 1344,
+    "frames": 2990,
     "summary": {
-      "t": 22.4,
-      "distance": 286.48,
-      "coins": 22,
+      "t": 49.83,
+      "distance": 1200.4,
+      "coins": 197,
       "nearMiss": 0,
       "hits": 1,
-      "score": 3120,
+      "score": 13285,
       "alive": false,
-      "casts": 1,
+      "casts": 2,
       "charId": "char_kaze"
     },
     "eventCounts": {
-      "cast": 1,
-      "coin": 22,
+      "cast": 2,
+      "coin": 197,
       "death": 1,
-      "hit": 1
+      "pickup": 2,
+      "zap": 1
     },
-    "eventsSha256": "79797d9143c87ee60ef99f571227484b1403f7bcc5bc5334ac8eb9dab66d7c5a",
+    "eventsSha256": "acc2eb15678a6106f16c4e0819096a0b67ba41a5f5e080d1831a7c9362deac52",
     "inputsSha256": "35acd88893cb3f423c23545163036370b5411c921d50193d9a98d7151d6173b0"
   }
 }

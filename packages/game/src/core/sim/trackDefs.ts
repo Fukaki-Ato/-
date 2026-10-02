@@ -2,6 +2,8 @@
  * 赛道障碍定义解析（trackGen 专用，纯函数）：
  * 把 config/obstacles.json 的原始字段归一化成实体可用的形状，脏数据一律降级为安全值。
  */
+import type { NamedEntry } from '../config/configTypes.js';
+import type { ObstacleEntity } from './trackGen.js';
 
 /** 摆锤横摆参数（实体字段名）：配置侧 writing 为 amplitudeM，实体统一用 ampM */
 export interface SwingSpec { ampM: number; periodS: number }
@@ -21,4 +23,25 @@ export function normalizeSwing(raw: unknown): SwingSpec | undefined {
   if (typeof amp !== 'number' || !Number.isFinite(amp)) return undefined;
   if (typeof period !== 'number' || !Number.isFinite(period) || period <= 0) return undefined;
   return { ampM: amp, periodS: period };
+}
+
+/**
+ * 由配置定义构造障碍实体：尺寸/类别/横摆归一化，并带出行为开关
+ * （jumpable=可跳挡板；rideTop=车顶可站立；moveZ=纵向漂移，负值朝玩家冲来；zap=闪电圈触电结算）。
+ * 字段缺失/类型不符时按「最保守」处理，绝不产出 NaN 或未知类别。
+ */
+export function buildObstacleEntity(def: NamedEntry, lane: number, worldZ: number): ObstacleEntity {
+  const size = (def.size as number[] | undefined) ?? [2, 1.2, 1.2];
+  const e: ObstacleEntity = {
+    obsRef: def.id,
+    cls: (def.class as ObstacleEntity['cls'] | undefined) ?? 'full',
+    w: size[0] ?? 2, h: size[1] ?? 1.2, d: size[2] ?? 1.2,
+    lane, worldZ,
+    swing: normalizeSwing(def.swing),
+  };
+  if (def.jumpable === true) e.jumpable = true;
+  if (def.rideTop === true) e.rideTop = true;
+  if (typeof def.moveZ === 'number' && Number.isFinite(def.moveZ) && def.moveZ !== 0) e.moveZ = def.moveZ;
+  if (def.zap === true) e.zap = true;
+  return e;
 }

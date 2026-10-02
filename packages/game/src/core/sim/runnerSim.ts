@@ -13,6 +13,7 @@ import { buildLoadout, itemEffects, type EffectSpec, type Loadout } from './char
 import { collectCoins, collectPickups, type CollectDeps } from './collect.js';
 import { hitsRunner, inDepthWindow, isNearMiss, relZ, safestLane } from './collision.js';
 import { Movement } from './movement.js';
+import { resolveHit, type HitCtx } from './resolveHit.js';
 import { TrackGen, type CloudEntity, type CoinEntity, type ObstacleEntity, type PickupEntity } from './trackGen.js';
 import { createSimWorld } from './simWorld.js';
 import {
@@ -55,6 +56,8 @@ export class RunnerSim {
   private readonly fly: { heightM: number; speedMul: number; glideSpeedMul: number; glideS: number };
   private readonly collectDeps: CollectDeps;
   private usedProtection = false;
+  /** 命中结算上下文（resolveHit 用；构造一次复用，教程保护消耗标志在闭包里） */
+  private readonly hitCtx: HitCtx;
   /** 金币收益的小数累计（coinValueAdd 的 +5% / ×2 靠它凑整，不逐枚四舍五入） */
   private coinCarry = 0;
   /** scoreAdd 原语与技能释放奖励的额外分 */
@@ -93,6 +96,14 @@ export class RunnerSim {
       state: this.state, coins: this.coinsArr, pickups: this.pickupsArr, fx: this.buffs.fx,
       events: this.events, laneWidth: this.laneWidth, coinFront: this.coinFront,
       creditCoin: () => this.creditCoin(), grantItem: (id) => this.grantItem(id),
+    };
+    this.hitCtx = {
+      s: this.state, fx: this.buffs.fx, buffs: this.buffs, events: this.events,
+      lives: this.lives, invulnS: this.invulnS, hitStunS: this.R.hitStunS ?? 0.8,
+      tutorial: {
+        protectionS: this.protectionS,
+        take: () => { if (this.usedProtection) return false; this.usedProtection = true; return true; },
+      },
     };
     this.applyPassive();
   }
@@ -191,6 +202,13 @@ export class RunnerSim {
     const dm = Math.min(raw, cap) * STEP_DT;
     s.distance += dm;
 
+    // 纵向漂移障碍（moveZ<0=向玩家冲来的冲撞体）：推进 worldZ，并把沿途同车道障碍撞开
+    for (const o of this.obstacles) {
+      if (!o.moveZ || o.done) continue;
+      o.worldZ += o.moveZ * STEP_DT;
+      if (o.moveZ < 0) this.smashAhead(o);
+    }
+
     const sk = this.loadout.skill;
     if (sk) s.energy = Math.min(sk.energyMax, s.energy + sk.energyPerMeter * dm);
 
@@ -225,50 +243,21 @@ export class RunnerSim {
         o.passed = true;
         if (isNearMiss(o, s, this.laneWidth)) { s.nearMiss++; this.events.push({ type: 'nearMiss' }); }
       }
-      if (hitsRunner(o, s, this.laneWidth)) { this.onHit(o); if (!s.alive) return; }
+      if (hitsRunner(o, s, this.laneWidth)) { resolveHit(o, this.hitCtx); if (!s.alive) return; }
     }
   }
 
-  private onHit(o: ObstacleEntity) {
+  /** 冲撞体沿途撞飞同车道障碍：标记 done+clearT 交渲染下沉，不再阻挡/判负（就地标记，不摘数组） */
+  private smashAhead(rusher: ObstacleEntity) {
     const s = this.state;
-    // 每个障碍最多造成一次判定：先消耗再判保护。
-    // 否则长列车（d=24m 重叠约 2s > 无敌 1.4s）会在无敌结束后二次判负 —— 一条命制下必死无疑。
-    o.done = true;
-    if (s.invulnT > 0 || this.fx.invincible) return;
-    if (!this.usedProtection && s.t < this.protectionS) {
-      this.usedProtection = true;
-      s.invulnT = this.invulnS;
-      this.events.push({ type: 'protected' });
-      return;
-    }
-    // 护盾层优先（docs/01 §5：抵挡 1 次碰撞），其次滑板护甲
-    if (this.fx.shieldLayers > 0) {
-      this.events.push({ type: 'shieldBreak', layers: this.buffs.consumeShield() });
-      s.invulnT = this.invulnS;
-      return;
-    }
-    if (this.fx.boardT > 0) {
-      this.buffs.remove('boardArmor');
-      this.events.push({ type: 'boardBreak' });
-      s.invulnT = this.invulnS;
-      return;
-    }
-    s.hits++;
-    s.stunT = this.R.hitStunS ?? 0.8;
-    s.invulnT = this.invulnS;
-    this.events.push({ type: 'hit' });
-    if (s.hits >= this.lives) {
-      // 头盔：窗口内替角色挡下致命一击（该次受击撤销），随后头盔消失
-      if (this.fx.helmetT > 0) {
-        this.buffs.remove('lifeAdd');
-        s.hits--;
-        s.stunT = 0;
-        s.invulnT = this.invulnS + 0.2;
-        this.events.push({ type: 'helmetSave' });
-        return;
-      }
-      s.alive = false;
-      this.events.push({ type: 'death' });
+    for (const b of this.obstacles) {
+      if (b === rusher || b.done) continue;
+      if (b.rideTop === true) continue; // 火车不撞火车：rideTop 载具（列车）不可被冲撞体撞飞
+      if (b.lane !== rusher.lane) continue;
+      if (Math.abs(b.worldZ - rusher.worldZ) >= (rusher.d + b.d) / 2 + 0.2) continue;
+      b.done = true;
+      b.passed = true;
+      b.clearT = s.t;
     }
   }
 

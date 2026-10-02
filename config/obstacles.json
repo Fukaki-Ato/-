@@ -1,8 +1,8 @@
 {
   "$schema": "../schema/config.schema.json#/obstacles",
-  "configVersion": "1.6.0",
+  "configVersion": "1.7.0",
   "minEngineVersion": "1.0.0",
-  "updatedAt": "2026-09-28",
+  "updatedAt": "2026-09-29",
   "defs": [
     {
       "id": "obs_box",
@@ -121,7 +121,6 @@
       ],
       "jumpable": true,
       "rideTop": true,
-      "moveZ": -3.5,
       "model": {
         "prefab": "assets/obstacles/train24.glb"
       },
@@ -134,6 +133,35 @@
           "ver": "1.0.0",
           "date": "2026-09-22",
           "change": "首发"
+        },
+        {
+          "ver": "1.8.0",
+          "date": "2026-10-01",
+          "change": "静止化：用户反馈火车不该在视野里移动撞到别的障碍/火车（moveZ 移除）"
+        }
+      ]
+    },
+    {
+      "id": "obs_mount_step",
+      "class": "step",
+      "status": "live",
+      "size": [
+        2.0,
+        0.6,
+        3.0
+      ],
+      "jumpable": true,
+      "model": {
+        "prefab": "assets/obstacles/board.glb"
+      },
+      "themes": [
+        "theme_neon_city"
+      ],
+      "versions": [
+        {
+          "ver": "1.8.0",
+          "date": "2026-10-01",
+          "change": "新增：登车板（地铁逃生式板子）。纯支撑面不判负，跑过自动踏上升级，踏板上起跳即可登上火车顶"
         }
       ]
     },
@@ -215,6 +243,85 @@
           "ver": "1.0.0",
           "date": "2026-09-22",
           "change": "首发"
+        }
+      ]
+    },
+    {
+      "id": "obs_rusher_long",
+      "class": "vehicle",
+      "status": "live",
+      "size": [
+        2.0,
+        2.4,
+        8.0
+      ],
+      "jumpable": false,
+      "rideTop": false,
+      "moveZ": -8,
+      "model": {
+        "prefab": "assets/obstacles/rusher.glb"
+      },
+      "hitVfx": "vfx_spark_big",
+      "themes": [
+        "theme_neon_city"
+      ],
+      "versions": [
+        {
+          "ver": "1.7.0",
+          "date": "2026-09-29",
+          "change": "新增：向玩家冲来的长方体（跳不过去，必须换道；沿途撞飞障碍）"
+        }
+      ]
+    },
+    {
+      "id": "obs_cube_roll",
+      "class": "low",
+      "status": "live",
+      "size": [
+        1.1,
+        1.1,
+        1.1
+      ],
+      "jumpable": true,
+      "moveZ": -6,
+      "model": {
+        "prefab": "assets/obstacles/cube.glb"
+      },
+      "hitVfx": "vfx_spark_small",
+      "themes": [
+        "theme_neon_city"
+      ],
+      "versions": [
+        {
+          "ver": "1.7.0",
+          "date": "2026-09-29",
+          "change": "新增：向玩家冲来的小正方体（可跳过）"
+        }
+      ]
+    },
+    {
+      "id": "obs_lightning_circle",
+      "class": "hazard",
+      "status": "live",
+      "size": [
+        2.2,
+        0.12,
+        2.2
+      ],
+      "zap": true,
+      "model": {
+        "prefab": "assets/obstacles/zap_circle.glb"
+      },
+      "hitVfx": "vfx_aura_electric",
+      "themes": [
+        "theme_neon_city",
+        "theme_storm"
+      ],
+      "versions": [
+        {
+          "ver": "1.7.0",
+          "date": "2026-09-29",
+          "change": "新增：闪电圈（每 200m；先电掉头盔/护盾等护具，无护具第二次直接致死）"
         }
       ]
     }
@@ -489,20 +596,26 @@
       "minDifficulty": 4,
       "weight": 14,
       "lengthSegments": 2,
-      "cells": [
-        {
-          "segment": 0,
-          "lane": 0,
-          "offsetM": 2,
-          "obsRef": "obs_train_slow"
-        },
-        {
-          "segment": 0,
-          "lane": 0,
-          "offsetM": 2,
-          "surface": "trainTop",
-          "coins": 12
-        },
+  "cells": [
+    {
+      "segment": 0,
+      "lane": 0,
+      "offsetM": 0,
+      "obsRef": "obs_mount_step"
+    },
+    {
+      "segment": 0,
+      "lane": 0,
+      "offsetM": 14,
+      "obsRef": "obs_train_slow"
+    },
+    {
+      "segment": 0,
+      "lane": 0,
+      "offsetM": 14,
+      "surface": "trainTop",
+      "coins": 12
+    },
         {
           "segment": 1,
           "lane": -1,
@@ -595,6 +708,72 @@
           -1
         ]
       }
+    },
+    {
+      "id": "pat_easy_cube_charge",
+      "minDifficulty": 2,
+      "weight": 18,
+      "lengthSegments": 2,
+      "cells": [
+        {
+          "segment": 0,
+          "lane": -1,
+          "offsetM": 10,
+          "obsRef": "obs_cube_roll"
+        },
+        {
+          "segment": 0,
+          "lane": 1,
+          "offsetM": 6,
+          "coins": 6
+        },
+        {
+          "segment": 1,
+          "lane": 1,
+          "offsetM": 10,
+          "obsRef": "obs_adwall"
+        }
+      ],
+      "guarantee": {
+        "safeLanePattern": [
+          1,
+          1,
+          0
+        ]
+      }
+    },
+    {
+      "id": "pat_mid_rusher",
+      "minDifficulty": 4,
+      "weight": 14,
+      "lengthSegments": 2,
+      "cells": [
+        {
+          "segment": 0,
+          "lane": 0,
+          "offsetM": 4,
+          "obsRef": "obs_rusher_long"
+        },
+        {
+          "segment": 0,
+          "lane": 1,
+          "offsetM": 18,
+          "coins": 6
+        },
+        {
+          "segment": 1,
+          "lane": -1,
+          "offsetM": 10,
+          "obsRef": "obs_box"
+        }
+      ],
+      "guarantee": {
+        "safeLanePattern": [
+          1,
+          1,
+          0
+        ]
+      }
     }
   ],
   "difficultyCurve": [
@@ -626,7 +805,8 @@
         "pat_gate_slide": 22,
         "pat_mid_gate_combo": 28,
         "pat_train_top_run": 16,
-        "pat_mid_single_wall": 20
+        "pat_mid_single_wall": 20,
+        "pat_easy_cube_charge": 14
       },
       "coinDensity": 1.1,
       "pickupRate": 1.0
@@ -639,7 +819,9 @@
         "pat_mid_wall_dodge": 14,
         "pat_train_top_run": 16,
         "pat_mid_single_wall": 16,
-        "pat_mid_wall_gauntlet": 18
+        "pat_mid_wall_gauntlet": 18,
+        "pat_easy_cube_charge": 12,
+        "pat_mid_rusher": 12
       },
       "coinDensity": 1.15,
       "pickupRate": 1.0
@@ -652,7 +834,9 @@
         "pat_train_top_run": 14,
         "pat_hazard_weave": 18,
         "pat_mid_single_wall": 14,
-        "pat_mid_wall_gauntlet": 18
+        "pat_mid_wall_gauntlet": 18,
+        "pat_easy_cube_charge": 10,
+        "pat_mid_rusher": 14
       },
       "coinDensity": 1.2,
       "pickupRate": 1.1
@@ -664,7 +848,9 @@
         "pat_train_top_run": 16,
         "pat_hazard_weave": 26,
         "pat_mid_single_wall": 16,
-        "pat_mid_wall_gauntlet": 18
+        "pat_mid_wall_gauntlet": 18,
+        "pat_easy_cube_charge": 10,
+        "pat_mid_rusher": 14
       },
       "coinDensity": 1.25,
       "pickupRate": 1.15
@@ -694,5 +880,10 @@
       "1": 80,
       "2": 20
     }
+  },
+  "zap": {
+    "ref": "obs_lightning_circle",
+    "everyM": 200,
+    "fromM": 200
   }
 }
