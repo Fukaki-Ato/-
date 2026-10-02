@@ -304,18 +304,20 @@ test('登车斜坡：赤脚不起跳，沿可走上去的斜坡走上火车顶�
 
 // ---------------- 8b. 弹跳鞋高度口径 ----------------
 
-test('弹跳鞋高度口径：配置 mul 下顶点与越 2.6m 高杆的时间窗口都富裕（用户反馈高度不够、容错太低）', () => {
+test('弹跳鞋高度口径：顶点 2.90m——可越 2.6m 高杆且低于 3.0m 满格墙（用户定稿 2.6m 口径）', () => {
   const { gravity, jumpVelocity } = content.game.params.runner;
   const g = -gravity;
   const apex = (jumpVelocity * BOOTS_MUL) ** 2 / (2 * g);
-  assert.ok(BOOTS_MUL >= 1.4, `弹跳鞋倍率应 ≥1.4（实际 ${BOOTS_MUL}）`);
-  assert.ok(apex > 4, `弹跳鞋顶点应 >4m（实际 ${apex.toFixed(2)}m）`);
+  // 顶点压线 2.60m 会让「y≥2.6 才算越杆」的窗口归零；2.70/2.80m 实测通过带仅约 1.5 帧，故取 2.90m
+  assert.ok(apex > 2.7 && apex < 3.0, `弹跳鞋顶点应在 2.7~3.0m（实际 ${apex.toFixed(2)}m）`);
   // 越杆窗口：抛物线上高于 2.6m 的持续时间（秒）——容错的量化口径
   const v = jumpVelocity * BOOTS_MUL, h = 2.6;
   const disc = v * v - 2 * g * h;
   assert.ok(disc > 0, '弹跳鞋顶点必须高于杆顶');
   const win = 2 * Math.sqrt(disc) / g;
-  assert.ok(win >= 0.6, `越杆时间窗口应 ≥0.6s（实际 ${win.toFixed(2)}s）`);
+  assert.ok(win >= 0.2, `越杆时间窗口应 ≥0.2s（实际 ${win.toFixed(2)}s）`);
+  // 3.0m 满格墙：顶点必须低于墙顶，不再出现「视觉可越、判定恒死」的割裂
+  assert.ok(apex < 3.0, `弹跳鞋顶点应 <3.0m 满格墙高（实际 ${apex.toFixed(2)}m）`);
   // 赤脚顶点必须仍低于杆顶：否则弹跳鞋失去存在意义
   const bareApex = jumpVelocity ** 2 / (2 * g);
   assert.ok(bareApex < h, `赤脚顶点应 <2.6m（实际 ${bareApex.toFixed(2)}m）`);
@@ -377,7 +379,7 @@ test('弹跳鞋跃过高杆：赤脚跳不过、穿鞋可越、滑铲可过', ()
   const runner = (y, sliding = false) => ({ x: 0, y, sliding, t: 0 });
   assert.equal(hitsRunner(gate, runner(1.0), 2.2), true, '杆体区间（1.2~2.6m）站立必中');
   assert.equal(hitsRunner(gate, runner(2.4), 2.2), true, '赤脚跳顶点 2.4 < 2.6 仍判中');
-  assert.equal(hitsRunner(gate, runner(3.2), 2.2), false, '弹跳鞋顶点 > 2.6 可越过高杆');
+  assert.equal(hitsRunner(gate, runner(2.9), 2.2), false, '弹跳鞋顶点 2.9 > 2.6 可越过高杆');
   assert.equal(hitsRunner(gate, runner(0, true), 2.2), false, '滑铲从杆下通过');
 
   const run = (boots, seed) => {
@@ -387,9 +389,9 @@ test('弹跳鞋跃过高杆：赤脚跳不过、穿鞋可越、滑铲可过', ()
     if (boots) grant(sim, 'jumpBoost', { durationS: 30, mul: BOOTS_MUL });
     let jumped = false, hit = false;
     for (let i = 0; i < 60 * 6 && sim.state.alive; i++) {
-      // 弹跳鞋 y≥2.6 的窗口覆盖起跳点前方一段：在 4.5m 处起跳，过杆时仍在杆顶之上
+      // 弹跳鞋 y≥2.6 的窗口覆盖起跳点前方一段：在 4.8m 处起跳，过杆全程仍在杆顶之上
       const gap = g.worldZ - sim.state.distance;
-      if (!jumped && gap <= 4.5 && gap > 0.5) { sim.applyAction('jump'); jumped = true; }
+      if (!jumped && gap <= 4.8 && gap > 0.5) { sim.applyAction('jump'); jumped = true; }
       sim.step();
       for (const e of sim.drainEvents()) if (e.type === 'hit' || e.type === 'death') hit = true;
     }
@@ -469,6 +471,8 @@ test('电弧地面：起跳窗口内可跳过（不跳必死；贴脸到 4m 起�
     assert.equal(run(gap, false), true, `赤脚距弧 ${gap}m 起跳应能跳过（用户体感「跳不过去」的修复点）`);
   }
   assert.equal(run(5, false), false, '起跳太早（落地时仍在弧内）照旧判死：时机要求保留');
-  for (const gap of [1, 3, 6]) assert.equal(run(gap, true), true, `弹跳鞋距弧 ${gap}m 起跳应能跳过`);
+  // 弹跳鞋 2.90m 顶点（滞空约 9.5m）：距弧 ≤4m 起跳可过；6m 起跳会落回弧内（时机要求保留）
+  for (const gap of [1, 3, 4]) assert.equal(run(gap, true), true, `弹跳鞋距弧 ${gap}m 起跳应能跳过`);
+  assert.equal(run(6, true), false, '弹跳鞋距弧 6m 起跳落地仍在弧内：保留时机要求');
   assert.equal(HAZARD_HIT_Y, 0.15, '判定线口径 0.15m（原 0.35：与视觉光带等高，几乎跳不过）');
 });

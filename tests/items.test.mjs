@@ -61,7 +61,7 @@ test('弹跳鞋：12 秒配置 + 同一起跳点，穿鞋可跃过高杆、赤�
     let jumped = false;
     const seen = new Set();
     for (let i = 0; i < 60 * 3; i++) {
-      if (!jumped && sim.state.distance > 24 - 6) { sim.applyAction('jump'); jumped = true; } // 固定提前 6m 起跳（适配 jumpVelocity 13.5）
+      if (!jumped && sim.state.distance > 24 - 4.8) { sim.applyAction('jump'); jumped = true; } // 固定提前 4.8m 起跳（适配弹跳鞋 2.90m 顶点：过杆全程仍在杆顶之上）
       sim.step();
       for (const e of sim.events) seen.add(e.type);
     }

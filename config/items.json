@@ -2,7 +2,7 @@
   "$schema": "../schema/config.schema.json#/items",
   "configVersion": "1.4.0",
   "minEngineVersion": "1.0.0",
-  "updatedAt": "2026-10-01",
+  "updatedAt": "2026-10-02",
   "items": [
     {
       "id": "item_coin",
@@ -272,7 +272,7 @@
         {
           "primitive": "jumpBoost",
           "durationS": 12,
-          "mul": 1.45
+          "mul": 1.1
         }
       ],
       "stackRule": "refresh",
@@ -287,6 +287,11 @@
           "ver": "1.9.0",
           "date": "2026-10-01",
           "change": "跳跃高度提升：mul 1.15→1.45（用户反馈弹簧鞋高度不够、容错太低）"
+        },
+        {
+          "ver": "1.9.1",
+          "date": "2026-10-02",
+          "change": "跳跃高度回调：mul 1.45→1.10（顶点 5.04m→2.90m）。用户定稿「墙加高 3m 后鞋顶点回 2.6m 级」；实测 2.70/2.80m 顶点下越 2.6m 高杆可通过带仅 0.3m（约 1.5 帧，即旧反馈「容错太低」），按可玩底线取 2.90m（实测带 4.4~5.3m）；3.0m 满格墙顶点仍差 0.22m 跳不过"
         }
       ]
     },
