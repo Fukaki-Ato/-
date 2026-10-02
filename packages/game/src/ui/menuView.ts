@@ -1,20 +1,19 @@
 /**
- * 主菜单（P3）：对照 DOM screens.renderMenu 逐项映射；角色卡片行 → 横向可滑动虚拟 List。
- * 卡内容：色块/名字/稀有度/皮肤数·id/技能/被动 + 选中态；点卡片换角色（即写本机记忆，
- * 与 DOM 版一致）；技能提示行按所选角色刷新；开始/清缓存按钮；配置来源与版本号行。
+ * 选角页（P3，由原主菜单拆出；开始页之后、每局结束/Esc 后回到这里）：角色卡片行 → 横向可滑动虚拟 List。
+ * 卡内容：色块/名字/稀有度/皮肤数·id/技能/被动 + 选中态；点卡片换角色（即写本机记忆）；
+ * 技能提示行按所选角色刷新；顶栏「返回」回开始页并显示本次入口方式；底部开始跑酷。
  */
 import { Box, Button, Label, List, type NinePatchSource, type ThemeColors, type UiView } from '@tr/framework/ui/index.js';
 import type { GameContent } from '@tr/game/core/config/configTypes.js';
-import type { FileSource } from '@tr/game/core/config/configLoader.js';
 import { buildLoadout, playableCharacters, type Loadout } from '@tr/game/core/sim/character.js';
 import type { UiHost } from '@tr/framework/ui/host.js';
-import type { MenuActions } from '../flow/views.js';
+import type { SelectActions } from '../flow/views.js';
+import { entryLabel, type EntryMethod } from '../flow/session.js';
 import { solidChip } from './parts.js';
-import { LAST_USER_KEY } from './loginView.js';
 
 export const CHAR_KEY = 'thunderrun:character';
 
-/** 菜单技能行：能量攒满所需里程由配置推导（skills.json energy.perMeter），不写死文案 */
+/** 选角页技能行：能量攒满所需里程由配置推导（skills.json energy.perMeter），不写死文案 */
 export function skillLine(load: Loadout): string {
   const sk = load.skill;
   if (!sk) return `本局角色「${load.name}」：无主动技能`;
@@ -109,16 +108,16 @@ class CharCard extends Box {
   }
 }
 
-interface MenuPageDeps {
+interface SelectPageDeps {
   content: GameContent;
-  sources: Record<string, FileSource>;
-  actions: MenuActions;
+  actions: SelectActions;
   currentCharId: string;
+  entry: EntryMethod | null;
 }
 
-export interface MenuPage { view: UiView }
+export interface SelectPage { view: UiView }
 
-export function buildMenuPage(host: UiHost, d: MenuPageDeps): MenuPage {
+export function buildSelectPage(host: UiHost, d: SelectPageDeps): SelectPage {
   const c = host.theme.colors;
   const chars = playableCharacters(d.content);
   let chosen = chars.some(x => x.id === d.currentCharId) ? d.currentCharId : (chars[0]?.id ?? '');
@@ -156,17 +155,8 @@ export function buildMenuPage(host: UiHost, d: MenuPageDeps): MenuPage {
   }
 
   const btnStart = new Button({ label: '开始 · 跑酷！', variant: 'primary', fontSizePx: 17, onClick: () => d.actions.onStartRun(chosen) });
-  const btnClear = new Button({ label: '清除本机缓存', fontSizePx: 15, onClick: d.actions.onClearCache });
-
-  const lastUser = host.adapter.storage.get(LAST_USER_KEY);
-  const userLabel = new Label({
-    text: lastUser ? `账号：${lastUser}（本地演示）` : '游客模式', fontSizePx: 12, color: c.muted,
-  });
-  const srcText = Object.entries(d.sources).map(([k, v]) => `${k}:${v === 'network' ? '网络' : v === 'cache' ? '缓存' : '失败'}`).join('  ');
-  const srcLabel = new Label({
-    text: `配置来源 ${srcText} · characters v${String(d.content.characters.configVersion)}`,
-    fontSizePx: 11, color: c.muted,
-  });
+  const btnBack = new Button({ label: '返回', fontSizePx: 14, padding: { top: 6, bottom: 6, left: 14, right: 14 }, onClick: d.actions.onBack });
+  const entryText = new Label({ text: `登录方式：${entryLabel(d.entry)}`, fontSizePx: 12, color: c.muted });
 
   const view = host.makeView();
   view.add(new Box(
@@ -178,18 +168,20 @@ export function buildMenuPage(host: UiHost, d: MenuPageDeps): MenuPage {
       },
       [
         new Box({ direction: 'row', justify: 'spaceBetween', align: 'center' }, [
-          new Label({ text: '主菜单', fontSizePx: 20, color: c.text }),
-          userLabel,
+          new Box({ direction: 'row', gap: 12, align: 'center' }, [
+            btnBack,
+            new Label({ text: '选择角色', fontSizePx: 20, color: c.text }),
+          ]),
+          entryText,
         ]),
         new Label({
-          text: '操作：← → 换道 · ↑/空格 跳 · ↓ 滑铲 · 双击或 E 放技能 · Esc 退出。点卡片换角色。',
+          text: '操作：← → 换道 · ↑/空格 跳 · ↓ 滑铲 · 双击或 E 放技能 · Esc 退出本局回选角。点卡片换角色。',
           fontSizePx: 12, color: c.muted,
         }),
         new Label({ text: '角色（左右滑动选择）', fontSizePx: 13, color: c.gold }),
         list,
         skillHint,
-        new Box({ direction: 'row', gap: 12, justify: 'center', padding: { top: 4 } }, [btnStart, btnClear]),
-        srcLabel,
+        new Box({ direction: 'row', gap: 12, justify: 'center', padding: { top: 4 } }, [btnStart]),
       ],
     )],
   ));
