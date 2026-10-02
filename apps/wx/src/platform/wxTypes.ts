@@ -70,6 +70,18 @@ export interface WxCloud {
   }): Promise<unknown>;
 }
 
+/** InnerAudioContext 的最小面（音频模块用；字段即属性，play/stop 等为方法）。 */
+export interface WxInnerAudioContext {
+  src: string;
+  loop: boolean;
+  volume: number;
+  play(): void;
+  stop(): void;
+  destroy(): void;
+  onEnded(cb: () => void): void;
+  onError(cb: (err: { errMsg: string }) => void): void;
+}
+
 /** 本包实际用到的 wx API 面（S10 §6 表；wx.onTouchMove 故意不接——判定内核只用 down/up/cancel）。 */
 export interface WxLike {
   createCanvas(): WxRawCanvas;
@@ -106,6 +118,8 @@ export interface WxLike {
   login(opts: { success?(res: { code: string }): void; fail?(err: { errMsg: string }): void }): void;
   shareAppMessage(opts: { title?: string; query?: string; imageUrl?: string }): void;
   cloud?: WxCloud;
+
+  createInnerAudioContext(): WxInnerAudioContext;
 }
 
 /** 全包唯一读取运行时 `wx` 全局的落点（createWxAdapter 默认值；测试用显式注入绕开）。 */

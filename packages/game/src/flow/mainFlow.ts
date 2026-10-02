@@ -13,7 +13,9 @@ import { buildLoadout } from '@tr/game/core/sim/character.js';
 import { RunnerSim } from '@tr/game/core/sim/runnerSim.js';
 import { createSceneMachine } from '@tr/game/core/scene/sceneMachine.js';
 import type { SceneName } from '@tr/game/core/scene/sceneMachine.js';
-import { hashSeed } from '@tr/game/core/rng.js';
+import { createAudioDirector } from '@tr/game/core/audio/audioDirector.js';
+import type { AudioDirector } from '@tr/game/core/audio/audioDirector.js';
+import { hashSeed, mulberry32 } from '@tr/game/core/rng.js';
 import { createRunnerScene } from '@tr/game/render/runnerScene.js';
 import type { PlatformAdapter } from '@tr/framework/platform/platformAdapter.js';
 import type { GameViews, RunSummary } from './views.js';
@@ -32,6 +34,10 @@ export interface GameFlowDeps {
   /** config 解析器：web 侧 './{name}.json'，wx 侧 'config/{name}.json'（extras.readJson 消费点，S6 接 CDN） */
   configResolve: (name: string) => string;
   debug?: boolean;
+  /** 音频随机源（死亡音效池抽取）；缺省为独立于玩法 RNG 的 mulberry32 流，测试可注入 */
+  audioRandom?: () => number;
+  /** 局内场景工厂（缺省 createRunnerScene）；测试注入假场景以驱动 sim 事件回调而无需 GL */
+  createScene?: typeof createRunnerScene;
 }
 
 export interface GameFlow {
@@ -48,6 +54,8 @@ export function createGameFlow(deps: GameFlowDeps): GameFlow {
   let scene: { dispose(): void } | null = null;
   let hud: ReturnType<GameViews['mountHud']> | null = null;
   let lastSeed = 0;
+  /** 音频导演：配置加载成功后创建；game.params.audio 缺省时为空操作（不阻塞玩法） */
+  let audio: AudioDirector | null = null;
 
   /**
    * 历史最佳分（v2 修正）：
@@ -112,27 +120,35 @@ export function createGameFlow(deps: GameFlowDeps): GameFlow {
       },
     },
     select: {
-      onEnter: () => content && views.renderSelect(content, {
-        onStartRun: id => { charId = id; adapter.storage.set(CHAR_KEY, id); machine.go('run'); },
-        onBack: () => machine.go('start'),
-      }, charId, entry),
+      onEnter: () => {
+        audio?.stopDeathMusic(); // 死亡后 Esc 直接回选角：死亡 BGM 不带进选角页
+        if (content) views.renderSelect(content, {
+          onStartRun: id => { charId = id; adapter.storage.set(CHAR_KEY, id); machine.go('run'); },
+          onBack: () => machine.go('start'),
+        }, charId, entry);
+      },
     },
     run: {
       onEnter: () => {
         if (!content) return;
+        audio?.enterRun(charId);
         lastSeed = hashSeed('run-' + Date.now());
         const sim: RunnerSim = new RunnerSim(content, lastSeed, charId);
         // v2：主画布幂等单例 + 即时窗口尺寸（S10 §7.2；跨局复用同一画布，不新建）
         const host = { canvas: adapter.canvas.mainCanvas(), size: adapter.canvas.windowSize() };
         hud = views.mountHud();
         hud.update({ score: 0, coins: 0, distance: 0, hits: 0, lives: sim.lives, buffs: [], skill: null });
-        scene = createRunnerScene(host, adapter, sim, content, {
+        scene = (deps.createScene ?? createRunnerScene)(host, adapter, sim, content, {
           onHud: h => hud?.update(h),
           onEnd: summary => machine.go('result', summary),
+          onDeath: () => audio?.onDeath(),
+          onCast: () => audio?.onCast(),
+          onPickup: () => audio?.onPickup(),
           debug: deps.debug,
         });
       },
-      onExit: () => { scene?.dispose(); scene = null; hud?.dispose(); hud = null; },
+      // 已死亡时 exitRun 保留死亡 BGM 到结算页；中途退出则停 run BGM
+      onExit: () => { scene?.dispose(); scene = null; hud?.dispose(); hud = null; audio?.exitRun(); },
     },
     result: {
       onEnter: ctx => {
@@ -146,6 +162,8 @@ export function createGameFlow(deps: GameFlowDeps): GameFlow {
           onSelect: () => machine.go('select'),
         });
       },
+      // 离开结算（重开/回选角）：停死亡 BGM，避免与下一局 run BGM 重叠
+      onExit: () => audio?.stopDeathMusic(),
     },
   }, 'boot');
 
@@ -173,6 +191,9 @@ export function createGameFlow(deps: GameFlowDeps): GameFlow {
       return;
     }
     content = report.content;
+    audio = createAudioDirector(adapter, content.game.params, {
+      random: deps.audioRandom ?? mulberry32(hashSeed('audio-' + Date.now())),
+    });
     machine.go('start');
   }
 

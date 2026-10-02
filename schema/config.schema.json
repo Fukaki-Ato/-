@@ -92,7 +92,62 @@
             },
             "additionalProperties": true
           },
-          "ui": { "type": "object" }
+          "ui": { "type": "object" },
+          "audio": {
+            "type": "object",
+            "properties": {
+              "volume": {
+                "type": "object",
+                "properties": {
+                  "music": { "type": "number" },
+                  "sfx": { "type": "number" }
+                },
+                "additionalProperties": true
+              },
+              "bgm": {
+                "type": "object",
+                "properties": {
+                  "run": { "type": "string", "description": "局内循环 BGM" },
+                  "death": { "type": "string", "description": "死亡一次性 BGM（不循环，延续到结算页）" }
+                },
+                "additionalProperties": true
+              },
+              "sfx": {
+                "type": "object",
+                "properties": {
+                  "start": { "type": "string", "description": "开局音效" },
+                  "death": {
+                    "description": "全局死亡音效：旧版单路径，或非空路径池（每次随机一条）",
+                    "anyOf": [
+                      { "type": "string" },
+                      { "type": "array", "items": { "type": "string" }, "minItems": 1 }
+                    ]
+                  }
+                },
+                "additionalProperties": true
+              },
+              "characters": {
+                "type": "object",
+                "description": "角色 id → 角色专属音效",
+                "additionalProperties": {
+                  "type": "object",
+                  "properties": {
+                    "sfx": {
+                      "type": "object",
+                      "properties": {
+                        "cast": { "type": "string" },
+                        "pickup": { "type": "string" },
+                        "death": { "type": "string" }
+                      },
+                      "additionalProperties": true
+                    }
+                  },
+                  "additionalProperties": true
+                }
+              }
+            },
+            "additionalProperties": true
+          }
         },
         "additionalProperties": true
       }

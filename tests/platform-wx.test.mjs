@@ -7,6 +7,12 @@ import assert from 'node:assert/strict';
 import { createWxAdapter } from '../apps/wx/build/platform/wxPlatform.js';
 import { installCanvasShim } from '../apps/wx/build/platform/shim.js';
 import { createWxStorage } from '../apps/wx/build/platform/storage.js';
+import { createWxAudio, resolveWxAudioPath } from '../apps/wx/build/platform/audio.js';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const root = join(fileURLToPath(import.meta.url), '..', '..');
 
 /** 可编程 wx mock：时钟、存储、触摸/生命周期回调、rAF、request、文件系统。 */
 function makeWxMock() {
@@ -239,4 +245,93 @@ test('extras.share 透传 wx.shareAppMessage（S9 编排带分口令）', () => 
   createWxAdapter({ wx: m.wx }).extras.share({ title: '我跑了 1234 分', query: 'score=1234' });
   assert.equal(m.shareArg.title, '我跑了 1234 分');
   assert.equal(m.shareArg.query, 'score=1234');
+});
+
+// 微信小游戏实测：rAF/cAF 在 GameGlobal 上，wx 对象上根本没有这两个方法。
+// 下面的 mock 特意保留了 wx.requestAnimationFrame，用来验证「有全局就用全局」这条优先级。
+test('requestFrame 优先用 GameGlobal 的 rAF，不用 wx.requestAnimationFrame', () => {
+  const m = makeWxMock();
+  let globalCalls = 0;
+  globalThis.requestAnimationFrame = () => { globalCalls++; return 9999; };
+  globalThis.cancelAnimationFrame = () => {};
+  try {
+    createWxAdapter({ wx: m.wx }).requestFrame(() => {});
+    assert.equal(globalCalls, 1, '必须走全局 rAF');
+    assert.equal(m.raf.cbs.size, 0, '不该再走 wx.requestAnimationFrame');
+  } finally {
+    delete globalThis.requestAnimationFrame;
+    delete globalThis.cancelAnimationFrame;
+  }
+});
+
+test('无全局 rAF 时回落注入的 wx（node 单测与旧基础库路径）', () => {
+  const m = makeWxMock();
+  createWxAdapter({ wx: m.wx }).requestFrame(() => {});
+  assert.equal(m.raf.cbs.size, 1, '回落时仍由注入的 wx 驱动');
+});
+
+// three 判定 isWebGL2 用的是「全局类存在 && 上下文构造器名 === WebGL2RenderingContext」，
+// 而微信不暴露那个全局类 → 适配器必须补，但只能补真 WebGL2 上下文。
+test('mainCanvas 仅在上下文构造器名匹配时暴露 WebGL2RenderingContext', () => {
+  const saved = globalThis.WebGL2RenderingContext;
+  delete globalThis.WebGL2RenderingContext;
+  try {
+    const neg = makeWxMock();
+    createWxAdapter({ wx: neg.wx }).canvas.mainCanvas();
+    assert.equal(globalThis.WebGL2RenderingContext, undefined, '普通对象不能被当成 WebGL2 上下文暴露出去');
+
+    const FakeCtor = { name: 'WebGL2RenderingContext' };
+    const pos = makeWxMock();
+    pos.wx.createCanvas = () => ({ width: 300, height: 150, getContext: () => ({ constructor: FakeCtor }) });
+    createWxAdapter({ wx: pos.wx }).canvas.mainCanvas();
+    assert.equal(globalThis.WebGL2RenderingContext, FakeCtor, '真 WebGL2 上下文必须补上全局类');
+  } finally {
+    if (saved) globalThis.WebGL2RenderingContext = saved;
+    else delete globalThis.WebGL2RenderingContext;
+  }
+});
+
+// ---------------- 音频：仓库相对路径 → 分包路径 ----------------
+
+test('resolveWxAudioPath：assets/audio/... → pkg-assets/assets/audio/...；分包路径/远程 URL/其它原样', () => {
+  assert.equal(resolveWxAudioPath('assets/audio/bgm/run.mp3'), 'pkg-assets/assets/audio/bgm/run.mp3');
+  assert.equal(resolveWxAudioPath('./assets/audio/sfx/start.mp3'), 'pkg-assets/assets/audio/sfx/start.mp3');
+  assert.equal(resolveWxAudioPath('/assets/audio/sfx/start.mp3'), 'pkg-assets/assets/audio/sfx/start.mp3');
+  assert.equal(resolveWxAudioPath('pkg-assets/assets/audio/bgm/run.mp3'), 'pkg-assets/assets/audio/bgm/run.mp3');
+  assert.equal(resolveWxAudioPath('https://cdn.example.com/assets/audio/a.mp3'), 'https://cdn.example.com/assets/audio/a.mp3');
+  assert.equal(resolveWxAudioPath('wxfile://usr/a.mp3'), 'wxfile://usr/a.mp3');
+  assert.equal(resolveWxAudioPath('assets/fonts/x.png'), 'assets/fonts/x.png');
+  // 幂等：二次解析不叠前缀
+  const once = resolveWxAudioPath('assets/audio/sfx/death-1.mp3');
+  assert.equal(resolveWxAudioPath(once), once);
+});
+
+test('createWxAudio：真实配置路径经解析写入 InnerAudioContext.src；音效结束即 destroy', () => {
+  const made = [];
+  const wx = {
+    ...makeWxMock().wx,
+    createInnerAudioContext() {
+      const ctx = {
+        src: '', loop: false, volume: 1, played: 0, destroyed: false, ended: null,
+        play() { this.played++; }, stop() {}, destroy() { this.destroyed = true; },
+        onEnded(cb) { this.ended = cb; }, onError() {},
+      };
+      made.push(ctx);
+      return ctx;
+    },
+  };
+  const game = JSON.parse(readFileSync(join(root, 'config', 'game.json'), 'utf8'));
+  const { bgm, sfx } = game.params.audio;
+  const audio = createWxAudio(wx);
+  audio.playMusic(bgm.run, { loop: true, volume: 0.7 });
+  audio.playSfx(sfx.start, { volume: 1 });
+  audio.playMusic(bgm.death, { loop: false, volume: 0.7 }); // 同一 BGM 实例换曲
+  assert.equal(made.length, 2);
+  assert.equal(made[0].src, `pkg-assets/${bgm.death}`);
+  assert.equal(made[0].loop, false);
+  assert.equal(made[1].src, `pkg-assets/${sfx.start}`);
+  made[1].ended();
+  assert.equal(made[1].destroyed, true);
+  audio.playMusic(`pkg-assets/${bgm.run}`, { loop: true });
+  assert.equal(made[0].src, `pkg-assets/${bgm.run}`, '已带分包前缀的路径不重复加前缀');
 });

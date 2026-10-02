@@ -2,7 +2,7 @@
   "$schema": "../schema/config.schema.json#/game",
   "configVersion": "1.0.0",
   "minEngineVersion": "1.0.0",
-  "updatedAt": "2026-09-28",
+  "updatedAt": "2026-09-29",
   "params": {
     "runner": {
       "baseSpeed": 12,
@@ -154,6 +154,37 @@
         30,
         46
       ]
+    },
+    "audio": {
+      "volume": {
+        "music": 0.7,
+        "sfx": 1
+      },
+      "bgm": {
+        "run": "assets/audio/bgm/run.mp3",
+        "death": "assets/audio/bgm/death.mp3"
+      },
+      "sfx": {
+        "start": "assets/audio/sfx/start.mp3",
+        "death": [
+          "assets/audio/sfx/death-1.mp3",
+          "assets/audio/sfx/death-2.mp3",
+          "assets/audio/sfx/death-3.mp3",
+          "assets/audio/sfx/death-4.mp3",
+          "assets/audio/sfx/death-5.mp3",
+          "assets/audio/sfx/death-6.mp3",
+          "assets/audio/sfx/death-7.mp3"
+        ]
+      },
+      "characters": {
+        "char_volt": {
+          "sfx": {
+            "cast": "assets/audio/sfx/char/char_volt/cast.mp3",
+            "pickup": "assets/audio/sfx/char/char_volt/pickup.mp3",
+            "death": "assets/audio/sfx/char/char_volt/death.mp3"
+          }
+        }
+      }
     }
   }
 }
