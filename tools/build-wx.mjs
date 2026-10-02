@@ -103,6 +103,9 @@ try {
   copyDir(join(root, 'config'), join(pkg, 'config'), n => n.endsWith('.json'));
   copyDir(join(root, 'assets/fonts'), join(pkg, 'assets/fonts'), n => /\.(png|metrics\.json)$/.test(n));
   const placeholders = writeAssetPlaceholders(pkg);
+  // 开发者工具硬性要求 game.json 声明的每个分包 root 下存在 game.js，否则拒绝打包
+  // （报「未找到 ["subpackages"][0]["root"] 对应的 /pkg-assets/game.js」）。分包内容经 wx.loadSubpackage 读取，此入口无执行逻辑。
+  writeFileSync(join(pkg, 'game.js'), '/* pkg-assets 分包占位入口：本包只提供资源，无执行逻辑 */\n');
 
   const m = measureDist(out);
   console.log(`apps/wx/dist ${dry ? '（--dry 临时目录校验）' : '就绪'}（minify=${minify}）：分包占位 ${placeholders} 项`);
