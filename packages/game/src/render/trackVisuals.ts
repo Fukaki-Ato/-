@@ -3,7 +3,7 @@
  * 纯装饰层：只跟随插值距离滚动，不读玩法状态。
  * 侧景完全由真 3D 几何承担（见 sceneryProps.ts，贴图带方案已删）：视差来自相机透视，
  * 地平线由 far 排房屋与棕榈补住，天空由渐变穹顶收尾。
- * 跑道两侧的沙地是静止的（不随距离滚动）——它只是地面色底，滚动反而暴露重复感。
+ * 跑道两侧的沙地网格固定，纹理随插值距离向后滚动，与虚线/侧景保持相同世界速度。
  */
 import * as THREE from 'three';
 import { createSceneryProps } from './sceneryProps.js';
@@ -110,9 +110,12 @@ export function createTrackVisuals(scene: THREE.Scene, laneWidth: number, colors
 
   let lastDist = 0;
   return {
-    /** 用插值距离推动虚线与侧景道具滚动（与角色同步，不掉帧抖动）；沙地保持静止 */
+    /** 用插值距离推动沙地纹理、虚线与侧景滚动（与角色同步，不掉帧抖动） */
     update(dist: number) {
       const move = dist - lastDist; lastDist = dist;
+      // 地面旋转后 UV 的 v 轴朝 -Z；正偏移让草斑向 +Z（角色身后）移动。
+      // 每 6m 平铺一轮，按绝对距离取相位：不累积漂移，也不移走地面网格露出边缘。
+      groundTex.offset.y = (dist % GROUND_TILE_M) / GROUND_TILE_M;
       for (const d of dashes) {
         d.position.z += move;
         if (d.position.z > DASH_RESET_Z) d.position.z -= DASH_LOOP;
