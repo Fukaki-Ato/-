@@ -7,7 +7,7 @@
  * UiHost 侧接口不变（见会话汇报）。
  */
 import * as THREE from 'three';
-import { loadFontSet, resolveUiConfig, type UiConfig, type UiResources } from '@tr/framework/ui/index.js';
+import { loadFontSet, resolveUiConfig, type NinePatchSource, type UiConfig, type UiResources } from '@tr/framework/ui/index.js';
 import { UiHost } from '@tr/framework/ui/host.js';
 import { ICON_NAMES, type IconSet } from '@tr/game/ui/icons.js';
 import type { PlatformAdapter } from '@tr/framework/platform/platformAdapter.js';
@@ -31,6 +31,8 @@ export interface UiShell {
   canvas: HTMLCanvasElement;
   config: UiConfig;
   icons: IconSet;
+  /** 大厅背景图贴图（assets/ui/lobby-bg.jpg，用户自备插画去水印版；缺文件时 undefined 回纯色底） */
+  background?: NinePatchSource;
   destroy(): void;
 }
 
@@ -65,6 +67,15 @@ export async function createUiShell(adapter: PlatformAdapter): Promise<UiShell> 
     } catch { /* 单图标缺失不阻塞页面 */ }
   }));
 
+  // 大厅背景图：零 insets 整图拉伸铺满页面
+  let background: NinePatchSource | undefined;
+  try {
+    const bmp = await resources.loadImage(`${import.meta.env.BASE_URL}assets/ui/lobby-bg.jpg`);
+    const texture = new THREE.Texture(bmp as unknown as ImageBitmap);
+    texture.needsUpdate = true;
+    background = { texture, insets: { top: 0, right: 0, bottom: 0, left: 0 }, texSize: { w: bmp.width, h: bmp.height } };
+  } catch { /* 缺图回纯色底，不阻塞启动 */ }
+
   const host = new UiHost({
     adapter,
     fonts,
@@ -88,13 +99,14 @@ export async function createUiShell(adapter: PlatformAdapter): Promise<UiShell> 
   canvas.addEventListener('pointercancel', onCancel);
 
   return {
-    host, renderer, canvas, config, icons,
+    host, renderer, canvas, config, icons, background,
     destroy() {
       canvas.removeEventListener('pointerdown', onDown);
       canvas.removeEventListener('pointermove', onMove);
       canvas.removeEventListener('pointerup', onUp);
       canvas.removeEventListener('pointercancel', onCancel);
       for (const src of Object.values(icons)) src.texture?.dispose();
+      background?.texture.dispose();
       host.dispose();
       renderer.dispose();
       canvas.remove();

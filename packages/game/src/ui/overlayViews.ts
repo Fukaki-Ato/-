@@ -16,11 +16,14 @@ import { buildLobbyPage } from './lobbyView.js';
 import { buildHudPage } from './hudView.js';
 import { buildResultPage } from './resultView.js';
 import type { IconSet } from './icons.js';
+import type { NinePatchSource } from '@tr/framework/ui/index.js';
 
 export interface OverlayViewsDeps {
   host: UiHost;
   /** 大厅图标贴图（壳侧加载注入；缺省时图标位退化为空槽） */
   icons?: IconSet;
+  /** 大厅背景图贴图（壳侧加载注入；缺省回主题纯色底） */
+  background?: NinePatchSource;
 }
 
 export type OverlayViews = GameViews;
@@ -53,7 +56,7 @@ export function createOverlayViews(deps: OverlayViewsDeps): OverlayViews {
         actions,
         currentCharId,
         entry,
-        extras: { coins: extras?.coins ?? 0, diamonds: extras?.diamonds ?? 0, icons: deps.icons },
+        extras: { coins: extras?.coins ?? 0, diamonds: extras?.diamonds ?? 0, icons: deps.icons, background: deps.background },
       }).view);
     },
 

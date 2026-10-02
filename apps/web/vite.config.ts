@@ -7,6 +7,8 @@ import { fileURLToPath } from 'node:url';
 const assetsDir = fileURLToPath(new URL('../../assets', import.meta.url));
 const MIME: Record<string, string> = {
   '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
   '.json': 'application/json; charset=utf-8',
   '.txt': 'text/plain; charset=utf-8',
   // 音频：dev 中间件按真实 MIME 下发，避免 <audio> 依赖嗅探

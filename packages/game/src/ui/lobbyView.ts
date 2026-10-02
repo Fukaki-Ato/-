@@ -6,7 +6,7 @@
  * 角色/场景两个板块可用（点选即写本机记忆），其余板块经 LobbySlotHandlers 预留接口，
  * 未注入时统一 toast「开发中」占位，后续功能逐个接入不改布局。
  */
-import { Box, Button, Label, List, type UiView } from '@tr/framework/ui/index.js';
+import { Box, Button, Label, List, type NinePatchSource, type UiView } from '@tr/framework/ui/index.js';
 import type { GameContent } from '@tr/game/core/config/configTypes.js';
 import { buildLoadout, playableCharacters, type Loadout } from '@tr/game/core/sim/character.js';
 import type { UiHost } from '@tr/framework/ui/host.js';
@@ -21,6 +21,8 @@ export interface LobbyExtras {
   coins: number;
   diamonds: number;
   icons?: IconSet;
+  /** 全屏背景贴图（用户自备插画）；缺省回主题纯色底 */
+  background?: NinePatchSource;
 }
 
 /** 预留功能接口：壳/流程注入真实实现后替换 toast 占位 */
@@ -255,7 +257,8 @@ export function buildLobbyPage(host: UiHost, d: LobbyDeps): LobbyPage {
 
   const view = host.makeView();
   view.add(new Box(
-    { direction: 'column', flex: 1, padding: 10, gap: 8 },
+    // 背景图铺满整屏（九宫格零 insets 拉伸），面板/文字按绘制顺序叠在其上
+    { direction: 'column', flex: 1, padding: 10, gap: 8, background: d.extras?.background ?? null },
     [topBar, midRow, panelHost, bottomBar],
   ));
   applyChosen(); // 入视图后才能 setText（Label bind 语义，同 S13）
