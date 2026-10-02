@@ -1,10 +1,9 @@
 /**
- * 登录后大厅页（P3 v2，替代原选角页单列布局）：
- * 顶栏＝头像｜金币｜钻石｜设置；左列＝活动；右列＝成就、任务；
- * 主体＝当前选中角色展示 + 「开始·酷跑」「场景切换」两板块；
- * 底部四联框＝商店｜角色｜宝箱｜福利手册（有分界）。
- * 角色/场景两个板块可用（点选即写本机记忆），其余板块经 LobbySlotHandlers 预留接口，
- * 未注入时统一 toast「开发中」占位，后续功能逐个接入不改布局。
+ * 登录后大厅页（P3 v3，按用户参考图重做）：
+ * 顶栏＝头像｜金币｜钻石｜设置；左＝活动（下挂登录方式）；右＝成就、任务、排行榜；
+ * 中下＝「开始·酷跑」「场景切换」两枚大徽标；底部棕条＝商店｜福利手册｜宝箱｜角色。
+ * 徽标全部为图片按钮（badges.ts，点击换淡黄描边帧反馈）；角色/场景面板可用，
+ * 其余板块经 LobbySlotHandlers 预留接口，未注入时 toast「开发中」占位。
  */
 import { Box, Button, Label, List, type NinePatchSource, type UiView } from '@tr/framework/ui/index.js';
 import type { GameContent } from '@tr/game/core/config/configTypes.js';
@@ -13,15 +12,14 @@ import type { UiHost } from '@tr/framework/ui/host.js';
 import type { SelectActions } from '../flow/views.js';
 import { CHAR_KEY, THEME_KEY } from '../flow/mainFlow.js';
 import { entryLabel, type EntryMethod } from '../flow/session.js';
-import { solidChip } from './parts.js';
-import { MiniCard, rarityColor, type CardEnv } from './charCard.js';
-import { iconBox, type IconName, type IconSet } from './icons.js';
+import { MiniCard, type CardEnv } from './charCard.js';
+import { badgeButton, badgeImage, type BadgeSet } from './badges.js';
 
 export interface LobbyExtras {
   coins: number;
   diamonds: number;
-  icons?: IconSet;
-  /** 全屏背景贴图（用户自备插画）；缺省回主题纯色底 */
+  badges?: BadgeSet;
+  /** 全屏背景贴图；缺省回主题纯色底 */
   background?: NinePatchSource;
 }
 
@@ -31,6 +29,7 @@ export interface LobbySlotHandlers {
   onEvent?: () => void;
   onAchievements?: () => void;
   onTasks?: () => void;
+  onRank?: () => void;
   onShop?: () => void;
   onChest?: () => void;
   onHandbook?: () => void;
@@ -47,7 +46,7 @@ export interface LobbyDeps {
 
 export interface LobbyPage { view: UiView }
 
-/** 选角页技能行：能量攒满所需里程由配置推导（skills.json energy.perMeter），不写死文案 */
+/** 选角面板技能行：能量攒满所需里程由配置推导（skills.json energy.perMeter），不写死文案 */
 export function skillLine(load: Loadout): string {
   const sk = load.skill;
   if (!sk) return '技能：无';
@@ -62,9 +61,14 @@ export function passiveLine(load: Loadout): string {
   return load.passive.length ? `被动：${load.talentLabel} — ${load.talentDesc}` : '被动：无';
 }
 
+// 参考图配色：棕色胶囊/底条 + 沙滩上的深棕标题字
+const PILL_BG = '#5e4b3a';
+const BAR_BG = '#5a4d42';
+const TITLE_ON_BG = '#6b4a2b';
+
 export function buildLobbyPage(host: UiHost, d: LobbyDeps): LobbyPage {
   const c = host.theme.colors;
-  const icons = d.extras?.icons;
+  const set = d.extras?.badges;
   const chars = playableCharacters(d.content);
   const loads = chars.map(x => buildLoadout(d.content, x.id));
   let chosen = chars.some(x => x.id === d.currentCharId) ? d.currentCharId : (chars[0]?.id ?? '');
@@ -72,44 +76,29 @@ export function buildLobbyPage(host: UiHost, d: LobbyDeps): LobbyPage {
 
   const stub = (name: string) => (): void => { host.toast(`「${name}」开发中，敬请期待`); };
   const slot = (key: keyof LobbySlotHandlers, name: string): (() => void) => d.slots?.[key] ?? stub(name);
-
-  /** 可点图标槽（方形小九宫格卡）：图标＋可选文字 */
-  const iconTile = (icon: IconName, label: string | null, size: number, onClick: () => void, tint = c.text): Box => {
-    const iconW = iconBox(icons, icon, Math.round(size * 0.58), tint);
-    const kids = label ? [iconW, new Label({ text: label, fontSizePx: 11, color: c.muted })] : [iconW];
-    return new Box(
-      { direction: 'column', background: 'card', padding: 6, gap: 4, align: 'center', justify: 'center', width: size, height: size, onClick },
-      kids,
-    );
+  const badge = (name: Parameters<typeof badgeButton>[1], w: number, h: number, onTap: () => void, tag: string): Box => {
+    if (set) return badgeButton(set, name, w, h, onTap, tag);
+    const holder = new Box({ width: w, height: h, onClick: onTap });
+    const l = new Label({ text: tag });
+    l.visible = false;
+    holder.add(l);
+    return holder;
   };
 
-  /** 顶栏货币chip：图标＋数值 */
-  const currencyChip = (icon: IconName, value: number, tint: string): Box => new Box(
-    { direction: 'row', background: 'card', padding: { top: 6, bottom: 6, left: 8, right: 8 }, gap: 6, align: 'center' },
-    [iconBox(icons, icon, 18, tint), new Label({ text: String(value), fontSizePx: 13, color: tint })],
+  /** 顶栏货币胶囊：棕色 pill + 徽标 + 动态数字 */
+  const currencyChip = (icon: 'coin' | 'gem', value: number, tint: string): Box => new Box(
+    { direction: 'row', background: host.solidSkin, backgroundColor: PILL_BG, padding: { top: 3, bottom: 3, left: 5, right: 10 }, gap: 5, align: 'center' },
+    [badgeImage(set, icon, 24, 24), new Label({ text: String(value), fontSizePx: 14, color: tint })],
   );
 
-  // ---------- 主体：选中角色展示 ----------
-  const chipHolder = new Box({ width: 84, height: 84, align: 'center', justify: 'center' });
-  const nameL = new Label({ text: '', fontSizePx: 20, color: c.text });
-  const rarityL = new Label({ text: '', fontSizePx: 12, color: c.muted });
-  const skillL = new Label({ text: '', fontSizePx: 12, color: c.muted, align: 'center' });
-  const passiveL = new Label({ text: '', fontSizePx: 12, color: c.muted, align: 'center' });
-  const entryL = new Label({ text: `登录方式：${entryLabel(d.entry)}`, fontSizePx: 11, color: c.muted });
-  const applyChosen = (): void => {
-    const load = loads[chosenIndex()];
-    if (!load) return;
-    for (const old of [...chipHolder.children]) chipHolder.remove(old);
-    chipHolder.add(solidChip(host.solidSkin, 64, load.tint));
-    nameL.setText(load.name);
-    rarityL.setText(load.rarity);
-    rarityL.setColor(rarityColor(c, load.rarity));
-    skillL.setText(skillLine(load));
-    passiveL.setText(passiveLine(load));
-  };
+  /** 中部大徽标组：标题字 + 徽标 */
+  const bigBadge = (title: string, name: Parameters<typeof badgeButton>[1], w: number, h: number, onTap: () => void, tag: string): Box => new Box(
+    { direction: 'column', align: 'center', gap: 4 },
+    [new Label({ text: title, fontSizePx: 17, color: TITLE_ON_BG }), badge(name, w, h, onTap, tag)],
+  );
 
-  // ---------- 弹层面板（角色 / 场景），同一时刻只开一个 ----------
-  const panelHost = new Box({ direction: 'column', gap: 8 });
+  // ---------- 角色 / 场景弹层 ----------
+  const panelHost = new Box({ direction: 'column', gap: 6 });
   let openKind: 'char' | 'theme' | null = null;
   const setPanel = (kind: 'char' | 'theme' | null, panel: Box | null): void => {
     for (const old of [...panelHost.children]) panelHost.remove(old);
@@ -119,15 +108,15 @@ export function buildLobbyPage(host: UiHost, d: LobbyDeps): LobbyPage {
 
   const live = new Set<MiniCard>();
   const cardEnv: CardEnv = { colors: c, solid: host.solidSkin, tintOf: i => loads[i]?.tint ?? '#ffffff', live };
-  const refreshMarks = (): void => {
-    for (const card of live) card.setPicked(card.slotIndex === chosenIndex());
-  };
+  const infoL = new Label({ text: '', fontSizePx: 12, color: c.muted, align: 'center' });
+  const refreshMarks = (): void => { for (const card of live) card.setPicked(card.slotIndex === chosenIndex()); };
   const choose = (i: number): void => {
     const id = chars[i]?.id;
     if (!id) return;
     chosen = id;
     host.adapter.storage.set(CHAR_KEY, id); // 点选即写本机记忆
-    applyChosen();
+    const load = loads[i]!;
+    infoL.setText(`${load.name}：${skillLine(load)}　${passiveLine(load)}`);
     refreshMarks();
   };
 
@@ -143,13 +132,14 @@ export function buildLobbyPage(host: UiHost, d: LobbyDeps): LobbyPage {
       onSelect: i => choose(i),
     });
     return new Box(
-      { direction: 'column', background: 'panel', backgroundOpacity: 0.85, padding: 10, gap: 8 },
+      { direction: 'column', background: 'panel', backgroundOpacity: 0.9, padding: 10, gap: 6 },
       [
         new Box({ direction: 'row', justify: 'spaceBetween', align: 'center' }, [
           new Label({ text: '选择角色（点选即保存）', fontSizePx: 14, color: c.gold }),
           new Button({ label: '收起', fontSizePx: 12, padding: { top: 4, bottom: 4, left: 12, right: 12 }, onClick: () => setPanel(null, null) }),
         ]),
         list,
+        infoL,
       ],
     );
   };
@@ -172,7 +162,7 @@ export function buildLobbyPage(host: UiHost, d: LobbyDeps): LobbyPage {
       });
     });
     return new Box(
-      { direction: 'column', background: 'panel', backgroundOpacity: 0.85, padding: 10, gap: 8 },
+      { direction: 'column', background: 'panel', backgroundOpacity: 0.9, padding: 10, gap: 8 },
       [
         new Box({ direction: 'row', justify: 'spaceBetween', align: 'center' }, [
           new Label({ text: '场景切换（下一局生效）', fontSizePx: 14, color: c.gold }),
@@ -185,82 +175,61 @@ export function buildLobbyPage(host: UiHost, d: LobbyDeps): LobbyPage {
 
   const toggleChar = (): void => {
     if (openKind === 'char') setPanel(null, null);
-    else setPanel('char', buildCharPanel());
+    else { setPanel('char', buildCharPanel()); choose(chosenIndex()); }
   };
   const toggleTheme = (): void => {
     if (openKind === 'theme') setPanel(null, null);
     else setPanel('theme', buildThemePanel());
   };
 
-  // ---------- 四段布局 ----------
+  // ---------- 四段布局（对齐参考图） ----------
   const topBar = new Box(
     { direction: 'row', align: 'center', gap: 8 },
     [
-      new Box({ width: 46, height: 46, background: 'card', align: 'center', justify: 'center' },
-        [iconBox(icons, 'circle-user', 30, c.neon)]),
-      currencyChip('coins', d.extras?.coins ?? 0, c.gold),
-      currencyChip('gem', d.extras?.diamonds ?? 0, c.neon),
+      badge('avatar', 41, 41, slot('onSettings', '头像'), '头像'),
+      currencyChip('coin', d.extras?.coins ?? 0, c.gold),
+      currencyChip('gem', d.extras?.diamonds ?? 0, '#BFE3FF'),
       new Box({ flex: 1 }),
-      iconTile('settings', null, 40, slot('onSettings', '设置')),
+      badge('settings', 36, 36, slot('onSettings', '设置'), '设置'),
     ],
   );
 
-  const midRow = new Box(
-    { direction: 'row', flex: 1, gap: 8, align: 'stretch' },
-    [
-      new Box({ direction: 'column', width: 68, gap: 8 }, [iconTile('calendar-days', '活动', 68, slot('onEvent', '活动'))]),
-      new Box({ direction: 'column', flex: 1, width: 0, gap: 10, align: 'center', justify: 'center' }, [
-        new Box(
-          { direction: 'column', background: 'panel', backgroundOpacity: 0.72, padding: 14, gap: 6, width: { percent: 100 }, maxWidth: 460 },
-          [
-            new Box({ direction: 'row', justify: 'center' }, [chipHolder]),
-            new Box({ direction: 'row', gap: 8, justify: 'center', align: 'center' }, [nameL, rarityL]),
-            skillL,
-            passiveL,
-            entryL,
-          ],
-        ),
-        new Box({ direction: 'row', gap: 12, justify: 'center' }, [
-          new Button({
-            label: '开始·酷跑', variant: 'primary', fontSizePx: 18,
-            padding: { top: 10, bottom: 10, left: 26, right: 26 },
-            onClick: () => d.actions.onStartRun(chosen),
-          }),
-          new Button({
-            label: '场景切换', fontSizePx: 14,
-            padding: { top: 10, bottom: 10, left: 18, right: 18 },
-            onClick: toggleTheme,
-          }),
-        ]),
-      ]),
-      new Box({ direction: 'column', width: 68, gap: 8 }, [
-        iconTile('trophy', '成就', 68, slot('onAchievements', '成就')),
-        iconTile('clipboard-list', '任务', 68, slot('onTasks', '任务')),
-      ]),
-    ],
-  );
+  const leftCol = new Box({ direction: 'column', width: 61, gap: 10, align: 'center' }, [
+    badge('event', 55, 66, slot('onEvent', '活动'), '活动'),
+    new Box({ direction: 'column', background: host.solidSkin, backgroundColor: PILL_BG, backgroundOpacity: 0.55, padding: { top: 3, bottom: 3, left: 4, right: 4 } },
+      [new Label({ text: `登录方式：${entryLabel(d.entry)}`, fontSizePx: 10, color: '#FFE9A0', align: 'center' })]),
+  ]);
 
-  const sep = (): Box => new Box({ width: 1, background: host.solidSkin, backgroundColor: c.muted, backgroundOpacity: 0.4 });
-  const bottomCell = (icon: IconName, label: string, onClick: () => void): Box => new Box(
-    { direction: 'column', flex: 1, align: 'center', justify: 'center', gap: 4, padding: { top: 8, bottom: 8 }, onClick },
-    [iconBox(icons, icon, 26, c.text), new Label({ text: label, fontSizePx: 12, color: c.text })],
-  );
+  const centerCol = new Box({ direction: 'column', flex: 1, width: 0, justify: 'end', align: 'center', gap: 6, padding: { bottom: 6 } }, [
+    new Box({ direction: 'row', gap: 18, align: 'end', justify: 'center' }, [
+      bigBadge('开始·酷跑', 'start', 150, 68, () => d.actions.onStartRun(chosen), '开始酷跑'),
+      bigBadge('场景切换', 'castle', 66, 66, toggleTheme, '场景切换'),
+    ]),
+  ]);
+
+  const rightCol = new Box({ direction: 'column', width: 61, gap: 6, align: 'center' }, [
+    badge('achieve', 55, 66, slot('onAchievements', '成就'), '成就'),
+    badge('task', 55, 66, slot('onTasks', '任务'), '任务'),
+    badge('rank', 55, 55, slot('onRank', '排行榜'), '排行榜'),
+  ]);
+
+  const midRow = new Box({ direction: 'row', flex: 1, gap: 6, align: 'stretch' }, [leftCol, centerCol, rightCol]);
+
   const bottomBar = new Box(
-    { direction: 'row', background: 'panel', padding: 4, align: 'stretch' },
+    { direction: 'row', background: host.solidSkin, backgroundColor: BAR_BG, padding: { top: 4, bottom: 4 }, align: 'center', justify: 'spaceAround' },
     [
-      bottomCell('store', '商店', slot('onShop', '商店')), sep(),
-      bottomCell('user-round', '角色', toggleChar), sep(),
-      bottomCell('archive', '宝箱', slot('onChest', '宝箱')), sep(),
-      bottomCell('book-open', '福利手册', slot('onHandbook', '福利手册')),
+      badge('shop', 77, 80, slot('onShop', '商店'), '商店'),
+      badge('handbook', 77, 80, slot('onHandbook', '福利手册'), '福利手册'),
+      badge('chest', 77, 80, slot('onChest', '宝箱'), '宝箱'),
+      badge('character', 77, 80, toggleChar, '角色'),
     ],
   );
 
   const view = host.makeView();
   view.add(new Box(
-    // 背景图铺满整屏（九宫格零 insets 拉伸），面板/文字按绘制顺序叠在其上
-    { direction: 'column', flex: 1, padding: 10, gap: 8, background: d.extras?.background ?? null },
+    // 背景图铺满整屏（九宫格零 insets 拉伸），徽标/面板按绘制顺序叠在其上
+    { direction: 'column', flex: 1, padding: 8, gap: 6, background: d.extras?.background ?? null },
     [topBar, midRow, panelHost, bottomBar],
   ));
-  applyChosen(); // 入视图后才能 setText（Label bind 语义，同 S13）
   return { view };
 }
