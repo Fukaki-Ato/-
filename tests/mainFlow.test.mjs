@@ -177,6 +177,7 @@ async function bootRealFlow({ withAudio = true } = {}) {
   const calls = [];
   const scenes = [];
   const inputs = [];
+  const logins = [];
   const seen = { select: null, result: null };
   const store = new Map();
   const adapter = {
@@ -184,6 +185,8 @@ async function bootRealFlow({ withAudio = true } = {}) {
     fetchJson: async url => JSON.parse(readFileSync(join(root, 'config', `${url}.json`), 'utf8')),
     canvas: { mainCanvas: () => ({}), windowSize: () => ({ width: 390, height: 844, dpr: 2 }) },
     onInput: cb => { inputs.push(cb); return () => {}; },
+    // 游客态直入：boot 全程不得触达登录；真被调用就记一笔供断言
+    extras: { login: async () => { logins.push(1); return { openid: 'guest', isGuest: true }; } },
     audio: withAudio ? {
       playMusic: (url, o) => calls.push(['playMusic', url, o]),
       stopMusic: () => calls.push(['stopMusic']),
@@ -206,15 +209,25 @@ async function bootRealFlow({ withAudio = true } = {}) {
   };
   const flow = createGameFlow({ adapter, views, configResolve: n => n, audioRandom: () => 0, createScene });
   await flow.boot();
-  assert.equal(flow.machine.current(), 'start');
-  seen.start.onGuest();
+  // 游客态直入主界面：boot 后落在 select、入口记 guest、全程零 login 调用
+  assert.equal(flow.machine.current(), 'select');
+  assert.equal(store.get(ENTRY_KEY), 'guest');
   const key = code => inputs.forEach(cb => cb({ type: 'key', code, phase: 'down' }));
-  return { flow, calls, scenes, seen, key };
+  return { flow, calls, scenes, seen, key, logins };
 }
 
 const sfxOpt = { volume: audioCfg.sfxVolume };
 const runBgm = ['playMusic', audioCfg.bgmRun, { loop: true, volume: audioCfg.musicVolume }];
 const deathBgm = ['playMusic', audioCfg.bgmDeath, { loop: false, volume: audioCfg.musicVolume }];
+
+test('主界面：boot 游客态直入 select，extras.login 零调用；开始酷跑 → run 仍零调用', async () => {
+  const { flow, scenes, seen, logins } = await bootRealFlow();
+  assert.equal(logins.length, 0);
+  seen.select.onStartRun('char_volt');
+  assert.equal(flow.machine.current(), 'run');
+  assert.equal(scenes[0].sim.loadout.charId, 'char_volt');
+  assert.equal(logins.length, 0);
+});
 
 test('音频 handoff：选角开局 → run BGM+开局音效；cast/pickup 回调 → 所选角色音效；死亡 → 死亡 BGM+池音效+角色音效，延续到结算', async () => {
   const { flow, calls, scenes, seen } = await bootRealFlow();

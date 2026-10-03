@@ -1,7 +1,9 @@
 /**
  * 主流程装配（@tr/game）——从 apps/web/src/bootstrap.ts 提取，两端共用（redesign §3.5）。
  * 职责：平台适配（经 adapter 注入）→ 场景状态机 → 加载配置 → 驱动页面流转：
- *       boot（配置加载）→ start（微信登录 / 游客登录）→ select（选角）→ run → result → select；
+ *       boot（配置加载）→ select（主界面兼选角，游客态直入）→ run → result → select；
+ *       start（微信/游客登录页）保留在场景机里但 boot 后不再可达——默认游客进入，
+ *       全程不调 adapter.extras.login()、不弹授权（issue：重构主界面并默认游客进入）；
  *       跑酷局内：每次进入 run 场景创建全新 RunnerSim（seed 记录在案，可复现），
  *       渲染场景消费 sim 事件；死亡 1.2s 后自动进结算页。
  * 微信登录只调注入的 adapter.extras.login()（wx 侧现为游客占位，服务端鉴权未接），见 session.ts。
@@ -90,7 +92,7 @@ export function createGameFlow(deps: GameFlowDeps): GameFlow {
     const n = Number(adapter.storage.get(key) ?? '0');
     return Number.isFinite(n) && n > 0 ? n : 0;
   };
-  /** 上次在开始页选的入口（本机记忆，选角页展示） */
+  /** 上次在开始页选的入口（本机记忆，选角页展示）；无记忆＝游客态直入主界面 */
   let entry: EntryMethod | null = readEntry(adapter.storage);
   /** 开始页进入代次：登录 promise 回来时若已离开/重进开始页则丢弃结果 */
   let startGen = 0;
@@ -207,7 +209,13 @@ export function createGameFlow(deps: GameFlowDeps): GameFlow {
     audio = createAudioDirector(adapter, content.game.params, {
       random: deps.audioRandom ?? mulberry32(hashSeed('audio-' + Date.now())),
     });
-    machine.go('start');
+    // 游客态直入主界面：不要求登录、不调 adapter.extras.login()、不显示授权弹窗。
+    // 开始页（微信/游客两入口）保留在场景机里但不再有入口可达，登录代码零调用。
+    if (entry === null) {
+      entry = 'guest';
+      saveEntry(adapter.storage, 'guest');
+    }
+    machine.go('select');
   }
 
   return { machine, boot, currentSeed: () => lastSeed };
