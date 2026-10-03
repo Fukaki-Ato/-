@@ -26,7 +26,7 @@ import numpy as np
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SRC = os.path.join(ROOT, 'tools', 'badge_matte_src', 'mainmenu-mockup.png')
 OUT = os.path.join(ROOT, 'assets', 'ui', 'menu-bg.png')
-DRAFT = os.path.join(ROOT, 'tools', 'badge_matte_src', 'menu-bg-draft.png')
+DRAFT = os.path.join(ROOT, 'vibe_images', 'menu-bg-draft.png')   # 迭代稿不进仓（vibe_images 被 .git/info/exclude 忽略）
 
 # (x0, y0, x1, y1, 方法, donor, 羽化(左,上,右,下))
 # 羽化环必须落在干净原图上，否则会把原图 UI 的颜色混进来当鬼影；
@@ -213,6 +213,7 @@ def main() -> None:
     ok, buf = cv2.imencode('.png', img)
     if not ok:
         raise SystemExit('编码失败')
+    os.makedirs(os.path.dirname(DRAFT), exist_ok=True)
     for path in (OUT, DRAFT):
         buf.tofile(path)
     print('written', OUT, img.shape)
