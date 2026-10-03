@@ -15,6 +15,8 @@ const MIME: Record<string, string> = {
   '.mp3': 'audio/mpeg',
   '.m4a': 'audio/mp4',
   '.ogg': 'audio/ogg',
+  // 大厅背景循环视频：<video> 对 octet-stream 直接拒绝解码，MIME 必须给对
+  '.mp4': 'video/mp4',
 };
 
 function trAssets(): Plugin {

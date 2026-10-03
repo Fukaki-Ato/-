@@ -24,21 +24,29 @@ export interface OverlayViewsDeps {
   badges?: BadgeSet;
   /** 大厅背景图贴图（壳侧加载注入；缺省回主题纯色底） */
   background?: NinePatchSource;
+  /**
+   * 「现在是不是大厅页」的通报口：背景是循环视频，而视频元素只能待在壳层
+   * （本包禁令：零 DOM），所以由壳层注入回调，视图只负责报可见性。缺省不接＝没人管视频。
+   */
+  onLobbyVisible?(visible: boolean): void;
 }
 
 export type OverlayViews = GameViews;
 
 export function createOverlayViews(deps: OverlayViewsDeps): OverlayViews {
   const { host } = deps;
+  const lobby = (visible: boolean): void => deps.onLobbyVisible?.(visible);
 
   return {
     renderBoot(): BootHandle {
+      lobby(false);
       const page = buildBootPage(host);
       host.mount(page.view);
       return page.handle;
     },
 
     renderStart(actions: StartActions): StartHandle {
+      lobby(false);
       const page = buildStartPage(host, actions);
       host.mount(page.view);
       return page.handle;
@@ -58,15 +66,18 @@ export function createOverlayViews(deps: OverlayViewsDeps): OverlayViews {
         entry,
         extras: { coins: extras?.coins ?? 0, diamonds: extras?.diamonds ?? 0, badges: deps.badges, background: deps.background },
       }).view);
+      lobby(true);
     },
 
     mountHud(): HudHandle {
+      lobby(false); // 进跑酷局：背景视频不在画面里，别再解码
       const page = buildHudPage(host);
       host.mount(page.view, { transparent: true });
       return page.handle;
     },
 
     renderResult(summary: RunSummary, best: number, actions: ResultActions): void {
+      lobby(false);
       host.mount(buildResultPage(host, { summary, best, actions }).view);
     },
 
