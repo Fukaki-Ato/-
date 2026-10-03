@@ -28,6 +28,16 @@ export interface BoxOptions {
   flex?: number;
   /** true=自身不作为命中目标（全屏底板），子项仍可命中 */
   passthrough?: boolean;
+  /**
+   * true=脱离常规流，按 top/left（或 right/bottom）相对父内容盒定位；不占父主轴空间，
+   * 且总是绘制在常规子项之上、命中优先。半屏弹层与全屏点击捕获层用它。
+   */
+  absolute?: boolean;
+  /** 绝对定位偏移 px，仅 absolute 为真时消费 */
+  top?: number;
+  left?: number;
+  right?: number;
+  bottom?: number;
   /** 九宫格背景：主题皮肤键 / 自定义源 / null（无背景） */
   background?: SkinKey | NinePatchSource | null;
   /** 背景乘色（默认白=皮肤原色） */
@@ -93,14 +103,21 @@ export class Box extends Widget {
 
   node(): LayoutNode {
     const o = this.opts;
-    this.laidOut = this.children.filter(c => c.visible);
+    const vis = this.children.filter(c => c.visible);
+    const kidNodes = vis.map(c => c.node());
+    // 产出顺序必须与 layout.arrange 一致（常规子项在前、绝对子项在后），
+    // 否则 sync() 里 laidOut[i] 与 box.children[i] 会错位对不上。sort 稳定，组内保序。
+    const order = vis.map((_, i) => i)
+      .sort((a, b) => (kidNodes[a].absolute ? 1 : 0) - (kidNodes[b].absolute ? 1 : 0));
+    this.laidOut = order.map(i => vis[i]);
     return {
       id: this.id,
       direction: o.direction, align: o.align, justify: o.justify, gap: o.gap,
       padding: o.padding, margin: o.margin, width: o.width, height: o.height,
       minWidth: o.minWidth, minHeight: o.minHeight, maxWidth: o.maxWidth, maxHeight: o.maxHeight,
       flex: o.flex, passthrough: o.passthrough,
-      children: this.laidOut.map(c => c.node()),
+      absolute: o.absolute, top: o.top, left: o.left, right: o.right, bottom: o.bottom,
+      children: order.map(i => kidNodes[i]),
     };
   }
 

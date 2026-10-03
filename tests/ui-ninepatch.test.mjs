@@ -82,6 +82,27 @@ test('NinePatchSprite：update 换矩形重建几何；零尺寸隐藏', () => {
   s.dispose();
 });
 
+test('ninePatchGeometry fit=cover：等比铺满并居中裁掉超出的一边', () => {
+  const flat = s => ({ ...s, insets: { top: 0, right: 0, bottom: 0, left: 0 } });
+  const uvsOf = geo => {
+    const uv = geo.getAttribute('uv');
+    return { u: [0, 1, 2, 3].map(i => uv.getX(i)), v: [0, 1, 2, 3].map(j => uv.getY(j * 4)) };
+  };
+  // 正方源 → 横长目标：横向铺满，纵向各裁掉 25%
+  const wide = uvsOf(ninePatchGeometry({ x: 0, y: 0, w: 200, h: 100 }, { top: 0, right: 0, bottom: 0, left: 0 },
+    { ...flat(src()), fit: 'cover' }));
+  assert.deepEqual(wide.u.map(n => +n.toFixed(6)), [0, 0, 1, 1], '横向不裁');
+  assert.deepEqual(wide.v.map(n => +n.toFixed(6)), [0.25, 0.25, 0.75, 0.75], '纵向居中裁');
+  // 正方源 → 竖长目标：镜像结论，改成裁横向
+  const tall = uvsOf(ninePatchGeometry({ x: 0, y: 0, w: 100, h: 200 }, { top: 0, right: 0, bottom: 0, left: 0 },
+    { ...flat(src()), fit: 'cover' }));
+  assert.deepEqual(tall.u.map(n => +n.toFixed(6)), [0.25, 0.25, 0.75, 0.75]);
+  assert.deepEqual(tall.v.map(n => +n.toFixed(6)), [0, 0, 1, 1]);
+  // 缺省仍是整图拉伸（徽标这类图标必须铺满自己的框）
+  const fill = uvsOf(ninePatchGeometry({ x: 0, y: 0, w: 200, h: 100 }, { top: 0, right: 0, bottom: 0, left: 0 }, flat(src())));
+  assert.deepEqual(fill.v.map(n => +n.toFixed(6)), [0, 0, 1, 1], 'fit 缺省不裁切');
+});
+
 test('planesForRect：裁剪面保内拒外（含四边外侧与对角）', () => {
   const planes = planesForRect({ x: 10, y: 10, w: 100, h: 50 });
   assert.ok(pointInPlanes(planes, 50, 30));

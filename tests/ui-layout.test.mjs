@@ -232,3 +232,45 @@ test('内容不超视口时 maxOffset=0', () => {
   assert.equal(box.scroll.maxOffset, 0)
   assert.equal(box.scroll.content, 20)
 })
+
+// ---------------- absolute 定位（半屏弹层 / 全屏点击捕获层的地基） ----------------
+
+test('absolute 子项不占父主轴空间：常规子项落点与没有它时完全一致', () => {
+  const root = kids => ({ id: 'root', direction: 'column', width: 100, height: 200, children: kids });
+  const plain = layout(root([{ id: 'a', height: 40 }, { id: 'b', height: 50 }]), VP);
+  const withAbs = layout(root([
+    { id: 'a', height: 40 },
+    { id: 'ov', absolute: true, top: 0, height: 120 },
+    { id: 'b', height: 50 },
+  ]), VP);
+  assert.equal(find(withAbs, 'a').rect.y, find(plain, 'a').rect.y);
+  assert.equal(find(withAbs, 'b').rect.y, find(plain, 'b').rect.y, '绝对子项不得把后续常规子项往下推');
+});
+
+test('absolute：top/left 定位，百分比宽度按父内容盒解析', () => {
+  const box = layout({
+    id: 'root', width: 400, height: 300, padding: 10,
+    children: [{ id: 'p', absolute: true, top: 20, left: 5, width: { percent: 100 }, height: 120 }],
+  }, VP);
+  assert.deepEqual(find(box, 'p').rect, { x: 15, y: 30, w: 380, h: 120 });
+});
+
+test('absolute：right/bottom 贴边', () => {
+  const box = layout({
+    id: 'root', width: 400, height: 300,
+    children: [{ id: 'p', absolute: true, right: 20, bottom: 30, width: 100, height: 50 }],
+  }, VP);
+  assert.deepEqual(find(box, 'p').rect, { x: 280, y: 220, w: 100, h: 50 });
+});
+
+test('absolute：统一排在常规子项之后产出（绘制在上、命中优先），组内保持声明序', () => {
+  const box = layout({
+    id: 'root', direction: 'column', width: 100, height: 200,
+    children: [
+      { id: 'ovB', absolute: true, top: 0, height: 10 },
+      { id: 'flow', height: 20 },
+      { id: 'ovA', absolute: true, top: 0, height: 10 },
+    ],
+  }, VP);
+  assert.deepEqual(box.children.map(c => c.id), ['flow', 'ovB', 'ovA']);
+});
