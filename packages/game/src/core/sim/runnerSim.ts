@@ -12,6 +12,7 @@ import { BuffEngine, type BuffView, type FxState } from '../effects/buffEngine.j
 import { buildLoadout, itemEffects, type EffectSpec, type Loadout } from './character.js';
 import { collectCoins, collectPickups, type CollectDeps } from './collect.js';
 import { hitsRunner, inDepthWindow, isNearMiss, relZ, safestLane } from './collision.js';
+import { clearSkyCoins } from './landing.js';
 import { Movement } from './movement.js';
 import { resolveHit, type HitCtx } from './resolveHit.js';
 import { TrackGen, type CloudEntity, type CoinEntity, type ObstacleEntity, type PickupEntity } from './trackGen.js';
@@ -82,7 +83,7 @@ export class RunnerSim {
         slideS: this.R.slideS ?? 0.6, slideCooldownS: this.R.slideCooldownS ?? 0.3, laneChangeS: this.R.laneChangeS ?? 0.18,
       },
       { heightM: this.fly.heightM, glideS: this.fly.glideS },
-      this.gen, this.obstacles,
+      this.obstacles,
     );
     this.buffs = new BuffEngine(createSimWorld({
       state: this.state, obstacles: this.obstacles, coins: this.coinsArr, pickups: this.pickupsArr,
@@ -215,6 +216,7 @@ export class RunnerSim {
     if (fx.avoidLookahead > 0) s.lane = safestLane(this.obstacles, s, fx.avoidLookahead);
     this.mv.advanceLateral(s, STEP_DT);
     this.mv.advanceVertical(s, fx, STEP_DT);
+    if (this.mv.landedThisStep) clearSkyCoins(this.coinsArr); // 着陆回收空中金币带（用户反馈：回地面后天上的金币应消失）
 
     this.gen.ensure(s.distance, GEN_AHEAD_M, this.obstacles, this.coinsArr, this.pickupsArr);
     this.collide();
@@ -237,7 +239,11 @@ export class RunnerSim {
     for (const o of this.obstacles) {
       if (o.done) continue;
       const z = relZ(o, s.distance);
-      if (!inDepthWindow(o, z)) continue;
+      // 电弧地面不用 DEPTH_SLACK 前瞻：4m 弧 + 2×0.4 前瞻 = 4.8m 判定期，
+      // 「跳过弧心但擦到边缘判死」的体感根因之一（与判定线过高叠加，见 collision.HAZARD_HIT_Y）。
+      if (o.cls === 'hazard' && o.zap !== true) {
+        if (Math.abs(z) > o.d / 2) continue;
+      } else if (!inDepthWindow(o, z)) continue;
       if (!o.passed) {
         // 首次进入深度窗口的那一帧判一次擦身（先于命中判定；命中时 lateralGap<=0 自然不计）
         o.passed = true;

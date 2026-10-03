@@ -25,7 +25,7 @@ export interface TrackColors {
 }
 
 /** 天空穹顶：竖直渐变（天顶蓝 → 地平线雾色），贴图带顶边渐隐后溶进这里 */
-function addSkyDome(scene: THREE.Scene, zenith: string, horizon: string) {
+function addSkyDome(scene: THREE.Scene, zenith: string, horizon: string): THREE.ShaderMaterial {
   const mat = new THREE.ShaderMaterial({
     side: THREE.BackSide,
     depthWrite: false,
@@ -37,6 +37,7 @@ function addSkyDome(scene: THREE.Scene, zenith: string, horizon: string) {
     fragmentShader: 'uniform vec3 top; uniform vec3 bottom; varying float vY; void main(){ float t = clamp(vY * 1.6 + 0.10, 0.0, 1.0); gl_FragColor = vec4(mix(bottom, top, pow(t, 0.85)), 1.0); }',
   });
   scene.add(new THREE.Mesh(new THREE.SphereGeometry(150, 24, 16), mat));
+  return mat;
 }
 
 /** 程序化沙地纹理（值噪声+稀疏草斑）：免素材、可平铺，消掉纯色地面的塑料感 */
@@ -68,7 +69,11 @@ function makeGroundTexture(): THREE.DataTexture {
 
 export function createTrackVisuals(scene: THREE.Scene, laneWidth: number, colors: TrackColors) {
   const roadWidth = 3 * laneWidth + 1.2;
-  addSkyDome(scene, colors.sky?.zenith ?? colors.baseColor, colors.sky?.horizon ?? colors.baseColor);
+  const zenith = colors.sky?.zenith ?? colors.baseColor;
+  const horizon = colors.sky?.horizon ?? colors.baseColor;
+  const skyDome = addSkyDome(scene, zenith, horizon);
+  const zenithBase = new THREE.Color(zenith);
+  const horizonBase = new THREE.Color(horizon);
 
   const groundTex = makeGroundTexture();
   groundTex.repeat.set(60 / GROUND_TILE_M, 240 / GROUND_TILE_M);
@@ -110,6 +115,11 @@ export function createTrackVisuals(scene: THREE.Scene, laneWidth: number, colors
 
   let lastDist = 0;
   return {
+    setFlash(flash: number, tint: THREE.Color) {
+      const amount = 0.85 * flash;
+      (skyDome.uniforms['top'].value as THREE.Color).copy(zenithBase).lerp(tint, amount);
+      (skyDome.uniforms['bottom'].value as THREE.Color).copy(horizonBase).lerp(tint, amount);
+    },
     /** 用插值距离推动沙地纹理、虚线与侧景滚动（与角色同步，不掉帧抖动） */
     update(dist: number) {
       const move = dist - lastDist; lastDist = dist;

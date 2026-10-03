@@ -8,20 +8,27 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { camTargets, CAM_Z_GROUND, CAM_Z_AIR, FOV_GROUND, FOV_AIR } from '../packages/game/dist/render/cameraRig.js';
+import { camTargets, CAM_Z_GROUND, CAM_Z_AIR, CAM_Y_BASE_GROUND, FOV_GROUND, FOV_AIR } from '../packages/game/dist/render/cameraRig.js';
 
 const root = join(fileURLToPath(import.meta.url), '..', '..');
 const game = JSON.parse(readFileSync(join(root, 'config', 'game.json'), 'utf8'));
 const FLIGHT_H = (game.params.flight ?? {}).heightM ?? 4.6; // 飞行高度（items.json 飞行道具升至此高度）
 
-test('地面机位：本轮抬高后的口径（Z 9.2 / Y 3.3+0.5 随动 / lookY 0.5 随动 / FOV 55）', () => {
+test('地面机位：回退 main 口径（Z 8.4 / Y 2.7+0.5 随动 / lookY 0.5 随动 / FOV 55）', () => {
   const g0 = camTargets(0, false);
-  assert.equal(g0.camZ, 9.2);
-  assert.equal(g0.camY, 3.3);
+  assert.equal(g0.camZ, 8.4, '地面纵深回 main 口径 8.4');
+  assert.equal(g0.camY, 2.7, '地面机高回 main 口径 2.7');
   assert.equal(g0.lookY, 0);
   assert.equal(g0.fov, FOV_GROUND);
-  assert.equal(camTargets(2, false).camY, 4.3, '跳跃时机位随动 0.5 口径不变');
+  assert.equal(camTargets(2, false).camY, 3.7, '跳跃时机位随动 0.5 口径不变');
   assert.equal(camTargets(2, false).lookY, 1);
+  // 俯角口径：机位/注视点纵深差 − 高度差。main 口径 7.9°（低机位=贴脸、人物大 14%）；
+  // 用户五轮实测后选定的就是这一档，只锁区间防误调，不要求高俯角。
+  const pitch = Math.atan2(g0.camY, CAM_Z_GROUND + 11) * 180 / Math.PI;
+  assert.ok(pitch >= 7 && pitch <= 9, `地面俯角应为 main 口径 7.9°，实际 ${pitch.toFixed(1)}°`);
+  // 地面机位不得再被抬高/推远（防回退被后续改动蚕食）；深层原因见 cameraRig 注释
+  assert.ok(CAM_Y_BASE_GROUND <= 2.7, '地面机高不得超过 main 口径（用户五轮定稿回退值）');
+  assert.ok(CAM_Z_GROUND <= 8.4, `地面纵深不得超过 main 口径（实际 ${CAM_Z_GROUND}）`);
 });
 
 test('空中机位：飞行高度下与地面机位有可感知差值（camY ≥ +1.8m / camZ ≥ +2m / FOV ≥ +10°）', () => {

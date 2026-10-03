@@ -16,6 +16,7 @@ import type { SceneName } from '@tr/game/core/scene/sceneMachine.js';
 import { createAudioDirector } from '@tr/game/core/audio/audioDirector.js';
 import type { AudioDirector } from '@tr/game/core/audio/audioDirector.js';
 import { hashSeed, mulberry32 } from '@tr/game/core/rng.js';
+import { installTestApi, uninstallTestApi } from './testApi.js';
 import { createRunnerScene } from '@tr/game/render/runnerScene.js';
 import type { PlatformAdapter } from '@tr/framework/platform/platformAdapter.js';
 import type { GameViews, RunSummary } from './views.js';
@@ -38,6 +39,8 @@ export interface GameFlowDeps {
   audioRandom?: () => number;
   /** 局内场景工厂（缺省 createRunnerScene）；测试注入假场景以驱动 sim 事件回调而无需 GL */
   createScene?: typeof createRunnerScene;
+  /** 测试模式（?debug/?test）：run 局内挂载 __trTest 技能开关 API，供左侧测试面板消费 */
+  test?: boolean;
 }
 
 export interface GameFlow {
@@ -146,9 +149,14 @@ export function createGameFlow(deps: GameFlowDeps): GameFlow {
           onPickup: () => audio?.onPickup(),
           debug: deps.debug,
         });
+        if (deps.test) installTestApi(sim, content); // 测试面板数据面：?debug/?test 才挂
       },
-      // 已死亡时 exitRun 保留死亡 BGM 到结算页；中途退出则停 run BGM
-      onExit: () => { scene?.dispose(); scene = null; hud?.dispose(); hud = null; audio?.exitRun(); },
+      onExit: () => {
+        scene?.dispose(); scene = null; hud?.dispose(); hud = null;
+        if (deps.test) uninstallTestApi(); // 局结束即卸载，避免 __trTest 指向已销毁的 sim
+        // 已死亡时 exitRun 保留死亡 BGM 到结算页；中途退出则停 run BGM
+        audio?.exitRun();
+      },
     },
     result: {
       onEnter: ctx => {
