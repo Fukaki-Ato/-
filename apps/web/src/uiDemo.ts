@@ -54,8 +54,8 @@ async function start(): Promise<void> {
   };
 
   const [fonts, gameJson] = await Promise.all([
-    loadFontSet(resources, '/assets/fonts'),
-    resources.loadJson('/game.json'),
+    loadFontSet(resources, `${import.meta.env.BASE_URL}assets/fonts`),
+    resources.loadJson(`${import.meta.env.BASE_URL}game.json`),
   ]);
   const config = resolveUiConfig((gameJson as { params?: unknown }).params);
 

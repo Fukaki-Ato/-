@@ -1,6 +1,6 @@
 /**
  * 场景状态机（core 层）
- * 对应文档：docs/02 §5（场景机 Boot → Login → Menu → Run → Result → Menu）。
+ * 对应文档：docs/02 §5（场景机；现流转 Boot → Start → Select → Run → Result → Select）。
  * M0 只需要状态定义与切换钩子；具体页面在 ui 层实现。
  */
 
@@ -42,5 +42,8 @@ export function createSceneMachine<S extends string>(scenes: Record<S, SceneDef>
   };
 }
 
-/** 本项目的场景名常量（docs/02 §5 场景机；demo 场景已由 M1 真实跑酷 run 取代） */
-export type SceneName = 'boot' | 'login' | 'menu' | 'run' | 'result';
+/**
+ * 本项目的场景名常量：boot（配置加载）→ start（品牌开始页 · 微信/游客入口）→ select（选角）
+ * → run → result → select。原 login（账号输入）/ menu（主菜单）已拆为 start + select。
+ */
+export type SceneName = 'boot' | 'start' | 'select' | 'run' | 'result';

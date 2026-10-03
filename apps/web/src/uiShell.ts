@@ -46,8 +46,8 @@ export async function createUiShell(adapter: PlatformAdapter): Promise<UiShell> 
   renderer.setSize(s0.width, s0.height, false);
 
   const [fonts, gameJson] = await Promise.all([
-    loadFontSet(resources, '/assets/fonts'),
-    resources.loadJson('/game.json'),
+    loadFontSet(resources, `${import.meta.env.BASE_URL}assets/fonts`),
+    resources.loadJson(`${import.meta.env.BASE_URL}game.json`),
   ]);
   const config = resolveUiConfig((gameJson as { params?: unknown }).params);
 

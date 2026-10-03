@@ -28,6 +28,19 @@ export const FLASH_LIGHT_GAIN = 2.6;
 /** 打击点点光峰值强度 */
 const IMPACT_LIGHT_PEAK = 26;
 
+export function applyLightningFlash(
+  background: THREE.Color,
+  fog: THREE.Color,
+  skyBase: THREE.Color,
+  fogBase: THREE.Color,
+  flashTint: THREE.Color,
+  flash: number,
+): void {
+  const amount = 0.85 * flash;
+  background.copy(skyBase).lerp(flashTint, amount);
+  fog.copy(fogBase).lerp(flashTint, amount);
+}
+
 const UP = new THREE.Vector3(0, 1, 0);
 
 export interface LightningFx {

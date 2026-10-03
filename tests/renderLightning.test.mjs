@@ -6,7 +6,21 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
-import { createLightningFx, FLASH_PEAK } from '../packages/game/dist/render/lightning.js';
+import { applyLightningFlash, createLightningFx, FLASH_PEAK, FLASH_TINT } from '../packages/game/dist/render/lightning.js';
+
+test('闪电闪白分别恢复天空色与雾色基线', () => {
+  const skyBase = new THREE.Color('#8ED0F2');
+  const fogBase = new THREE.Color('#CFE9F7');
+  const flashTint = new THREE.Color(FLASH_TINT);
+  const background = new THREE.Color();
+  const fog = new THREE.Color();
+  applyLightningFlash(background, fog, skyBase, fogBase, flashTint, 1);
+  assert.equal(background.getHex(), skyBase.clone().lerp(flashTint, 0.85).getHex());
+  assert.equal(fog.getHex(), fogBase.clone().lerp(flashTint, 0.85).getHex());
+  applyLightningFlash(background, fog, skyBase, fogBase, flashTint, 0);
+  assert.equal(background.getHex(), skyBase.getHex());
+  assert.equal(fog.getHex(), fogBase.getHex());
+});
 
 test('触发雷击：闪白立即拉满并随时间衰减归零', () => {
   const fx = createLightningFx(new THREE.Scene());

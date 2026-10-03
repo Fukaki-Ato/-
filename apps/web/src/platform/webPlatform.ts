@@ -7,6 +7,7 @@ import { createGestureClassifier } from '@tr/framework/platform/gestureClassifie
 import type {
   CanvasFactory, GLCanvas, InputEvent, PlatformAdapter, SyncStorage, Unsubscribe, WindowSize,
 } from '@tr/framework/platform/platformAdapter.js';
+import { createWebAudio } from './webAudio.js';
 import { createWebExtras } from './webExtras.js';
 
 export interface WebPlatformOptions {
@@ -139,5 +140,6 @@ export function createWebPlatform(options: WebPlatformOptions): PlatformAdapter 
     now: () => performance.now(),
 
     extras: createWebExtras({ storage, fetchJson }),
+    audio: createWebAudio(),
   };
 }

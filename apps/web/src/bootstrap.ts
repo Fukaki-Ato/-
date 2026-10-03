@@ -21,8 +21,8 @@ async function main(): Promise<void> {
   const flow = createGameFlow({
     adapter,
     views,
-    // config/*.json 由 Vite publicDir 挂载到站点根路径（重设计 §2：config 留仓库根，两端共用）
-    configResolve: name => `./${name}.json`,
+    // config/*.json 由 Vite publicDir 挂载在部署 base 下（本地 dev 为 /，测试站为 /thunder-run/）
+    configResolve: name => `${import.meta.env.BASE_URL}${name}.json`,
     debug,
     test: testMode,
   });
@@ -30,12 +30,6 @@ async function main(): Promise<void> {
   // 测试模式面板（?debug/?test）：左侧技能开关，数据面为 __trTest（mainFlow 在 run 局挂载）
   const testPanel = createTestPanel();
   if (testMode) (globalThis as Record<string, unknown>).__trTestPanel = testPanel; // 调试期可手动 dispose
-
-  // 键盘注入（仅 web 壳有物理键盘；wx 不发 key 事件，天然空转）
-  adapter.onInput(e => {
-    if (e.type === 'key' && e.phase === 'down') views.onKey(e.code);
-  });
-
   // 调试钩子：暴露场景机与最近 seed（?debug 时；局内探针 __trRun.* 由 packages/render 挂载）
   if (debug) {
     (globalThis as Record<string, unknown>).__trMachine = flow.machine;

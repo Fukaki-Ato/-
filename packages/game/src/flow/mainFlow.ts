@@ -1,22 +1,26 @@
 /**
  * 主流程装配（@tr/game）——从 apps/web/src/bootstrap.ts 提取，两端共用（redesign §3.5）。
- * 职责：平台适配（经 adapter 注入）→ 场景状态机 → 加载配置 → 驱动页面流转；
+ * 职责：平台适配（经 adapter 注入）→ 场景状态机 → 加载配置 → 驱动页面流转：
+ *       boot（配置加载）→ start（微信登录 / 游客登录）→ select（选角）→ run → result → select；
  *       跑酷局内：每次进入 run 场景创建全新 RunnerSim（seed 记录在案，可复现），
  *       渲染场景消费 sim 事件；死亡 1.2s 后自动进结算页。
- * 铁律：本包零 DOM/wx——挂载点、登录页表单、回车快捷全部经 GameViews 由 apps/* 注入。
+ * 微信登录只调注入的 adapter.extras.login()（wx 侧现为游客占位，服务端鉴权未接），见 session.ts。
+ * 铁律：本包零 DOM/wx——挂载点与页面全部经 GameViews 由 apps/* 注入。
  */
 import { loadAllConfig } from '@tr/game/core/config/configLoader.js';
-import type { FileSource } from '@tr/game/core/config/configLoader.js';
 import type { GameContent } from '@tr/game/core/config/configTypes.js';
 import { buildLoadout } from '@tr/game/core/sim/character.js';
 import { RunnerSim } from '@tr/game/core/sim/runnerSim.js';
 import { createSceneMachine } from '@tr/game/core/scene/sceneMachine.js';
 import type { SceneName } from '@tr/game/core/scene/sceneMachine.js';
-import { hashSeed } from '@tr/game/core/rng.js';
+import { createAudioDirector } from '@tr/game/core/audio/audioDirector.js';
+import type { AudioDirector } from '@tr/game/core/audio/audioDirector.js';
+import { hashSeed, mulberry32 } from '@tr/game/core/rng.js';
 import { installTestApi, uninstallTestApi } from './testApi.js';
 import { createRunnerScene } from '@tr/game/render/runnerScene.js';
 import type { PlatformAdapter } from '@tr/framework/platform/platformAdapter.js';
 import type { GameViews, RunSummary } from './views.js';
+import { readEntry, saveEntry, wechatAvailable, wechatLogin, type EntryMethod } from './session.js';
 
 /** 历史最佳分存储键（v2 修正键；旧版笔误键含真省略号 U+2026，见 LEGACY_BEST_KEY） */
 export const BEST_KEY = 'thunderrun:best';
@@ -31,13 +35,17 @@ export interface GameFlowDeps {
   /** config 解析器：web 侧 './{name}.json'，wx 侧 'config/{name}.json'（extras.readJson 消费点，S6 接 CDN） */
   configResolve: (name: string) => string;
   debug?: boolean;
+  /** 音频随机源（死亡音效池抽取）；缺省为独立于玩法 RNG 的 mulberry32 流，测试可注入 */
+  audioRandom?: () => number;
+  /** 局内场景工厂（缺省 createRunnerScene）；测试注入假场景以驱动 sim 事件回调而无需 GL */
+  createScene?: typeof createRunnerScene;
   /** 测试模式（?debug/?test）：run 局内挂载 __trTest 技能开关 API，供左侧测试面板消费 */
   test?: boolean;
 }
 
 export interface GameFlow {
   machine: ReturnType<typeof createSceneMachine<SceneName>>;
-  /** 加载配置并进入登录页；失败则停在启动页显示错误（不静默吞错）。 */
+  /** 加载配置并进入开始页；失败则停在启动页显示错误（不静默吞错）。 */
   boot(): Promise<void>;
   /** 最近一局 seed（同种子复现赛道用）。 */
   currentSeed(): number;
@@ -46,10 +54,11 @@ export interface GameFlow {
 export function createGameFlow(deps: GameFlowDeps): GameFlow {
   const { adapter, views } = deps;
   let content: GameContent | null = null;
-  let sources: Record<string, FileSource> = {};
   let scene: { dispose(): void } | null = null;
   let hud: ReturnType<GameViews['mountHud']> | null = null;
   let lastSeed = 0;
+  /** 音频导演：配置加载成功后创建；game.params.audio 缺省时为空操作（不阻塞玩法） */
+  let audio: AudioDirector | null = null;
 
   /**
    * 历史最佳分（v2 修正）：
@@ -73,32 +82,71 @@ export function createGameFlow(deps: GameFlowDeps): GameFlow {
   };
   /** 上次选的角色（本机记忆；账号级保存在 S9 接 extras.cloud 后端） */
   let charId = adapter.storage.get(CHAR_KEY) ?? DEFAULT_CHAR;
+  /** 上次在开始页选的入口（本机记忆，选角页展示） */
+  let entry: EntryMethod | null = readEntry(adapter.storage);
+  /** 开始页进入代次：登录 promise 回来时若已离开/重进开始页则丢弃结果 */
+  let startGen = 0;
+
+  const enterSelect = (method: EntryMethod): void => {
+    entry = method;
+    saveEntry(adapter.storage, method);
+    machine.go('select');
+  };
 
   const machine = createSceneMachine<SceneName>({
     boot: {},
-    login: { onEnter: () => views.renderLogin({ onGuest: () => machine.go('menu') }) },
-    menu: {
-      onEnter: () => content && views.renderMenu(content, sources, {
-        onStartRun: id => { charId = id; adapter.storage.set(CHAR_KEY, id); machine.go('run'); },
-        onClearCache: () => {
-          Object.keys(sources).forEach(k => adapter.storage.remove('thunderrun:config:' + k));
-          adapter.storage.remove('thunderrun:lastUser');
-          views.toast('已清除，重新加载页面生效');
-        },
-      }, charId),
+    start: {
+      onEnter: () => {
+        const gen = ++startGen;
+        const canWechat = wechatAvailable(adapter);
+        let busy = false;
+        const handle = views.renderStart({
+          wechatAvailable: canWechat,
+          onGuest: () => { if (!busy) enterSelect('guest'); },
+          onWechat: () => {
+            if (!canWechat || busy) return;
+            busy = true;
+            handle.setBusy(true);
+            handle.setFeedback('微信登录中…', false);
+            wechatLogin(adapter).then(
+              () => { if (gen === startGen && machine.current() === 'start') enterSelect('wechat'); },
+              (err: unknown) => {
+                if (gen !== startGen || machine.current() !== 'start') return;
+                busy = false;
+                handle.setBusy(false);
+                const msg = err instanceof Error ? err.message : String(err);
+                handle.setFeedback(`微信登录失败：${msg}。可重试，或选择游客登录`, true);
+              },
+            );
+          },
+        });
+      },
+    },
+    select: {
+      onEnter: () => {
+        audio?.stopDeathMusic(); // 死亡后 Esc 直接回选角：死亡 BGM 不带进选角页
+        if (content) views.renderSelect(content, {
+          onStartRun: id => { charId = id; adapter.storage.set(CHAR_KEY, id); machine.go('run'); },
+          onBack: () => machine.go('start'),
+        }, charId, entry);
+      },
     },
     run: {
       onEnter: () => {
         if (!content) return;
+        audio?.enterRun(charId);
         lastSeed = hashSeed('run-' + Date.now());
         const sim: RunnerSim = new RunnerSim(content, lastSeed, charId);
         // v2：主画布幂等单例 + 即时窗口尺寸（S10 §7.2；跨局复用同一画布，不新建）
         const host = { canvas: adapter.canvas.mainCanvas(), size: adapter.canvas.windowSize() };
         hud = views.mountHud();
         hud.update({ score: 0, coins: 0, distance: 0, hits: 0, lives: sim.lives, buffs: [], skill: null });
-        scene = createRunnerScene(host, adapter, sim, content, {
+        scene = (deps.createScene ?? createRunnerScene)(host, adapter, sim, content, {
           onHud: h => hud?.update(h),
           onEnd: summary => machine.go('result', summary),
+          onDeath: () => audio?.onDeath(),
+          onCast: () => audio?.onCast(),
+          onPickup: () => audio?.onPickup(),
           debug: deps.debug,
         });
         if (deps.test) installTestApi(sim, content); // 测试面板数据面：?debug/?test 才挂
@@ -106,6 +154,8 @@ export function createGameFlow(deps: GameFlowDeps): GameFlow {
       onExit: () => {
         scene?.dispose(); scene = null; hud?.dispose(); hud = null;
         if (deps.test) uninstallTestApi(); // 局结束即卸载，避免 __trTest 指向已销毁的 sim
+        // 已死亡时 exitRun 保留死亡 BGM 到结算页；中途退出则停 run BGM
+        audio?.exitRun();
       },
     },
     result: {
@@ -117,16 +167,18 @@ export function createGameFlow(deps: GameFlowDeps): GameFlow {
         if (summary.score > best) adapter.storage.set(BEST_KEY, String(summary.score));
         views.renderResult(summary, best, {
           onRetry: () => machine.go('run'),
-          onMenu: () => machine.go('menu'),
+          onSelect: () => machine.go('select'),
         });
       },
+      // 离开结算（重开/回选角）：停死亡 BGM，避免与下一局 run BGM 重叠
+      onExit: () => audio?.stopDeathMusic(),
     },
   }, 'boot');
 
-  // 全局按键：run 中 Esc 退出到菜单（v2 onInput 的 key 分支，替代 v1 adapter.onKey，S10 §7.3）
+  // 全局按键：run 中 Esc 退回选角页（v2 onInput 的 key 分支，替代 v1 adapter.onKey，S10 §7.3）
   adapter.onInput(e => {
     if (e.type === 'key' && e.phase === 'down' && e.code === 'Escape' && machine.current() === 'run') {
-      machine.go('menu');
+      machine.go('select');
     }
   });
 
@@ -142,13 +194,15 @@ export function createGameFlow(deps: GameFlowDeps): GameFlow {
       },
       deps.configResolve,
     );
-    sources = report.sources;
     if (!report.ok) {
       bootUi.setStatus('配置加载失败：\n' + report.errors.join('\n'), true); // 停在启动页，错误信息可见
       return;
     }
     content = report.content;
-    machine.go('login');
+    audio = createAudioDirector(adapter, content.game.params, {
+      random: deps.audioRandom ?? mulberry32(hashSeed('audio-' + Date.now())),
+    });
+    machine.go('start');
   }
 
   return { machine, boot, currentSeed: () => lastSeed };

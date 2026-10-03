@@ -18,7 +18,7 @@ import { installRunProbe, uninstallRunProbe } from './runDebugProbe.js';
 import { createSpeedLines } from './speedLines.js';
 import { createTrackVisuals } from './trackVisuals.js';
 import { createBurstPool } from './vfxBurst.js';
-import { createLightningFx, FLASH_LIGHT_GAIN, FLASH_TINT } from './lightning.js';
+import { applyLightningFlash, createLightningFx, FLASH_LIGHT_GAIN, FLASH_TINT } from './lightning.js';
 
 export interface RunCallbacks {
   onHud(h: {
@@ -27,6 +27,12 @@ export interface RunCallbacks {
     skill: { label: string; energy: number; cd: number; ready: boolean } | null;
   }): void;
   onEnd(summary: ReturnType<RunnerSim['summary']>): void;
+  /** 死亡瞬间回调（音频等表现层用；endTimer 计时与 onEnd 节奏不变） */
+  onDeath?(): void;
+  /** sim cast 事件（技能施放）回调：角色技能音效 */
+  onCast?(): void;
+  /** sim pickup 事件（道具箱，非金币）回调：角色拾取音效 */
+  onPickup?(): void;
   debug?: boolean;
 }
 
@@ -57,9 +63,13 @@ export function createRunnerScene(
   /** 滑翔倒计时换算：core 以 heightM/glideS 匀速下降（movement.ts），HUD 显示与 s.gliding 一致的真实剩余秒数 */
   const flight = (content.game.params.flight ?? {}) as Record<string, number>;
   const glideFallMps = (flight.heightM ?? 4.6) / (flight.glideS ?? 1.8);
-  const theme = (content.themes.items ?? []).find(t => t.id === 'theme_neon_city');
-  const sky = (theme?.sky ?? { baseColor: '#0B1226', flashColor: '#9FD8FF' }) as { baseColor: string; flashColor: string };
-  const tint = (theme?.vfxTint as string | undefined) ?? '#7FD1FF';
+  // 默认主题 = 首个 live 条目（主题切换尚未做，先不硬编码 id，避免删主题时漏改）
+  const themeItems = (content.themes.items ?? []) as Record<string, unknown>[];
+  const theme = themeItems.find(t => t['status'] === 'live') ?? themeItems[0];
+  const sky = (theme?.sky ?? { baseColor: '#8ED0F2', flashColor: '#FFF3C4' }) as { baseColor: string; flashColor: string };
+  const fogColor = ((theme?.fog as Record<string, unknown> | undefined)?.color as string | undefined) ?? sky.baseColor;
+  const tint = (theme?.vfxTint as string | undefined) ?? '#FFD98A';
+  const groundColor = (theme?.groundColor as string | undefined) ?? '#E3CFA4';
   /** buff 派生视图：引擎原地更新同一个对象，渲染层缓存引用安全（docs/09 T2.2） */
   const fx = sim.fx;
 
@@ -73,23 +83,27 @@ export function createRunnerScene(
   renderer.setSize(width, height, false);
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(sky.baseColor);
-  scene.fog = new THREE.Fog(sky.baseColor, FOG_NEAR, FOG_FAR);
+  scene.fog = new THREE.Fog(fogColor, FOG_NEAR, FOG_FAR);
   const rig0 = camTargets(0, false);
   const camera = new THREE.PerspectiveCamera(rig0.fov, width / height, 0.1, 160);
   camera.position.set(0, rig0.camY, rig0.camZ);
   camera.lookAt(0, rig0.lookY, LOOK_AHEAD_Z);
-  const hemi = new THREE.HemisphereLight(0x9fb8ff, 0x0c1020, 1.1);
-  const HEMI_BASE = 1.1;
-  const keyLight = new THREE.DirectionalLight(0xffffff, 1.6);
-  const KEY_BASE = 1.6;
+  // 白天海滨的光：半球光天空浅蓝/地面暖沙，主光偏暖阳色（夜景那套冷光会让晴天发灰）
+  const hemi = new THREE.HemisphereLight(0xbfe3ff, 0xd8c39a, 1.15);
+  const HEMI_BASE = 1.15;
+  const keyLight = new THREE.DirectionalLight(0xfff2d0, 1.9);
+  const KEY_BASE = 1.9;
   scene.add(hemi);
   keyLight.position.set(3, 8, 4);
   scene.add(keyLight);
   /** 闪白（雷电）：背景/雾色的基色与目标色缓存，逐帧按闪白强度插值 */
-  const skyBase = new THREE.Color(sky.baseColor), flashTint = new THREE.Color(FLASH_TINT);
+  const skyBase = new THREE.Color(sky.baseColor), fogBase = new THREE.Color(fogColor), flashTint = new THREE.Color(FLASH_TINT);
   const lightning = createLightningFx(scene);
 
-  const track = createTrackVisuals(scene, laneWidth, { baseColor: sky.baseColor, flashColor: sky.flashColor, tint });
+  const track = createTrackVisuals(scene, laneWidth, {
+    baseColor: sky.baseColor, flashColor: sky.flashColor, tint, groundColor,
+    sky: { zenith: sky.baseColor, horizon: fogColor },
+  });
   const avatar = createAvatar(scene, laneWidth, sim.loadout);
   const coinField = createCoinField(scene, laneWidth);
   const obstacleLayer = createObstacleLayer(scene, laneWidth);
@@ -146,17 +160,19 @@ export function createRunnerScene(
       else if (ev.type === 'hit') shakeT = 0.25;
       else if (ev.type === 'death') {
         endTimer = 0;
+        cb.onDeath?.();
         // 闪电圈致死：雷电落到致死点（普通致死无位置字段，不触发）
         if (ev.lane !== undefined && ev.worldZ !== undefined) lightning.strike(ev.lane, ev.worldZ, laneWidth);
       }
       // 施放技能：爆点 + 轻微震屏，拖尾/光环等完整表现在 M4 T4.4
-      else if (ev.type === 'cast') { fireAtPlayer(); shakeT = 0.12; }
+      else if (ev.type === 'cast') { fireAtPlayer(); shakeT = 0.12; cb.onCast?.(); }
       else if (ev.type === 'shieldBreak' || ev.type === 'boardBreak') { fireAtPlayer(); shakeT = 0.18; }
       else if (ev.type === 'zap') {
         fireAtPlayer(ZAP_BURST_COLOR); shakeT = 0.32;
         lightning.strike(ev.lane, ev.worldZ, laneWidth); // MC 式雷电：天→落点 + 全场闪白
       }
-      // pickup：按用户要求不加特效与震动，仅 HUD 显示 buff 倒计时
+      // pickup：按用户要求不加特效与震动，仅 HUD 显示 buff 倒计时（只回调音频）
+      else if (ev.type === 'pickup') cb.onPickup?.();
     }
   }
 
@@ -188,8 +204,8 @@ export function createRunnerScene(
     hemi.intensity = HEMI_BASE + flash * FLASH_LIGHT_GAIN;
     keyLight.intensity = KEY_BASE + flash * FLASH_LIGHT_GAIN;
     const bg = scene.background as THREE.Color;
-    bg.copy(skyBase).lerp(flashTint, 0.85 * flash);
-    (scene.fog as THREE.Fog).color.copy(bg);
+    applyLightningFlash(bg, (scene.fog as THREE.Fog).color, skyBase, fogBase, flashTint, flash);
+    track.setFlash(flash, flashTint);
     const rig = camTargets(s.y, airborne);
     camX += (s.x - camX) * CAM_FOLLOW;
     camY += (rig.camY - camY) * CAM_FOLLOW;
