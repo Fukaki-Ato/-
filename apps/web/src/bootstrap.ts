@@ -10,10 +10,7 @@ const debug = location.search.includes('debug');
 async function main(): Promise<void> {
   const adapter = createWebPlatform({ mount });
   const shell = await createUiShell(adapter);
-  const views = createOverlayViews({
-    host: shell.host, badges: shell.badges, background: shell.background,
-    onLobbyVisible: v => shell.setBackgroundVisible(v), // 背景视频只在大厅解码
-  });
+  const views = createOverlayViews({ host: shell.host, badges: shell.badges, background: shell.background, backdrop: shell.backdrop });
   shell.host.start();
   // UI 就绪：撤掉 index.html 的静态占位文案（此后画布之上不再需要 DOM）
   mount.textContent = '';

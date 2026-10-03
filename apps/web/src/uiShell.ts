@@ -10,6 +10,7 @@ import * as THREE from 'three';
 import { loadFontSet, resolveUiConfig, type NinePatchSource, type UiConfig, type UiResources } from '@tr/framework/ui/index.js';
 import { UiHost } from '@tr/framework/ui/host.js';
 import { BADGE_NAMES, type BadgeSet } from '@tr/game/ui/badges.js';
+import type { BackdropSet } from '@tr/game/ui/menuBackdrop.js';
 import type { PlatformAdapter } from '@tr/framework/platform/platformAdapter.js';
 
 const resources: UiResources = {
@@ -31,61 +32,28 @@ export interface UiShell {
   canvas: HTMLCanvasElement;
   config: UiConfig;
   badges: BadgeSet;
-  /** 大厅背景贴图：优先循环视频 assets/ui/lobby-bg.mp4，取不到时回落静态 lobby-bg.jpg（都按 cover 铺满） */
+  /** 主界面背景贴图（assets/ui/menu-bg.png，合成效果图抹 UI 补出的纯背景；cover 铺满） */
   background?: NinePatchSource;
-  /** 只有大厅在放背景视频：进大厅播、离开就停（跑一局时看不见还解码，白烧 GPU 和电） */
-  setBackgroundVisible(visible: boolean): void;
+  /** 分层背景动效贴图（云条/海鸥/浪花带；缺省时动效层不挂） */
+  backdrop?: BackdropSet;
   destroy(): void;
 }
 
-/**
- * 大厅背景循环视频。视频元素只能待在壳层（packages/** 禁 DOM），框架侧照旧只收一个
- * NinePatchSource —— 贴图换成 THREE.VideoTexture 而已，three 0.160 的 VideoTexture
- * 自带 requestVideoFrameCallback，逐帧刷新不用壳层插手。
- * 素材处理（tools 侧 ffmpeg，源片在仓库外）：裁掉底部 44px 的「豆包AI生成 / Qoder AI 生成」
- * 水印再等比拉回 720×1280、去音轨、setsar=1，15.04s / 2.3MB。
- * 首帧超时或解码不支持 → 返回 undefined，由调用方回落静态图，页面绝不空底。
- */
-async function loadVideoBackground(base: string): Promise<
-  { src: NinePatchSource; el: HTMLVideoElement; setVisible(visible: boolean): void } | undefined> {
-  const v = document.createElement('video');
-  // 挂进 DOM 但不可见：分离节点在部分浏览器会省掉解码，背景图就冻在首帧
-  Object.assign(v.style, { position: 'fixed', left: '-10000px', top: '0', width: '2px', height: '2px', opacity: '0' });
-  v.loop = true;
-  v.muted = true; // 带音轨的自动播放会被浏览器拦，背景音也归 audioDirector 管
-  v.playsInline = true;
-  v.preload = 'auto';
-  v.src = `${base}assets/ui/lobby-bg.mp4`;
-  document.body.appendChild(v);
-  try {
-    await new Promise<void>((res, rej) => {
-      const to = setTimeout(() => rej(new Error('背景视频首帧超时')), 4000);
-      v.onloadeddata = () => { clearTimeout(to); res(); };
-      v.onerror = () => { clearTimeout(to); rej(new Error('背景视频加载失败')); };
-    });
-  } catch {
-    v.remove();
-    v.src = '';
-    return undefined;
-  }
-  // 不在这里播：由壳层的 setBackgroundVisible 管（进大厅才播）。muted + playsInline 已经满足
-  // 浏览器的自动播放条件，不需要等用户手势；play() 万一被策略拒绝，首帧仍是贴图，不至于黑底。
-  const texture = new THREE.VideoTexture(v);
-  // 必须关掉 flipY：UI 那套自定义 shader 的 UV 与 ImageBitmap 路径对齐（Chrome 对 ImageBitmap
-  // 不吃 UNPACK_FLIP_Y），而 <video> 上传是吃 flipY 的，留着 true 会把背景整个上下颠倒。
-  texture.flipY = false;
-  texture.needsUpdate = true;
-  return {
-    el: v,
-    setVisible: (visible: boolean): void => {
-      if (!visible) v.pause();
-      else void v.play().catch(() => undefined);
-    },
-    src: {
-      texture, insets: { top: 0, right: 0, bottom: 0, left: 0 },
-      texSize: { w: v.videoWidth || 720, h: v.videoHeight || 1280 }, fit: 'cover',
-    },
+async function loadBackdrop(base: string): Promise<BackdropSet | undefined> {
+  const one = async (name: string): Promise<NinePatchSource | undefined> => {
+    try {
+      const bmp = await resources.loadImage(`${base}assets/ui/backdrop/${name}.png`) as ImageBitmap;
+      const texture = new THREE.Texture(bmp);
+      texture.needsUpdate = true;
+      return { texture, insets: { top: 0, right: 0, bottom: 0, left: 0 }, texSize: { w: bmp.width, h: bmp.height } };
+    } catch { return undefined; }
   };
+  const [cloudA, cloudB, foam, ga, gb, gc] = await Promise.all(
+    ['cloud_a_strip', 'cloud_b_strip', 'foam_strip', 'gull_a', 'gull_b', 'gull_c'].map(one),
+  );
+  const gulls = [ga, gb, gc].filter((g): g is NinePatchSource => g !== undefined);
+  if (!cloudA || !cloudB || !foam || gulls.length === 0) return undefined;
+  return { cloudA, cloudB, foam, gulls };
 }
 
 export async function createUiShell(adapter: PlatformAdapter): Promise<UiShell> {
@@ -119,26 +87,18 @@ export async function createUiShell(adapter: PlatformAdapter): Promise<UiShell> 
     } catch { /* 单帧缺失不阻塞页面 */ }
   })));
 
-  // 大厅背景：循环视频优先，拿不到再回静态图（两者都等比铺满、超出居中裁掉，横窗下不变形）
+  // 主界面背景：合成效果图抹 UI 补出的纯背景，等比铺满、超出居中裁掉（横窗下不变形）
   let background: NinePatchSource | undefined;
-  let bgVideo: HTMLVideoElement | undefined;
-  let bgSetVisible: ((visible: boolean) => void) | undefined;
-  const vid = await loadVideoBackground(import.meta.env.BASE_URL);
-  if (vid) {
-    background = vid.src;
-    bgVideo = vid.el;
-    bgSetVisible = vid.setVisible;
-  } else {
-    try {
-      const bmp = await resources.loadImage(`${import.meta.env.BASE_URL}assets/ui/lobby-bg.jpg`);
-      const texture = new THREE.Texture(bmp as unknown as ImageBitmap);
-      texture.needsUpdate = true;
-      background = {
-        texture, insets: { top: 0, right: 0, bottom: 0, left: 0 },
-        texSize: { w: bmp.width, h: bmp.height }, fit: 'cover',
-      };
-    } catch { /* 视频和图都没有：回主题纯色底，不阻塞启动 */ }
-  }
+  try {
+    const bmp = await resources.loadImage(`${import.meta.env.BASE_URL}assets/ui/menu-bg.png`) as ImageBitmap;
+    const texture = new THREE.Texture(bmp);
+    texture.needsUpdate = true;
+    background = {
+      texture, insets: { top: 0, right: 0, bottom: 0, left: 0 },
+      texSize: { w: bmp.width, h: bmp.height }, fit: 'cover',
+    };
+  } catch { /* 缺图回主题纯色底，不阻塞启动 */ }
+  const backdrop = await loadBackdrop(import.meta.env.BASE_URL);
 
   const host = new UiHost({
     adapter,
@@ -163,18 +123,18 @@ export async function createUiShell(adapter: PlatformAdapter): Promise<UiShell> 
   canvas.addEventListener('pointercancel', onCancel);
 
   return {
-    host, renderer, canvas, config, badges, background,
-    // 静态图兜底时 bgSetVisible 是 undefined ⇒ 空操作，调用方不用区分
-    setBackgroundVisible: (visible: boolean) => { bgSetVisible?.(visible); },
+    host, renderer, canvas, config, badges, background, backdrop,
     destroy() {
       canvas.removeEventListener('pointerdown', onDown);
       canvas.removeEventListener('pointermove', onMove);
       canvas.removeEventListener('pointerup', onUp);
       canvas.removeEventListener('pointercancel', onCancel);
       for (const src of [...Object.values(badges.normal), ...Object.values(badges.glow)]) src.texture?.dispose();
-      bgVideo?.pause(); // 背景视频是壳层建的 DOM 节点，销毁时归这里收
-      bgVideo?.remove();
       background?.texture.dispose();
+      for (const g of backdrop?.gulls ?? []) g.texture?.dispose();
+      backdrop?.cloudA.texture?.dispose();
+      backdrop?.cloudB.texture?.dispose();
+      backdrop?.foam.texture?.dispose();
       host.dispose();
       renderer.dispose();
       canvas.remove();

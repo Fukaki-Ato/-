@@ -41,6 +41,10 @@
       "slideDurationMs": 240,
       "nameCandidates": ["小跑者", "闪电少年", "海滨酷跑王", "椰子骑士", "风驰电掣", "钻石收藏家"]
     },
+    "ui": {
+      "safeTop": 10,
+      "safeBottom": 10
+    },
     "revive": {
       "maxPerRun": 2,
       "invincibleS": 3,
