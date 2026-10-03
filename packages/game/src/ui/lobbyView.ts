@@ -3,6 +3,7 @@
  * 顶栏＝头像｜金币｜钻石｜设置；左＝活动（下挂登录方式）；右＝成就、任务、排行榜；
  * 中下＝「开始·酷跑」「场景切换」两枚大徽标；底部棕条＝商店｜福利手册｜宝箱｜角色。
  * 徽标全部为图片按钮（badges.ts，点击换淡黄描边帧反馈）；角色/场景面板可用，
+ * 左上角头像＝玩家档案半屏弹层（profileView.ts：换头像/改昵称），
  * 其余板块经 LobbySlotHandlers 预留接口，未注入时 toast「开发中」占位。
  */
 import { Box, Button, Label, List, type NinePatchSource, type UiView } from '@tr/framework/ui/index.js';
@@ -14,6 +15,8 @@ import { CHAR_KEY, THEME_KEY } from '../flow/mainFlow.js';
 import { entryLabel, type EntryMethod } from '../flow/session.js';
 import { MiniCard, type CardEnv } from './charCard.js';
 import { badgeButton, badgeImage, type BadgeSet } from './badges.js';
+import { buildProfileOverlay, createAvatarSlot, type AvatarSlot } from './profileView.js';
+import { profileParamsFrom } from '../core/profile/playerProfile.js';
 
 export interface LobbyExtras {
   coins: number;
@@ -63,8 +66,10 @@ export function passiveLine(load: Loadout): string {
 
 // 参考图配色：棕色胶囊/底条 + 沙滩上的深棕标题字
 const PILL_BG = '#5e4b3a';
-const BAR_BG = '#5a4d42';
+// 底栏别太暗：旧 #5a4d42 把四枚徽标压得发闷（用户反馈），提亮成暖中棕
+const BAR_BG = '#7d6550';
 const TITLE_ON_BG = '#6b4a2b';
+const LABEL_ON_BAR = '#FFF3D6';
 
 export function buildLobbyPage(host: UiHost, d: LobbyDeps): LobbyPage {
   const c = host.theme.colors;
@@ -85,10 +90,25 @@ export function buildLobbyPage(host: UiHost, d: LobbyDeps): LobbyPage {
     return holder;
   };
 
-  /** 顶栏货币胶囊：纯色棕底（自动随数字扩容）+ 图标（按源比例定宽）+ 动态数字 */
-  const currencyChip = (icon: 'coin' | 'gem', iconW: number, value: number, tint: string): Box => new Box(
-    { direction: 'row', background: host.solidSkin, backgroundColor: PILL_BG, padding: { top: 3, bottom: 3, left: 5, right: 10 }, gap: 5, align: 'center' },
-    [badgeImage(set, icon, iconW, 24), new Label({ text: String(value), fontSizePx: 14, color: tint })],
+  /** 图标 + 真文字标签：生图重做的六枚不再把字烤进图里（AI 写字必糊，旧「活动」标签即乱码） */
+  const labeledBadge = (name: Parameters<typeof badgeButton>[1], size: number, label: string, color: string, onTap: () => void): Box => new Box(
+    { direction: 'column', align: 'center', gap: 2 },
+    [badge(name, size, size, onTap, label), new Label({ text: label, fontSizePx: 13, color })],
+  );
+
+  /** 货币框右端的「+」：在框内、数字右侧；暂无获取入口，先走预留槽的 toast */
+  const plusInPill = (tint: string, tag: string): Box => new Box(
+    { width: 18, height: 18, align: 'center', justify: 'center', onClick: stub(`加${tag}`) },
+    [new Label({ text: '+', fontSizePx: 15, color: tint })],
+  );
+
+  /** 顶栏货币胶囊：纯色棕底（自动随数字扩容）+ 图标（正方形）+ 数字 + 「+」；
+   *  数字 Label 提到外面，档案面板改名扣钻后要能刷新同一块 */
+  const coinsL = new Label({ text: String(d.extras?.coins ?? 0), fontSizePx: 14, color: c.gold });
+  const gemsL = new Label({ text: String(d.extras?.diamonds ?? 0), fontSizePx: 14, color: '#BFE3FF' });
+  const currencyChip = (icon: 'coin' | 'gem', iconW: number, tint: string, tag: string, value: Label): Box => new Box(
+    { direction: 'row', background: host.solidSkin, backgroundColor: PILL_BG, padding: { top: 3, bottom: 3, left: 5, right: 5 }, gap: 5, align: 'center' },
+    [badgeImage(set, icon, iconW, iconW), value, plusInPill(tint, tag)],
   );
 
   /** 中部大徽标组：标题字 + 徽标 */
@@ -183,19 +203,31 @@ export function buildLobbyPage(host: UiHost, d: LobbyDeps): LobbyPage {
   };
 
   // ---------- 四段布局（对齐参考图） ----------
+  // 头像＝玩家档案弹层入口。onAvatar 回调在 avatarSlot 赋值前也会被触达，故用 let + 可选链。
+  let avatarSlot: AvatarSlot | null = null;
+  const overlay = buildProfileOverlay(host, {
+    params: profileParamsFrom(d.content.game.params?.['profile']),
+    badges: set,
+    storage: host.adapter.storage,
+    onDiamonds: n => gemsL.setText(String(n)),
+    onAvatar: k => avatarSlot?.setImage(k),
+  });
+  avatarSlot = createAvatarSlot(set, 46, overlay.avatarKey(), () => overlay.toggle());
+
   const topBar = new Box(
     { direction: 'row', align: 'center', gap: 8 },
     [
-      badge('avatar', 46, 46, slot('onSettings', '头像'), '头像'),
-      currencyChip('coin', 17, d.extras?.coins ?? 0, c.gold),
-      currencyChip('gem', 23, d.extras?.diamonds ?? 0, '#BFE3FF'),
+      avatarSlot.box,
+      currencyChip('coin', 22, c.gold, '金币', coinsL),
+      currencyChip('gem', 22, '#BFE3FF', '钻石', gemsL),
       new Box({ flex: 1 }),
       badge('settings', 36, 36, slot('onSettings', '设置'), '设置'),
     ],
   );
 
   const leftCol = new Box({ direction: 'column', width: 61, gap: 14, align: 'center' }, [
-    badge('event', 55, 66, slot('onEvent', '活动'), '活动'),
+    // 左列也压在亮天/棕榈上，米白标签在横窗下几乎看不见，与「成就」统一取深棕
+    labeledBadge('event', 55, '活动', TITLE_ON_BG, slot('onEvent', '活动')),
     new Box({ direction: 'column', background: host.solidSkin, backgroundColor: PILL_BG, backgroundOpacity: 0.55, padding: { top: 3, bottom: 3, left: 4, right: 4 } },
       [new Label({ text: `登录方式：${entryLabel(d.entry)}`, fontSizePx: 10, color: '#FFE9A0', align: 'center' })]),
   ]);
@@ -208,7 +240,9 @@ export function buildLobbyPage(host: UiHost, d: LobbyDeps): LobbyPage {
   ]);
 
   const rightCol = new Box({ direction: 'column', width: 61, gap: 6, align: 'center' }, [
-    badge('achieve', 55, 66, slot('onAchievements', '成就'), '成就'),
+    // 勋章是生图重做的纯图标（AI 烤字必糊），板块名改由真文字渲染；这块压在亮天上，
+    // 用左列那套米白会糊成一片，所以取「开始·酷跑」同款的深棕标题字
+    labeledBadge('achieve', 55, '成就', TITLE_ON_BG, slot('onAchievements', '成就')),
     badge('task', 55, 66, slot('onTasks', '任务'), '任务'),
     badge('rank', 55, 55, slot('onRank', '排行榜'), '排行榜'),
   ]);
@@ -218,18 +252,19 @@ export function buildLobbyPage(host: UiHost, d: LobbyDeps): LobbyPage {
   const bottomBar = new Box(
     { direction: 'row', background: host.solidSkin, backgroundColor: BAR_BG, padding: { top: 4, bottom: 4 }, align: 'center', justify: 'spaceAround' },
     [
-      badge('shop', 77, 80, slot('onShop', '商店'), '商店'),
-      badge('handbook', 77, 80, slot('onHandbook', '福利手册'), '福利手册'),
-      badge('chest', 77, 80, slot('onChest', '宝箱'), '宝箱'),
-      badge('character', 77, 80, toggleChar, '角色'),
+      labeledBadge('shop', 62, '商店', LABEL_ON_BAR, slot('onShop', '商店')),
+      labeledBadge('handbook', 62, '福利手册', LABEL_ON_BAR, slot('onHandbook', '福利手册')),
+      labeledBadge('chest', 62, '宝箱', LABEL_ON_BAR, slot('onChest', '宝箱')),
+      labeledBadge('character', 62, '角色', LABEL_ON_BAR, toggleChar),
     ],
   );
 
   const view = host.makeView();
   view.add(new Box(
-    // 背景图铺满整屏（九宫格零 insets 拉伸），徽标/面板按绘制顺序叠在其上
+    // 背景图铺满整屏（等比裁切），徽标/面板按绘制顺序叠在其上；
+    // 档案弹层的两个 absolute 兄弟放最后＝画在最上层，捕获层在前故面板吃点击优先
     { direction: 'column', flex: 1, padding: 8, gap: 6, background: d.extras?.background ?? null },
-    [topBar, midRow, panelHost, bottomBar],
+    [topBar, midRow, panelHost, bottomBar, overlay.catcher, overlay.panel],
   ));
   return { view };
 }
