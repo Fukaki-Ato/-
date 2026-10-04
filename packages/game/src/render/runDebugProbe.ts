@@ -6,6 +6,7 @@
  */
 import type { RunnerSim } from '@tr/game/core/sim/runnerSim.js';
 import type { createBurstPool } from './vfxBurst.js';
+import type { createCoinField } from './coinField.js';
 
 /** 前瞻采样窗口（米）：金币按车道统计、障碍/道具箱按最近若干个 */
 const COIN_LOOKAHEAD_M = 60, OBS_LOOKAHEAD_M = 40, PICKUP_LOOKAHEAD_M = 200;
@@ -18,6 +19,8 @@ export function installRunProbe(
   bursts: BurstPool,
   /** 渲染统计（drawcall / 三角面），docs/02 §8 性能预算与 docs/08 §5 门禁取证用 */
   renderInfo: () => { calls: number; triangles: number } = () => ({ calls: -1, triangles: -1 }),
+  /** 金币场实际绘制数（「跳跃顶点金币消失」类问题排查用；正式运行不影响逻辑） */
+  coinField?: ReturnType<typeof createCoinField>,
 ) {
   const r2 = (v: number) => +v.toFixed(2);
   const fxOf = () => {
@@ -34,6 +37,8 @@ export function installRunProbe(
       const s = sim.state;
       return {
         ...sim.summary(), sliding: s.sliding, y: r2(s.y), fx: fxOf(),
+        lane: s.lane, x: r2(s.x), supportY: r2(s.supportY),
+        coinN: coinField ? coinField.lastCount : -1,
         shocks: s.shocks,
         energy: r2(s.energy), cd: r2(s.skillCd), gliding: s.gliding, cam: camera(), draw: renderInfo(),
         burstFired: bursts.fired,
@@ -54,6 +59,11 @@ export function installRunProbe(
         pk: sim.pickupsArr.filter(p => !p.taken && rel(p.worldZ) > 0 && rel(p.worldZ) < PICKUP_LOOKAHEAD_M)
           .slice(0, 3).map(p => ({ lane: p.lane, z: r2(rel(p.worldZ)), item: p.itemRef })),
         coinsAhead: perLane,
+        // 窗口内金币明细（与 render/coinField 的选取口径 z∈[-115,8] 一致，符号取 worldZ-dist；
+        // 排查「跳跃顶点地面金币消失」用：taken 状态 + 远近分布）
+        coins: sim.coinsArr
+          .map(c => ({ z: r2(rel(c.worldZ)), y: r2(c.y ?? 0.65), taken: c.taken === true }))
+          .filter(c => c.z >= -8 && c.z <= 116).slice(0, 40),
       };
     },
   };

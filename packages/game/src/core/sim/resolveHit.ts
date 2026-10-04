@@ -31,7 +31,7 @@ export function resolveHit(o: ObstacleEntity, d: HitCtx): void {
     events.push({ type: 'protected' });
     return;
   }
-  if (o.zap === true) { zapShock(d); return; }
+  if (o.zap === true) { zapShock(o, d); return; }
   // 护盾层优先（docs/01 §5：抵挡 1 次碰撞），其次滑板护甲
   if (fx.shieldLayers > 0) {
     events.push({ type: 'shieldBreak', layers: buffs.consumeShield() });
@@ -64,12 +64,13 @@ export function resolveHit(o: ObstacleEntity, d: HitCtx): void {
 }
 
 /** 闪电圈触电：护具被「电掉」；无护具——第一次受创硬直，第二次直接致死（头盔若在身已在本次被电掉） */
-function zapShock(d: HitCtx): void {
+function zapShock(o: ObstacleEntity, d: HitCtx): void {
   const { s, fx, buffs, events } = d;
+  const at = { lane: o.lane, worldZ: o.worldZ }; // 打击位置：渲染层雷电特效用
   const jolt = (gear: 'shield' | 'board' | 'helmet' | null) => {
     s.stunT = d.hitStunS;
     s.invulnT = d.invulnS;
-    events.push({ type: 'zap', gear });
+    events.push({ type: 'zap', gear, ...at });
   };
   if (fx.shieldLayers > 0) {
     events.push({ type: 'shieldBreak', layers: buffs.consumeShield() });
@@ -90,7 +91,7 @@ function zapShock(d: HitCtx): void {
   if (s.shocks >= 1) {
     s.hits++;
     s.alive = false;
-    events.push({ type: 'death' });
+    events.push({ type: 'death', ...at });
     return;
   }
   s.shocks++;

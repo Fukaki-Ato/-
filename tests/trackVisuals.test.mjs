@@ -8,6 +8,7 @@ function fixture(t) {
   const scene = new THREE.Scene();
   const track = createTrackVisuals(scene, 2.2, {
     baseColor: '#8ED0F2', flashColor: '#FFF3C4', tint: '#FFD98A', groundColor: '#E3CFA4',
+    sky: { zenith: '#8ED0F2', horizon: '#CFE9F7' },
   });
   const ground = scene.children.find(o => o.isMesh && o.material?.map?.isDataTexture);
   assert.ok(ground, '程序化草斑沙地应存在');
@@ -25,10 +26,25 @@ function fixture(t) {
     });
     for (const resource of resources) resource.dispose();
   });
-  return { track, ground, texture, tileM };
+  return { track, scene, ground, texture, tileM };
 }
 
 const near = (a, b) => assert.ok(Math.abs(a - b) < 1e-9, `${a} != ${b}`);
+
+test('闪白更新天空穹顶渐变并恢复天顶与地平线基色', t => {
+  const { track, scene } = fixture(t);
+  const dome = scene.children.find(o => o.isMesh && o.material?.isShaderMaterial);
+  assert.ok(dome, '天空穹顶应使用 ShaderMaterial');
+  const top = dome.material.uniforms.top.value;
+  const bottom = dome.material.uniforms.bottom.value;
+  const tint = new THREE.Color(0xcfe4ff);
+  track.setFlash(1, tint);
+  assert.equal(top.getHex(), new THREE.Color('#8ED0F2').lerp(tint, 0.85).getHex());
+  assert.equal(bottom.getHex(), new THREE.Color('#CFE9F7').lerp(tint, 0.85).getHex());
+  track.setFlash(0, tint);
+  assert.equal(top.getHex(), new THREE.Color('#8ED0F2').getHex());
+  assert.equal(bottom.getHex(), new THREE.Color('#CFE9F7').getHex());
+});
 
 function sampleGroundUv(ground, texture, worldPoint) {
   const local = ground.worldToLocal(worldPoint.clone());

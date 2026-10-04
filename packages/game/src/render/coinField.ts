@@ -30,6 +30,10 @@ export function createCoinField(scene: THREE.Scene, laneWidth: number) {
   const faceInst = new THREE.InstancedMesh(faceGeo, faceMat, COIN_MAX);
   ringInst.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
   faceInst.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  // 关视锥剔除：实例矩阵每帧全量重写（boundingSphere 每帧重算既无意义又 O(count)），
+  // 且基于实例的包围球在跳跃顶点（相机抬升）会被判出视锥——整组金币闪断 1~2 帧，
+  // 用户反馈「弹跳鞋跳到最高点时地上金币消失」的根因。
+  ringInst.frustumCulled = false; faceInst.frustumCulled = false;
   scene.add(ringInst, faceInst);
 
   const dummy = new THREE.Object3D(); // 矩阵组装复用，零分配
@@ -80,7 +84,10 @@ export function createCoinField(scene: THREE.Scene, laneWidth: number) {
     return COIN_MAX;
   }
 
+  /** 上一帧实际投入绘制的金币数（性能监控/「金币消失」类问题排查用） */
+  let lastN = 0;
   return {
+    get lastCount() { return lastN; },
     update(a: CoinFieldArgs) {
       const scale = a.magnetOn ? MAGNET_COIN_SCALE : 1;
       const n = selectVisible(a.coins, a.dist, a.t);
@@ -104,6 +111,7 @@ export function createCoinField(scene: THREE.Scene, laneWidth: number) {
         ringInst.setMatrixAt(slot, dummy.matrix);
         faceInst.setMatrixAt(slot, dummy.matrix);
       }
+      lastN = n;
       ringInst.count = n; faceInst.count = n;
       ringInst.instanceMatrix.needsUpdate = true; faceInst.instanceMatrix.needsUpdate = true;
     },

@@ -7,7 +7,8 @@
  * 5. 闪电圈：无护具第一次受创、第二次致死（不走普通 hits）；有护盾/头盔先被电掉；跳跃可避
  * 6. 空中金币不再铺满三道（按 laneGroupWeights 抽 1/2/3 道）
  * 7. 落地走廊软清除：障碍保留在数组（done+clearT 下沉动画）但不再判负，掠过身后被回收
- * 8. 登车板（step）：赤脚无弹跳鞋也能登上静止火车——跑过自动上板、踏板起跳落顶
+ * 8. 登车斜坡（step）：赤脚无弹跳鞋也能登上静止火车——沿可走上去的斜坡走上车顶
+ * 8b. 弹跳鞋高度口径：配置 mul 下越 2.6m 高杆有充足时间窗口（用户反馈容错太低）
  * 9. 火车不撞火车：冲撞体沿途撞飞普通障碍，但撞不动 rideTop 列车
  * 10. 弹跳鞋跃过高杆：高度口径 <2.6 判中、≥顶可越；赤脚跳不过、穿鞋可越、滑铲可过
  */
@@ -19,7 +20,8 @@ import { fileURLToPath } from 'node:url';
 import { RunnerSim } from '../packages/game/dist/core/sim/runnerSim.js';
 import { TrackGen } from '../packages/game/dist/core/sim/trackGen.js';
 import { RunRng } from '../packages/game/dist/core/rng.js';
-import { hitsRunner, lateralGap, obstacleX } from '../packages/game/dist/core/sim/collision.js';
+import { hitsRunner, lateralGap, obstacleX, HAZARD_HIT_Y } from '../packages/game/dist/core/sim/collision.js';
+import { pickAvatarMode } from '../packages/game/dist/render/avatarRig.js';
 
 const root = join(fileURLToPath(import.meta.url), '..', '..');
 const NAMES = ['game', 'characters', 'skills', 'items', 'obstacles', 'themes', 'events', 'economy'];
@@ -37,6 +39,9 @@ function cleanSim(seed) {
 function grant(sim, primitive, params) {
   sim.buffs.add(primitive, params, primitive, { distance: sim.state.distance, lane: sim.state.lane });
 }
+
+/** 弹跳鞋倍率读配置（不写死）：items.json item_boots 的 jumpBoost.mul */
+const BOOTS_MUL = content.items.items.find(i => i.id === 'item_boots').effects[0].mul;
 
 // ---------------- 1. 移动挡板可跳 + 限幅 ----------------
 
@@ -65,7 +70,7 @@ test('弹跳鞋上车顶：列车顶可落可站（rideTop）；赤脚同一时�
     const sim = cleanSim(seed);
     const train = { obsRef: 'obs_train_static', cls: 'vehicle', w: 2.0, h: 2.4, d: 24, lane: 0, worldZ: sim.state.distance + 40, rideTop: true };
     sim.obstacles.push(train);
-    if (boots) grant(sim, 'jumpBoost', { durationS: 30, mul: 1.15 });
+    if (boots) grant(sim, 'jumpBoost', { durationS: 30, mul: BOOTS_MUL });
     const front = train.worldZ - train.d / 2;
     let jumped = false, rodeOn = false, hit = false;
     for (let i = 0; i < 60 * 8 && sim.state.alive; i++) {
@@ -239,50 +244,111 @@ test('滑翔期不清障：远处障碍全程保留（不再「近处消失远�
   assert.ok(glided && landed > 0, '应完成滑翔落地');
   assert.ok(!clearedDuringGlide, '滑翔期不得清除任何障碍（用户要求：滑翔完全不清障）');
   assert.ok(marker.done !== true, '落地带（±8~14m）之外的障碍应原样保留，不被清除');
-  assert.ok(sim.state.alive, '滑翔末段免伤 + 落地缓冲下不应判死');
+  assert.ok(sim.state.alive, '滑翔期不判负（落地后判罚另见下条用例）');
 });
 
-test('落地帧只清落脚点一小段：带内障碍软清除（done+clearT 渐隐），带外不动', () => {
+test('落地帧不清障不给无敌：带内障碍原样保留，落地即恢复判定（无免伤窗口）', () => {
   const sim = new RunnerSim(content, 311, 'char_volt');
+  sim.state.t = 20; // 越过新手保护（protectionS）：只测落地判定，不吃教程保护
   for (let k = 0; k < 60; k++) sim.step();
   const s = sim.state;
   grant(sim, 'fly', { durationS: 2 });
   const inBand = { obsRef: 't_band', cls: 'full', w: 2, h: 2.6, d: 0.8, lane: s.lane, worldZ: 0 };
-  let pushed = false, landed = -1;
+  let pushed = false, landed = -1, invulnAtLanding = 0;
   for (let i = 0; i < 60 * 20; i++) {
     const wasGliding = s.gliding;
-    // 滑翔末段（高度已低于判定线、免伤生效）把障碍放到落脚点前 3m：验证它一路不被清、直到落地帧才被软清除
-    if (!pushed && s.gliding && s.y < 1.5 && s.y > 0.2) { inBand.worldZ = s.distance + 3; sim.obstacles.push(inBand); pushed = true; }
+    // 滑翔末段（即将贴地）把障碍放到落脚点前 4m：落地时还没接触到（本帧不撞），
+    // 之后无无敌护着，再跑约 2m 就应撞上判负
+    if (!pushed && s.gliding && s.y < 0.35 && s.y > 0.05) { inBand.worldZ = s.distance + 4; sim.obstacles.push(inBand); pushed = true; }
     sim.step();
     if (inBand.clearT != null && s.gliding) throw new Error('滑翔期不应软清除带内障碍');
-    if (wasGliding && !s.gliding && s.y === 0) { landed = s.distance; break; }
+    if (wasGliding && !s.gliding && s.y === 0) { landed = s.distance; invulnAtLanding = s.invulnT; break; }
   }
   assert.ok(pushed && landed > 0, '应完成滑翔落地');
-  assert.ok(inBand.done === true && inBand.clearT != null, '落地帧应把落脚点前后的障碍软清除（渐隐，不是整批摘除）');
-  assert.ok(sim.state.alive, '落地带内障碍被软清除后不应判死');
+  // 用户要求「飞行落下的时候不要无敌」：落地瞬间无免伤窗口
+  assert.equal(invulnAtLanding, 0, `落地帧不应给无敌，实际 ${invulnAtLanding}`);
+  // 用户要求：落地时障碍自动消失这个行为移除——带内障碍保持原状（不下沉、不渐隐、不摘除）
+  assert.ok(inBand.done !== true && inBand.clearT == null, '落地帧不得软清除带内障碍（用户要求移除落地清障）');
+  // 落地后无保护：再往前走几步就会撞上带内障碍判负（证明判定已恢复）
+  let died = false;
+  for (let i = 0; i < 60; i++) { sim.step(); if (!sim.state.alive) { died = true; break; } }
+  assert.ok(died, '落地后无无敌，撞上保留的障碍应判负');
+  assert.ok(sim.obstacles.includes(inBand), '带内障碍实体应仍在赛道数组中（不清障）');
 });
 
 // ---------------- 8. 登车板（step）：赤脚也能上静止火车 ----------------
 
-test('登车板：跑过自动上板、踏板起跳落火车顶（无弹跳鞋）', () => {
+test('登车斜坡：赤脚不起跳，沿可走上去的斜坡走上火车顶（坡中高度随深度线性升高）', () => {
   const sim = cleanSim(311);
   const s = sim.state;
-  const step = { obsRef: 'obs_mount_step', cls: 'step', w: 2.0, h: 0.6, d: 3.0, lane: 0, worldZ: s.distance + 10 };
-  const train = { obsRef: 'obs_train_static', cls: 'vehicle', w: 2.0, h: 2.4, d: 24, lane: 0, worldZ: s.distance + 25, rideTop: true };
-  sim.obstacles.push(step, train);
-  let steppedUp = false, rodeOn = false;
-  for (let i = 0; i < 60 * 8 && sim.state.alive; i++) {
-    // 贴上板面（支撑面把 y 抬到 0.6、垂直速度归零）的那一刻从踏板起跳——不需要弹跳鞋
-    if (!steppedUp && Math.abs(s.y - 0.6) < 1e-6 && s.vy === 0 && s.distance >= step.worldZ - step.d / 2) {
-      steppedUp = true;
-      sim.applyAction('jump');
+  // 斜坡：坡底贴地、坡顶接火车前脸（与 pat_train_top_run 模板同构：坡远端 = 列车近端）
+  const ramp = { obsRef: 'obs_mount_step', cls: 'step', w: 2.0, h: 2.4, d: 6, lane: 0, worldZ: s.distance + 20 };
+  const train = { obsRef: 'obs_train_static', cls: 'vehicle', w: 2.0, h: 2.4, d: 24, lane: 0, worldZ: ramp.worldZ + ramp.d / 2 + 12, rideTop: true };
+  sim.obstacles.push(ramp, train);
+  let midRampY = -1, midRampZ = 0, midErr = 0, rodeOn = false;
+  for (let i = 0; i < 60 * 12 && sim.state.alive; i++) {
+    sim.step(); // 全程不给任何输入：能不能上车只靠「走」
+    const z = s.distance - ramp.worldZ;
+    if (midRampY < 0 && z > -0.5 && z < 0.5) { // 坡中取样：截面高度应≈2.4*(0.5+z/4)
+      midRampY = s.y; midRampZ = z;
+      midErr = Math.abs(s.y - ramp.h * Math.min(1, (z + ramp.d / 2) / (ramp.d - 0.8)));
     }
-    sim.step();
-    if (sim.obstacles.includes(train) && Math.abs(s.y - 2.4) < 1e-6 && s.vy === 0) rodeOn = true;
+    if (Math.abs(s.y - 2.4) < 1e-6 && s.vy === 0 && s.distance > train.worldZ - 12) rodeOn = true;
+    if (s.distance > train.worldZ + train.d / 2 + 1) break; // 骑过整列车即证明登车成功，不再往后跑（后续生成内容与本用例无关）
   }
-  assert.ok(steppedUp, '跑到板子上应自动贴上板面（y=0.6）');
-  assert.ok(rodeOn, '踏板起跳应落上火车顶（y=2.4）');
+  assert.ok(midRampY > 0.8 && midRampY < 1.6, `坡中应被抬到约 1.2m（0.8~1.6m），实际 ${midRampY.toFixed(2)}`);
+  assert.ok(midErr < 0.05, `坡中高度应贴合斜坡截面（z=${midRampZ.toFixed(2)}，实际 ${midRampY.toFixed(2)}）`);
+  assert.ok(rodeOn, '赤脚沿坡应走上火车顶（吸附 y=2.4 且 vy=0）');
   assert.ok(sim.state.alive, '登车全程不应判负');
+});
+
+// ---------------- 8b. 弹跳鞋高度口径 ----------------
+
+test('弹跳鞋高度口径：顶点 2.90m——可越 2.6m 高杆且低于 3.0m 满格墙（用户定稿 2.6m 口径）', () => {
+  const { gravity, jumpVelocity } = content.game.params.runner;
+  const g = -gravity;
+  const apex = (jumpVelocity * BOOTS_MUL) ** 2 / (2 * g);
+  // 顶点压线 2.60m 会让「y≥2.6 才算越杆」的窗口归零；2.70/2.80m 实测通过带仅约 1.5 帧，故取 2.90m
+  assert.ok(apex > 2.7 && apex < 3.0, `弹跳鞋顶点应在 2.7~3.0m（实际 ${apex.toFixed(2)}m）`);
+  // 越杆窗口：抛物线上高于 2.6m 的持续时间（秒）——容错的量化口径
+  const v = jumpVelocity * BOOTS_MUL, h = 2.6;
+  const disc = v * v - 2 * g * h;
+  assert.ok(disc > 0, '弹跳鞋顶点必须高于杆顶');
+  const win = 2 * Math.sqrt(disc) / g;
+  assert.ok(win >= 0.2, `越杆时间窗口应 ≥0.2s（实际 ${win.toFixed(2)}s）`);
+  // 3.0m 满格墙：顶点必须低于墙顶，不再出现「视觉可越、判定恒死」的割裂
+  assert.ok(apex < 3.0, `弹跳鞋顶点应 <3.0m 满格墙高（实际 ${apex.toFixed(2)}m）`);
+  // 赤脚顶点必须仍低于杆顶：否则弹跳鞋失去存在意义
+  const bareApex = jumpVelocity ** 2 / (2 * g);
+  assert.ok(bareApex < h, `赤脚顶点应 <2.6m（实际 ${bareApex.toFixed(2)}m）`);
+});
+
+// ---------------- 8c. 滑翔落火车顶 ----------------
+
+test('滑翔落到火车顶：下方是 rideTop 列车时正常落在车顶（不穿模、不判负、不给无敌）', () => {
+  const sim = cleanSim(313);
+  const s = sim.state;
+  // 火车的位置 = 滑翔末段下方：飞行 2s（2.5 倍速约 60m）+ 滑翔约 1.8s（滑翔速约 19m/s）
+  const train = { obsRef: 'obs_train_static', cls: 'vehicle', w: 2.0, h: 2.4, d: 24, lane: s.lane, worldZ: s.distance + 78, rideTop: true };
+  sim.obstacles.push(train);
+  grant(sim, 'fly', { durationS: 2 });
+  let landedY = -1, landedOnTrain = false;
+  for (let i = 0; i < 60 * 8 && sim.state.alive; i++) {
+    const wasGliding = s.gliding;
+    sim.step();
+    if (wasGliding && !s.gliding) {
+      landedY = s.y;
+      landedOnTrain = Math.abs(s.y - train.h) < 1e-6; // 支撑面吸附到车顶高度且 vy=0
+      break;
+    }
+  }
+  assert.ok(landedY >= 0, '应结束滑翔');
+  assert.ok(landedOnTrain, `应落在 2.4m 车顶上（实际 y=${landedY}）`);
+  assert.equal(s.invulnT, 0, '落在车顶同样不给无敌（用户要求：落下不要无敌）');
+  assert.ok(sim.state.alive, '落车顶不应判负');
+  // 站在车顶上继续跑：支撑面保持，仍存活
+  for (let i = 0; i < 60; i++) sim.step();
+  assert.ok(sim.state.alive && Math.abs(s.y - 2.4) < 1e-6, '应继续站在车顶');
 });
 
 // ---------------- 9. 火车不撞火车 ----------------
@@ -313,19 +379,19 @@ test('弹跳鞋跃过高杆：赤脚跳不过、穿鞋可越、滑铲可过', ()
   const runner = (y, sliding = false) => ({ x: 0, y, sliding, t: 0 });
   assert.equal(hitsRunner(gate, runner(1.0), 2.2), true, '杆体区间（1.2~2.6m）站立必中');
   assert.equal(hitsRunner(gate, runner(2.4), 2.2), true, '赤脚跳顶点 2.4 < 2.6 仍判中');
-  assert.equal(hitsRunner(gate, runner(3.2), 2.2), false, '弹跳鞋顶点约 3.2 > 2.6 可越过高杆');
+  assert.equal(hitsRunner(gate, runner(2.9), 2.2), false, '弹跳鞋顶点 2.9 > 2.6 可越过高杆');
   assert.equal(hitsRunner(gate, runner(0, true), 2.2), false, '滑铲从杆下通过');
 
   const run = (boots, seed) => {
     const sim = cleanSim(seed);
     const g = { obsRef: 'obs_gate_low', cls: 'high', w: 2, h: 2.6, d: 0.6, lane: 0, worldZ: sim.state.distance + 40 };
     sim.obstacles.push(g);
-    if (boots) grant(sim, 'jumpBoost', { durationS: 30, mul: 1.15 });
+    if (boots) grant(sim, 'jumpBoost', { durationS: 30, mul: BOOTS_MUL });
     let jumped = false, hit = false;
     for (let i = 0; i < 60 * 6 && sim.state.alive; i++) {
-      // 弹跳鞋 y≥2.6 的窗口只覆盖起跳点前方约 2.3~7.5m：在 4.5m 处起跳，过杆时仍在杆顶之上
+      // 弹跳鞋 y≥2.6 的窗口覆盖起跳点前方一段：在 4.8m 处起跳，过杆全程仍在杆顶之上
       const gap = g.worldZ - sim.state.distance;
-      if (!jumped && gap <= 4.5 && gap > 0.5) { sim.applyAction('jump'); jumped = true; }
+      if (!jumped && gap <= 4.8 && gap > 0.5) { sim.applyAction('jump'); jumped = true; }
       sim.step();
       for (const e of sim.drainEvents()) if (e.type === 'hit' || e.type === 'death') hit = true;
     }
@@ -333,4 +399,80 @@ test('弹跳鞋跃过高杆：赤脚跳不过、穿鞋可越、滑铲可过', ()
   };
   assert.ok(run(true, 321).alive && !run(true, 321).hit, '穿弹跳鞋应能跃过高杆');
   assert.ok(run(false, 322).hit || !run(false, 322).alive, '赤脚跳不高杆必中');
+});
+
+// ---------------- 11. 车顶判定 2.1m 口径 ----------------
+
+test('车顶判定口径：2.1m 以下判撞死、≥2.1m 算落顶/站顶（用户定稿）', () => {
+  const train = { obsRef: 'obs_train_static', cls: 'vehicle', w: 2.0, h: 2.4, d: 24, lane: 0, worldZ: 0, rideTop: true };
+  const mk = y => ({ x: 0, y, sliding: false, t: 0 });
+  assert.equal(hitsRunner(train, mk(2.0), 2.2), true, 'y=2.0（<2.1）应判撞前脸');
+  assert.equal(hitsRunner(train, mk(2.05), 2.2), true, 'y=2.05（<2.1）应判撞前脸');
+  assert.equal(hitsRunner(train, mk(2.1), 2.2), false, 'y=2.1 应算站顶（不判）');
+  assert.equal(hitsRunner(train, mk(2.39), 2.2), false, 'y=2.39（车顶下沿附近）应算站顶');
+  assert.equal(hitsRunner(train, mk(2.4), 2.2), false, 'y=2.4（满高）应算站顶');
+  // 非 rideTop 载具（冲撞长方体）不看高度：恒判
+  const rusher = { obsRef: 'obs_rusher_long', cls: 'vehicle', w: 2.0, h: 2.4, d: 8, lane: 0, worldZ: 0, moveZ: -8 };
+  assert.equal(hitsRunner(rusher, mk(5), 2.2), true, '冲撞长方体无 rideTop：任何高度都判');
+});
+
+// ---------------- 12. 火车顶跑动姿态（动画模式门） ----------------
+
+test('站在车顶是跑动姿态：supportY 写回 + pickAvatarMode 按支撑面判空', () => {
+  const sim = cleanSim(314);
+  const s = sim.state;
+  const train = { obsRef: 'obs_train_static', cls: 'vehicle', w: 2.0, h: 2.4, d: 24, lane: s.lane, worldZ: s.distance + 40, rideTop: true };
+  sim.obstacles.push(train);
+  grant(sim, 'jumpBoost', { durationS: 30, mul: BOOTS_MUL });
+  // 起跳落到车顶：y 应=2.4 且 supportY 同步=2.4（渲染层据此播跑动动画）
+  let jumped = false, sawStand = false;
+  for (let i = 0; i < 60 * 8 && sim.state.alive; i++) {
+    const front = train.worldZ - train.d / 2;
+    if (!jumped && front - s.distance <= 6.2) { sim.applyAction('jump'); jumped = true; }
+    sim.step();
+    if (jumped && Math.abs(s.y - 2.4) < 1e-6 && s.vy === 0) {
+      assert.equal(s.supportY, 2.4, `站顶时 supportY 应为 2.4，实际 ${s.supportY}`);
+      sawStand = true;
+      break;
+    }
+  }
+  assert.ok(sawStand, '应站上火车顶（y=2.4, vy=0）');
+  assert.equal(pickAvatarMode(s), 'run', '站在车顶上应为跑动姿态（旧版 y>0.05 会误判空中）');
+  assert.equal(pickAvatarMode({ ...s, y: 2.4 + 0.2 }), 'air', '离车顶 0.2m 才算腾空');
+  assert.equal(pickAvatarMode({ ...s, y: 0, supportY: 0 }), 'run', '地面站立仍是跑动');
+});
+
+// ---------------- 13. 电弧地面可跳过（用户反馈「粉紫挡板跳不过去」） ----------------
+
+/** 只保留被测弧光：把 sim 每步生成的其它障碍摘掉，排除赛道噪声 */
+function onlyArc(sim, arc) {
+  for (let i = sim.obstacles.length - 1; i >= 0; i--) if (sim.obstacles[i] !== arc) sim.obstacles.splice(i, 1);
+}
+
+test('电弧地面：起跳窗口内可跳过（不跳必死；贴脸到 4m 起跳都活；太早起跳落地在弧内才死）', () => {
+  const run = (jumpGap, boots) => {
+    const sim = cleanSim(315);
+    const s = sim.state;
+    const arc = { obsRef: 'obs_arc_floor', cls: 'hazard', w: 2.0, h: 0.1, d: 4, lane: 0, worldZ: s.distance + 30 };
+    sim.obstacles.push(arc);
+    if (boots) grant(sim, 'jumpBoost', { durationS: 30, mul: BOOTS_MUL });
+    const front = arc.worldZ - arc.d / 2;
+    let jumped = false;
+    for (let i = 0; i < 60 * 6 && sim.state.alive; i++) {
+      if (!jumped && front - s.distance <= jumpGap) { sim.applyAction('jump'); jumped = true; }
+      onlyArc(sim, arc);
+      sim.step();
+      if (arc.done && s.y <= 0.001) break; // 弧光已判过且已落地
+    }
+    return sim.state.alive;
+  };
+  assert.equal(run(0, false), false, '不跳必死');
+  for (const gap of [0.5, 1, 2, 3, 4]) {
+    assert.equal(run(gap, false), true, `赤脚距弧 ${gap}m 起跳应能跳过（用户体感「跳不过去」的修复点）`);
+  }
+  assert.equal(run(5, false), false, '起跳太早（落地时仍在弧内）照旧判死：时机要求保留');
+  // 弹跳鞋 2.90m 顶点（滞空约 9.5m）：距弧 ≤4m 起跳可过；6m 起跳会落回弧内（时机要求保留）
+  for (const gap of [1, 3, 4]) assert.equal(run(gap, true), true, `弹跳鞋距弧 ${gap}m 起跳应能跳过`);
+  assert.equal(run(6, true), false, '弹跳鞋距弧 6m 起跳落地仍在弧内：保留时机要求');
+  assert.equal(HAZARD_HIT_Y, 0.15, '判定线口径 0.15m（原 0.35：与视觉光带等高，几乎跳不过）');
 });
