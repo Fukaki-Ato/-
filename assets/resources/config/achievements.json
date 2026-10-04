@@ -1,0 +1,56 @@
+[
+  {
+    "id": "ach.run10",
+    "name": "初露锋芒",
+    "desc": "累计完成 10 局跑酷。",
+    "metric": "run.count",
+    "target": 10,
+    "reward": { "diamond": 30 },
+    "order": 1
+  },
+  {
+    "id": "ach.distance5000",
+    "name": "长跑健将",
+    "desc": "累计跑动距离达到 5000 米。",
+    "metric": "run.distance",
+    "target": 5000,
+    "reward": { "gold": 500 },
+    "order": 2
+  },
+  {
+    "id": "ach.score3000",
+    "name": "高分选手",
+    "desc": "单局得分达到 3000 分。",
+    "metric": "run.score.single",
+    "target": 3000,
+    "reward": { "diamond": 20 },
+    "order": 3
+  },
+  {
+    "id": "ach.coins10000",
+    "name": "积少成多",
+    "desc": "累计收集 10000 金币。",
+    "metric": "run.coins.total",
+    "target": 10000,
+    "reward": { "items": [{ "id": "revive", "count": 3 }] },
+    "order": 4
+  },
+  {
+    "id": "ach.upgrade5",
+    "name": "养成大师",
+    "desc": "累计升级角色 5 次。",
+    "metric": "character.upgrade.count",
+    "target": 5,
+    "reward": { "diamond": 60 },
+    "order": 5
+  },
+  {
+    "id": "ach.login7",
+    "name": "风雨无阻",
+    "desc": "累计登录 7 天。",
+    "metric": "login.days",
+    "target": 7,
+    "reward": { "diamond": 50 },
+    "order": 6
+  }
+]

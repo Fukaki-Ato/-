@@ -1,0 +1,14 @@
+{
+  "signIn": {
+    "days": [
+      { "day": 1, "reward": { "gold": 100 } },
+      { "day": 2, "reward": { "gold": 150 } },
+      { "day": 3, "reward": { "items": [{ "id": "magnet", "count": 1 }] } },
+      { "day": 4, "reward": { "gold": 200 } },
+      { "day": 5, "reward": { "gold": 250 } },
+      { "day": 6, "reward": { "items": [{ "id": "revive", "count": 1 }] } },
+      { "day": 7, "reward": { "diamond": 50 } }
+    ]
+  },
+  "dailyFreeAd": { "reward": { "gold": 100 } }
+}

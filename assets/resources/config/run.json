@@ -1,0 +1,13 @@
+[
+  {
+    "mode": "classic",
+    "name": "经典模式",
+    "settle": { "coinsToGold": 1, "scoreToGoldDivisor": 10, "diamondEveryCoins": 500 },
+    "revive": { "adPerRun": 1 },
+    "buffs": {
+      "magnet": { "name": "磁铁", "desc": "开局携带，10 秒内自动吸附金币。", "durationSec": 10 },
+      "revive": { "name": "复活币", "desc": "死亡后原地复活一次。", "count": 1 },
+      "speed": { "name": "疾风符", "desc": "开局携带，8 秒内奔跑速度提升。", "durationSec": 8 }
+    }
+  }
+]

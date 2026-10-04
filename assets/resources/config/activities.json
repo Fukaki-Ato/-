@@ -1,0 +1,54 @@
+[
+  {
+    "id": "act_login",
+    "name": "累计登录",
+    "desc": "活动期间累计登录 2/4/6 天，领取丰厚奖励。",
+    "banner": "images/ui/activity_login_banner",
+    "icon": "images/ui/activity_login_icon",
+    "startTime": "2026-10-01 00:00",
+    "endTime": "2026-11-01 00:00",
+    "ruleText": "每日登录后进度 +1（按游戏日）。",
+    "metric": "login.days",
+    "milestones": [
+      { "target": 2, "reward": { "gold": 300 } },
+      { "target": 4, "reward": { "items": [{ "id": "magnet", "count": 2 }] } },
+      { "target": 6, "reward": { "diamond": 50 } }
+    ],
+    "order": 1,
+    "enabled": true
+  },
+  {
+    "id": "act_sprint",
+    "name": "冲刺冬季赛",
+    "desc": "活动期间累计奔跑 5000/12000 米，领取限定奖励。",
+    "banner": "images/ui/activity_sprint_banner",
+    "icon": "images/ui/activity_sprint_icon",
+    "startTime": "2026-12-01 00:00",
+    "endTime": "2026-12-31 23:59",
+    "ruleText": "每局跑动距离累加，达成里程碑即可领取。",
+    "metric": "run.distance",
+    "milestones": [
+      { "target": 5000, "reward": { "gold": 800 } },
+      { "target": 12000, "reward": { "diamond": 80, "items": [{ "id": "speed_boost", "count": 2 }] } }
+    ],
+    "order": 2,
+    "enabled": true
+  },
+  {
+    "id": "act_summer",
+    "name": "夏日高分挑战",
+    "desc": "已结束的活动，用于历史列表展示。",
+    "banner": "images/ui/activity_summer_banner",
+    "icon": "images/ui/activity_summer_icon",
+    "startTime": "2026-07-01 00:00",
+    "endTime": "2026-08-01 00:00",
+    "ruleText": "单局最高分达到目标即可领取对应奖励。",
+    "metric": "run.score.single",
+    "milestones": [
+      { "target": 2500, "reward": { "gold": 500 } },
+      { "target": 5000, "reward": { "diamond": 100 } }
+    ],
+    "order": 3,
+    "enabled": true
+  }
+]

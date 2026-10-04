@@ -1,0 +1,160 @@
+[
+  {
+    "id": "free_gold_ad",
+    "tab": "gold",
+    "name": "免费金币",
+    "desc": "观看广告可得 200 金币。",
+    "icon": "images/ui/shop_free_gold",
+    "price": null,
+    "viaAd": true,
+    "gain": { "gold": 200 },
+    "dailyLimit": 3,
+    "tag": "免费",
+    "order": 1
+  },
+  {
+    "id": "gold_1000",
+    "tab": "gold",
+    "name": "金币袋",
+    "desc": "1000 金币，跑酷好帮手。",
+    "icon": "images/ui/shop_gold_s",
+    "price": { "currency": "diamond", "amount": 10 },
+    "gain": { "gold": 1000 },
+    "order": 2
+  },
+  {
+    "id": "gold_6000",
+    "tab": "gold",
+    "name": "金币箱",
+    "desc": "6000 金币，超值之选。",
+    "icon": "images/ui/shop_gold_l",
+    "price": { "currency": "diamond", "amount": 50 },
+    "gain": { "gold": 6000 },
+    "order": 3
+  },
+  {
+    "id": "recharge_6",
+    "tab": "diamond",
+    "name": "60 钻石",
+    "desc": "充值获得 60 钻石。",
+    "icon": "images/ui/shop_diamond_s",
+    "price": { "currency": "CNY", "amount": 600 },
+    "productId": "ltkp.diamond.60",
+    "gain": { "diamond": 60 },
+    "iosVisible": false,
+    "order": 1
+  },
+  {
+    "id": "recharge_30",
+    "tab": "diamond",
+    "name": "300 钻石",
+    "desc": "充值获得 300 钻石。",
+    "icon": "images/ui/shop_diamond_m",
+    "price": { "currency": "CNY", "amount": 3000 },
+    "productId": "ltkp.diamond.300",
+    "gain": { "diamond": 300 },
+    "iosVisible": false,
+    "order": 2
+  },
+  {
+    "id": "recharge_98",
+    "tab": "diamond",
+    "name": "980 钻石",
+    "desc": "充值获得 980 钻石，额外赠送 50 钻石。",
+    "icon": "images/ui/shop_diamond_l",
+    "price": { "currency": "CNY", "amount": 9800 },
+    "productId": "ltkp.diamond.980",
+    "gain": { "diamond": 1030 },
+    "iosVisible": false,
+    "tag": "加赠",
+    "order": 3
+  },
+  {
+    "id": "prop_magnet_1",
+    "tab": "props",
+    "name": "磁铁 x1",
+    "desc": "开局携带，10 秒内自动吸附金币。",
+    "icon": "images/items/magnet",
+    "price": { "currency": "gold", "amount": 100 },
+    "gain": { "items": [{ "id": "magnet", "count": 1 }] },
+    "order": 1
+  },
+  {
+    "id": "prop_magnet_5",
+    "tab": "props",
+    "name": "磁铁 x5",
+    "desc": "五连装磁铁，更划算。",
+    "icon": "images/items/magnet",
+    "price": { "currency": "gold", "amount": 450 },
+    "gain": { "items": [{ "id": "magnet", "count": 5 }] },
+    "tag": "热卖",
+    "order": 2
+  },
+  {
+    "id": "prop_revive_1",
+    "tab": "props",
+    "name": "复活币 x1",
+    "desc": "死亡后可原地复活一次。",
+    "icon": "images/items/revive",
+    "price": { "currency": "gold", "amount": 300 },
+    "gain": { "items": [{ "id": "revive", "count": 1 }] },
+    "order": 3
+  },
+  {
+    "id": "prop_shard_lin_1",
+    "tab": "props",
+    "name": "林小满碎片 x1",
+    "desc": "集齐 10 个可解锁角色「林小满」。",
+    "icon": "images/items/char_shard_lin",
+    "price": { "currency": "gold", "amount": 880 },
+    "gain": { "items": [{ "id": "char_shard_lin", "count": 1 }] },
+    "order": 4
+  },
+  {
+    "id": "free_revive_ad",
+    "tab": "special",
+    "name": "免费复活币",
+    "desc": "观看广告可得复活币 x1，每日限 1 次。",
+    "icon": "images/items/revive",
+    "price": null,
+    "viaAd": true,
+    "gain": { "items": [{ "id": "revive", "count": 1 }] },
+    "dailyLimit": 1,
+    "tag": "免费",
+    "order": 1
+  },
+  {
+    "id": "special_growth",
+    "tab": "special",
+    "name": "成长礼包",
+    "desc": "5000 金币 + 磁铁 x3 + 复活币 x1，每日限购 1 次。",
+    "icon": "images/ui/shop_growth",
+    "price": { "currency": "diamond", "amount": 500 },
+    "gain": {
+      "gold": 5000,
+      "items": [
+        { "id": "magnet", "count": 3 },
+        { "id": "revive", "count": 1 }
+      ]
+    },
+    "dailyLimit": 1,
+    "tag": "超值",
+    "order": 2
+  },
+  {
+    "id": "recharge_gift",
+    "tab": "special",
+    "name": "钻石福袋",
+    "desc": "充值获得 100 钻石 + 磁铁 x3。",
+    "icon": "images/ui/shop_gift",
+    "price": { "currency": "CNY", "amount": 1000 },
+    "productId": "ltkp.gift.diamond100",
+    "gain": {
+      "diamond": 100,
+      "items": [{ "id": "magnet", "count": 3 }]
+    },
+    "iosVisible": false,
+    "tag": "限时",
+    "order": 3
+  }
+]

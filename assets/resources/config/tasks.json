@@ -1,0 +1,101 @@
+[
+  {
+    "id": "daily.run3",
+    "type": "daily",
+    "name": "跑 3 局",
+    "desc": "任意模式完成 3 局跑酷。",
+    "metric": "run.count",
+    "target": 3,
+    "reward": { "gold": 200, "items": [{ "id": "magnet", "count": 1 }] },
+    "link": "run",
+    "order": 1
+  },
+  {
+    "id": "daily.distance1500",
+    "type": "daily",
+    "name": "奔跑 1500 米",
+    "desc": "今日累计跑动距离达到 1500 米。",
+    "metric": "run.distance",
+    "target": 1500,
+    "reward": { "gold": 150 },
+    "link": "run",
+    "order": 2
+  },
+  {
+    "id": "daily.coins500",
+    "type": "daily",
+    "name": "收集 500 金币",
+    "desc": "今日累计收集 500 金币。",
+    "metric": "run.coins.total",
+    "target": 500,
+    "reward": { "gold": 300 },
+    "link": "run",
+    "order": 3
+  },
+  {
+    "id": "daily.login1",
+    "type": "daily",
+    "name": "每日登录",
+    "desc": "登录游戏即可领取奖励。",
+    "metric": "login.days",
+    "target": 1,
+    "reward": { "gold": 100 },
+    "link": "welfare",
+    "order": 4
+  },
+  {
+    "id": "daily.buy1",
+    "type": "daily",
+    "name": "逛一次商店",
+    "desc": "在商店购买任意商品 1 次。",
+    "metric": "shop.buy.count",
+    "target": 1,
+    "reward": { "gold": 50 },
+    "link": "shop",
+    "order": 5
+  },
+  {
+    "id": "daily.upgrade1",
+    "type": "daily",
+    "name": "强化角色",
+    "desc": "升级任意角色 1 次。",
+    "metric": "character.upgrade.count",
+    "target": 1,
+    "reward": { "gold": 150 },
+    "link": "character",
+    "order": 6
+  },
+  {
+    "id": "weekly.run20",
+    "type": "weekly",
+    "name": "本周跑 20 局",
+    "desc": "本周累计完成 20 局跑酷。",
+    "metric": "run.count",
+    "target": 20,
+    "reward": { "diamond": 30 },
+    "link": "run",
+    "order": 1
+  },
+  {
+    "id": "weekly.distance10000",
+    "type": "weekly",
+    "name": "本周奔跑 10000 米",
+    "desc": "本周累计跑动距离达到 10000 米。",
+    "metric": "run.distance",
+    "target": 10000,
+    "reward": { "diamond": 50, "items": [{ "id": "revive", "count": 1 }] },
+    "link": "run",
+    "order": 2
+  },
+  {
+    "id": "weekly.score4000",
+    "type": "weekly",
+    "name": "单局 4000 分",
+    "desc": "单局得分达到 4000 分。",
+    "metric": "run.score.single",
+    "target": 4000,
+    "reward": { "diamond": 40 },
+    "link": "run",
+    "order": 3
+  }
+]
