@@ -9,6 +9,10 @@ import { InventoryService } from '../../assets/scripts/core/services/InventorySe
 import { CharacterService } from '../../assets/scripts/core/services/CharacterService';
 import { RewardService } from '../../assets/scripts/core/services/RewardService';
 import { ShopService } from '../../assets/scripts/core/services/ShopService';
+import { TaskService } from '../../assets/scripts/core/services/TaskService';
+import { AchievementService } from '../../assets/scripts/core/services/AchievementService';
+import { WelfareService } from '../../assets/scripts/core/services/WelfareService';
+import { ActivityService } from '../../assets/scripts/core/services/ActivityService';
 import { createFakeLogger, silentLog, type FakeLogger } from '../helpers';
 
 export const at = (year: number, month: number, day: number, hour = 12, minute = 0): number =>
@@ -371,4 +375,33 @@ export function seedSave(save: SaveData, gold: number, diamond: number, inventor
   save.currency.gold = gold;
   save.currency.diamond = diamond;
   save.inventory = { ...inventory };
+}
+
+export interface Progress {
+  ctx: TestContext;
+  config: ConfigService;
+  inventory: InventoryService;
+  currency: CurrencyService;
+  character: CharacterService;
+  reward: RewardService;
+  shop: ShopService;
+  task: TaskService;
+  achievement: AchievementService;
+  welfare: WelfareService;
+  activity: ActivityService;
+}
+
+/** 在经济服务之上装配进度类服务（任务/成就/福利/活动）。 */
+export async function createProgress(
+  overrides: Partial<TestTables> = {},
+  ctxOpts: { now?: number; save?: SaveData } = {},
+): Promise<Progress> {
+  const economy = await createEconomy(overrides, ctxOpts);
+  return {
+    ...economy,
+    task: new TaskService(economy.ctx.deps, economy.config, economy.reward),
+    achievement: new AchievementService(economy.ctx.deps, economy.config, economy.reward),
+    welfare: new WelfareService(economy.ctx.deps, economy.config, economy.reward),
+    activity: new ActivityService(economy.ctx.deps, economy.config, economy.reward),
+  };
 }
