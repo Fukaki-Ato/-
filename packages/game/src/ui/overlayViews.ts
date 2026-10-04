@@ -71,8 +71,7 @@ export function createOverlayViews(deps: OverlayViewsDeps): OverlayViews {
       stopBackdrop();
       let frame: ((t: number) => void) | undefined;
       if (deps.backdrop) {
-        const { width, height } = host.adapter.canvas.windowSize();
-        backdrop = createMenuBackdrop(host.overlay.scene, host.overlay.camera, deps.backdrop, width, height);
+        backdrop = createMenuBackdrop(host.overlay.scene, host.overlay.camera, deps.backdrop);
         const bd = backdrop;
         frame = t => bd.step(t);
       }
