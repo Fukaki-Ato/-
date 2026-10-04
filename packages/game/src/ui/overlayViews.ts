@@ -26,8 +26,13 @@ export interface OverlayViewsDeps {
   badges?: BadgeSet;
   /** 主界面背景贴图（壳侧加载注入；缺省回主题纯色底） */
   background?: NinePatchSource;
-  /** 分层背景动效贴图（壳侧加载注入；缺省不挂动效层） */
+  /** 主界面背景贴图（Web 为循环视频；缺省回主题纯色底） */
   backdrop?: BackdropSet;
+  /**
+   * 「现在是不是主界面」的通报口：背景是循环视频，而视频元素只能待在壳层
+   * （本包禁令：零 DOM），所以由壳层注入回调，视图只报可见性。缺省＝没人管视频。
+   */
+  onLobbyVisible?(visible: boolean): void;
 }
 
 export type OverlayViews = GameViews;
@@ -35,7 +40,8 @@ export type OverlayViews = GameViews;
 export function createOverlayViews(deps: OverlayViewsDeps): OverlayViews {
   const { host } = deps;
   let backdrop: MenuBackdrop | null = null;
-  const stopBackdrop = (): void => { backdrop?.dispose(); backdrop = null; };
+  const lobby = (visible: boolean): void => deps.onLobbyVisible?.(visible);
+  const stopBackdrop = (): void => { backdrop?.dispose(); backdrop = null; lobby(false); };
 
   return {
     renderBoot(): BootHandle {
@@ -74,6 +80,7 @@ export function createOverlayViews(deps: OverlayViewsDeps): OverlayViews {
         frame = t => bd.step(t);
       }
       host.mount(page.view, { frame });
+      lobby(true);
     },
 
     mountHud(): HudHandle {

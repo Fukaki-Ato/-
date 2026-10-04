@@ -1,84 +1,66 @@
 /**
- * 主界面分层背景动效（issue #12：轻柔连续循环、循环边界不跳变、按经过时间推进、
- * 离开页面暂停、不额外创建 renderer/帧循环）。
+ * 主界面背景（issue #12：按经过时间推进、离开页面暂停、不额外创建 renderer/帧循环）。
  *
- * 实现：three 网格直接挂进 UiHost 现有场景（host.overlay.scene 与 mount(view,{frame})
- * 逐帧回调在 origin/main 就是公开能力，故本模块不改框架公共 API），垫在 UI 舞台后面
- * （z=-10 + 负 renderOrder）。层＝两条无缝云条（UV RepeatWrapping 循环位移）+
- * 海岸浪花带（周期平移）+ 三只错峰海鸥（飞入/飞出带淡入淡出）；棕榈为烘焙静态
- * （issue 允许「树干基本固定」）。
+ * Web 端背景是 15 秒循环视频（壳层建 <video> 包成 VideoTexture 注入，本包零 DOM）；
+ * 微信端没有 <video> 通路，注入的是同一构图静态图 menu-bg.png，本模块两边同一套代码。
  *
- * 时间→位姿全部是纯函数（mod 取模保证循环连续），可脱离 GL 用假时钟单测。
+ * 对位原则：背景按「与 UI 同一个 s=min(vw/1024,vh/1536)、底边贴视口底」铺，宽度按贴图
+ * 自身比例算（视频 9:16 比设计 2:3 窄）；竖屏多出来的高度由顶部纯色天空帽吸收
+ * （实心段 + 30px 渐隐段压住背景顶边），横屏/窄画幅两侧缺口用 MirroredRepeat 镜像外延。
+ *
+ * 循环接缝：源片镜头缓慢漂移、首尾不接。用「起点帧覆盖层」做淡入淡出——播到末段
+ * fadeSec 内把起点帧淡入盖住视频，视频在起点处完成跳转后再把起点帧淡出 ⇒ 接缝不可见。
+ * 时间→不透明度是纯函数 loopFade，可脱离 GL 用假时钟单测。
  */
 import * as THREE from 'three';
 import type { NinePatchSource } from '@tr/framework/ui/index.js';
 
-/** 壳层加载注入的动效贴图（云条/浪花带为横向无缝周期条） */
+/** 壳层加载注入的贴图 */
 export interface BackdropSet {
-  cloudA: NinePatchSource;
-  cloudB: NinePatchSource;
-  foam: NinePatchSource;
-  gulls: NinePatchSource[];
+  /** 背景：Web 为 VideoTexture，微信/兜底为静态图 */
+  main: NinePatchSource;
+  /** 视频时长 s（缺省＝静态图，不做循环淡入淡出） */
+  seconds?: number;
+  /** 起点帧覆盖图（与视频同构图）；配 seconds 用 */
+  loopCover?: NinePatchSource;
+  /** 读当前播放时刻 s（壳层注入；纯函数化便于单测，本包不碰 DOM） */
+  time?(): number;
 }
+
+/** 静态图的像素尺寸（视频按自身贴图比例算宽，不用这个） */
+export const BG_DESIGN = { w: 1007, h: 1562 };
+/** 顶部天空帽颜色，取样自 menu-bg (500,4) 的 #4dbbf2 */
+const SKY_CAP_RGB = 0x4dbbf2;
+/** 循环接缝淡入淡出时长 s */
+export const LOOP_FADE_S = 1.2;
 
 export function mod(a: number, n: number): number {
   return ((a % n) + n) % n;
 }
 
-/** 平铺层 UV 偏移：speed px/s、period px 一个循环；取模 ⇒ 循环边界连续不跳变 */
-export function loopOffset(tSec: number, speedPxPerS: number, periodPx: number): number {
-  const p = Math.abs(periodPx) || 1;
-  return mod(tSec * speedPxPerS, p);
+/**
+ * 起点帧覆盖层的不透明度：末段 [P-F, P] 线性淡入到 1，首段 [0, F] 从 1 淡出到 0，
+ * 中间为 0。P 处（视频跳回 0）两侧都等于 1 ⇒ 循环边界连续不跳变。
+ */
+export function loopFade(tSec: number, periodSec: number, fadeSec = LOOP_FADE_S): number {
+  const P = Math.max(0.001, periodSec);
+  const F = Math.min(fadeSec, P / 2);
+  const t = mod(tSec, P);
+  if (t >= P - F) return (t - (P - F)) / F;
+  if (t <= F) return 1 - t / F;
+  return 0;
 }
-
-export interface GullSpec {
-  /** 一个完整周期 s（飞行窗口 + 屏外休息） */
-  period: number;
-  /** 错峰相位 s */
-  delay: number;
-  /** 巡航高度（屏高比例） */
-  yFrac: number;
-  /** 相对屏宽的缩放 */
-  scale: number;
-}
-
-export interface GullPose { x: number; y: number; alpha: number; visible: boolean }
-
-/** 海鸥位姿：周期内前 62% 飞越屏幕（左入右出 + 轻微起伏 + 进出场淡入淡出），其余屏外 */
-export function gullPose(tSec: number, g: GullSpec): GullPose {
-  const local = mod(tSec - g.delay, g.period);
-  const fly = g.period * 0.62;
-  if (local >= fly) return { x: 0, y: 0, alpha: 0, visible: false };
-  const u = local / fly;
-  const x = -0.12 + u * 1.24;
-  const y = g.yFrac + Math.sin(u * Math.PI * 2) * 0.012;
-  const alpha = Math.max(0, Math.min(1, u / 0.12, (1 - u) / 0.12));
-  return { x, y, alpha, visible: true };
-}
-
-export const GULLS: GullSpec[] = [
-  { period: 26, delay: 0, yFrac: 0.30, scale: 1.0 },
-  { period: 31, delay: 9, yFrac: 0.22, scale: 0.72 },
-  { period: 23, delay: 16, yFrac: 0.38, scale: 0.55 },
-];
-
-const CLOUD_A_SPEED = 14;   // px/s 低空积云
-const CLOUD_B_SPEED = 7;    // px/s 高空卷云更慢＝视差
-const FOAM_SPEED = 22;      // px/s 浪花带
 
 export interface MenuBackdrop {
   step(tSec: number): void;
   dispose(): void;
 }
 
-interface TileLayer {
-  mesh: THREE.Mesh;
-  mat: THREE.MeshBasicMaterial;
-  tex: THREE.Texture;
-  /** 单个周期条在世界坐标的宽度 px（offset 换算用：content = px/tileW + offset） */
-  tileW: number;
-  speed: number;
-  yFrac: number;
+/** ImageBitmap 上传不吃 UNPACK_FLIP_Y（行 0＝图顶），标准材质的 v=0 在底 ⇒ 翻 UV */
+function unflip(tex: THREE.Texture): void {
+  tex.repeat.y = -Math.abs(tex.repeat.y || 1);
+  tex.offset.y = 1;
+  tex.needsUpdate = true;
 }
 
 export function createMenuBackdrop(
@@ -88,75 +70,112 @@ export function createMenuBackdrop(
   vw0: number,
   vh0: number,
 ): MenuBackdrop {
-  const tiles: TileLayer[] = [];
   const meshes: THREE.Mesh[] = [];
+  const s0 = Math.min(vw0 / 1024, vh0 / 1536);
+  const aspect = set.main.texSize.w / Math.max(1, set.main.texSize.h);
 
-  const addTile = (src: NinePatchSource, wFrac: number, yFrac: number, speed: number, opacity: number): void => {
-    const tex = src.texture as THREE.Texture;
-    tex.wrapS = THREE.RepeatWrapping;
-    tex.needsUpdate = true;
-    const tileW = vw0 * wFrac;
-    const planeW = vw0 + tileW;                       // 多铺一个周期当滚动余量
-    const aspect = src.texSize.h / Math.max(1, src.texSize.w);
-    const geo = new THREE.PlaneGeometry(planeW, tileW * aspect);
-    const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, opacity, depthWrite: false, depthTest: false });
-    mat.map!.repeat.set(planeW / tileW, 1);
-    const mesh = new THREE.Mesh(geo, mat);
-    mesh.position.set((vw0 - tileW) / 2, -vh0 * yFrac, -10);
-    mesh.renderOrder = -10 - tiles.length;
+  const plane = (tex: THREE.Texture, w: number, h: number, order: number, opacity = 1): THREE.Mesh => {
+    const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: opacity < 1, opacity, depthWrite: false, depthTest: false });
+    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(w, h), mat);
+    mesh.renderOrder = order;
+    mesh.position.z = -12;
     scene.add(mesh);
     meshes.push(mesh);
-    tiles.push({ mesh, mat, tex, tileW, speed, yFrac });
+    return mesh;
   };
-  addTile(set.cloudB, 1.15, 0.10, CLOUD_B_SPEED, 0.75);
-  addTile(set.cloudA, 1.30, 0.30, CLOUD_A_SPEED, 0.9);
-  addTile(set.foam, 0.80, 0.80, FOAM_SPEED, 0.55);
 
-  const gulls = GULLS.slice(0, set.gulls.length).map((spec, i) => {
-    const src = set.gulls[i]!;
-    const tex = src.texture as THREE.Texture;
-    const aspect = src.texSize.h / Math.max(1, src.texSize.w);
-    const h = vh0 * 0.035 * spec.scale;
-    const geo = new THREE.PlaneGeometry(h / aspect, h);
-    const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, depthTest: false });
-    const mesh = new THREE.Mesh(geo, mat);
-    mesh.renderOrder = -5;
-    mesh.visible = false;
-    scene.add(mesh);
-    meshes.push(mesh);
-    return { spec, mesh, mat };
-  });
+  // ---- 背景主体：与 UI 同 s、底边贴视口底、宽按贴图比例 ----
+  unflip(set.main.texture as THREE.Texture);
+  const bgH0 = BG_DESIGN.h * s0;
+  const main = plane(set.main.texture as THREE.Texture, bgH0 * aspect, bgH0, -30);
+  // ---- 循环接缝覆盖层：起点帧，淡入淡出盖住跳转 ----
+  let cover: THREE.Mesh | null = null;
+  let coverMat: THREE.MeshBasicMaterial | null = null;
+  if (set.loopCover && set.seconds) {
+    unflip(set.loopCover.texture as THREE.Texture);
+    cover = plane(set.loopCover.texture as THREE.Texture, bgH0 * aspect, bgH0, -28, 0);
+    coverMat = cover.material as THREE.MeshBasicMaterial;
+  }
+  // ---- 顶部天空帽：实心段吃多余高度 + 30px 渐隐段压住背景顶边 ----
+  // three 的 alphaMap 取绿通道：行0=v0=底透明、行1=顶不透明
+  const fade = new THREE.DataTexture(new Uint8Array([0, 0, 0, 255, 0, 255, 0, 255]), 1, 2, THREE.RGBAFormat);
+  fade.needsUpdate = true;
+  fade.magFilter = THREE.LinearFilter;
+  fade.minFilter = THREE.LinearFilter;   // 1×2 不能生成 mipmap，否则 alphaMap 采样失败整块透明
+  const cap = new THREE.Mesh(new THREE.PlaneGeometry(1, 1),
+    new THREE.MeshBasicMaterial({ color: SKY_CAP_RGB, depthWrite: false, depthTest: false }));
+  const capFade = new THREE.Mesh(new THREE.PlaneGeometry(1, 1),
+    new THREE.MeshBasicMaterial({ color: SKY_CAP_RGB, transparent: true, alphaMap: fade, depthWrite: false, depthTest: false }));
+  for (const m of [cap, capFade]) {
+    m.renderOrder = -29;
+    m.position.z = -12;
+    scene.add(m);
+    meshes.push(m);
+  }
+  // ---- 两侧缺口：MirroredRepeat 把靠边 35% 镜像外延（椰树框景自然续出去） ----
+  const sideMesh = (offsetX: number, repeatX: number): THREE.Mesh => {
+    const tex = (set.main.texture as THREE.Texture).clone();
+    tex.wrapS = THREE.MirroredRepeatWrapping;
+    tex.repeat.set(repeatX, -1);
+    tex.offset.set(offsetX, 1);
+    tex.needsUpdate = true;
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(1, 1),
+      new THREE.MeshBasicMaterial({ map: tex, depthWrite: false, depthTest: false }));
+    m.renderOrder = -29;
+    m.position.z = -12;
+    scene.add(m);
+    meshes.push(m);
+    return m;
+  };
+  const sideL = sideMesh(0.35, -0.35);
+  const sideR = sideMesh(1.0, 0.35);
 
   return {
-    step(tSec: number): void {
+    step(): void {
       // 每帧从相机读视口：宿主 resize 后无需重建即自适应（正交相机 left=0/top=0）
       const vw = camera.right || vw0;
       const vh = -camera.bottom || vh0;
-      const sx = vw / vw0;
-      const sy = vh / vh0;
-      for (const l of tiles) {
-        const period = l.tileW * sx;
-        l.mesh.scale.x = sx;
-        l.mesh.position.x = (vw - period) / 2;
-        l.mesh.position.y = -vh * l.yFrac;
-        l.tex.offset.x = loopOffset(tSec, l.speed, period) / period;
+      const s = Math.min(vw / 1024, vh / 1536);
+      const bgW = BG_DESIGN.h * s * aspect;
+      const bgH = BG_DESIGN.h * s;
+      const bgTop = vh - bgH;                          // 底边贴视口底
+      main.scale.setScalar(s / s0);
+      main.position.set(vw / 2, -(bgTop + bgH / 2), -12);
+      if (cover && coverMat && set.loopCover && set.seconds && set.time) {
+        const k = loopFade(set.time(), set.seconds);
+        cover.visible = k > 0.002;
+        coverMat.opacity = k;
+        cover.scale.setScalar(s / s0);
+        cover.position.set(vw / 2, -(bgTop + bgH / 2), -12);
+      } else if (cover) {
+        cover.visible = false;
       }
-      for (const g of gulls) {
-        const p = gullPose(tSec, g.spec);
-        g.mesh.visible = p.visible;
-        if (!p.visible) continue;
-        g.mesh.scale.set(sy, sy, 1);
-        g.mesh.position.set(p.x * vw, -p.y * vh, -8);
-        g.mat.opacity = p.alpha;
-      }
+      const gapTop = Math.max(0, bgTop);
+      const fadeH = 30 * s;
+      cap.visible = gapTop > 1;
+      cap.scale.set(vw, Math.max(1, gapTop), 1);
+      cap.position.set(vw / 2, -gapTop / 2, -12);
+      capFade.visible = gapTop > 1;
+      capFade.scale.set(vw, fadeH, 1);
+      capFade.position.set(vw / 2, -(gapTop + fadeH / 2), -12);
+      const gapX = Math.max(0, (vw - bgW) / 2);
+      sideL.visible = gapX > 1;
+      sideR.visible = gapX > 1;
+      sideL.scale.set(Math.max(1, gapX), vh, 1);
+      sideR.scale.set(Math.max(1, gapX), vh, 1);
+      sideL.position.set((vw - bgW) / 4, -vh / 2, -12);
+      sideR.position.set(vw - (vw - bgW) / 4, -vh / 2, -12);
     },
     dispose(): void {
       for (const m of meshes) {
         scene.remove(m);
         m.geometry.dispose();
-        (m.material as THREE.Material).dispose();   // 贴图归壳层，不在此 dispose
+        const mat = m.material as THREE.MeshBasicMaterial;
+        mat.alphaMap?.dispose();
+        const shared = [set.main.texture, set.loopCover?.texture].filter(Boolean) as THREE.Texture[];
+        if (mat.map && !shared.includes(mat.map)) mat.map.dispose();
+        mat.dispose();   // 背景/覆盖贴图归壳层，不在此 dispose
       }
-      tiles.length = 0;
     },
   };
 }
