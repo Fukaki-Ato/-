@@ -1,0 +1,10 @@
+node_modules/
+library/
+temp/
+local/
+profiles/
+build/
+native/engine/
+*.log
+.DS_Store
+Thumbs.db
