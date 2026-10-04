@@ -1,0 +1,55 @@
+[
+  {
+    "id": "magnet",
+    "name": "磁铁",
+    "desc": "开局携带，10 秒内自动吸附金币。",
+    "icon": "images/items/magnet",
+    "type": "consumable",
+    "quality": 3,
+    "stackable": true,
+    "useEffect": { "kind": "runBuff", "buffId": "magnet" },
+    "useTargets": ["menu", "run"]
+  },
+  {
+    "id": "revive",
+    "name": "复活币",
+    "desc": "死亡后可原地复活一次。",
+    "icon": "images/items/revive",
+    "type": "consumable",
+    "quality": 4,
+    "stackable": true,
+    "useEffect": { "kind": "runBuff", "buffId": "revive" },
+    "useTargets": ["run"]
+  },
+  {
+    "id": "speed_boost",
+    "name": "疾风符",
+    "desc": "开局携带，8 秒内奔跑速度提升。",
+    "icon": "images/items/speed_boost",
+    "type": "consumable",
+    "quality": 4,
+    "stackable": true,
+    "useEffect": { "kind": "runBuff", "buffId": "speed" },
+    "useTargets": ["menu"]
+  },
+  {
+    "id": "gold_pouch",
+    "name": "金币福袋",
+    "desc": "使用后立即获得 200 金币。",
+    "icon": "images/items/gold_pouch",
+    "type": "consumable",
+    "quality": 3,
+    "stackable": true,
+    "useEffect": { "kind": "grant", "reward": { "gold": 200 } },
+    "useTargets": ["menu"]
+  },
+  {
+    "id": "char_shard_lin",
+    "name": "林小满碎片",
+    "desc": "集齐 10 个可解锁角色「林小满」。",
+    "icon": "images/items/char_shard_lin",
+    "type": "material",
+    "quality": 4,
+    "stackable": true
+  }
+]

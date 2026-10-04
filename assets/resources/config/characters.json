@@ -1,0 +1,54 @@
+[
+  {
+    "id": "runner_default",
+    "name": "阿雷",
+    "desc": "海边长大的少年，跑得又快又稳。",
+    "icon": "images/characters/runner_default",
+    "preview": "images/characters/runner_default_big",
+    "quality": 3,
+    "unlock": { "type": "default" },
+    "baseAttr": { "speed": 10, "jump": 10, "magnet": 0, "coinBonus": 0, "scoreBonus": 0 },
+    "upgrade": {
+      "maxLevel": 10,
+      "baseCost": { "gold": 500 },
+      "costFactor": 1.6,
+      "growth": { "speed": 0.5, "jump": 0.5, "coinBonus": 1 }
+    }
+  },
+  {
+    "id": "runner_moon",
+    "name": "月见",
+    "desc": "夜色中奔跑的少女，金币收益更高。",
+    "icon": "images/characters/runner_moon",
+    "preview": "images/characters/runner_moon_big",
+    "quality": 5,
+    "unlock": { "type": "currency", "cost": { "diamond": 200 } },
+    "baseAttr": { "speed": 12, "jump": 11, "magnet": 5, "coinBonus": 10, "scoreBonus": 0 },
+    "upgrade": {
+      "maxLevel": 10,
+      "baseCost": { "gold": 800 },
+      "costFactor": 1.6,
+      "growth": { "speed": 0.4, "jump": 0.4, "coinBonus": 1.5 }
+    }
+  },
+  {
+    "id": "runner_lin",
+    "name": "林小满",
+    "desc": "热爱发明的小小工程师，碎片集齐后加入队伍。",
+    "icon": "images/characters/runner_lin",
+    "preview": "images/characters/runner_lin_big",
+    "quality": 4,
+    "unlock": {
+      "type": "item",
+      "itemId": "char_shard_lin",
+      "cost": { "items": [{ "id": "char_shard_lin", "count": 10 }] }
+    },
+    "baseAttr": { "speed": 11, "jump": 12, "magnet": 8, "coinBonus": 5, "scoreBonus": 5 },
+    "upgrade": {
+      "maxLevel": 10,
+      "baseCost": { "gold": 600 },
+      "costFactor": 1.5,
+      "growth": { "speed": 0.5, "jump": 0.5, "magnet": 0.5, "scoreBonus": 1 }
+    }
+  }
+]
