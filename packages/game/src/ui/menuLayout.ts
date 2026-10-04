@@ -43,14 +43,16 @@ export interface MenuLayout {
 }
 
 const BAR_H = 163;
-const BAR_X = 40;
 const BAR_W = 944;
-const CELL_W = BAR_W / 4;
 const ICON_W = 114;
 const ICON_H = 139;
 const PLAQUE_W = 600;
 const PLAQUE_H = 290;
 const PLAQUE_GAP = 34;
+/** 左右两列入口贴屏幕边留的边距（设计 px） */
+const EDGE = 12;
+/** 同列两枚入口之间的间距（设计 px）——排行榜压成就就是这里给小了 */
+const COL_GAP = 14;
 
 export function scaleOf(vw: number, vh: number): number {
   return Math.min(vw / DESIGN_W, vh / DESIGN_H);
@@ -58,30 +60,39 @@ export function scaleOf(vw: number, vh: number): number {
 
 export function menuLayout(vw: number, vh: number, safe: MenuSafe): MenuLayout {
   const s = scaleOf(vw, vh);
-  const ox = (vw - DESIGN_W * s) / 2;                 // 横屏时两侧留边，竖屏为 0
   const d = (n: number): number => Math.round(n * s);
-  const dx = (n: number): number => Math.round(ox + n * s);
   const top = (n: number): number => Math.round(safe.top * s + n * s);
+  const cx = (w: number): number => Math.round((vw - w) / 2);   // 横向一律按视口居中
+  const barW = d(BAR_W);
+  const barX = cx(barW);
   const barY = vh - Math.round((safe.bottom + 6) * s) - d(BAR_H);
+  // 底栏四格与分隔线按「栏」定位（栏本身按视口居中，横屏下才不会与栏错位）
   const cells: Rect[] = [];
   const dividers: Rect[] = [];
   for (let k = 0; k < 4; k++) {
-    const cx = BAR_X + CELL_W * k;
-    cells.push({ x: dx(cx + (CELL_W - ICON_W) / 2), y: barY + d(12), w: d(ICON_W), h: d(ICON_H) });
-    if (k > 0) dividers.push({ x: dx(cx), y: barY + d(37), w: Math.max(1, d(2)), h: d(90) });
+    const slotX = barX + Math.round((barW / 4) * k);
+    const slotW = Math.round(barW / 4);
+    cells.push({ x: slotX + Math.round((slotW - d(ICON_W)) / 2), y: barY + d(12), w: d(ICON_W), h: d(ICON_H) });
+    if (k > 0) dividers.push({ x: slotX, y: barY + d(37), w: Math.max(1, d(2)), h: d(90) });
   }
+  // 侧列贴屏幕两边（只留 EDGE 设计边距）：画面横向伸缩时不跟着舞台往里缩，
+  // 这才符合参考图「入口挂在画框两侧」的观感。纵向仍按设计 y 走。
+  const evW = d(131), evH = d(166);
+  const tkW = d(142), tkH = d(152);
+  const acW = d(132), acH = d(152), acY = top(124);
+  const rkW = d(130), rkH = d(137);
   return {
     s,
-    pill: { x: dx(296), y: top(8), w: d(433), h: d(66) },
-    settings: { x: dx(914), y: top(6), w: d(96), h: d(96) },
-    event: { x: dx(12), y: top(12), w: d(131), h: d(166) },
-    task: { x: dx(10), y: top(182), w: d(142), h: d(152) },
-    achieve: { x: dx(878), y: top(124), w: d(132), h: d(152) },
-    rank: { x: dx(880), y: top(262), w: d(130), h: d(137) },
-    plaque: { x: dx((DESIGN_W - PLAQUE_W) / 2), y: barY - d(PLAQUE_GAP) - d(PLAQUE_H), w: d(PLAQUE_W), h: d(PLAQUE_H) },
-    bar: { x: dx(BAR_X), y: barY, w: d(BAR_W), h: d(BAR_H) },
+    pill: { x: cx(d(433)), y: top(8), w: d(433), h: d(66) },
+    settings: { x: vw - d(EDGE) - d(96), y: top(6), w: d(96), h: d(96) },
+    event: { x: d(EDGE), y: top(12), w: evW, h: evH },
+    task: { x: d(EDGE), y: top(12) + evH + d(COL_GAP), w: tkW, h: tkH },
+    achieve: { x: vw - d(EDGE) - acW, y: acY, w: acW, h: acH },
+    rank: { x: vw - d(EDGE) - rkW, y: acY + acH + d(COL_GAP), w: rkW, h: rkH },
+    plaque: { x: cx(d(PLAQUE_W)), y: barY - d(PLAQUE_GAP) - d(PLAQUE_H), w: d(PLAQUE_W), h: d(PLAQUE_H) },
+    bar: { x: cx(barW), y: barY, w: barW, h: d(BAR_H) },
     cells,
     dividers,
-    panel: { x: dx(152), y: top(290), w: d(720), h: 0 },
+    panel: { x: cx(d(720)), y: top(290), w: d(720), h: 0 },
   };
 }

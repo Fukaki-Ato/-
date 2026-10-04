@@ -31,9 +31,8 @@ test('竖屏（390×844）：全部控件在屏内，顶栏贴顶、底栏贴底
   const gap = vh - (L.bar.y + L.bar.h);
   assert.ok(Math.abs(gap - Math.round((DEFAULT_SAFE.bottom + 6) * L.s)) <= 1, `底栏贴底（安全区+6px 设计间隙），实得间隙 ${gap}`);
   assert.ok(L.plaque.y + L.plaque.h <= L.bar.y, '牌匾不压底栏');
-  assert.ok(L.event.y + L.event.h <= L.task.y, '左列活动/任务不互相遮挡');
-  // 参考图里成就飘带本就略压排行榜顶（贴纸叠放），允许 ≤16 设计像素
-  assert.ok(L.achieve.y + L.achieve.h <= L.rank.y + 16 * L.s, '右列成就/排行榜叠放不超参考图');
+  assert.ok(L.task.y >= L.event.y + L.event.h + 1, '左列活动/任务之间留实距不互相遮挡');
+  assert.ok(L.rank.y >= L.achieve.y + L.achieve.h + 1, '右列成就/排行榜之间留实距不互相遮挡');
 });
 
 test('高竖屏（412×915）与窄竖屏（360×780）：底栏仍贴底、牌匾仍在底栏之上', () => {
@@ -45,13 +44,26 @@ test('高竖屏（412×915）与窄竖屏（360×780）：底栏仍贴底、牌�
   }
 });
 
-test('横屏（800×600）：舞台横向居中留边，控件不越出舞台', () => {
+test('横屏（800×600）：顶栏按视口居中，左右入口贴屏幕两边只留小边距', () => {
   const vw = 800, vh = 600;
   const L = menuLayout(vw, vh, DEFAULT_SAFE);
-  const ox = (vw - DESIGN_W * L.s) / 2;
-  assert.ok(ox > 0, '横屏两侧留边');
-  assert.ok(L.pill.x >= ox - 1 && L.settings.x + L.settings.w <= vw - ox + 1, '顶栏控件在舞台内');
+  assert.ok((vw - DESIGN_W * L.s) / 2 > 0, '横屏舞台两侧本应留边');
+  assert.ok(Math.abs(L.pill.x + L.pill.w / 2 - vw / 2) <= 1, '货币胶囊按视口居中');
+  assert.ok(Math.abs(L.bar.x + L.bar.w / 2 - vw / 2) <= 1, '底栏按视口居中');
+  // 贴屏幕边：不跟着舞台往里缩（EDGE=12 设计 px）
+  assert.ok(L.event.x <= Math.round(14 * L.s), `活动贴左边，实得 x=${L.event.x}`);
+  assert.ok(L.task.x <= Math.round(14 * L.s), `任务贴左边，实得 x=${L.task.x}`);
+  assert.ok(vw - (L.settings.x + L.settings.w) <= Math.round(14 * L.s), `设置贴右边，实得留白 ${vw - (L.settings.x + L.settings.w)}`);
+  assert.ok(vw - (L.rank.x + L.rank.w) <= Math.round(14 * L.s), `排行榜贴右边，实得留白 ${vw - (L.rank.x + L.rank.w)}`);
   assert.ok(inside(L.bar, vw, vh) && inside(L.plaque, vw, vh), '横屏关键控件仍在屏内');
+});
+
+test('竖屏变窄（320×720）：侧列仍贴边、底栏四格不跑出栏外', () => {
+  const vw = 320, vh = 720;
+  const L = menuLayout(vw, vh, DEFAULT_SAFE);
+  assert.ok(L.event.x <= Math.round(14 * L.s) && vw - (L.achieve.x + L.achieve.w) <= Math.round(14 * L.s), '两列贴边');
+  assert.ok(L.cells.every(c => c.x >= L.bar.x - 1 && c.x + c.w <= L.bar.x + L.bar.w + 1), '四格都在底栏内');
+  assert.ok(L.plaque.x >= 0 && L.plaque.x + L.plaque.w <= vw, '牌匾不超出屏宽');
 });
 
 test('安全区加高：顶栏与底栏整体让出', () => {
