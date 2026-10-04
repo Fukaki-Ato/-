@@ -7,7 +7,7 @@
  * （badgeButton 换 glow 帧），不导航不弹窗不读写——LobbySlotHandlers 留作后续注入真实实现。
  * 选角面板复用现有选角 UI（lobbyPanels），由「角色」格开关；开始酷跑沿用 选角→跑酷 流程。
  */
-import { Box, Label, type NinePatchSource, type UiView } from '@tr/framework/ui/index.js';
+import { Box, Label, type UiView } from '@tr/framework/ui/index.js';
 import type { GameContent } from '@tr/game/core/config/configTypes.js';
 import type { UiHost } from '@tr/framework/ui/host.js';
 import type { SelectActions } from '../flow/views.js';
@@ -19,8 +19,6 @@ export interface LobbyExtras {
   coins: number;
   diamonds: number;
   badges?: BadgeSet;
-  /** 全屏背景贴图（纯背景 menu-bg；缺省回主题纯色底） */
-  background?: NinePatchSource;
 }
 
 /** 预留功能接口：壳/流程注入真实实现后替换空操作（未定义入口默认仅按压反馈） */
@@ -101,11 +99,9 @@ export function buildLobbyPage(host: UiHost, d: LobbyDeps): LobbyPage {
   // 否则 absolute 父盒高度 0 会把子的自动高度压成 0（List 塌掉点不中）。
   let chosen = d.currentCharId;
   let panelHost: Box | null = null;
-  const root = new Box(
-    // 背景等比裁切铺满整屏；absolute 子项排在常规子项之后 ⇒ 控件叠在背景上、命中优先
-    { direction: 'column', flex: 1, background: d.extras?.background ?? null },
-    [],
-  );
+  // 背景由 menuBackdrop 的网格铺（视频/静态图同一套），这里只留透明容器；
+  // absolute 子项排在常规子项之后 ⇒ 控件叠在背景上、命中优先
+  const root = new Box({ direction: 'column', flex: 1 }, []);
   const toggleChar = (): void => {
     if (panelHost) {
       root.remove(panelHost);

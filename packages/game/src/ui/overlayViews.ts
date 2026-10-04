@@ -18,14 +18,11 @@ import { buildHudPage } from './hudView.js';
 import { buildResultPage } from './resultView.js';
 import { createMenuBackdrop, type BackdropSet, type MenuBackdrop } from './menuBackdrop.js';
 import type { BadgeSet } from './badges.js';
-import type { NinePatchSource } from '@tr/framework/ui/index.js';
 
 export interface OverlayViewsDeps {
   host: UiHost;
   /** 大厅徽标贴图（壳侧加载注入；缺省时徽标位退化为空槽） */
   badges?: BadgeSet;
-  /** 主界面背景贴图（壳侧加载注入；缺省回主题纯色底） */
-  background?: NinePatchSource;
   /** 主界面背景贴图（Web 为循环视频；缺省回主题纯色底） */
   backdrop?: BackdropSet;
   /**
@@ -69,7 +66,7 @@ export function createOverlayViews(deps: OverlayViewsDeps): OverlayViews {
         content,
         actions,
         currentCharId,
-        extras: { coins: extras?.coins ?? 0, diamonds: extras?.diamonds ?? 0, badges: deps.badges, background: deps.background },
+        extras: { coins: extras?.coins ?? 0, diamonds: extras?.diamonds ?? 0, badges: deps.badges },
       });
       stopBackdrop();
       let frame: ((t: number) => void) | undefined;

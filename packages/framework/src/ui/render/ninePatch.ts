@@ -15,13 +15,6 @@ export interface NinePatchSource {
   insets: Edges;
   /** 源图尺寸 px（DataTexture 为正方形边长） */
   texSize: { w: number; h: number };
-  /**
-   * 'cover' = 保持源图比例铺满目标矩形、超出部分居中裁掉；缺省 'fill' = 整图拉伸。
-   * 全屏照片背景用 cover：宿主窗口比例和源图不一致时（桌面横窗）拉伸会把画面拉变形。
-   * 裁切写在 UV 上而不是 texture.repeat 上，因为 UI 材质是自定义 shader，不应用 three 的
-   * 纹理变换矩阵（见 uiBasic.ts）。
-   */
-  fit?: 'fill' | 'cover';
 }
 
 /** 切分轴：[0, l, size-r, size] 与对应 uv（insets 夹到不越界，保证单调） */
@@ -41,17 +34,6 @@ export function ninePatchGeometry(rect: Rect, insetsPx: Edges, src: NinePatchSou
   const ys = [rect.y, rect.y + it, rect.y + rect.h - ib, rect.y + rect.h];
   const uSrc = slices(src.texSize.w, src.insets.left, src.insets.right);
   const vSrc = slices(src.texSize.h, src.insets.top, src.insets.bottom);
-  if (src.fit === 'cover') {
-    // 取源图的一个居中子矩形，让它与目标矩形同比例：多出来的那一边按超出量裁掉
-    const s = Math.max(rect.w / Math.max(1, src.texSize.w), rect.h / Math.max(1, src.texSize.h));
-    const uw = Math.min(1, rect.w / (Math.max(1, src.texSize.w) * s));
-    const vh = Math.min(1, rect.h / (Math.max(1, src.texSize.h) * s));
-    const ox = (1 - uw) / 2, oy = (1 - vh) / 2;
-    for (let i = 0; i < 4; i++) {
-      uSrc.uv[i] = ox + uSrc.uv[i]! * uw;
-      vSrc.uv[i] = oy + vSrc.uv[i]! * vh;
-    }
-  }
 
   const positions = new Float32Array(16 * 3);
   const uvs = new Float32Array(16 * 2);
