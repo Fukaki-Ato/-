@@ -26,6 +26,14 @@ export function resolveHit(o: ObstacleEntity, d: HitCtx): void {
   // 否则长列车（d=24m 重叠约 2s > 无敌 1.4s）会在无敌结束后二次判负 —— 一条命制下必死无疑。
   o.done = true;
   if (s.invulnT > 0 || fx.invincible) return;
+  // 身高优势（曼波被动）：需要下滑躲避的高杆直接穿过，不消耗任何保护与护体
+  if (fx.duckPass && o.cls === 'high') return;
+  // 下滑护体（曼波主动技能）：滑行中撞上小型障碍（cls=low）时消耗一次护体穿过去；次数用尽或不在滑行中则正常判负
+  if (s.sliding && fx.slideGuardCharges > 0 && o.cls === 'low') {
+    events.push({ type: 'slideGuard', charges: buffs.consumeSlideGuard() });
+    s.invulnT = d.invulnS;
+    return;
+  }
   if (s.t < d.tutorial.protectionS && d.tutorial.take()) {
     s.invulnT = d.invulnS;
     events.push({ type: 'protected' });

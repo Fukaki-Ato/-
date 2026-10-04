@@ -1,73 +1,26 @@
 /**
- * 效果原语引擎（docs/03 §4.3 原语表 ↔ 本文件 PRIMITIVES 注册表，一一对应）
- * 对应任务：docs/09 T2.2。
+ * 效果原语引擎（docs/03 §4.3 原语表 ↔ primitives.ts 的 PRIMITIVES 注册表，一一对应）
+ * 对应任务：docs/09 T2.2。原语注册表与槽位模型拆在 primitives.ts（守 300 行模块上限）。
  * 约定：
- *   1. 玩法只有两个入口 —— `add()`（施加效果）与 `tick(dt)`（推进时间）；
+ *   1. 玩法只有两个入口 —— `add()`（施加效果）与 `tick(dt, ctx)`（推进时间，ctx 带来当前里程）；
  *   2. `fx` 是所有已施加效果的**派生视图**，每步整体重算，sim/render/HUD 只读不写；
- *   3. 瞬时原语（dash/blink/scoreAdd/spawnCoinsRow）在 add 时通过 `EffectWorld` 回调直接改世界；
- *   4. 引擎内禁止随机数（C6 确定性）与每步堆分配（docs/02 §8 性能预算）。
- * 新增原语 = 代码任务（标 [PRIMITIVE]）：此表加一项 + recompute 加合并规则 + docs/03 §4.3 补一行 + 单测。
+ *   3. 瞬时原语（dash/blink/scoreAdd/spawnCoinsRow/smashAhead）在 add 时通过 `EffectWorld` 回调直接改世界；
+ *   4. 到期口径有两种且可并存：`durationS`（秒，受 buffDurationAdd/Flat 拉长）与 `distanceM`（跑到该里程即失效，如「无敌 20 米」）；
+ *   5. `periodic` 为周期原语：常驻槽位，每 everyS 秒把一组子效果重新施加一次——周期被动只改 JSON 即可加人；
+ *   6. 引擎内禁止随机数（C6 确定性）与每步堆分配（docs/02 §8 性能预算）。
+ * 新增原语 = 代码任务（标 [PRIMITIVE]）：primitives.ts 注册表加一项 + 本文件 recompute 加合并规则 +
+ *            schema/config.schema.json 的 primitive.enum 补一项 + 单测（三处必须同集合）。
  */
 import {
   freshFx,
   type BuffView, type CastContext, type EffectParams, type EffectWorld, type FxState, type StackRule,
 } from './effectTypes.js';
+import {
+  asChildren, layersOf, num, MAX_DURATION, MAX_SLOTS, PRIMITIVES, type Slot,
+} from './primitives.js';
 
 export * from './effectTypes.js';
-
-interface Slot {
-  primitive: string;
-  label: string;
-  params: EffectParams;
-  /** 剩余秒数；Infinity = 永久（无 durationS 的被动，如开局护盾） */
-  left: number;
-  /** stack 语义下的累计层数（shieldAdd 用） */
-  layers: number;
-}
-
-/** 原语元数据：instant=施加即结算；timed=进槽位按秒衰减 */
-type Kind = 'instant' | 'timed';
-interface PrimDef { kind: Kind }
-
-/** 与 docs/03 §4.3 表格、schema 的 primitive.enum 严格同集合 */
-export const PRIMITIVES: Record<string, PrimDef> = {
-  invincible: { kind: 'timed' },
-  speedMul: { kind: 'timed' },
-  magnet: { kind: 'timed' },
-  fly: { kind: 'timed' },
-  lifeAdd: { kind: 'timed' },
-  jumpBoost: { kind: 'timed' },
-  dash: { kind: 'instant' },
-  blink: { kind: 'instant' },
-  timeSlow: { kind: 'timed' },
-  shieldAdd: { kind: 'timed' },
-  buffDurationAdd: { kind: 'timed' },
-  coinValueAdd: { kind: 'timed' },
-  scoreAdd: { kind: 'instant' },
-  spawnCoinsRow: { kind: 'instant' },
-  laneAutoAvoid: { kind: 'timed' },
-  pickupAll: { kind: 'timed' },
-  slideExtend: { kind: 'timed' },
-  cooldownMul: { kind: 'timed' },
-  boardArmor: { kind: 'timed' },
-  // 局外效果：作用于账号经验倍率，无局内表现（xp 系统在 M5 之后）
-  xpMul: { kind: 'timed' },
-};
-
-/** 配置里出现未注册原语时给出的可定位提示（供 configValidator 使用） */
-export const SUPPORTED_PRIMITIVES = Object.keys(PRIMITIVES);
-
-export function isPrimitiveSupported(name: string): boolean {
-  return Object.prototype.hasOwnProperty.call(PRIMITIVES, name);
-}
-
-/** 同时生效的 buff 上限：超出按「剩余最短优先」淘汰，保证不与玩家抢判定 */
-const MAX_SLOTS = 24;
-/** 单次时长上限（schema 3600 + buffDurationAdd 拉长余量） */
-const MAX_DURATION = 3600 * 1.5;
-
-const num = (p: EffectParams, key: string, dflt: number): number =>
-  typeof p[key] === 'number' && Number.isFinite(p[key]) ? (p[key] as number) : dflt;
+export * from './primitives.js';
 
 export class BuffEngine {
   /** 派生视图：外部持有引用读取，勿替换对象 */
@@ -95,11 +48,16 @@ export class BuffEngine {
     const def = PRIMITIVES[primitive];
     if (!def) return; // configValidator 已拦截；热路径防御性静默，不抛错
     if (def.kind === 'instant') { this.castInstant(primitive, params, ctx); return; }
+    if (def.kind === 'cyclic') { this.addCycle(params, label); return; }
 
     const base = num(params, 'durationS', Number.POSITIVE_INFINITY);
-    const raw = Number.isFinite(base) ? base * (1 + this.durationBonus() / 100) : Number.POSITIVE_INFINITY;
+    // 时长 = 基础秒 ×（1 + 百分比加成）+ 固定秒加成；无 durationS 的永久效果（开局护盾等）不参与加成
+    const raw = Number.isFinite(base) ? base * (1 + this.durationBonus() / 100) + this.durationFlat() : Number.POSITIVE_INFINITY;
     const left = Number.isFinite(raw) ? Math.min(Math.max(0, raw), MAX_DURATION) : raw;
-    if (left <= 0) return; // 0 时长边界（docs/08 §3）：不产生任何状态
+    // distanceM：按里程到期（「无敌 20 米」这类），与秒数并存时以先到者为准
+    const distM = num(params, 'distanceM', 0);
+    const endAt = distM > 0 ? ctx.distance + distM : undefined;
+    if (left <= 0 && endAt === undefined) return; // 0 时长边界（docs/08 §3）：不产生任何状态
 
     // 飞行第一次到手：开空中内容；飞行中续时：把金币带/云团延展到新的终点
     if (primitive === 'fly') {
@@ -113,28 +71,53 @@ export class BuffEngine {
     const existing = this.slots.find(s => s.primitive === primitive);
     if (existing && stackRule === 'stack') {
       // 叠层（护盾）：层数累加，时长取较长者
-      existing.layers += Math.max(1, Math.round(num(params, 'layers', 1)));
+      existing.layers += layersOf(params);
       existing.params = params;
       existing.label = label;
       existing.left = Math.max(existing.left, left);
+      if (endAt !== undefined) existing.endAt = Math.max(existing.endAt ?? 0, endAt);
     } else if (existing && stackRule === 'replace') {
       // 替换（滑板）：旧的重置为新参数
       this.slots.splice(this.slots.indexOf(existing), 1);
-      this.push(primitive, params, label, left);
+      this.push(primitive, params, label, left, endAt);
     } else if (existing) {
       // refresh（默认）：刷新时长与参数
       existing.params = params;
       existing.label = label;
       existing.left = left;
+      existing.endAt = endAt;
     } else {
-      this.push(primitive, params, label, left);
+      this.push(primitive, params, label, left, endAt);
     }
     this.recompute();
   }
 
-  private push(primitive: string, params: EffectParams, label: string, left: number) {
+  private push(primitive: string, params: EffectParams, label: string, left: number, endAt?: number) {
+    this.enqueue({ primitive, label, params, left, endAt, layers: layersOf(params) });
+  }
+
+  /**
+   * 周期原语（periodic）：常驻槽位，每 everyS 秒把 effects 里那组子效果重新施加一次。
+   * 首次触发在下一个 tick（即开局就生效一次）；子效果在解析期校验，热路径不再读 JSON。
+   * 同 label 的周期槽位复用（refresh 语义），不同 label 各自独立计时。
+   */
+  private addCycle(params: EffectParams, label: string) {
+    const everyS = num(params, 'everyS', 0);
+    const children = asChildren(params['effects']);
+    if (!(everyS > 0) || children.length === 0) return;
+    const existing = this.slots.find(s => s.primitive === 'periodic' && s.label === label);
+    if (existing) {
+      existing.params = params;
+      existing.children = children;
+      existing.nextAt = 0;
+      return;
+    }
+    this.enqueue({ primitive: 'periodic', label, params, left: Number.POSITIVE_INFINITY, layers: 1, nextAt: 0, children });
+  }
+
+  private enqueue(slot: Slot) {
     if (this.slots.length >= MAX_SLOTS) this.evictLeastRemaining();
-    this.slots.push({ primitive, label, params, left, layers: Math.max(1, Math.round(num(params, 'layers', 1))) });
+    this.slots.push(slot);
   }
 
   /** 消耗一层护盾（受击判定调用），返回消耗后剩余层数 */
@@ -143,6 +126,16 @@ export class BuffEngine {
     if (!s || s.layers <= 0) return 0;
     s.layers -= 1;
     if (s.layers <= 0) this.remove('shieldAdd');
+    else this.recompute();
+    return s.layers;
+  }
+
+  /** 消耗一次下滑护体（滑行中穿过小型障碍时调用），返回剩余次数 */
+  consumeSlideGuard(): number {
+    const s = this.slots.find(x => x.primitive === 'slideGuard');
+    if (!s || s.layers <= 0) return 0;
+    s.layers -= 1;
+    if (s.layers <= 0) this.remove('slideGuard');
     else this.recompute();
     return s.layers;
   }
@@ -159,10 +152,12 @@ export class BuffEngine {
     Object.assign(this.fx, freshFx());
   }
 
-  /** 推进时间并重算派生视图（每固定步一次） */
-  tick(dt: number) {
+  /** 推进时间并重算派生视图（每固定步一次）；ctx 提供当前里程，供按米数到期与周期触发用 */
+  tick(dt: number, ctx: CastContext) {
     for (let i = this.slots.length - 1; i >= 0; i--) {
       const s = this.slots[i];
+      if (s.endAt !== undefined && ctx.distance >= s.endAt) { this.slots.splice(i, 1); continue; }
+      if (s.children) { this.runCycle(s, dt, ctx); continue; } // 周期槽位自身不衰减
       if (!Number.isFinite(s.left)) continue;
       s.left -= dt;
       if (s.left <= 0) this.slots.splice(i, 1);
@@ -170,10 +165,28 @@ export class BuffEngine {
     this.recompute();
   }
 
+  /** 周期触发：到点把子效果重施加一轮，并把下次触发推后 everyS（落后过多不补发，直接对齐下一周期） */
+  private runCycle(s: Slot, dt: number, ctx: CastContext) {
+    if (s.nextAt === undefined) return;
+    s.nextAt -= dt;
+    if (s.nextAt > 0) return;
+    const everyS = Math.max(0.1, num(s.params, 'everyS', 10));
+    s.nextAt += everyS;
+    if (s.nextAt <= 0) s.nextAt = everyS;
+    for (const c of s.children ?? []) this.add(c.primitive, c.params, s.label, ctx);
+  }
+
   private durationBonus(): number {
     let pct = 0;
     for (const s of this.slots) if (s.primitive === 'buffDurationAdd') pct += num(s.params, 'pct', 0);
     return pct;
+  }
+
+  /** 固定秒数加成（buffDurationFlat，如「道具持续 +2 秒」） */
+  private durationFlat(): number {
+    let add = 0;
+    for (const s of this.slots) if (s.primitive === 'buffDurationFlat') add += num(s.params, 'addS', 0);
+    return add;
   }
 
   /** 满位时淘汰剩余时间最短者（规则确定可复现） */
@@ -215,7 +228,10 @@ export class BuffEngine {
         case 'buffDurationAdd': f.buffPct += num(p, 'pct', 0); break;
         case 'cooldownMul': f.cooldownMul *= num(p, 'mul', 1); break;
         case 'pickupAll': f.pickupAllT = Math.max(f.pickupAllT, s.left); break;
-        default: break; // xpMul 等局外原语：仅占位计时，不参与局内数值
+        case 'slideGuard': f.slideGuardCharges += s.layers; break;
+        case 'duckPass': f.duckPass = true; break;
+        case 'buffDurationFlat': f.buffAddS += num(p, 'addS', 0); break;
+        default: break; // xpMul / periodic：仅占位计时，不直接参与局内数值
       }
     }
     Object.assign(this.fx, f);
@@ -224,6 +240,12 @@ export class BuffEngine {
   private castInstant(primitive: string, params: EffectParams, ctx: CastContext) {
     const w = this.world;
     if (primitive === 'scoreAdd') { w.addBonusScore(Math.max(0, num(params, 'flat', 0))); return; }
+    if (primitive === 'smashAhead') {
+      // 破坏前方 aheadM 米全部车道的障碍（金币与道具箱原样保留）
+      const aheadM = Math.max(0, num(params, 'aheadM', 0));
+      if (aheadM > 0) w.smashObstacles(ctx.distance, ctx.distance + aheadM);
+      return;
+    }
     if (primitive === 'spawnCoinsRow') {
       const lanes = Array.isArray(params['lanes'])
         ? (params['lanes'] as unknown[]).map(Number).filter(n => n >= -1 && n <= 1) : [];
@@ -242,6 +264,8 @@ export class BuffEngine {
       const phasing = params['phase'] === true || num(params, 'phase', 0) === 1;
       const to = phasing ? ctx.distance + distance
         : (w.firstBlocker(ctx.lane, ctx.distance, ctx.distance + distance) ?? ctx.distance + distance);
+      // collectCoins：位移途中把经过纵深里的金币全部掠走（穿梭时空），不分车道、不受高度限制
+      if (params['collectCoins'] === true) w.collectCoinsAlong(ctx.distance, to);
       w.advance(Math.max(0, to - ctx.distance));
     }
   }

@@ -10,14 +10,14 @@ import type { UiHost } from '@tr/framework/ui/host.js';
 import { CHAR_KEY } from '../flow/mainFlow.js';
 import { MiniCard, type CardEnv } from './charCard.js';
 
-/** 选角面板技能行：能量攒满所需里程由配置推导（skills.json energy.perMeter），不写死文案 */
+/** 选角面板技能行：释放门槛与冷却全部由 skills.json 推导（charge.slides / cooldownS），不写死文案 */
 export function skillLine(load: Loadout): string {
   const sk = load.skill;
   if (!sk) return '技能：无';
-  const need = Number.isFinite(sk.energyPerMeter) && sk.energyPerMeter > 0
-    ? `跑满 ${Math.ceil(sk.energyMax / sk.energyPerMeter)} 米攒满能量`
-    : '开局即可释放';
-  return `技能：${sk.label} — ${sk.desc}（双击屏幕 / E 释放；${need}，冷却 ${sk.cooldownS}s）`;
+  const gate = sk.chargeSlides > 0
+    ? `主动下滑 ${sk.chargeSlides} 次可释放${sk.cooldownS > 0 ? `，之后冷却 ${sk.cooldownS}s` : ''}`
+    : `开局即可释放，冷却 ${sk.cooldownS}s`;
+  return `技能：${sk.label} — ${sk.desc}（双击屏幕 / E 释放；${gate}）`;
 }
 
 /** 被动行：与技能行同规格展示 */

@@ -27,9 +27,10 @@ architecture boundaries live in [architecture.md](architecture.md).
 - `packages/game/src/core/config/configValidator.ts` owns the runtime rules: ids, cross-file
   references, and value ranges. `tools/validate-config.mjs` runs the same code for local
   checks and CI.
-- `packages/game/src/core/effects/buffEngine.ts` (`PRIMITIVES`) must stay exactly in sync
+- `packages/game/src/core/effects/primitives.ts` (`PRIMITIVES`) must stay exactly in sync
   with the schema `primitive` enum. `effectTypes.ts` defines `FxState` (the derived view) and
-  `EffectWorld` (the capabilities instant primitives call into).
+  `EffectWorld` (the capabilities instant primitives call into); `buffEngine.ts` owns the
+  slot lifecycle (`add` / `tick` / `recompute`).
 - Audio content (music / one-shot cues) is registered in `game.json → params.audio` with files
   under `assets/audio/`; playback is already wired through
   `packages/game/src/core/audio/audioDirector.ts`. See [audio.md](audio.md).
@@ -55,12 +56,25 @@ architecture boundaries live in [architecture.md](architecture.md).
 
 All three parts land in the same PR (see CONTRIBUTING rules):
 
-1. Engine (`buffEngine.ts`): register the primitive in `PRIMITIVES` as `timed` or `instant`.
-   A `timed` primitive needs a merge rule in `recompute()` and a field in `FxState` when it
-   exposes new derived state; an `instant` primitive needs a branch in `castInstant()` that
-   uses `EffectWorld` capabilities implemented by the simulation.
+1. Engine (`primitives.ts`): register the primitive in `PRIMITIVES` as `timed`, `instant` or
+   `cyclic`. A `timed` primitive needs a merge rule in `buffEngine.ts` `recompute()` and a
+   field in `FxState` when it exposes new derived state; an `instant` primitive needs a branch
+   in `castInstant()` that uses `EffectWorld` capabilities implemented by the simulation; a
+   `cyclic` primitive (`periodic`) re-applies its `effects` child list every `everyS` seconds.
+   Timed state may expire by seconds (`durationS`) and/or by metres travelled (`distanceM`).
 2. Schema: add the name to the `primitive` enum in `schema/config.schema.json`.
 3. Tests: extend `tests/effects.test.mjs` and cover the configuration entries that use it.
+
+### Adding display text (names, taglines, skill descriptions)
+
+The CJK font atlas is a subset, not a full font: `assets/fonts/cjk.png` only carries the
+glyphs that existed in the scanned sources when it was generated. A character whose glyph is
+missing occupies width but draws nothing, so new wording silently renders as blanks.
+
+After changing any rendered Chinese string in `config/**` or `packages/game/src/**`, rebuild
+the atlas before testing: `node tools/fontgen/charset.mjs` then `node tools/fontgen/gen.mjs
+--preset cjk` (needs the system font in `C:/Windows/Fonts`). Both outputs are deterministic,
+so the diff should contain only the added glyphs.
 
 ## Bug fixer interface (`@mostny`)
 

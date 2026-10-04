@@ -882,22 +882,22 @@
     "summary": {
       "t": 24.33,
       "distance": 298.48,
-      "coins": 41,
+      "coins": 70,
       "nearMiss": 0,
       "hits": 1,
-      "score": 3335,
+      "score": 3630,
       "alive": false,
-      "casts": 1,
+      "casts": 2,
       "charId": "char_ama"
     },
     "eventCounts": {
-      "cast": 1,
-      "coin": 41,
+      "cast": 2,
+      "coin": 70,
       "death": 1,
       "hit": 1,
       "protected": 1
     },
-    "eventsSha256": "369a51d3239a5e3eb33aeac84047bc3b3741cbe919d99c7e6ebe2bcc3602a92d",
+    "eventsSha256": "ba81b8e1155b198b88b561bed78d1f990acad38f3801f6b9e1c3aaf930d04b3e",
     "inputsSha256": "d17b07eff0b4d858ed03b2683c2992a9459316b5b548f9ecc6cf5f4c218b5409"
   }
 }

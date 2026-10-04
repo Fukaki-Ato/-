@@ -1,68 +1,105 @@
 {
   "$schema": "../schema/config.schema.json#/skills",
-  "configVersion": "1.0.0",
-  "minEngineVersion": "1.0.0",
-  "updatedAt": "2026-09-22",
+  "configVersion": "1.1.0",
+  "minEngineVersion": "1.1.0",
+  "updatedAt": "2026-10-04",
   "items": [
     {
       "id": "skill_thunder_dash", "kind": "active", "status": "live",
       "name": { "zh-CN": "雷霆冲刺", "en-US": "Thunder Dash" },
       "desc": { "zh-CN": "2.5 秒无敌并自动避开前方障碍" },
       "trigger": "double_tap", "cooldownS": 18,
-      "energy": { "mode": "distance", "perMeter": 0.02, "max": 1 },
       "vfx": { "cast": "vfx_thunder_dash", "loop": "vfx_aura_electric" },
       "effects": [
         { "primitive": "invincible", "durationS": 2.5 },
         { "primitive": "laneAutoAvoid", "durationS": 2.5, "lookaheadM": 18 },
         { "primitive": "speedMul", "durationS": 2.5, "mul": 1.15 }
       ],
-      "versions": [ { "ver": "1.0.0", "date": "2026-09-22", "change": "首发" } ]
+      "versions": [
+        { "ver": "1.0.0", "date": "2026-09-22", "change": "首发" },
+        { "ver": "1.1.0", "date": "2026-10-04", "change": "移除能量充能，纯冷却释放（用户定稿：删充能，开局第 0 秒即可放）" }
+      ]
     },
     {
       "id": "skill_magnet_pulse", "kind": "active", "status": "live",
       "name": { "zh-CN": "磁暴脉冲" },
       "desc": { "zh-CN": "6 秒全屏金币吸附" },
       "trigger": "double_tap", "cooldownS": 20,
-      "energy": { "mode": "distance", "perMeter": 0.02, "max": 1 },
       "vfx": { "cast": "vfx_pickup_pop", "loop": "vfx_aura_electric" },
       "effects": [ { "primitive": "magnet", "durationS": 6, "radiusM": 99 } ],
-      "versions": [ { "ver": "1.0.0", "date": "2026-09-22", "change": "首发" } ]
+      "versions": [
+        { "ver": "1.0.0", "date": "2026-09-22", "change": "首发" },
+        { "ver": "1.1.0", "date": "2026-10-04", "change": "移除能量充能，纯冷却释放" }
+      ]
     },
     {
       "id": "skill_blink_smash", "kind": "active", "status": "live",
       "name": { "zh-CN": "瞬闪" },
       "desc": { "zh-CN": "向前瞬移 12 米并撞碎路径障碍" },
       "trigger": "double_tap", "cooldownS": 16,
-      "energy": { "mode": "distance", "perMeter": 0.02, "max": 1 },
       "vfx": { "cast": "vfx_thunder_dash" },
       "effects": [
         { "primitive": "dash", "distanceM": 12, "destroyObstacles": true },
         { "primitive": "invincible", "durationS": 0.5 }
       ],
-      "versions": [ { "ver": "1.0.0", "date": "2026-09-22", "change": "首发" } ]
+      "versions": [
+        { "ver": "1.0.0", "date": "2026-09-22", "change": "首发" },
+        { "ver": "1.1.0", "date": "2026-10-04", "change": "移除能量充能，纯冷却释放" }
+      ]
     },
     {
       "id": "skill_thunder_wings", "kind": "active", "status": "live",
       "name": { "zh-CN": "雷神之翼" },
       "desc": { "zh-CN": "8 秒空中飞行，自动拾取空中金币" },
       "trigger": "double_tap", "cooldownS": 24,
-      "energy": { "mode": "distance", "perMeter": 0.02, "max": 1 },
       "vfx": { "cast": "vfx_thunder_dash", "loop": "vfx_trail_thunder" },
       "effects": [ { "primitive": "fly", "durationS": 8 }, { "primitive": "magnet", "durationS": 8, "radiusM": 8 } ],
-      "versions": [ { "ver": "1.0.0", "date": "2026-09-22", "change": "首发" } ]
+      "versions": [
+        { "ver": "1.0.0", "date": "2026-09-22", "change": "首发" },
+        { "ver": "1.1.0", "date": "2026-10-04", "change": "移除能量充能，纯冷却释放" }
+      ]
     },
     {
-      "id": "skill_storm_domain", "kind": "active", "status": "live",
-      "name": { "zh-CN": "时缓领域" },
-      "desc": { "zh-CN": "3 秒世界减速 30%，只有你不慌" },
-      "trigger": "double_tap", "cooldownS": 22,
-      "energy": { "mode": "distance", "perMeter": 0.02, "max": 1 },
-      "vfx": { "cast": "vfx_aura_electric" },
+      "id": "skill_chrono_leap", "kind": "active", "status": "live",
+      "name": { "zh-CN": "穿梭时空", "en-US": "Chrono Leap" },
+      "desc": { "zh-CN": "瞬移 100 米，沿途金币全部入手" },
+      "trigger": "double_tap", "cooldownS": 25,
+      "vfx": { "cast": "vfx_thunder_dash", "loop": "vfx_aura_electric" },
       "effects": [
-        { "primitive": "timeSlow", "durationS": 3, "worldMul": 0.7 },
-        { "primitive": "invincible", "durationS": 1 }
+        { "primitive": "blink", "distanceM": 100, "phase": true, "collectCoins": true },
+        { "primitive": "invincible", "durationS": 0.6 }
       ],
-      "versions": [ { "ver": "1.0.0", "date": "2026-09-22", "change": "首发" } ]
+      "versions": [
+        { "ver": "1.1.0", "date": "2026-10-04", "change": "顶替「时缓领域」（原 skill_storm_domain）：用户定稿改为瞬移 100 米并掠取一路金币。落点带 0.6 秒无敌，防止瞬移终点正卡在障碍里当场判负" }
+      ]
+    },
+    {
+      "id": "skill_belly_laugh", "kind": "active", "status": "live",
+      "name": { "zh-CN": "捧腹大笑", "en-US": "Belly Laugh" },
+      "desc": { "zh-CN": "笑出黄色防护罩，10 秒无敌" },
+      "trigger": "double_tap", "cooldownS": 30,
+      "vfx": { "cast": "vfx_pickup_pop", "loop": "vfx_aura_electric" },
+      "effects": [ { "primitive": "invincible", "durationS": 10 } ],
+      "versions": [ { "ver": "1.1.0", "date": "2026-10-04", "change": "新增（奶蛙）：10 秒无敌。渲染层目前还没有护盾/无敌气泡表现，防护罩先由释放爆点与 HUD 名称承担" } ]
+    },
+    {
+      "id": "skill_mambo_power", "kind": "active", "status": "live",
+      "name": { "zh-CN": "曼波之力", "en-US": "Mambo Power" },
+      "desc": { "zh-CN": "下滑 10 次触发：接下来 2 次下滑可穿过小型障碍" },
+      "trigger": "double_tap", "cooldownS": 0,
+      "charge": { "type": "slideCount", "slides": 10 },
+      "vfx": { "cast": "vfx_pickup_pop" },
+      "effects": [ { "primitive": "slideGuard", "durationS": 12, "charges": 2 } ],
+      "versions": [ { "ver": "1.1.0", "date": "2026-10-04", "change": "新增（曼波）：释放门槛是主动下滑 10 次（不是能量充能），护体 2 次不可叠加、12 秒内不用即作废" } ]
+    },
+    {
+      "id": "skill_mama_save", "kind": "active", "status": "live",
+      "name": { "zh-CN": "妈妈救我", "en-US": "Mama, Save Me" },
+      "desc": { "zh-CN": "前方 50 米障碍全部消失，金币道具都还在" },
+      "trigger": "double_tap", "cooldownS": 18,
+      "vfx": { "cast": "vfx_spark_big" },
+      "effects": [ { "primitive": "smashAhead", "aheadM": 50 } ],
+      "versions": [ { "ver": "1.1.0", "date": "2026-10-04", "change": "新增（阿牛）：清除前方 50 米全部车道的障碍（含金色闪电圈与登车坡），只摘障碍不动金币与道具箱" } ]
     },
     {
       "id": "talent_volt_coin", "kind": "passive", "status": "live",
@@ -93,11 +130,47 @@
       "versions": [ { "ver": "1.0.0", "date": "2026-09-22", "change": "首发" } ]
     },
     {
-      "id": "talent_bolt_cool", "kind": "passive", "status": "live",
-      "name": { "zh-CN": "老警长的节奏" }, "desc": { "zh-CN": "技能冷却 -20%" },
+      "id": "talent_chrono_slow", "kind": "passive", "status": "live",
+      "name": { "zh-CN": "时间延缓" }, "desc": { "zh-CN": "道具持续时间 +2 秒" },
       "trigger": "run_start",
-      "effects": [ { "primitive": "cooldownMul", "durationS": 3600, "mul": 0.8 } ],
-      "versions": [ { "ver": "1.0.0", "date": "2026-09-22", "change": "首发" } ]
+      "effects": [ { "primitive": "buffDurationFlat", "durationS": 3600, "addS": 2 } ],
+      "versions": [
+        { "ver": "1.1.0", "date": "2026-10-04", "change": "顶替「老警长的节奏」（原 talent_bolt_cool 冷却 -20%）：用户定稿改为按固定秒数拉长道具时长" }
+      ]
+    },
+    {
+      "id": "talent_frog_bounce", "kind": "passive", "status": "live",
+      "name": { "zh-CN": "弹跳之力" }, "desc": { "zh-CN": "每 10 秒自动获得一次强力跳跃" },
+      "trigger": "run_start",
+      "effects": [
+        {
+          "primitive": "periodic", "durationS": 3600, "everyS": 10,
+          "effects": [ { "primitive": "jumpBoost", "durationS": 2.5, "mul": 1.1 } ]
+        }
+      ],
+      "versions": [ { "ver": "1.1.0", "date": "2026-10-04", "change": "新增（奶蛙）：周期被动，每次给 2.5 秒强跳窗口（mul 1.1 = 弹跳鞋定稿值）" } ]
+    },
+    {
+      "id": "talent_mambo_height", "kind": "passive", "status": "live",
+      "name": { "zh-CN": "身高优势" }, "desc": { "zh-CN": "需要下滑的障碍，站着就能穿过去" },
+      "trigger": "run_start",
+      "effects": [ { "primitive": "duckPass", "durationS": 3600 } ],
+      "versions": [ { "ver": "1.1.0", "date": "2026-10-04", "change": "新增（曼波）：高杆类（class=high）障碍直接穿过，无需下滑；闪电圈与满格墙不受影响" } ]
+    },
+    {
+      "id": "talent_niu_rush", "kind": "passive", "status": "live",
+      "name": { "zh-CN": "蛮牛冲撞" }, "desc": { "zh-CN": "每 20 秒自动冲撞一次：三倍速、20 米无敌" },
+      "trigger": "run_start",
+      "effects": [
+        {
+          "primitive": "periodic", "durationS": 3600, "everyS": 20,
+          "effects": [
+            { "primitive": "speedMul", "distanceM": 20, "mul": 3 },
+            { "primitive": "invincible", "distanceM": 20 }
+          ]
+        }
+      ],
+      "versions": [ { "ver": "1.1.0", "date": "2026-10-04", "change": "新增（阿牛）：周期 20 秒，效果按里程到期（无敌与提速都是走完 20 米即止）。注意三倍速会被 game.json runner.maxSpeed 上限夹住" } ]
     }
   ]
 }

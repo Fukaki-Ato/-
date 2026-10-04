@@ -416,15 +416,15 @@ test('HUD：分数/金币/里程/爱心 + buff 同名合并 + 技能三态文案
   hud.update({
     score: 2000, coins: 10, distance: 200, hits: 0, lives: 3,
     buffs: [{ name: '雷神护体', left: 5 }, { name: '雷神护体', left: 8 }, { name: '永固', left: Infinity }],
-    skill: { label: '雷霆瞬步', energy: 0.5, cd: 0, ready: false },
+    skill: { label: '雷霆瞬步', cd: 0, ready: false, charge: { now: 5, need: 10 } },
   });
   const t2 = texts(host);
   assert.ok(t2.some(x => x.includes('雷神护体 8s') && !x.includes('5s')), '同名 buff 取最长剩余');
   assert.ok(t2.some(x => x.includes('永固') && !/永固 \d/.test(x)), '永久被动不显倒计时');
-  assert.ok(t2.some(x => x === '雷霆瞬步：能量 50%'), '技能能量态');
-  hud.update({ score: 2000, coins: 10, distance: 200, hits: 0, lives: 3, buffs: [], skill: { label: '雷霆瞬步', energy: 1, cd: 2.5, ready: false } });
+  assert.ok(t2.some(x => x === '雷霆瞬步：下滑 5/10'), '充能已移除：未就绪时显示下滑积攒进度');
+  hud.update({ score: 2000, coins: 10, distance: 200, hits: 0, lives: 3, buffs: [], skill: { label: '雷霆瞬步', cd: 2.5, ready: false, charge: null } });
   assert.ok(texts(host).some(x => x.startsWith('雷霆瞬步：冷却 2.5s')));
-  hud.update({ score: 2000, coins: 10, distance: 200, hits: 0, lives: 3, buffs: [], skill: { label: '雷霆瞬步', energy: 1, cd: 0, ready: true } });
+  hud.update({ score: 2000, coins: 10, distance: 200, hits: 0, lives: 3, buffs: [], skill: { label: '雷霆瞬步', cd: 0, ready: true, charge: null } });
   assert.ok(texts(host).some(x => x.includes('就绪（双击 / E）')));
   hud.dispose();
   assert.equal(host.overlay.current, null, 'dispose 即卸页');

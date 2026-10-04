@@ -26,6 +26,8 @@ export type SimEvent =
   | { type: 'death'; lane?: number; worldZ?: number }
   | { type: 'pickup'; itemRef: string } | { type: 'helmetSave' }
   | { type: 'cast'; skillRef: string } | { type: 'shieldBreak'; layers: number } | { type: 'boardBreak' }
+  /** slideGuard：下滑护体消耗一次（曼波滑行穿过小型障碍），带剩余次数 */
+  | { type: 'slideGuard'; charges: number }
   /** zap 带打击位置（lane/worldZ）：渲染层据此把雷电特效画到闪电圈所在车道与深度 */
   | { type: 'zap'; gear: 'shield' | 'board' | 'helmet' | null; lane: number; worldZ: number };
 
@@ -37,8 +39,8 @@ export interface RunnerState {
   shocks: number; // 已被闪电圈电到的次数（无护具时第二次直接致死）
   coins: number; nearMiss: number; score: number;
   gliding: boolean; // 飞行器燃料耗尽后的降落段
-  /** 主动技能能量（0..skill.energyMax）、冷却剩余、本局释放次数 */
-  energy: number; skillCd: number; casts: number;
+  /** 技能冷却剩余、本局累计主动下滑次数（下滑积攒型技能的门槛计数）、本局释放次数 */
+  skillCd: number; slideCount: number; casts: number;
   /** 当前可站立支撑面高度（米，0=地面；>0=列车顶/坡道面）。每帧由 movement 算好后写回：
    *  渲染层据此区分「站在支撑面上跑」与「真正离地」，sim→render 单向数据流 */
   supportY: number;
@@ -58,7 +60,7 @@ export function initialRunnerState(): RunnerState {
     sliding: false, slideT: 0, stunT: 0, invulnT: 0, hits: 0, alive: true, topple: 0,
     shocks: 0,
     coins: 0, nearMiss: 0, score: 0, gliding: false,
-    energy: 0, skillCd: 0, casts: 0,
+    skillCd: 0, slideCount: 0, casts: 0,
     supportY: 0,
   };
 }

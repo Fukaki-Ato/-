@@ -66,6 +66,7 @@ export class Movement {
     if (s.sliding || this.slideCd > 0) return; // 冷却中不可再次下滑
     s.slideT = this.P.slideS + fx.slideAddS;   // 被动「贴地飞行」加长
     s.sliding = true;
+    s.slideCount++; // 下滑积攒型技能的计数：每次真正进入滑行算一次
   }
 
   /** 结束滑行并进入冷却（飞行进入地面、起身跳时都会调用） */
