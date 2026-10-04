@@ -57,6 +57,8 @@ def main() -> None:
         if stats[k, cv2.CC_STAT_AREA] >= MIN_COMP:
             keep[lab == k] = 255
     alpha = cv2.GaussianBlur(keep, (0, 0), 1.2)
+    alpha = np.where(alpha > 90, alpha, 0).astype(np.uint8)   # 掐掉 halo 噪点 veil，保留浪花软边
+    alpha = cv2.GaussianBlur(alpha, (0, 0), 0.7)
     ys, xs = np.where(alpha > 8)
     tx0, tx1, ty0, ty1 = xs.min(), xs.max() + 1, ys.min(), ys.max() + 1
     rgb = cv2.cvtColor(mock, cv2.COLOR_BGR2RGB)[ty0:ty1, tx0:tx1]

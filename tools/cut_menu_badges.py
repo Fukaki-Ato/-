@@ -26,7 +26,7 @@ MOCK = os.path.join(ROOT, 'tools', 'badge_matte_src', 'mainmenu-mockup.png')
 BG = os.path.join(ROOT, 'assets', 'ui', 'menu-bg.png')
 DIFF_T = 60
 BROWN_T2 = 900          # 与条棕色距离平方阈值（约 30/通道）
-MIN_COMP = 120
+MIN_COMP = 600
 
 # name: (rect, 键)
 CUTS = {
@@ -60,13 +60,13 @@ def cut_one(mock: np.ndarray, bg: np.ndarray, diff: np.ndarray, brown: np.ndarra
         rgb = mock[y0:y1, x0:x1].astype(np.int32)
         r, g, b = rgb[..., 2], rgb[..., 1], rgb[..., 0]
         leaf = (g > r + 6) & (g > b + 6)
-        sky = (b > r + 20) & (b > 150)
+        sky = (b > r + 20) & (b > 90)   # 含深青叶影（b 不到 150 的那档）
         m = m * (1 - cv2.dilate((leaf | sky).astype(np.uint8), np.ones((3, 3), np.uint8)))
     else:
         d2 = ((mock[y0:y1, x0:x1].astype(np.int32) - brown.astype(np.int32)) ** 2).sum(axis=2)
         m = (d2 > BROWN_T2).astype(np.uint8) * 255
     m = cv2.morphologyEx(m, cv2.MORPH_CLOSE, np.ones((4, 4), np.uint8))
-    m = cv2.morphologyEx(m, cv2.MORPH_OPEN, np.ones((2, 2), np.uint8))
+    m = cv2.morphologyEx(m, cv2.MORPH_OPEN, np.ones((3, 3), np.uint8))
     n, lab, stats, _ = cv2.connectedComponentsWithStats(m, 8)
     keep = np.zeros_like(m)
     for k in range(1, n):
@@ -75,6 +75,8 @@ def cut_one(mock: np.ndarray, bg: np.ndarray, diff: np.ndarray, brown: np.ndarra
     # 标签与图标之间可能有 1-2px 断缝：再闭一次把整枚连成一块
     keep = cv2.morphologyEx(keep, cv2.MORPH_CLOSE, np.ones((7, 7), np.uint8))
     alpha = cv2.GaussianBlur(keep, (0, 0), 1.2)
+    alpha = np.where(alpha > 150, alpha, 0).astype(np.uint8)   # 掐掉羽化环里的低 alpha 噪点 veil
+    alpha = cv2.GaussianBlur(alpha, (0, 0), 0.7)
     ys, xs = np.where(alpha > 8)
     if len(xs) == 0:
         raise SystemExit(name + ': 掩码为空')
