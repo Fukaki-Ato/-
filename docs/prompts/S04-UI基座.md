@@ -1,6 +1,13 @@
 # 【子会话 S04】雷霆酷跑：UI 基座（UIKit）
 
-你是子会话 **S04**，负责「雷霆酷跑」Cocos 界面的基础设施：UIRoot、面板管理、通用组件、主题、资源占位降级与音频服务。工作区：`F:\OpenCode Projects\雷霆酷跑`。
+你是子会话 **S04**，负责「雷霆酷跑」Cocos 界面的基础设施：UIRoot、面板管理、通用组件、主题、资源占位降级与音频服务。
+
+> **并行隔离（重要）**：本会话在独立 git worktree 中工作，工作目录为
+> `F:\OpenCode Projects\雷霆酷跑\.worktrees\S04`（分支 `sess/S04`）。
+> - 所有文件读写、命令、git 操作都限定在该目录内；git 命令先 `cd` 到该目录或使用 `git -C <路径>`。
+> - 不要操作主目录 `F:\OpenCode Projects\雷霆酷跑`；不要 checkout/merge/rebase/push/切换分支。
+> - `node_modules` 通过目录向上解析自动可用；仅当命令报模块缺失时才在 worktree 内执行 `npm install`。
+> - 报告与提交都在 worktree 内完成，提交信息以 `S04: ` 开头。
 
 ## 开工必读
 
@@ -8,11 +15,10 @@
 2. `docs/01-架构与工程规范.md` §2（依赖规则）、§5（场景策略）、§6（代码规范）
 3. `docs/07-测试与验收标准.md` §2-S04
 4. `assets/scripts/core/contracts.ts`（重点 `IGameContext`、事件、`RedDotKey`）
-5. `docs/reports/S03-*.md`（context 用法）
 
 ## 前置状态
 
-S01–S03 完成：core 全部可单测；本会话开始引入 `cc`。运行期不允许 npm 依赖。**编辑器可能尚未安装**：以 `npm run typecheck:cc` 通过 + 代码评审验收；如编辑器可用，做最小冒烟并写进报告。
+S01 已完成（框架与契约可用）。S02/S03 正在另一个 worktree 并行开发，其报告与实现文件在本 worktree 中不存在，也不要依赖或创建它们：你只依赖 `contracts.ts` 的接口进行编程，运行期所依赖的服务由调用方注入。本会话开始引入 `cc`，运行期不允许 npm 依赖。**编辑器可能尚未安装**：以 `npm run typecheck:cc` 通过 + 代码评审验收；如编辑器可用，做最小冒烟并写进报告。
 
 ## 任务清单（assets/scripts/ui/）
 

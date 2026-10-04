@@ -5,6 +5,7 @@ local/
 profiles/
 build/
 native/engine/
+.worktrees/
 *.log
 .DS_Store
 Thumbs.db
