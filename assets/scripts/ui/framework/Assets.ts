@@ -25,6 +25,22 @@ export function getCachedSprite(path: string): SpriteFrame | null {
   return spriteCache.get(normalize(path)) ?? null;
 }
 
+/**
+ * 选择实际加载路径：3.7+ 图片按 sprite-frame 导入时主路径为 ImageAsset，
+ * SpriteFrame 在 `<path>/spriteFrame` 子资源上；旧式 meta（redirect 指向 f9941）则主路径即为 SpriteFrame。
+ * 两者都探测，优先子资源路径；探测 API 不可用时退回主路径。
+ */
+function resolveSpriteLoadPath(key: string): string {
+  const subPath = `${key}/spriteFrame`;
+  try {
+    if (resources.getInfoWithPath(subPath, SpriteFrame)) return subPath;
+    if (resources.getInfoWithPath(key, SpriteFrame)) return key;
+  } catch {
+    // 编辑器早期环境可能不支持路径查询；按主路径加载。
+  }
+  return key;
+}
+
 /** 按路径加载图片，结果缓存；失败回调 null 且同一路径只 warn 一次，绝不抛出。 */
 export function loadSprite(path: string, cb?: (frame: SpriteFrame | null) => void): void {
   const key = normalize(path);
@@ -45,7 +61,7 @@ export function loadSprite(path: string, cb?: (frame: SpriteFrame | null) => voi
   const waiters: Array<(frame: SpriteFrame | null) => void> = [];
   if (cb) waiters.push(cb);
   spriteWaiters.set(key, waiters);
-  resources.load(key, SpriteFrame, (err, frame) => {
+  resources.load(resolveSpriteLoadPath(key), SpriteFrame, (err, frame) => {
     const list = spriteWaiters.get(key) ?? [];
     spriteWaiters.delete(key);
     if (err || !frame) {

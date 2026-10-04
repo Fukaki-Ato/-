@@ -101,7 +101,7 @@ export class ConfigService implements IConfigService {
 
   allItems(): ItemConfig[] {
     this.requireReady();
-    return [...this.itemMap.values()];
+    return Array.from(this.itemMap.values());
   }
 
   character(id: CharacterId): CharacterConfig | undefined {
@@ -111,7 +111,7 @@ export class ConfigService implements IConfigService {
 
   allCharacters(): CharacterConfig[] {
     this.requireReady();
-    return [...this.characterMap.values()];
+    return Array.from(this.characterMap.values());
   }
 
   goods(id: GoodsId): ShopGoodsConfig | undefined {

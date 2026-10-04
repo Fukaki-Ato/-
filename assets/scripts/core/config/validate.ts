@@ -244,7 +244,7 @@ export function validateConfigs(tables: RawConfigs): string[] {
       requireString('items', entryLabel, 'desc', entry.desc);
       requireString('items', entryLabel, 'icon', entry.icon);
       if (!ITEM_TYPES.has(entry.type as string)) {
-        fail('items', entryLabel, 'type', `必须是 ${[...ITEM_TYPES].join('/')} 之一`);
+        fail('items', entryLabel, 'type', `必须是 ${Array.from(ITEM_TYPES).join('/')} 之一`);
       }
       if (!isQuality(entry.quality)) fail('items', entryLabel, 'quality', '必须是 1–5 的整数');
       if (typeof entry.stackable !== 'boolean') fail('items', entryLabel, 'stackable', '必须是布尔值');

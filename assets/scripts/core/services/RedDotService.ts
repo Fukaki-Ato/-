@@ -96,7 +96,7 @@ export class RedDotService implements IRedDotService {
   }
 
   private notify(key: RedDotKey, on: boolean): void {
-    for (const cb of [...this.subscribers]) {
+    for (const cb of Array.from(this.subscribers)) {
       try {
         cb(key, on);
       } catch (err) {
