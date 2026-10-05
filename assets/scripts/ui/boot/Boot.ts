@@ -18,6 +18,11 @@ const log = new Logger();
 /** 隐私摘要（完整文本见 app.json 的 privacyPolicy，通过 TextDialog 展示）。 */
 const PRIVACY_DIGEST = '为了保障您的权益，请阅读并同意《隐私保护指引》。取得您的同意后，我们才会获取微信昵称、头像与登录标识，用于账号登录与云存档；完整条款可在启动页或设置中随时查看。';
 
+/** 平台原生隐私授权扩展点（微信实现提供；Local 无此方法）。 */
+interface PlatformPrivacyHost {
+  requestPrivacyAuthorization?: () => Promise<boolean>;
+}
+
 /**
  * 启动流程组件（场景挂载点）：
  * 启动页展示 → 隐私授权（未同意先弹政策）→ 登录（失败降级游客）→ refreshDaily
@@ -82,9 +87,29 @@ export class Boot extends Component {
   // 隐私授权
   // -------------------------------------------------------------------------
 
+  /**
+   * 隐私门禁（docs/05 §7）：本地未同意先弹自家政策；随后调用平台原生隐私授权。
+   * 微信基础库未通过原生授权（或调用异常）时一律不进入登录。
+   */
   private async ensurePrivacy(ctx: IGameContext): Promise<boolean> {
-    if (ctx.save.flags.privacyAccepted === true) return true;
-    return this.requestConsent(ctx);
+    if (ctx.save.flags.privacyAccepted !== true) {
+      if (!(await this.requestConsent(ctx))) return false;
+    }
+    return this.ensurePlatformPrivacy(ctx);
+  }
+
+  /** 微信原生隐私授权：结构化探测附加方法，不直接依赖具体适配器实现。 */
+  private async ensurePlatformPrivacy(ctx: IGameContext): Promise<boolean> {
+    const host = ctx.platform as unknown as PlatformPrivacyHost;
+    if (typeof host.requestPrivacyAuthorization !== 'function') return true;
+    try {
+      const ok = await host.requestPrivacyAuthorization();
+      if (!ok) log.warn('微信原生隐私授权未通过，暂不登录');
+      return ok;
+    } catch (err) {
+      log.warn('微信原生隐私授权调用异常，按未通过处理', err);
+      return false;
+    }
   }
 
   private async requestConsent(ctx: IGameContext): Promise<boolean> {
@@ -117,7 +142,8 @@ export class Boot extends Component {
     const screen = this.screen;
     if (!ctx || !screen) return;
     try {
-      if (!(await this.requestConsent(ctx))) return;
+      // 重新走完整隐私门禁（本地弹窗 + 平台原生授权），避免只重试本地同意。
+      if (!(await this.ensurePrivacy(ctx))) return;
       screen.showConsentRetry(false);
       await this.enterMainMenu(ctx);
     } catch (err) {

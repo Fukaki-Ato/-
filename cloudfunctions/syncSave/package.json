@@ -1,0 +1,9 @@
+{
+  "name": "ltkp-cloud-sync-save",
+  "version": "1.0.0",
+  "description": "雷霆酷跑：云存档上传/下载（版本时间戳防覆盖）",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "~4.0.2"
+  }
+}

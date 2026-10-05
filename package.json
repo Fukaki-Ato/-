@@ -11,10 +11,12 @@
     "test:watch": "vitest",
     "typecheck:core": "tsc -p tsconfig.core.json",
     "typecheck:cc": "tsc -p tsconfig.cc.json",
-    "check": "npm run typecheck:core && npm run typecheck:cc && npm run test"
+    "check": "npm run typecheck:core && npm run typecheck:cc && npm run test",
+    "wechat:opendata": "node scripts/wechat-open-data-context.mjs"
   },
   "devDependencies": {
     "@cocos/creator-types": "3.8.8",
+    "miniprogram-api-typings": "^5.2.3",
     "typescript": "^5.9.3",
     "vitest": "^5.0.3"
   }

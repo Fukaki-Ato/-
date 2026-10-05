@@ -1,0 +1,9 @@
+{
+  "name": "ltkp-cloud-submit-score",
+  "version": "1.0.0",
+  "description": "雷霆酷跑：提交成绩并维护最佳分数",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "~4.0.2"
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "name": "ltkp-cloud-get-leaderboard",
+  "version": "1.0.0",
+  "description": "雷霆酷跑：世界排行榜查询",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "~4.0.2"
+  }
+}

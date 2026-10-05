@@ -1,6 +1,25 @@
 {
   "version": "0.1.0",
   "cloudEnvId": "",
+  "adUnits": {
+    "settlement.double": "",
+    "shop.free.gold": "",
+    "welfare.daily": "",
+    "run.revive": ""
+  },
+  "pay": {
+    "offerId": "",
+    "mode": "goods",
+    "env": 0,
+    "currencyType": "CNY",
+    "zoneId": "1",
+    "buyQuantity": 1
+  },
+  "share": {
+    "title": "雷霆酷跑，一起来跑！",
+    "imageUrl": ""
+  },
+  "forceLocal": false,
   "dailyResetHour": 0,
   "weeklyResetWeekday": 1,
   "debug": true,

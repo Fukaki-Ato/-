@@ -1,0 +1,9 @@
+{
+  "name": "ltkp-cloud-login",
+  "version": "1.0.0",
+  "description": "雷霆酷跑：以 OPENID 初始化/读取玩家档案",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "~4.0.2"
+  }
+}
