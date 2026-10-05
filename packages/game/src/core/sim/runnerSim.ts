@@ -87,6 +87,7 @@ export class RunnerSim {
       },
       { heightM: this.fly.heightM, glideS: this.fly.glideS },
       this.obstacles,
+      { consumeJumpCharge: () => this.buffs.consumeJumpCharge() },
     );
     this.buffs = new BuffEngine(createSimWorld({
       state: this.state, obstacles: this.obstacles, coins: this.coinsArr, pickups: this.pickupsArr,

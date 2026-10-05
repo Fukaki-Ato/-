@@ -46,6 +46,12 @@ export interface FxState {
   duckPass: boolean;
   /** 其他 buff 时长的固定增量（buffDurationFlat，秒） */
   buffAddS: number;
+  /** 跳跃充能层数（jumpCharge）：每层换一次更高跳，起跳时消耗一层 */
+  jumpCharges: number;
+  /** 充能跳跃的初速倍率（jumpCharge 的 mul，层数>0 时生效） */
+  jumpChargeMul: number;
+  /** 周期被动的子效果此刻是否正在生效（阿牛冲撞期等；HUD 被动图标亮灯依据） */
+  periodicLive: boolean;
 }
 
 /** 瞬时原语的作用上下文：调用 add 时把「此刻我在哪」传进来，引擎不反向读 sim 状态 */
@@ -80,5 +86,6 @@ export function freshFx(): FxState {
     shieldLayers: 0, shieldT: 0, boardT: 0, invincible: false, speedMul: 1, timeSlowMul: 1,
     avoidLookahead: 0, coinPct: 0, slideAddS: 0, buffPct: 0, cooldownMul: 1, pickupAllT: 0,
     slideGuardCharges: 0, duckPass: false, buffAddS: 0,
+    jumpCharges: 0, jumpChargeMul: 1, periodicLive: false,
   };
 }

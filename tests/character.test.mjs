@@ -172,17 +172,16 @@ test('捧腹大笑（奶蛙）：10 秒无敌，期间撞墙不判负', () => {
   assert.equal(sim.state.alive, true, '无敌期撞墙不应出局');
 });
 
-test('弹跳之力（奶蛙被动）：每 10 秒自动给一次强跳窗口，窗口过后进入空档', () => {
+test('弹跳之力（奶蛙被动）：每 10 秒充能一层、可叠加，不再是 2.5 秒限时窗口', () => {
   const sim = new RunnerSim(content, SIM_SEED(), 'char_frog');
-  // 逐帧清障：只验周期计时，别让中途死亡把 buff 时钟冻住
+  // 逐帧清障：只验充能计时，别让中途死亡把 buff 时钟冻住
   const steps = (sec) => { for (let i = 0; i < 60 * sec; i++) { sim.obstacles.length = 0; sim.step(); sim.drainEvents(); } };
   steps(0.2); // 周期被动在第一步就触发
-  assert.ok(sim.fx.bootsT > 0, '首个周期应已挂上强跳');
-  assert.ok(Math.abs(sim.fx.jumpMul - 1.1) < 1e-9, `强跳倍率应读配置（弹跳鞋同值），实际 ${sim.fx.jumpMul}`);
-  steps(3); // 2.5 秒窗口过后
-  assert.equal(sim.fx.bootsT, 0, '窗口结束应失效');
-  steps(7); // 累计约 10 秒 → 下一周期
-  assert.ok(sim.fx.bootsT > 0, '下一个 10 秒周期应再次挂上');
+  assert.equal(sim.fx.jumpCharges, 1, '首个周期应已充能 1 层');
+  assert.ok(Math.abs(sim.fx.jumpChargeMul - 1.1369) < 1e-9, `充能倍率应读配置，实际 ${sim.fx.jumpChargeMul}`);
+  assert.equal(sim.fx.bootsT, 0, '充能不再走弹跳鞋的限时窗口');
+  steps(10); // 越过下一个周期
+  assert.equal(sim.fx.jumpCharges, 2, '充能可叠加：第二周期应为 2 层');
 });
 
 test('曼波之力：主动下滑 10 次才亮，释放后计数归零', () => {
