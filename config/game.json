@@ -1,8 +1,8 @@
 {
   "$schema": "../schema/config.schema.json#/game",
-  "configVersion": "1.0.0",
+  "configVersion": "1.0.1",
   "minEngineVersion": "1.0.0",
-  "updatedAt": "2026-09-29",
+  "updatedAt": "2026-10-05",
   "params": {
     "runner": {
       "baseSpeed": 12,
@@ -195,6 +195,22 @@
             "cast": "assets/audio/sfx/char/char_volt/cast.mp3",
             "pickup": "assets/audio/sfx/char/char_volt/pickup.mp3",
             "death": "assets/audio/sfx/char/char_volt/death.mp3"
+          }
+        },
+        "char_mambo": {
+          "sfx": {
+            "cast": "assets/audio/sfx/char/char_mambo/cast.mp3",
+            "pickup": "assets/audio/sfx/char/char_mambo/pickup.mp3"
+          }
+        },
+        "char_frog": {
+          "sfx": {
+            "cast": "assets/audio/sfx/char/char_frog/cast.mp3"
+          }
+        },
+        "char_niu": {
+          "sfx": {
+            "cast": "assets/audio/sfx/char/char_niu/cast.mp3"
           }
         }
       }
