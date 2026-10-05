@@ -28,6 +28,7 @@ export function installRunProbe(
     return {
       magnetT: r2(f.magnetT), magnetRadius: r2(f.magnetRadius), bootsT: r2(f.bootsT), flyT: r2(f.flyT),
       helmetT: r2(f.helmetT), shield: f.shieldLayers, boardT: r2(f.boardT), invincible: f.invincible,
+      jumpCharges: f.jumpCharges, jumpChargeMul: r2(f.jumpChargeMul), periodicLive: f.periodicLive,
       speedMul: r2(f.speedMul), timeSlowMul: r2(f.timeSlowMul), avoid: r2(f.avoidLookahead),
       coinPct: r2(f.coinPct), slideAddS: r2(f.slideAddS), buffPct: r2(f.buffPct), cdMul: r2(f.cooldownMul),
     };

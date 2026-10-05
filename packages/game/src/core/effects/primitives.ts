@@ -5,7 +5,7 @@
  * 新增原语 = 代码任务（标 [PRIMITIVE]）：PRIMITIVES 加一项 + recompute 加合并规则 +
  *            schema/config.schema.json 的 primitive.enum 补一项 + 单测（三处必须同集合）。
  */
-import type { EffectParams } from './effectTypes.js';
+import type { EffectParams, StackRule } from './effectTypes.js';
 
 /** 一条生效中的槽位（引擎内部状态，外部只能通过 fx / list() 读派生结果） */
 export interface Slot {
@@ -25,7 +25,7 @@ export interface Slot {
 }
 
 /** periodic 的一条子效果（已解析） */
-export interface Child { primitive: string; params: EffectParams }
+export interface Child { primitive: string; params: EffectParams; stackRule: StackRule }
 
 /** 原语元数据：instant=施加即结算；timed=进槽位按秒衰减；cyclic=进槽位按周期重复施加子效果 */
 export type Kind = 'instant' | 'timed' | 'cyclic';
@@ -58,6 +58,7 @@ export const PRIMITIVES: Record<string, PrimDef> = {
   duckPass: { kind: 'timed' },            // 身高优势：需下滑躲避的高杆直接穿过
   smashAhead: { kind: 'instant' },        // 破坏前方 aheadM 米全部车道障碍（金币与道具保留）
   periodic: { kind: 'cyclic' },           // 每 everyS 秒自动施加一组子效果（周期被动）
+  jumpCharge: { kind: 'timed' },          // 跳跃充能层数：每层换一次更高跳（弹跳之力，层数可叠加）
   // 局外效果：作用于账号经验倍率，无局内表现（xp 系统在 M5 之后）
   xpMul: { kind: 'timed' },
 };
@@ -84,18 +85,23 @@ export const layersOf = (p: EffectParams): number =>
 
 /**
  * 解析 periodic 的子效果表：只接受已注册且非周期的原语（禁止周期套周期造成自激），
- * durationS/distanceM 等参数原样传给子效果。
+ * durationS/distanceM 等参数原样传给子效果；stackRule 由子效果自带（默认 refresh），
+ * 充能型子效果（jumpCharge）声明 stack 才能逐周期叠层。
  */
 export function asChildren(v: unknown): Child[] {
   if (!Array.isArray(v)) return [];
   const out: Child[] = [];
   for (const item of v) {
     if (item === null || typeof item !== 'object' || Array.isArray(item)) continue;
-    const { primitive, ...rest } = item as Record<string, unknown>;
+    const { primitive, stackRule, ...rest } = item as Record<string, unknown>;
     if (typeof primitive !== 'string') continue;
     const def = PRIMITIVES[primitive];
     if (!def || def.kind === 'cyclic') continue;
-    out.push({ primitive, params: rest });
+    const rule = String(stackRule ?? 'refresh');
+    out.push({
+      primitive, params: rest,
+      stackRule: rule === 'stack' || rule === 'replace' ? rule : 'refresh',
+    });
   }
   return out;
 }
