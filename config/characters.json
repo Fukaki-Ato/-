@@ -1,8 +1,8 @@
 {
   "$schema": "../schema/config.schema.json#/characters",
-  "configVersion": "1.1.0",
+  "configVersion": "1.1.1",
   "minEngineVersion": "1.0.0",
-  "updatedAt": "2026-10-04",
+  "updatedAt": "2026-10-05",
   "items": [
     {
       "id": "char_volt", "status": "live",
@@ -121,7 +121,10 @@
       "model": { "prefab": "assets/characters/niu.glb", "scale": 1.08, "lod": [2, 6, 12] },
       "audio": { "voDir": "assets/audio/vo/niu/", "footstep": "step_boot" },
       "tint": "#E45C5C",
-      "versions": [ { "ver": "1.1.0", "date": "2026-10-04", "change": "新增：妈妈救我清空前方 50 米障碍 + 每 20 秒自动蛮牛冲撞（三倍速、20 米无敌）" } ]
+      "versions": [
+        { "ver": "1.1.0", "date": "2026-10-04", "change": "新增：妈妈救我清空前方 50 米障碍 + 每 20 秒自动蛮牛冲撞（三倍速、20 米无敌）" },
+        { "ver": "1.1.1", "date": "2026-10-05", "change": "issue #16 校正口径：蛮牛冲撞按 talent_niu_rush 1.1.1 改为「速度顶到地面 maxSpeed 26、冲过 45 米」，上面的「三倍速、20 米」是当时未核钳位的说法" }
+      ]
     },
     { "id": "skin_volt_default", "kind": "skin", "status": "live", "baseRef": "char_volt",
       "name": { "zh-CN": "默认涂装" }, "rarity": "R",

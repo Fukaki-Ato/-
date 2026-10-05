@@ -256,17 +256,31 @@ test('妈妈救我（阿牛）：前方 50 米障碍全部消失，金币与道�
   assert.equal(sim.pickupsArr.length, 1, '道具箱必须保留');
 });
 
-test('蛮牛冲撞（阿牛被动）：每 20 秒自动提速，无敌按跑满 20 米到期', () => {
+test('蛮牛冲撞（阿牛被动）：每 20 秒自动提速，速度顶到地面 maxSpeed，无敌按配置里程到期', () => {
+  const talent = content.skills.items.find(s => s.id === 'talent_niu_rush');
+  const [speed, inv] = talent.effects[0].effects;
+  const maxSpeed = content.game.params.runner.maxSpeed;
+  assert.equal(speed.primitive, 'speedMul');
+  assert.equal(inv.primitive, 'invincible');
+  assert.equal(speed.distanceM, inv.distanceM, '提速与无敌同属一次冲撞，到期里程应一致');
+  // mul 写成顶满上限所需的最小值：baseSpeed 12 × 2.2 已 ≥ maxSpeed，再大也只跑 maxSpeed（虚标）
+  assert.ok(speed.mul * (content.game.params.runner.baseSpeed ?? 12) >= maxSpeed,
+    `提速该顶到上限，实际 ${speed.mul} × baseSpeed 不够`);
+
   const sim = new RunnerSim(content, SIM_SEED(), 'char_niu');
   sim.obstacles.length = 0;
   sim.step(); sim.drainEvents(); // 周期被动在第一步触发，触发时里程仍为 0
   assert.equal(sim.fx.invincible, true, '第一个周期应触发冲撞');
   assert.ok(sim.fx.speedMul > 1, '冲撞期应提速');
+  const d0 = sim.state.distance, t0 = sim.state.t;
+  for (let i = 0; i < 30; i++) { sim.obstacles.length = 0; sim.step(); sim.drainEvents(); }
+  const v = (sim.state.distance - d0) / (sim.state.t - t0);
+  assert.ok(Math.abs(v - maxSpeed) < 0.5, `冲撞期实测速度应顶到 maxSpeed ${maxSpeed}，实际 ${v.toFixed(1)}`);
   let guard = 0;
   while (sim.fx.invincible && guard++ < 60 * 60) { sim.obstacles.length = 0; sim.step(); sim.drainEvents(); }
   assert.equal(sim.fx.invincible, false, '按里程到期后应解除');
-  assert.ok(sim.state.distance >= 20, `应跑满 20 米才解除，实际 ${sim.state.distance.toFixed(1)}`);
-  assert.ok(sim.state.distance < 22, `解除不应明显拖过 20 米，实际 ${sim.state.distance.toFixed(1)}`);
+  assert.ok(sim.state.distance >= speed.distanceM, `应跑满 ${speed.distanceM} 米才解除，实际 ${sim.state.distance.toFixed(1)}`);
+  assert.ok(sim.state.distance < speed.distanceM + 1, `解除不应明显拖过 ${speed.distanceM} 米，实际 ${sim.state.distance.toFixed(1)}`);
   assert.equal(sim.fx.speedMul, 1, '提速与无敌同属一次冲撞，应一起结束');
 });
 

@@ -1,13 +1,13 @@
 {
   "$schema": "../schema/config.schema.json#/skills",
-  "configVersion": "1.1.0",
+  "configVersion": "1.1.1",
   "minEngineVersion": "1.1.0",
-  "updatedAt": "2026-10-04",
+  "updatedAt": "2026-10-05",
   "items": [
     {
       "id": "skill_thunder_dash", "kind": "active", "status": "live",
       "name": { "zh-CN": "雷霆冲刺", "en-US": "Thunder Dash" },
-      "desc": { "zh-CN": "2.5 秒无敌并自动避开前方障碍" },
+      "desc": { "zh-CN": "2.5 秒无敌提速，自动避开前方障碍" },
       "trigger": "double_tap", "cooldownS": 18,
       "vfx": { "cast": "vfx_thunder_dash", "loop": "vfx_aura_electric" },
       "effects": [
@@ -17,7 +17,8 @@
       ],
       "versions": [
         { "ver": "1.0.0", "date": "2026-09-22", "change": "首发" },
-        { "ver": "1.1.0", "date": "2026-10-04", "change": "移除能量充能，纯冷却释放（用户定稿：删充能，开局第 0 秒即可放）" }
+        { "ver": "1.1.0", "date": "2026-10-04", "change": "移除能量充能，纯冷却释放（用户定稿：删充能，开局第 0 秒即可放）" },
+        { "ver": "1.1.1", "date": "2026-10-05", "change": "issue #16 文案补全：原说明漏了 speedMul 1.15 这一段效果，玩家看不到提速会以为只是无敌。数值不动（小电/阿玛拉/风剃已进 golden 基线，动数值要重放 5 seed × 3 角色，不划算）" }
       ]
     },
     {
@@ -35,16 +36,17 @@
     {
       "id": "skill_blink_smash", "kind": "active", "status": "live",
       "name": { "zh-CN": "瞬闪" },
-      "desc": { "zh-CN": "向前瞬移 12 米并撞碎路径障碍" },
+      "desc": { "zh-CN": "向前瞬移 12 米，撞碎本车道障碍" },
       "trigger": "double_tap", "cooldownS": 16,
       "vfx": { "cast": "vfx_thunder_dash" },
       "effects": [
-        { "primitive": "dash", "distanceM": 12, "destroyObstacles": true },
+        { "primitive": "dash", "distanceM": 12 },
         { "primitive": "invincible", "durationS": 0.5 }
       ],
       "versions": [
         { "ver": "1.0.0", "date": "2026-09-22", "change": "首发" },
-        { "ver": "1.1.0", "date": "2026-10-04", "change": "移除能量充能，纯冷却释放" }
+        { "ver": "1.1.0", "date": "2026-10-04", "change": "移除能量充能，纯冷却释放" },
+        { "ver": "1.1.1", "date": "2026-10-05", "change": "issue #16 清死配置：dash 是瞬时原语，buffEngine 里恒撞碎所在车道（EffectWorld.destroyObstacles 只收 lane），destroyObstacles 参数运行时根本不读，留着等于承诺了一个不存在的 false 档；文案同步写准「本车道」" }
       ]
     },
     {
@@ -80,17 +82,23 @@
       "trigger": "double_tap", "cooldownS": 30,
       "vfx": { "cast": "vfx_pickup_pop", "loop": "vfx_aura_electric" },
       "effects": [ { "primitive": "invincible", "durationS": 10 } ],
-      "versions": [ { "ver": "1.1.0", "date": "2026-10-04", "change": "新增（奶蛙）：10 秒无敌。渲染层目前还没有护盾/无敌气泡表现，防护罩先由释放爆点与 HUD 名称承担" } ]
+      "versions": [
+        { "ver": "1.1.0", "date": "2026-10-04", "change": "新增（奶蛙）：10 秒无敌。渲染层目前还没有护盾/无敌气泡表现，防护罩先由释放爆点与 HUD 名称承担" },
+        { "ver": "1.1.1", "date": "2026-10-05", "change": "issue #16 复核后维持 10 秒：覆盖率 10/30=33% 看着最高，但这技能只买命不给金币与提速，莉娜同为 33% 覆盖率却额外有 2.5 倍飞行速度和空中金币带，稀有度也对价（SR 4500-7000 金币 vs SSR 奖池/活动）。若评审仍判过强，把 durationS 改 8 即降到 27%（同步 tests/character.test.mjs 那条「无敌应 10 秒」）" }
+      ]
     },
     {
       "id": "skill_mambo_power", "kind": "active", "status": "live",
       "name": { "zh-CN": "曼波之力", "en-US": "Mambo Power" },
-      "desc": { "zh-CN": "下滑 10 次触发：接下来 2 次下滑可穿过小型障碍" },
+      "desc": { "zh-CN": "下滑 10 次触发：12 秒内滑行可穿 2 个低障碍" },
       "trigger": "double_tap", "cooldownS": 0,
       "charge": { "type": "slideCount", "slides": 10 },
       "vfx": { "cast": "vfx_pickup_pop" },
       "effects": [ { "primitive": "slideGuard", "durationS": 12, "charges": 2 } ],
-      "versions": [ { "ver": "1.1.0", "date": "2026-10-04", "change": "新增（曼波）：释放门槛是主动下滑 10 次（不是能量充能），护体 2 次不可叠加、12 秒内不用即作废" } ]
+      "versions": [
+        { "ver": "1.1.0", "date": "2026-10-04", "change": "新增（曼波）：释放门槛是主动下滑 10 次（不是能量充能），护体 2 次不可叠加、12 秒内不用即作废" },
+        { "ver": "1.1.1", "date": "2026-10-05", "change": "issue #16 文案对准运行时：resolveHit 里 slideGuard 只在 sliding 且障碍 cls=low（本来要跳起的那种）时消耗，高杆与满格墙不吃护体；原文案「小型障碍」会被读成任意小东西，且没交代 12 秒就作废。数值不动" }
+      ]
     },
     {
       "id": "skill_mama_save", "kind": "active", "status": "live",
@@ -159,18 +167,21 @@
     },
     {
       "id": "talent_niu_rush", "kind": "passive", "status": "live",
-      "name": { "zh-CN": "蛮牛冲撞" }, "desc": { "zh-CN": "每 20 秒自动冲撞一次：三倍速、20 米无敌" },
+      "name": { "zh-CN": "蛮牛冲撞" }, "desc": { "zh-CN": "每 20 秒自动冲撞：速度顶到上限，冲过前 45 米" },
       "trigger": "run_start",
       "effects": [
         {
           "primitive": "periodic", "durationS": 3600, "everyS": 20,
           "effects": [
-            { "primitive": "speedMul", "distanceM": 20, "mul": 3 },
-            { "primitive": "invincible", "distanceM": 20 }
+            { "primitive": "speedMul", "distanceM": 45, "mul": 2.2 },
+            { "primitive": "invincible", "distanceM": 45 }
           ]
         }
       ],
-      "versions": [ { "ver": "1.1.0", "date": "2026-10-04", "change": "新增（阿牛）：周期 20 秒，效果按里程到期（无敌与提速都是走完 20 米即止）。注意三倍速会被 game.json runner.maxSpeed 上限夹住" } ]
+      "versions": [
+        { "ver": "1.1.0", "date": "2026-10-04", "change": "新增（阿牛）：周期 20 秒，效果按里程到期（无敌与提速都是走完 20 米即止）。注意三倍速会被 game.json runner.maxSpeed 上限夹住" },
+        { "ver": "1.1.1", "date": "2026-10-05", "change": "issue #16 校准：地面速度在 runnerSim 里被 runner.maxSpeed=26 硬夹（baseSpeed 12 × 3 = 36 也只能跑到 26），mul 3 是虚标，改 2.2 后同样的顶满；20 米在顶满速度下只有 0.77 秒，无敌还没走完一个障碍群就到期，改 45 米（≈1.7 秒），文案不再承诺「三倍」" }
+      ]
     }
   ]
 }
