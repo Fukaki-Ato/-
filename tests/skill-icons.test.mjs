@@ -169,6 +169,33 @@ test('主动图标：亮=可点，点击触发释放回调；暗态被禁用点�
   host.clear();
 });
 
+test('暗态真的落到渲染参数上（不被 Button 的 disabled 视觉覆盖回去）', () => {
+  const { host } = hostFixture();
+  const icons = buildSkillIcons(host, {}, () => {}, { top: 0, bottom: 0 });
+  const view = host.makeView();
+  view.add(icons.root);
+  host.mount(view, { transparent: true });
+  relayout2(host);
+
+  icons.update({ ready: true, cd: 0, charge: null, active: true, charges: 0 });
+  relayout2(host);
+  const lit = icons.activeIcon.bgVisual;
+  assert.equal(lit.color, 'ffffff', '亮态应是白乘色（不改色相）');
+  assert.equal(lit.opacity, 1, '亮态应全不透明');
+
+  // 暗态：Button 走 setDisabled，其 applyVisual 会把乘色重置为白、透明度重置为 0.45。
+  // 上面那条用例只验「点不动」，验不到「画出来没有」——顺序写反时图标会糊成半透明灰块。
+  icons.update({ ready: false, cd: 12, charge: null, active: false, charges: 0 });
+  relayout2(host);
+  const dim = icons.activeIcon.bgVisual;
+  assert.notEqual(dim.color, 'ffffff', '暗态乘色不该仍是白：白=被 applyVisual 覆盖，压暗参数没落上');
+  assert.ok(dim.opacity < lit.opacity, `暗态应比亮态更暗，实际 ${dim.opacity} vs ${lit.opacity}`);
+  assert.ok(dim.opacity >= 0.6,
+    `暗态不该低于 0.6（跑酷背景是亮沙，太透就看不出那是个技能键），实际 ${dim.opacity}`);
+  assert.equal(icons.passiveIcon.bgVisual.color, dim.color, '被动暗态与主动同口径（Box 侧不受态机影响）');
+  host.clear();
+});
+
 test('被动图标：充能耗尽后转暗且不留文案', () => {
   const { host } = hostFixture();
   const icons = buildSkillIcons(host, {}, null, { top: 0, bottom: 0 });
@@ -259,7 +286,8 @@ test('sim.passiveActive：无被动的装配返回 false（不亮假图标）', 
 test('技能图标素材在场：两张 png，体积克制且同量级', () => {
   for (const name of ['active', 'passive']) {
     const p = join(process.cwd(), 'assets/ui/skills', `${name}.png`);
-    assert.ok(existsSync(p), `缺少 ${name}.png（跑 D:/python/python.exe tools/gen_skill_icons.py）`);
+    assert.ok(existsSync(p), `缺少 ${name}.png（重出图：ImageGen 品红底 → tools/mat_skill_icons.py 抠图；`
+      + `离线兜底：D:/python/python.exe tools/gen_skill_icons.py）`);
     const bytes = statSync(p).size;
     assert.ok(bytes > 500, `${name}.png 太小（${bytes}B），可能是空图`);
     assert.ok(bytes < 120 * 1024, `${name}.png 过大（${(bytes / 1024).toFixed(1)}KB），要算 WX 包体`);

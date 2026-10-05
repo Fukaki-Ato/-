@@ -80,10 +80,12 @@ export function skillCaption(kind: 'active' | 'passive', s: {
   return s.charges > 0 ? `×${s.charges}` : '生效中';
 }
 
-/** 亮/暗的视觉参数：暗态压暗乘色 + 降不透明度（亮态=白） */
+/** 亮/暗的视觉参数：暗态压暗乘色 + 降不透明度（亮态=白）
+ *  乘色取中性浅灰而非蓝灰：图标本体是琥珀金/青蓝两套色，压成蓝灰会把金色糊成灰饼、
+ *  看不出是闪电；浅灰只降亮度不抢色相，暗态仍能辨形但明显「没点亮」。 */
 const LIT_COLOR = '#ffffff';
-const DIM_COLOR = '#5a6478';
-const DIM_OPACITY = 0.55;
+const DIM_COLOR = '#9aa3b0';
+const DIM_OPACITY = 0.72;
 const LIT_OPACITY = 1;
 
 /**
@@ -100,16 +102,18 @@ class SkillIcon extends Box {
     super({ direction: 'column', align: 'center', gap: 2 });
     const src = kind === 'active' ? set.active : set.passive;
     // 缺贴图时用主题圆底占位：结构/命中区不变，测试与调试锚点照旧
-    const faceOpts = {
+    const base = {
       width: size, height: size, align: 'center' as const, justify: 'center' as const,
-      ...(src
-        ? { background: src, backgroundColor: LIT_COLOR }
-        : { background: host.solidSkin, backgroundColor: kind === 'active' ? '#c8922e' : '#2b7fb0' }),
     };
+    const bg = src ?? host.solidSkin;
+    const tint = src ? LIT_COLOR : (kind === 'active' ? '#c8922e' : '#2b7fb0');
     this.isButton = onTap !== null;
+    // 注意：Button 的背景只认 opts.skin（见 framework button.ts 的 onBind），传 background 会被
+    // 静默忽略 ⇒ 图标画成通用按钮皮，闪电/盾牌根本不上屏。它也不收 backgroundColor：
+    // 亮暗乘色统一由 setLit → setBackground 落，构造期不需要着色。
     this.face = onTap
-      ? new Button({ ...faceOpts, padding: 0, onClick: () => onTap() })
-      : new Box(faceOpts);
+      ? new Button({ ...base, skin: bg, padding: 0, onClick: () => onTap() })
+      : new Box({ ...base, background: bg, backgroundColor: tint });
     this.caption = new Label({ text: '', fontSizePx: 11, color: host.theme.colors.gold, align: 'center' });
     // 名牌锚点（不可见）：测试按文本定位两枚图标，不依赖贴图
     const tag = new Label({ text: kind === 'active' ? '主动技能' : '被动天赋' });
@@ -127,8 +131,10 @@ class SkillIcon extends Box {
     const v = { color: lit ? LIT_COLOR : DIM_COLOR, opacity: lit ? LIT_OPACITY : DIM_OPACITY };
     if (this.isButton) {
       const btn = this.face as Button;
-      btn.setBackground(v);
+      // 顺序要紧：setDisabled 会走 applyVisual 把乘色/透明度覆盖成 disabled 的 0.45 白，
+      // 先它后 setBackground，暗态参数才留得住（否则冷却中的图标只是半透明，压在亮沙上直接糊掉）。
       btn.setDisabled(!lit);
+      btn.setBackground(v);
     } else {
       (this.face as Box).setBackground(v);
     }
@@ -140,6 +146,18 @@ class SkillIcon extends Box {
   get captionLabel(): Label { return this.caption; }
   /** 主动图标是否可点（暗态被 setDisabled 吞掉点击） */
   get tappable(): boolean { return this.isButton; }
+  /**
+   * 测试锚点：图标面**实际**的乘色与不透明度（读渲染对象，不读 opts）。
+   * 存在的理由：Button.setDisabled 会经 applyVisual 覆盖这两个值，
+   * 只测「暗态点不动」测不出「暗态根本没画出来」——两者是不同的 bug。
+   */
+  get bgVisual(): { color: string; opacity: number } {
+    const u = (this.face as unknown as {
+      bg?: { material?: { uniforms?: Record<string, { value: unknown }> } };
+    }).bg?.material?.uniforms;
+    const col = u?.uColor?.value as { getHexString?: () => string } | undefined;
+    return { color: col?.getHexString?.() ?? '', opacity: typeof u?.uOpacity?.value === 'number' ? u.uOpacity.value : -1 };
+  }
 }
 
 /** HUD 右侧技能图标区：竖排两枚 + 更新句柄（root 交给调用方挂进自己的 view） */
