@@ -697,6 +697,8 @@ export interface IPlatformAdapter {
 export interface GameplayLaunchOptions {
   mode: GameMode;
   characterId: CharacterId;
+  /** 当前角色算得的属性（由外围在 launch 前预取传入，玩法直接使用）。 */
+  attrs?: CharacterAttrs;
   items?: ItemId[];
   seed?: number;
 }

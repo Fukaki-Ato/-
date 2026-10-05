@@ -329,14 +329,15 @@ export class MainMenuPanel extends BasePanel {
    * 开始酷跑（docs/06 §4 集成时序）：
    * 携带 pendingBuff → preload（3s 超时忽略）→ run.started → launch →
    * run.finished（S03 装配响应任务/成就/活动）→ 结算计算 → RunSettlementPanel。
-   * launch 异常/拒绝：Toast「本局无效」，不发奖，LoadingMask 保证关闭。
+   * launch 异常/拒绝：Toast「本局无效」，不发奖，携带道具放回存档，LoadingMask 保证关闭。
    */
   private async onStartRun(): Promise<void> {
     if (this.running) return;
     this.running = true;
     if (this.startButton) this.startButton.interactable = false;
     LoadingMask.show('准备出发...');
-    const opts = this.buildLaunchOptions();
+    const buffs = this.takePendingBuffs();
+    const opts = this.buildLaunchOptions(buffs.items);
     try {
       await this.preloadGameplay(PRELOAD_TIMEOUT_MS);
       this.ctx.events.emit('run.started', opts);
@@ -347,6 +348,7 @@ export class MainMenuPanel extends BasePanel {
       });
     } catch (err) {
       log.error('跑酷启动失败', err);
+      buffs.restore();
       Toast.show('本局无效');
     } finally {
       LoadingMask.hide();
@@ -355,35 +357,56 @@ export class MainMenuPanel extends BasePanel {
     }
   }
 
-  /** 收集本局进入参数：当前角色 + flags 中的 pendingBuff 道具（传完清空）。 */
-  private buildLaunchOptions(): GameplayLaunchOptions {
-    const items = this.collectPendingBuffs();
+  /** 组装本局进入参数：当前角色 + 角色属性 + pendingBuff 道具。 */
+  private buildLaunchOptions(items: ItemId[]): GameplayLaunchOptions {
+    const characterId = this.ctx.save.characters.selected;
     return {
       mode: 'classic',
-      characterId: this.ctx.save.characters.selected,
+      characterId,
+      attrs: this.ctx.character.attrsOf(characterId),
       ...(items.length > 0 ? { items } : {}),
     };
   }
 
-  private collectPendingBuffs(): ItemId[] {
+  /**
+   * 从 flags 取出本局携带的 buff 道具（取出即清空，避免重复携带）。
+   * 返回 restore() 供 launch 失败时原样放回，防止白扣道具。
+   */
+  private takePendingBuffs(): { items: ItemId[]; restore: () => void } {
     const flags = this.ctx.save.flags;
     const items: ItemId[] = [];
+    const original: Record<string, number> = {};
     for (const key of Object.keys(flags)) {
       if (!key.startsWith(PENDING_BUFF_PREFIX)) continue;
       const raw = flags[key];
-      const count = typeof raw === 'number' && Number.isFinite(raw)
-        ? Math.min(MAX_BUFF_STACK, Math.max(0, Math.trunc(raw)))
-        : 0;
+      const rawCount = typeof raw === 'number' && Number.isFinite(raw) ? Math.max(0, Math.trunc(raw)) : 0;
+      original[key] = rawCount;
       const buffId = key.slice(PENDING_BUFF_PREFIX.length);
       delete flags[key];
       if (buffId.length === 0) continue;
+      const count = Math.min(MAX_BUFF_STACK, rawCount);
       for (let i = 0; i < count; i += 1) items.push(buffId);
     }
     if (items.length > 0) {
       this.ctx.markDirty();
       log.info(`本局携带道具：${items.join(',')}`);
     }
-    return items;
+    return {
+      items,
+      restore: () => {
+        for (const [key, count] of Object.entries(original)) {
+          const current = flags[key];
+          const base = typeof current === 'number' && Number.isFinite(current)
+            ? Math.max(0, Math.trunc(current))
+            : 0;
+          flags[key] = base + count;
+        }
+        if (items.length > 0) {
+          this.ctx.markDirty();
+          log.warn(`本局无效，已放回携带道具：${items.join(',')}`);
+        }
+      },
+    };
   }
 
   /** preload 不阻塞进入：超时或 reject 均忽略（docs/06 §4）。 */
