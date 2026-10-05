@@ -7,7 +7,8 @@
  *   1) 产物根目录存在开放数据域代码目录（入口 index.js）；
  *   2) game.json 写入 "openDataContext": "<目录名>"。
  *
- * 本脚本在每次 `npm run build:wechat`（或手动构建）后执行：
+ * 本脚本在每次 build/wechatgame 构建完成后执行：
+ *   npm run wechat:opendata
  *   node scripts/wechat-open-data-context.mjs [buildDir]
  * 默认 buildDir = build/wechatgame。
  */
