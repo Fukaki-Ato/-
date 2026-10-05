@@ -108,6 +108,15 @@ export class SettingsPanel extends BasePanel {
     button({
       parent: bg,
       size: { width: 520, height: 92 },
+      position: [0, row(108)],
+      text: '分享给好友',
+      variant: 'green',
+      onClick: () => void this.shareToFriend(),
+    });
+
+    button({
+      parent: bg,
+      size: { width: 520, height: 92 },
       position: [0, row(120)],
       text: '重置存档',
       variant: 'danger',
@@ -137,6 +146,16 @@ export class SettingsPanel extends BasePanel {
     // 存档设置可能在别处变更（如调试面板），打开时同步一次。
     this.musicToggle?.setValue(AudioService.isMusicOn());
     this.sfxToggle?.setValue(AudioService.isSfxOn());
+  }
+
+  /** 主动分享入口（docs/04 §3.3）：失败仅静默 Toast，不阻塞设置面板。 */
+  private async shareToFriend(): Promise<void> {
+    try {
+      const ok = await this.ctx.platform.share({ title: '雷霆酷跑，一起来跑！' });
+      if (!ok) Toast.show('分享未完成');
+    } catch {
+      Toast.show('分享失败，请稍后再试');
+    }
   }
 
   private async confirmReset(): Promise<void> {
