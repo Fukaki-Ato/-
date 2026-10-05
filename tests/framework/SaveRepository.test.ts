@@ -127,4 +127,40 @@ describe('LocalSaveRepository', () => {
     expect(raw).not.toBeNull();
     expect((JSON.parse(raw as string) as { currency: { gold: number } }).currency.gold).toBe(0);
   });
+
+  const invalidCases: Array<{ name: string; mutate: (save: any) => void }> = [
+    { name: '缺少 welfare', mutate: (save) => delete save.welfare },
+    { name: 'inventory 值为负数', mutate: (save) => { save.inventory = { magnet: -1 }; } },
+    { name: 'tasks.daily 缺少 claimed', mutate: (save) => delete save.tasks.daily.claimed },
+    { name: 'settings 类型错误', mutate: (save) => { save.settings = { music: 'yes', sfx: true }; } },
+    { name: 'stats 字段缺失', mutate: (save) => delete save.stats.loginDays },
+    { name: '角色等级表缺失', mutate: (save) => delete save.characters.levels },
+    { name: 'activities.progress 非数字', mutate: (save) => { save.activities.progress = { act: 'x' }; } },
+  ];
+
+  for (const { name, mutate } of invalidCases) {
+    it(`子结构非法按坏档处理：${name}`, () => {
+      const { storage, repo } = setup();
+      const save = createDefaultSave(PROFILE, '2026-10-04', '2026-W40', 1);
+      mutate(save);
+      storage.set(SAVE_KEY, JSON.stringify(save));
+      const loaded = repo.load();
+      expect(loaded.currency).toEqual({ gold: 0, diamond: 0 });
+      expect(loaded.profile.uid).toBe(PROFILE.uid);
+      expect(storage.get(`${SAVE_CORRUPT_PREFIX}${NOW}`)).not.toBeNull();
+    });
+  }
+
+  it('合法完整档（含道具/统计/flags）不受加固校验影响', () => {
+    const { storage, repo } = setup();
+    const save = createDefaultSave(PROFILE, '2026-10-04', '2026-W40', 1);
+    save.inventory = { magnet: 2 };
+    save.stats.runs = 3;
+    save.flags = { privacyAccepted: true, 'pendingBuff.magnet': 2 };
+    storage.set(SAVE_KEY, JSON.stringify(save));
+    const loaded = repo.load();
+    expect(loaded.inventory.magnet).toBe(2);
+    expect(loaded.stats.runs).toBe(3);
+    expect(storage.get(`${SAVE_CORRUPT_PREFIX}${NOW}`)).toBeNull();
+  });
 });

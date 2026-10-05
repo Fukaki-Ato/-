@@ -167,21 +167,95 @@ function isNonNegativeInt(value: unknown): value is number {
   return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0;
 }
 
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value);
+}
+
+function isStringArray(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every((item) => typeof item === 'string');
+}
+
+function isNonNegativeIntRecord(value: unknown): value is Record<string, number> {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;
+  return Object.values(value as Record<string, unknown>).every(isNonNegativeInt);
+}
+
+function isStringArrayRecord(value: unknown): value is Record<string, string[]> {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;
+  return Object.values(value as Record<string, unknown>).every(isStringArray);
+}
+
+function isTaskPeriodState(value: unknown): boolean {
+  if (typeof value !== 'object' || value === null) return false;
+  const state = value as { date?: unknown; progress?: unknown; claimed?: unknown };
+  return typeof state.date === 'string'
+    && isNonNegativeIntRecord(state.progress)
+    && isStringArray(state.claimed);
+}
+
+function isPlayerProfile(value: unknown): boolean {
+  if (typeof value !== 'object' || value === null) return false;
+  const profile = value as Record<string, unknown>;
+  return typeof profile.uid === 'string'
+    && typeof profile.nickname === 'string'
+    && typeof profile.avatarUrl === 'string'
+    && typeof profile.isGuest === 'boolean'
+    && isFiniteNumber(profile.createdAt);
+}
+
+function isPlayerStats(value: unknown): boolean {
+  if (typeof value !== 'object' || value === null) return false;
+  const stats = value as Record<string, unknown>;
+  return ['runs', 'bestScore', 'totalDistance', 'totalCoins', 'totalDiamonds', 'totalPlayMs', 'loginDays']
+    .every((field) => isNonNegativeInt(stats[field]));
+}
+
+/** 完整结构校验：任一子结构缺失或非法都视为坏档（备份 + 默认档）。 */
 function isSaveShape(value: unknown): value is SaveData {
   if (typeof value !== 'object' || value === null) return false;
-  const save = value as Partial<SaveData>;
+  const save = value as Record<string, unknown>;
   if (!isNonNegativeInt(save.version)) return false;
-  const profile = save.profile;
-  if (!profile || typeof profile.uid !== 'string' || typeof profile.nickname !== 'string') return false;
-  const currency = save.currency;
+  if (!isPlayerProfile(save.profile)) return false;
+  if (!isNonNegativeIntRecord(save.inventory)) return false;
+
+  const currency = save.currency as Record<string, unknown> | undefined;
   if (!currency || !isNonNegativeInt(currency.gold) || !isNonNegativeInt(currency.diamond)) return false;
-  const characters = save.characters;
-  if (!characters || !Array.isArray(characters.unlocked)) return false;
-  if (typeof characters.selected !== 'string' || !characters.unlocked.includes(characters.selected)) return false;
-  const tasks = save.tasks;
-  if (!tasks?.daily || !tasks.weekly) return false;
-  const stats = save.stats;
-  if (!stats || !isNonNegativeInt(stats.bestScore)) return false;
-  if (typeof save.updatedAt !== 'number') return false;
-  return true;
+
+  const characters = save.characters as Record<string, unknown> | undefined;
+  if (!characters) return false;
+  const unlocked = characters.unlocked;
+  if (!isStringArray(unlocked) || unlocked.length === 0) return false;
+  if (typeof characters.selected !== 'string' || !unlocked.includes(characters.selected)) return false;
+  if (!isNonNegativeIntRecord(characters.levels)) return false;
+
+  const welfare = save.welfare as Record<string, unknown> | undefined;
+  if (!welfare || typeof welfare.lastSignInDate !== 'string') return false;
+  if (!isNonNegativeInt(welfare.signInCycleDay) || !isStringArray(welfare.signInHistory)) return false;
+
+  const tasks = save.tasks as Record<string, unknown> | undefined;
+  if (!tasks || !isTaskPeriodState(tasks.daily) || !isTaskPeriodState(tasks.weekly)) return false;
+
+  const achievements = save.achievements as Record<string, unknown> | undefined;
+  if (!achievements || !isNonNegativeIntRecord(achievements.progress) || !isStringArray(achievements.claimed)) return false;
+
+  const shop = save.shop as Record<string, unknown> | undefined;
+  if (!shop || !isNonNegativeIntRecord(shop.dailyBought) || !isNonNegativeIntRecord(shop.adClaimed)) return false;
+  if (typeof shop.dailyRefreshDate !== 'string') return false;
+
+  const activities = save.activities as Record<string, unknown> | undefined;
+  if (!activities || !isStringArrayRecord(activities.claimed) || !isNonNegativeIntRecord(activities.progress)) return false;
+
+  if (!isPlayerStats(save.stats)) return false;
+
+  const settings = save.settings as Record<string, unknown> | undefined;
+  if (!settings || typeof settings.music !== 'boolean' || typeof settings.sfx !== 'boolean') return false;
+
+  const flags = save.flags;
+  if (typeof flags !== 'object' || flags === null || Array.isArray(flags)) return false;
+  const flagsValid = Object.values(flags as Record<string, unknown>).every(
+    (item) => typeof item === 'boolean' || typeof item === 'string' || isFiniteNumber(item),
+  );
+  if (!flagsValid) return false;
+
+  return isFiniteNumber(save.updatedAt);
 }
