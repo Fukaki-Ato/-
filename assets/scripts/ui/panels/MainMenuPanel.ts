@@ -1,6 +1,7 @@
 import { Button, Color, Graphics, Node, SafeArea, Widget } from 'cc';
-import type { RedDotKey } from '../../core/contracts';
+import type { GameplayLaunchOptions, ItemId, RedDotKey } from '../../core/contracts';
 import { Logger } from '../../core/framework/Logger';
+import { delay } from '../../core/framework/Utils';
 import { applySprite } from '../framework/Assets';
 import { AudioService } from '../framework/AudioService';
 import { BasePanel } from '../framework/BasePanel';
@@ -12,8 +13,16 @@ import { Theme } from '../framework/Theme';
 import { Toast } from '../framework/Toast';
 import { label, node, stretch } from '../framework/UIKit';
 import { PANEL_NAMES } from './panelNames';
+import { openSettlementPanel } from './RunFlow';
 
 const log = new Logger();
+
+/** useItem 写入的待生效道具前缀（docs/03 §2.6）。 */
+const PENDING_BUFF_PREFIX = 'pendingBuff.';
+/** 单个 buff 单局最多携带份数（防脏存档撑爆 items）。 */
+const MAX_BUFF_STACK = 99;
+/** preload 等待上限（docs/06 §4：超时忽略继续进入）。 */
+const PRELOAD_TIMEOUT_MS = 3000;
 
 const DESIGN_W = Theme.size.designWidth;
 const DESIGN_H = Theme.size.designHeight;
@@ -316,25 +325,82 @@ export class MainMenuPanel extends BasePanel {
     Toast.show('商店开发中');
   }
 
+  /**
+   * 开始酷跑（docs/06 §4 集成时序）：
+   * 携带 pendingBuff → preload（3s 超时忽略）→ run.started → launch →
+   * run.finished（S03 装配响应任务/成就/活动）→ 结算计算 → RunSettlementPanel。
+   * launch 异常/拒绝：Toast「本局无效」，不发奖，LoadingMask 保证关闭。
+   */
   private async onStartRun(): Promise<void> {
     if (this.running) return;
     this.running = true;
     if (this.startButton) this.startButton.interactable = false;
-    LoadingMask.show('进入酷跑...');
+    LoadingMask.show('准备出发...');
+    const opts = this.buildLaunchOptions();
     try {
-      const result = await this.ctx.gameplay.launch({
-        mode: 'classic',
-        characterId: this.ctx.save.characters.selected,
+      await this.preloadGameplay(PRELOAD_TIMEOUT_MS);
+      this.ctx.events.emit('run.started', opts);
+      const result = await this.ctx.gameplay.launch(opts);
+      this.ctx.events.emit('run.finished', result);
+      await openSettlementPanel(this.ctx, result, () => {
+        void this.onStartRun();
       });
-      // S08 接入点：此处改为打开 RunSettlementPanel，并走 run.finished / run.settled 流程。
-      Toast.show(`得分 ${result.score}｜距离 ${result.distance}m（结算接入见 S08）`);
     } catch (err) {
       log.error('跑酷启动失败', err);
-      Toast.show('跑酷启动失败，请重试');
+      Toast.show('本局无效');
     } finally {
       LoadingMask.hide();
       this.running = false;
       if (this.startButton) this.startButton.interactable = true;
     }
+  }
+
+  /** 收集本局进入参数：当前角色 + flags 中的 pendingBuff 道具（传完清空）。 */
+  private buildLaunchOptions(): GameplayLaunchOptions {
+    const items = this.collectPendingBuffs();
+    return {
+      mode: 'classic',
+      characterId: this.ctx.save.characters.selected,
+      ...(items.length > 0 ? { items } : {}),
+    };
+  }
+
+  private collectPendingBuffs(): ItemId[] {
+    const flags = this.ctx.save.flags;
+    const items: ItemId[] = [];
+    for (const key of Object.keys(flags)) {
+      if (!key.startsWith(PENDING_BUFF_PREFIX)) continue;
+      const raw = flags[key];
+      const count = typeof raw === 'number' && Number.isFinite(raw)
+        ? Math.min(MAX_BUFF_STACK, Math.max(0, Math.trunc(raw)))
+        : 0;
+      const buffId = key.slice(PENDING_BUFF_PREFIX.length);
+      delete flags[key];
+      if (buffId.length === 0) continue;
+      for (let i = 0; i < count; i += 1) items.push(buffId);
+    }
+    if (items.length > 0) {
+      this.ctx.markDirty();
+      log.info(`本局携带道具：${items.join(',')}`);
+    }
+    return items;
+  }
+
+  /** preload 不阻塞进入：超时或 reject 均忽略（docs/06 §4）。 */
+  private async preloadGameplay(timeoutMs: number): Promise<void> {
+    let timedOut = false;
+    try {
+      await Promise.race([
+        this.ctx.gameplay.preload().catch((err) => {
+          log.warn('玩法 preload 失败，已忽略', err);
+        }),
+        delay(timeoutMs).then(() => {
+          timedOut = true;
+        }),
+      ]);
+    } catch (err) {
+      log.warn('玩法 preload 异常，已忽略', err);
+    }
+    if (timedOut) log.warn(`玩法 preload 超过 ${timeoutMs}ms，继续进入`);
   }
 }
