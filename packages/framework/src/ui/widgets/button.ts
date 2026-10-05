@@ -67,6 +67,17 @@ export class Button extends Widget {
     if (r.changed) { this.applyVisual(); this.requireEnv().invalidate(); }
   }
 
+  /**
+   * 就地改背景乘色/不透明度（不重建控件 ⇒ 不打断命中注册与按压态机）。
+   * 亮暗两态靠它表达：亮=白乘色全不透明，暗=压暗乘色并降透明度。
+   * 注意与 setDisabled 的区别：disabled 会吞掉点击（技能「冷却中不可点」用这个），
+   * 而本方法只改视觉（按下/冷却提示等仍需可点时用）。
+   */
+  setBackground(v: { color?: string; opacity?: number }): void {
+    this.bg?.setColor(v.color ?? this.env?.theme.pressedTint ?? '#ffffff');
+    this.bg?.setOpacity(v.opacity ?? 1);
+  }
+
   get state() { return this.machine.state; }
 
   private applyVisual(): void {
