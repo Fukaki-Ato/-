@@ -4,19 +4,23 @@
 > 解决「跳不过高障碍」；② 局内 HUD 加**中右方两枚技能图标**（主动亮=可点释放、
 > 被动亮=可触发但不可释放），替换原顶部技能文字行。所有角色共用一套图标。
 >
-> 分支 `content/frog-jump-charge`，**未推**。叠在 PR #14（`content/character-skills`，
-> 仍待 @Fukaki-Ato review）之上，比它多 3 个提交。基线 `main` = `origin/main` = `22e03fa`。
-> 验证：`npm run check` 五步全绿（444 用例），WX 整包 9.01 MB / 30 MB。
+> 分支已按 CONTRIBUTING 拆成三条（见 §一）：`feature/ui-set-background`（框架，base `main`）、
+> `content/frog-jump-charge`（跳跃充能，base PR #14）、`feature/run-skill-icons`（图标，base 上一条）。
+> 三条**都未推**，等本人点头。基线 `main` = `origin/main` = `22e03fa`。
+> 验证：三条各自跑过 `npm run check` 五步全绿；图标那条整包 9.04 MB / 30 MB。
 
 ---
 
-## 一、三条提交
+## 一、三条分支 / 三条 PR（2026-10-05 已按 CONTRIBUTING 拆开）
 
-| 提交 | 内容 | 文件 |
-| --- | --- | --- |
-| `071c014` | 充能式跳跃：新原语 `jumpCharge` + `periodic` 子效果叠层 + 起跳乘区 + 配置 | 12 个（含 config/schema/font） |
-| `b59779b` | `?debug` 探针暴露 `jumpCharges`/`jumpChargeMul`/`periodicLive` | 1 |
-| `015f8d8` | 技能图标：素材生成 + HUD 装配 + 亮灯口径 + 两处框架只加不改 | 16 |
+| PR | 分支 | base | 内容 |
+| --- | --- | --- | --- |
+| ① 框架 API | `feature/ui-set-background` | `main` | `Box.setBackground` + `Button.setBackground` + 三条控件用例。**独立可评审**，@Fukaki-Ato 专属 |
+| ② 跳跃充能 | `content/frog-jump-charge` | `content/character-skills`（PR #14） | 新原语 `jumpCharge` + `periodic` 子效果叠层 + 起跳乘区 + 配置 + 字体图集 + `?debug` 探针 |
+| ③ 技能图标 | `feature/run-skill-icons` | ②分支 | 素材 + 抠图工具 + HUD 装配 + 亮灯口径 + 图标修复；**并 cherry-pick 了 ①的两条提交**（不带上它编译不过） |
+
+①与②无耦合，可并行评审。③依赖①②：①合并后把 ③里那两条 cherry-pick 提交撤掉
+（同 patch-id，GitHub 会自动从 diff 里消失），base 保持 ②即可。
 
 评审可按提交逐条看，每条提交信息都写了「改了什么 + 为什么」。
 
@@ -91,16 +95,26 @@ const mul = this.hooks.consumeJumpCharge() ? chargeMul : (fx.bootsT > 0 ? fx.jum
 叠层被动亮时显示次数（奶蛙 `×3`），暗态不留文案。图标下方状态小字：
 主动 `可释放` / `12.0s` / `5/10`（下滑积攒进度）；被动 `生效中` / `×N`。
 
-### 3.2 素材：为什么程序化生成而不是复用 badges
+### 3.2 素材：现在走 ImageGen 出图 + 抠图，程序化生成留作离线兜底
 
 `assets/ui/badges/*` 那批是大厅**入口**徽标（金框、尺寸 290~604 不一、烘焙了中文标签、
-normal/glow 双帧），语义和尺寸需求都对不上，另做一套。生成器
-`tools/gen_skill_icons.py`：
+normal/glow 双帧），语义和尺寸需求都对不上，另做一套。
 
-- 192²，各约 25~28KB，**确定性输出、无随机**（超采样 4× 再 LANCZOS 降采样得到抗锯齿）。
+**当前入库的两张图来自 ImageGen**（2026-10-05 视觉重做定稿）：让它画在**纯品红
+#FF00FF** 底上（调色板里没有这个色，键控不会误吃本体），再由 `tools/mat_skill_icons.py`
+色度键抠图 → 圆形遮罩裁掉右下角「Qoder AI 生成」水印 → 去粉边 → 192²。
+重跑：先 `cp` 到 ASCII 目录（本机 PIL 不吃中文路径），
+`D:/python/python.exe tools/mat_skill_icons.py --in D:/tmp/icons/active.png --out D:/tmp/icons_out/active.png`，
+再拷回 `assets/ui/skills/`。
+
+`tools/gen_skill_icons.py`（程序化确定性生成，同 192² 规格）保留作**离线兜底**：
+没有出图通道时 `D:/python/python.exe tools/gen_skill_icons.py` 能重出一张能用的。
+
+两张共同约束（`tests/skill-icons.test.mjs` 钉住）：存在、>500B、**<120KB**、彼此同量级。
+当前 39.7 / 43.8KB。
+
 - **只烘亮态一张**：暗态由 UI 层乘暗 + 降透明度。省一半贴图，也免了两帧配准问题。
-- 带外发光（`GaussianBlur(3)` 后 alpha 合成）：跑酷背景是浅蓝亮沙，无发光会糊进画面。
-- 重跑：`D:/python/python.exe tools/gen_skill_icons.py`（注意 cv2/PIL 不吃中文路径）。
+- 带外发光：跑酷背景是浅蓝亮沙，无发光会糊进画面。
 
 ### 3.3 亮灯口径（`core/sim/passiveView.ts`）
 
@@ -157,8 +171,8 @@ normal/glow 是点击瞬间换一次，不存在高频翻转。
 | 被动亮=可触发、不可释放 | ✅ | 被动用 `Box` 非 `Button`，`tappable === false` |
 | 图标不出屏/不重叠/贴边 | ✅ | 7 档视口（390×844 … 1200×500）含竖屏横屏极端档 |
 | 缺贴图降级 | ✅ | 退化为纯色圆，结构与命中区不变 |
-| `npm run check` | ✅ | 五步全绿，444 用例 |
-| WX 包体门禁 | ✅ | 分包 +52KB，整包 9.01 MB / 30 MB（26.4%） |
+| `npm run check` | ✅ | 五步全绿，448 用例（拆 PR 后在 `feature/run-skill-icons` 上复验） |
+| WX 包体门禁 | ✅ | 分包 +52KB，整包 9.04 MB / 30 MB（26.5%） |
 | golden 基线 | ⚠️ 未重算 | 见 2.5，已确认不需要，但属实测推断 |
 
 ---
@@ -177,6 +191,16 @@ normal/glow 是点击瞬间换一次，不存在高频翻转。
    被别的东西撞死（一度四组用例全部返回同一个 `y=2.18`）。
 5. **测「基础跳」不能用奶蛙**：它开局第一步就被 `periodic` 挂上 1 层充能，
    不显式 `buffs.remove('jumpCharge')` 就会把充能跳误报成基础跳。基线用小电。
+6. **`Button` 的背景只认 `opts.skin`，不读 `opts.background`**（`framework/src/ui/widgets/button.ts`
+   的 `onBind`）。第一版技能图标传的是 `background`，于是主动图标一直画成**通用按钮灰皮**，
+   闪电/盾牌贴图根本没上屏——headless 测试全绿也照样看不出来，因为是浏览器实跑才发现的。
+   照 `ui/badges.ts:51` 的写法传 `skin`。
+7. **暗态会被 `Button.setDisabled` 覆盖**：`setDisabled` 走 `applyVisual()`，把乘色重置成白、
+   透明度重置成 disabled 自带的 0.45。所以 `setLit` 里必须**先 `setDisabled` 后 `setBackground`**，
+   顺序反了图标就只是块半透明灰，压在亮沙背景上直接糊掉。
+   回归用例在 `tests/ui-widgets.test.mjs` 与 `tests/skill-icons.test.mjs`，
+   读的是 `NinePatchSprite` 的 `uColor`/`uOpacity` uniform——**断言取纯黑 `#000000`**，
+   THREE 的 Color 有 sRGB↔linear 往返，`0x80` 读回来是 `0xbc`，只有 0/1 精确可逆。
 
 ---
 
@@ -198,23 +222,21 @@ normal/glow 是点击瞬间换一次，不存在高频翻转。
   接上时注意：wx 无 `<video>`，图标不受影响；`skillIcons`/`skillIconLayout` 是跨端纯代码，
   可直接复用，只需在 wx 壳补一次贴图加载（照 `uiShell.loadStill` 的写法走
   `extras.readBinary` → `wx.createImage()`）。
-- **文件行数**（改前先看）：
-  `skillIcons.ts` 158 / `passiveView.ts` 32 / `hudView.ts` 71 /
-  `primitives.ts` 90 / `buffEngine.ts` 249 / `movement.ts` 140 / `runnerSim.ts` 253 /
-  `box.ts` 141 / `button.ts` 120。
+- **文件行数**（2026-10-05 图标修复后实测，改前先看；`tools/check-import-rules.mjs` 卡 ≤300）：
+  ⚠️ **`runnerSim.ts` 已经 300 行整，一行余量都没有**——再加东西必须先就近拆文件。
+  `runnerSim.ts` 300 / `buffEngine.ts` 296 / `movement.ts` 179 / `primitives.ts` 107 /
+  `skillIcons.ts` 214 / `hudView.ts` 81 / `passiveView.ts` 41 /
+  `box.ts` 169 / `button.ts` 141。
 
 ---
 
 ## 七、未决 / 待裁决
 
-1. **要不要拆 PR**。本分支同时含 `config/**` + `core/**`（@kljfg 的 content 地盘）与
-   `packages/game/src/ui|flow/**` + `packages/framework`（@mostny 的 fix 地盘，
-   且框架部分按规矩需 @Fukaki-Ato review）。按 CONTRIBUTING 应拆成
-   「跳跃充能」与「技能图标」两个 PR。要拆的话现在拆最省事
-   （两个改动无耦合，`015f8d8` 不依赖 `071c014`）。
-2. **图标视觉是否定稿**。素材是程序化生成的，风格（金框圆底 + 奶白高光）与大厅徽标
-   同源但不是同一套抠图。若要更贴合参考图，可换 ImageGen 重出后直接替换同名 png，
-   **不需要改任何代码**（生成器只负责产出，暗态由 UI 乘暗）。
+1. **图标视觉是否定稿**。当前两张由 ImageGen 出（品红底 → 抠图，见 §3.2），
+   风格与大厅徽标同源但不是同一套抠图。要再换风格就重出图后**同名替换**，
+   **不需要改任何代码**（暗态由 UI 乘暗，与素材无关）。
+   已知观感取舍：暗态乘色用中性浅灰 `#9aa3b0` + 不透明度 0.72——早先的蓝灰 `#5a6478`
+   会把琥珀金糊成灰饼、看不出那是闪电；再暗就会在亮沙背景上糊成一团半透明。
 3. **被动「亮=生效」的口径是否够**。当前口径下 8 个角色的被动开局即亮（常驻），
    周期被动只在冲撞/充能窗口内亮。若想让周期被动**接近下次触发时预告性地亮**
    （提前 2 秒），需要给 `periodic` 槽位暴露 `nextAt`，那是新的派生位与新测试。
