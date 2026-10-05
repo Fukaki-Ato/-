@@ -129,7 +129,7 @@ export interface WxApi {
 declare const wx: unknown;
 
 export function getGlobalWx(): WxApi | null {
-  const globalWx: unknown = wx;
-  if (typeof globalWx === 'undefined' || !globalWx) return null;
-  return globalWx as WxApi;
+  // 必须先做 typeof 判断再引用：`const x = wx` 在非微信环境会直接抛 ReferenceError。
+  if (typeof wx === 'undefined' || !wx) return null;
+  return wx as WxApi;
 }
