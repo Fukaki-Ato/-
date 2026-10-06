@@ -108,8 +108,12 @@ if (makeZip) {
   mkdirSync(distDir, { recursive: true });
   const zipName = `${pkg.name}-web-${commitShort}${dirty ? '-dirty' : ''}.zip`;
   const zipPath = join(distDir, zipName);
-  const command = `Compress-Archive -Path '${join(outDir, '*')}' -DestinationPath '${zipPath}' -Force`;
-  const zipResult = spawnSync('powershell', ['-NoProfile', '-Command', command], { stdio: 'inherit' });
+  // bsdtar 打包（Windows 10+ 与 macOS 自带）：PowerShell Compress-Archive 会把路径分隔符写成反斜杠，
+  // Linux 解压得到损坏的平铺文件名；bsdtar 写入正斜杠，跨端可用。
+  const tarBin = process.platform === 'win32'
+    ? join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'tar.exe')
+    : 'tar';
+  const zipResult = spawnSync(tarBin, ['-a', '-cf', zipPath, '-C', outDir, '.'], { stdio: 'inherit' });
   if (zipResult.status !== 0 || !existsSync(zipPath)) {
     console.error('[build-web] 打包失败');
     process.exit(1);
