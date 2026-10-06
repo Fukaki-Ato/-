@@ -5,7 +5,7 @@ import type { Node, Texture2D } from 'cc';
  * 调用方：MainMenuBackground.ts（BG1 会话）。
  */
 export interface ParallaxCropSpec {
-  /** 源图纹理内归一化裁剪区（0-1，左下原点）：x, y, w, h */
+  /** 源图纹理内归一化裁剪区（0-1，**左上原点、y 向下**；与 SpriteFrame.rect 口径一致）：x, y, w, h */
   x: number;
   y: number;
   w: number;
@@ -40,8 +40,8 @@ export interface ParallaxHandle {
 
 /** 临时估值（主会话提供）；BG3 会话的校准结果见 temp/bg-eval/crops.json。 */
 export const DEFAULT_PARALLAX_CROPS: ParallaxCropSpec[] = [
-  { x: 0.15, y: 0.62, w: 0.7, h: 0.2, screenHeight: 350, screenY: 313, speed: 8, mirror: true },
-  { x: 0.0, y: 0.1, w: 0.35, h: 0.24, screenHeight: 380, screenY: -482, speed: -14, mirror: true },
+  { x: 0.15, y: 0.18, w: 0.7, h: 0.2, screenHeight: 350, screenY: 313, speed: 8, mirror: true },
+  { x: 0.0, y: 0.66, w: 0.35, h: 0.24, screenHeight: 380, screenY: -482, speed: -14, mirror: true },
 ];
 
 /** 占位实现：BG2 会话用真实实现替换，保持导出签名不变。 */

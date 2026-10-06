@@ -35,17 +35,21 @@
        "source": "assets/resources/images/bg/main.png",
        "sourceSize": [1007, 1562],
        "recommended": [
-         { "x": 0.15, "y": 0.62, "w": 0.7, "h": 0.2,
-           "screenHeight": 350, "screenY": 313, "speed": 8, "mirror": true, "note": "云带" }
+         { "x": 0.15, "y": 0.18, "w": 0.7, "h": 0.2,
+           "screenHeight": 350, "screenY": 313, "speed": 8, "mirror": true, "note": "云带" },
+         { "x": 0.0, "y": 0.66, "w": 0.35, "h": 0.24,
+           "screenHeight": 380, "screenY": -482, "speed": -14, "mirror": true, "note": "海浪带" }
        ]
      }
      ```
-     （`screenHeight/screenY/speed` 是屏幕侧参数：screenY 为相对屏幕中心、向上为正；speed 正值向右，设计 750 宽坐标系）
+     （x/y/w/h 为源图归一化区域，**y 从图像顶部向下量**，与 `SpriteFrame.rect` 口径一致；`screenHeight/screenY/speed` 为屏幕侧参数：screenY 相对屏幕中心、向上为正；speed 正值向右，设计 750 宽坐标系）
 2. `scripts/bg-eval/record-bg-video.mjs`
    - 用 `recommended` 参数在 canvas 复刻滚动动画：云带向右、海浪带向左（速度比例与 JSON 一致）
    - 分辨率建议 540×1170（=750×1624 的 0.72 倍），30fps，8 秒，静音；画面内容 = 条带动画 + 深色底（不要渲染任何 UI）
    - `MediaRecorder` 录制 webm（优先 vp9，`isTypeSupported` 不支持则 vp8）；文件保存到 `temp/bg-eval/bg-test.webm`
    - 落盘方式：页面触发下载 + CDP `Browser.setDownloadBehavior`（或等效可靠方案）；结束打印路径/大小/时长
+   - 已知限制：MediaRecorder 产出的 WebM **无时长元数据**（部分播放器显示未知时长），对 `<video loop>` 背景播放无碍；本机未安装 ffmpeg，无法重封装，请在报告中记录
+   - Edge 启动参数建议追加 `--disable-background-timer-throttling --disable-renderer-backgrounding --disable-backgrounding-occluded-windows`，保证录制期间不被节流
 3. 报告 `docs/reports/BG3-切带分析与代理视频.md`
    - 每个候选区域的**纯净度评估**（是否含烘焙 UI、为何可用/不可用）
    - **最终推荐 rect 列表**（主会话将用它校准 ParallaxLayers 与视频）

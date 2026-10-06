@@ -18,7 +18,9 @@
 
 - `build-templates/web-desktop/index.html`（已含竖屏适配 fit 脚本）与 `build-templates/web-desktop/style.css`
 - `docs/11-Web构建与溯源.md`（了解构建产物结构，不要执行构建）
-- 已核实事实：`settings.json` 的 `engine.macros.ENABLE_TRANSPARENT_CANVAS` 会在引擎初始化时被应用（`macro.init` 读取），WebGL 上下文以 `alpha` 创建 → 画布可透明
+- 已核实事实：`settings.json` 的 `engine.macros.ENABLE_TRANSPARENT_CANVAS` 在 WebGL 上下文创建**之前**由引擎 `macro.init` 应用 → 画布可透明；宏在启动时读取，修改后需刷新页面
+- 配套依赖（游戏侧，由 BG1 会话负责）：主相机 clearColor 的 alpha 需为 0，否则画布被清屏色填满、视频透不出来
+- 验证宏是否生效的方法（控制台/CDP）：`document.querySelector('#GameCanvas').getContext('webgl2')?.getContextAttributes()?.alpha === true`（无 webgl2 时用 webgl）
 
 ## 4. 改动
 

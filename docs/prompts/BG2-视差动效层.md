@@ -21,10 +21,14 @@
 
 - 冻结接口文件本身（`ParallaxLayers.ts` 的类型注释即规格）
 - `assets/scripts/ui/framework/UIKit.ts`（`node`/层级工具）、`Assets.ts`（资源加载行为）
-- Cocos 3.8 API 要点（**开工先自行验证**，可从 `build/web-desktop/cocos-js/*.js` 或 `node_modules/@cocos/creator-types` 查证）：
-  - 运行时裁剪：`const sf = new SpriteFrame(); sf.texture = tex; sf.rect = new Rect(px, py, pw, ph);`（矩形为像素单位、原点左下；由归一化值 × textureSize 换算，注意 y 轴方向）
-  - 镜像：节点 `scale.x = -1`
-  - 透明度：节点 `UIOpacity`
+- Cocos 3.8 API 要点（主会话已核实，实现时以类型检查为准）：
+  - 运行时裁剪：`const sf = new SpriteFrame(); sf.texture = tex; sf.rect = new Rect(px, py, pw, ph); sf.originalSize = new Size(pw, ph);`
+  - **顺序必须先 texture 后 rect**（texture setter 会把 rect 重置为整图）
+  - `rect` 为像素单位、**左上角原点、y 向下**（与 `ParallaxCropSpec` 归一化口径一致，直接乘 textureSize 即可，无需翻转）
+  - `rect` setter 会自动重算 UV；但挂到 Sprite 后不要再改 rect（SIMPLE 模式不会刷新），且必须整体赋 `new Rect`，不能改 getter 返回对象的字段
+  - `rect` **不校验越界**（可能 UV 越界、边缘拉伸），务必自行 clamp 到纹理范围
+  - 多个 SpriteFrame 共享同一张 texture 不额外占显存；`SpriteFrame.destroy()` 不会销毁贴图
+  - 镜像：节点 `scale.x = -1`；透明度：节点 `UIOpacity`
 
 ## 4. 实现要求
 

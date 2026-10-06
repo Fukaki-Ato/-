@@ -54,7 +54,8 @@ export function createMainMenuBackground(parent: Node, mode: BackgroundMode): { 
    ```
    并用 `update(dt)` 持续驱动（建议在 `MainMenuBackground.ts` 内实现一个私有 `Component`（如 `BackgroundTicker`）挂到 Background 根节点驱动；注意组件销毁时停止）
 4. `video`：`fallback` 与 `image` 都不创建（背景保持无渲染内容、全透明），仍返回可用的句柄
-5. `dispose()`：销毁自建节点、解除更新
+5. `video` 模式配套（重要，主会话已核实）：场景主相机（`Canvas` 下的 `cc.Camera`，当前 `clearFlags=7`、`clearColor=(78,195,247,255)` 全不透明）必须在 video 模式把 `clearColor` 的 alpha 置 0（dispose 时恢复原值）；否则即使引擎透明画布宏开启，画布仍会被相机清屏色填满，DOM 视频透不出来。相机可用场景查找获取（如 `getComponentInChildren(Camera)`），注意 `camera.clearColor = new Color(r, g, b, 0)` 的赋值方式以类型定义/实测为准
+6. `dispose()`：销毁自建节点、恢复相机 clearColor、解除更新
 
 ## 5. 改动文件
 

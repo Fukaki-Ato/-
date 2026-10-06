@@ -27,7 +27,7 @@
 
 每个模式独立执行（单模式失败不中断整体，记录错误继续）：
 
-1. 启动 headless Edge（临时 user-data-dir；软渲染/尺寸参数参考 s11-smoke.js；追加 `--autoplay-policy=no-user-gesture-required`）
+1. 启动 headless Edge（临时 user-data-dir；软渲染/尺寸参数参考 s11-smoke.js；追加 `--autoplay-policy=no-user-gesture-required --disable-background-timer-throttling --disable-renderer-backgrounding --disable-backgrounding-occluded-windows`）
 2. 打开 `<url>/?bg=<mode>`；等待引擎与 Main 场景就绪（参考 s11 的等待表达式）
 3. 用 `__smoke` 手法穿隐私门禁（新 profile 首启会出现）直到主界面
 4. 静置 3 秒稳定后，注入 rAF 计数器采样 **8 秒**：输出 avg / min FPS
