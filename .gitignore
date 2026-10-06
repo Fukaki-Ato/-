@@ -4,6 +4,7 @@ temp/
 local/
 profiles/
 build/
+dist/
 native/engine/
 .worktrees/
 cloudfunctions/*/common/

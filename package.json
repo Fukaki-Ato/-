@@ -12,6 +12,8 @@
     "typecheck:core": "tsc -p tsconfig.core.json",
     "typecheck:cc": "tsc -p tsconfig.cc.json",
     "check": "npm run typecheck:core && npm run typecheck:cc && npm run test",
+    "build:web": "node scripts/build-web-desktop.mjs",
+    "build:web:zip": "node scripts/build-web-desktop.mjs --zip",
     "wechat:opendata": "node scripts/wechat-open-data-context.mjs"
   },
   "devDependencies": {
