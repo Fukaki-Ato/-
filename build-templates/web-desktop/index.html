@@ -49,15 +49,65 @@
 <script>
   // 本地/桌面测试适配：游戏容器按 750:1624 竖屏比例等比缩放并居中，
   // 避免默认 1280x960 横屏画布下竖屏 UI 上下被裁、按钮点不到。
+  // BG4 视频垫底：?bg=video 时在游戏画布下垫 DOM 视频（需透明画布宏，见 scripts/bg-eval/）。
   (function () {
     var DESIGN_W = 750;
     var DESIGN_H = 1624;
+    var BG_VIDEO_SRC = './bg-test.webm';
+    var bgVideo = null;
+    var bgVideoFailed = false;
+
+    function isBgVideoMode() {
+      return location.search.indexOf('bg=video') !== -1;
+    }
+
+    function ensureBgVideo() {
+      if (bgVideo) return bgVideo;
+      var el = document.getElementById('bgVideo');
+      if (!el) {
+        el = document.createElement('video');
+        el.id = 'bgVideo';
+        el.setAttribute('src', BG_VIDEO_SRC);
+        el.setAttribute('muted', '');
+        el.setAttribute('loop', '');
+        el.setAttribute('playsinline', '');
+        el.setAttribute('autoplay', '');
+        el.muted = true;
+        el.loop = true;
+        el.autoplay = true;
+        document.body.insertBefore(el, document.body.firstChild);
+      }
+      // 文件缺失/解码失败静默降级：隐藏视频，页面照常运行。
+      el.addEventListener('error', function () {
+        bgVideoFailed = true;
+        el.style.display = 'none';
+      });
+      var played = el.play();
+      if (played && typeof played.catch === 'function') {
+        played.catch(function () { /* 自动播放受限/加载失败：静默降级 */ });
+      }
+      bgVideo = el;
+      return bgVideo;
+    }
+
+    function fitBgVideo(gd) {
+      if (!isBgVideoMode() || bgVideoFailed) return;
+      var el = ensureBgVideo();
+      var rect = gd.getBoundingClientRect();
+      el.style.left = (rect.left + (window.scrollX || 0)) + 'px';
+      el.style.top = (rect.top + (window.scrollY || 0)) + 'px';
+      el.style.width = Math.round(rect.width) + 'px';
+      el.style.height = Math.round(rect.height) + 'px';
+      el.style.display = 'block';
+    }
+
     function fit() {
       var gd = document.getElementById('GameDiv');
       if (!gd) return;
       var s = Math.min(window.innerWidth / DESIGN_W, window.innerHeight / DESIGN_H);
       gd.style.width = Math.floor(DESIGN_W * s) + 'px';
       gd.style.height = Math.floor(DESIGN_H * s) + 'px';
+      fitBgVideo(gd);
     }
     window.addEventListener('resize', fit);
     fit();

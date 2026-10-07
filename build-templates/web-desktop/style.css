@@ -33,6 +33,18 @@ canvas {
 #GameDiv {
     margin: 0 auto;
     position:relative;
+    z-index: 1;
+}
+
+/* BG4 视频垫底：?bg=video 时由 index.html 脚本按容器矩形显示；始终位于游戏画布之下。 */
+#bgVideo {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 0;
+  display: none;
+  object-fit: cover;
+  pointer-events: none;
 }
 
 /* 本地/桌面测试适配：隐藏默认页头页脚，避免把游戏容器挤出窗口。 */
