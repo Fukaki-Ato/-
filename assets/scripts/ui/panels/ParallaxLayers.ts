@@ -1,4 +1,4 @@
-import { isValid, Rect, Size, Sprite, SpriteFrame, UIOpacity } from 'cc';
+import { isValid, Rect, Size, Sprite, SpriteFrame, UIOpacity, UITransform } from 'cc';
 import type { Node, Texture2D } from 'cc';
 import { node as uiNode } from '../framework/UIKit';
 import { computeParallaxLayerLayout, wrapSpanPosition } from './parallaxMath';
@@ -73,9 +73,14 @@ function createBlockNode(parent: Node, layout: ParallaxLayerLayout, frame: Sprit
     position: [left + layout.blockWidth / 2, layout.screenY],
   });
   const sprite = blockNode.addComponent(Sprite);
-  sprite.spriteFrame = frame;
-  sprite.trim = false;
+  // 顺序敏感：必须先设 CUSTOM 再赋帧。默认模式会在赋值时按帧像素尺寸改写节点尺寸，
+  // 导致块宽（帧像素尺寸）与布局间距（blockWidth）不一致，表现为相邻块重叠或空隙（集成验收发现）。
   sprite.sizeMode = Sprite.SizeMode.CUSTOM;
+  sprite.trim = false;
+  sprite.spriteFrame = frame;
+  // 防御性兜底：显式恢复布局尺寸（避免引擎后续行为变化再次改写）。
+  const blockUi = blockNode.getComponent(UITransform);
+  if (blockUi) blockUi.setContentSize(layout.blockWidth, layout.screenHeight);
   if (layout.mirror && index % 2 === 1) blockNode.setScale(-1, 1, 1);
   if (layout.opacity < 255) blockNode.addComponent(UIOpacity).opacity = layout.opacity;
   return { node: blockNode, left };
