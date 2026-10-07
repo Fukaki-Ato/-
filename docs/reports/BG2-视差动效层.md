@@ -90,3 +90,10 @@
 ## 提交
 
 - 分支：`sess/BG2`；提交信息以 `BG2: ` 开头；**未 push**。
+
+## 集成修复记录（主会话，2026-10-07）
+
+- 集成构建后发现：块节点的 UITransform 尺寸被改写为**裁剪帧的像素尺寸**（云带 312×375、海浪带 191×164），与布局间距（blockWidth 291/443）不一致，表现为相邻块重叠 21px / 中间出现 252px 空隙。
+- 根因：`createBlockNode` 中先赋 `sprite.spriteFrame` 后设 `sprite.sizeMode = CUSTOM`；赋帧时默认模式按帧尺寸自动改写节点尺寸。
+- 修复：调整顺序（先 CUSTOM 再赋帧）并在赋帧后显式 `setContentSize(blockWidth, screenHeight)` 兜底；提交 `135784f`。修复后经运行期节点检查确认无缝平铺。
+
