@@ -12,6 +12,8 @@ import { RedDots } from '../framework/RedDots';
 import { Theme } from '../framework/Theme';
 import { Toast } from '../framework/Toast';
 import { label, node, stretch } from '../framework/UIKit';
+import { createMainMenuBackground, resolveBackgroundMode } from './MainMenuBackground';
+import type { MainMenuBackgroundHandle } from './MainMenuBackground';
 import { PANEL_NAMES } from './panelNames';
 import { openSettlementPanel } from './RunFlow';
 
@@ -27,10 +29,6 @@ const PRELOAD_TIMEOUT_MS = 3000;
 const DESIGN_W = Theme.size.designWidth;
 const DESIGN_H = Theme.size.designHeight;
 
-/** 背景缺失时的占位色（天空/海面/沙滩三段）。 */
-const BG_SKY = new Color(78, 195, 247, 255);
-const BG_SEA = new Color(96, 200, 240, 255);
-const BG_SAND = new Color(245, 208, 122, 255);
 /** 底部导航木条（占位样式，素材到位后可替换）。 */
 const NAV_WOOD = new Color(122, 74, 43, 235);
 
@@ -96,6 +94,7 @@ function drawRoundRect(target: Node, width: number, height: number, color: Color
 export class MainMenuPanel extends BasePanel {
   private startButton: Button | null = null;
   private running = false;
+  private background: MainMenuBackgroundHandle | null = null;
 
   protected override onCreate(): void {
     this.buildBackground();
@@ -117,21 +116,12 @@ export class MainMenuPanel extends BasePanel {
   // -------------------------------------------------------------------------
 
   private buildBackground(): void {
-    const bg = node('Background', { parent: this.node, size: { width: DESIGN_W, height: DESIGN_H } });
-    stretch(bg);
-    const g = bg.addComponent(Graphics);
-    // 覆盖整屏的三段占位；实际背景图就位后覆盖其上。
-    g.fillColor = BG_SKY;
-    g.rect(-DESIGN_W / 2, 100, DESIGN_W, 4000);
-    g.fill();
-    g.fillColor = BG_SEA;
-    g.rect(-DESIGN_W / 2, -430, DESIGN_W, 530);
-    g.fill();
-    g.fillColor = BG_SAND;
-    g.rect(-DESIGN_W / 2, -4000, DESIGN_W, 3570);
-    g.fill();
-    // 透明占位色：图片缺失时不遮挡上面的三段色块，加载成功则完全覆盖。
-    applySprite(bg, Theme.assets.bgMain, { radius: 0, color: new Color(0, 0, 0, 0) });
+    this.background = createMainMenuBackground(this.node, resolveBackgroundMode());
+    // 面板节点销毁（场景切换 / UIRoot.reset）时释放：恢复相机清屏色、停止视差驱动。
+    this.node.once(Node.EventType.NODE_DESTROYED, () => {
+      this.background?.dispose();
+      this.background = null;
+    });
   }
 
   /** 安全区容器：顶部货币栏与底部导航挂其下，自动避开刘海/手势条。 */
