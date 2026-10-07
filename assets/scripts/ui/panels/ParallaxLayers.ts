@@ -42,10 +42,10 @@ export interface ParallaxHandle {
   dispose(): void;
 }
 
-/** 临时估值（主会话提供）；BG3 会话的校准结果见 temp/bg-eval/crops.json。 */
+/** 已校准（主会话目测 cloud-p1 / wave-p 候选确认；源图 1007×1562，y 自顶部向下）。 */
 export const DEFAULT_PARALLAX_CROPS: ParallaxCropSpec[] = [
-  { x: 0.15, y: 0.18, w: 0.7, h: 0.2, screenHeight: 350, screenY: 313, speed: 8, mirror: true },
-  { x: 0.0, y: 0.66, w: 0.35, h: 0.24, screenHeight: 380, screenY: -482, speed: -14, mirror: true },
+  { x: 0.27, y: 0.29, w: 0.31, h: 0.24, screenHeight: 350, screenY: 313, speed: 8, mirror: true },
+  { x: 0.0, y: 0.687, w: 0.19, h: 0.105, screenHeight: 380, screenY: -482, speed: -14, mirror: true },
 ];
 
 interface ParallaxBlock {
