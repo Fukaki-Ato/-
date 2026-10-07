@@ -144,7 +144,7 @@ export function createMainMenuBackground(parent: Node, mode: BackgroundMode): Ma
       disposed = true;
       if (ticker && isValid(ticker)) ticker.stop();
       ticker = null;
-      if (camera && originalClearColor) camera.clearColor = originalClearColor;
+      if (camera && isValid(camera) && originalClearColor) camera.clearColor = originalClearColor;
       camera = null;
       originalClearColor = null;
       if (isValid(root)) root.destroy();

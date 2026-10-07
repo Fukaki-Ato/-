@@ -13,7 +13,7 @@
  * - 为保证金循环无缝，代理片用「正弦往复漂移」而不是匀速滚动（sin 在 t=0 与 t=8s 完全一致）；
  *   视差模式是匀速单向滚动；正式视频由美术按首尾帧对齐制作。
  * - 实现：脚本内迷你静态服务（避免 file:// 污染画布）+ headless Edge + CDP；
- *   下载落盘用 Browser.setDownloadBehavior（失败回退 Page.setDownloadBehavior，再回退文件轮询）。
+ *   下载落盘用 Browser.setDownloadBehavior（失败回退 Page.setDownloadBehavior），随后轮询目标文件直到大小稳定；脚本无全局超时，页面卡死时需手动中断。
  */
 import { spawn, spawnSync } from 'node:child_process';
 import { createServer } from 'node:http';

@@ -53,14 +53,28 @@ describe('computeParallaxLayerLayout', () => {
     expect(layout.blockCount).toBe(4);
   });
 
-  it('块数受每带 4 节点预算封顶', () => {
-    const layout = mustLayout({ x: 0, y: 0, w: 0.1, h: 0.1, screenHeight: 100, screenY: 0, speed: 0, mirror: false }, SQUARE_TEXTURE);
-    expect(layout.blockWidth).toBeCloseTo(100, 6);
+  it('4 块预算内无法覆盖时返回 null（窄条带不铺设，避免周期性缺口）', () => {
+    // blockWidth = 100：覆盖需要 ceil(750/100)+1 = 9 块，超出 4 块预算 → 跳过该条带
+    expect(
+      computeParallaxLayerLayout(
+        { x: 0, y: 0, w: 0.1, h: 0.1, screenHeight: 100, screenY: 0, speed: 0, mirror: false },
+        SQUARE_TEXTURE,
+        DESIGN,
+      ),
+    ).toBeNull();
+  });
+
+  it('块宽恰好满足覆盖下限时仍可铺设（预算边界）', () => {
+    // blockWidth = 250：4 块 × 250 = 1000 ≥ 750 + 250，恰好满足回绕余量
+    const layout = mustLayout({ x: 0, y: 0, w: 0.25, h: 0.1, screenHeight: 100, screenY: 0, speed: 0, mirror: false }, SQUARE_TEXTURE);
+    expect(layout.blockWidth).toBeCloseTo(250, 6);
     expect(layout.blockCount).toBe(4);
+    expect(layout.wrapSpan).toBeCloseTo(1000, 6);
   });
 
   it('四舍五入溢出时按纹理边界安全 clamp', () => {
-    const layout = mustLayout({ x: 0.5, y: 0.5, w: 0.5, h: 0.5, screenHeight: 100, screenY: 0, speed: 0, mirror: false });
+    // screenHeight 取 400 保证 4 块预算内可覆盖（blockWidth ≈ 257.6）
+    const layout = mustLayout({ x: 0.5, y: 0.5, w: 0.5, h: 0.5, screenHeight: 400, screenY: 0, speed: 0, mirror: false });
     expect(layout.rect.x).toBe(504);
     expect(layout.rect.width).toBe(503);
     expect(layout.rect.x + layout.rect.width).toBe(TEXTURE.width);

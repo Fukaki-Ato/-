@@ -115,6 +115,9 @@ export function computeParallaxLayerLayout(
   if (blockCount <= 0) return null;
   const wrapSpan = blockCount * blockWidth;
   if (!isPositiveNumber(wrapSpan)) return null;
+  // 覆盖校验：受 4 块预算封顶后，回绕窗口必须仍满足「覆盖 designWidth + 一块宽度」，
+  // 否则条带会出现周期性缺口（窄条带预算不足时）——按不可铺设处理，跳过该条带。
+  if (wrapSpan < designSize.width + blockWidth) return null;
 
   return {
     rect,

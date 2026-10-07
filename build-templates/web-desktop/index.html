@@ -58,7 +58,12 @@
     var bgVideoFailed = false;
 
     function isBgVideoMode() {
-      return location.search.indexOf('bg=video') !== -1;
+      // 与游戏侧 MainMenuBackground.resolveBackgroundMode 同口径：精确取 bg 参数
+      try {
+        return new URLSearchParams(location.search).get('bg') === 'video';
+      } catch (err) {
+        return false;
+      }
     }
 
     function ensureBgVideo() {

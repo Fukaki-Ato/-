@@ -663,6 +663,27 @@ async function measureMode(mode, options) {
     need('settle');
     await sleep(3000);
 
+    if (mode === 'video') {
+      need('bg-video-check');
+      const bgVideo = await evaluate(cdp, `(function () {
+        var el = document.getElementById('bgVideo');
+        if (!el) return { ok: false, reason: 'no-element' };
+        return {
+          ok: !el.error && el.style.display !== 'none' && el.readyState >= 2,
+          display: el.style.display || '',
+          readyState: el.readyState,
+          errorCode: el.error ? el.error.code : null
+        };
+      })()`, deadline, 'bg-video-check');
+      result.bgVideo = bgVideo;
+      if (!bgVideo || !bgVideo.ok) {
+        result.warnings.push(`bgVideo 未生效：${JSON.stringify(bgVideo)}`);
+        log(`[${mode}] 警告：bgVideo 未生效 ${JSON.stringify(bgVideo)}`);
+      } else {
+        log(`[${mode}] bgVideo readyState=${bgVideo.readyState}`);
+      }
+    }
+
     log(`[${mode}] rAF 采样 8s`);
     need('fps-sample');
     const sample = await evaluate(cdp, fpsSampleScript(8000), deadline, 'fps-sample');
