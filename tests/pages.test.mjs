@@ -1,8 +1,8 @@
 /**
  * S5 页面流转测试（node 端 view model：不渲染像素、不建 WebGL 上下文）。
  * 覆盖：UiHost+页面构造器（headless，three 对象只建不画）、页面信息与交互断言
- * （开始页恰好两个入口 + web 置灰微信登录、选角页可滑动 List/返回/入口方式、HUD onHud 推送、
- * 结算含技能释放次数）、createGameFlow 真实主流程（boot→start→select→result→select，run 需 GL 不进 node）。
+ * （兼容开始页组件、主菜单启动/可选角色页/商店、HUD onHud 推送、结算含技能释放次数）、
+ * createGameFlow 真实主流程（boot→主菜单→run/result/主菜单，测试 run 使用假场景）。
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -73,8 +73,6 @@ function allButtons(host) {
   return out;
 }
 
-const tick = () => new Promise(r => setImmediate(r));
-
 /** 预置全部 config 进内存 storage：boot 网络失败 → configLoader 落到缓存 */
 function seedConfigCache(adapter) {
   for (const name of CONTENT_NAMES) {
@@ -116,8 +114,11 @@ test('start 页：品牌标题 + 恰好两个入口按钮，无输入框/校验�
   const { host } = hostFixture();
   const views = createOverlayViews({ host });
   views.renderStart({ wechatAvailable: true, onWechat() {}, onGuest() {} });
+  assert.equal(host.overlay.scene.background, null, '开始页叠在 Web 海滨背景上');
   assert.ok(texts(host).includes('雷霆酷跑'), '品牌标题');
-  assert.deepEqual(allButtons(host), ['微信登录', '游客登录'], '只有两个入口');
+  assert.ok(texts(host).includes('THUNDER RUN · 清风快跑'));
+  assert.ok(!texts(host).some(t => t.includes('霓虹雷暴')));
+  assert.deepEqual(allButtons(host), ['WeChat 登录', '游客登录'], '只有两个入口');
   assert.ok(!texts(host).some(t => t.includes('openid') || t.includes('4-64')), '无账号输入/校验残留');
 });
 
@@ -126,11 +127,11 @@ test('start 页：wechatAvailable=false（web）→ 微信登录置灰不回调�
   const views = createOverlayViews({ host });
   const acts = [];
   views.renderStart({ wechatAvailable: false, onWechat: () => acts.push('wx'), onGuest: () => acts.push('guest') });
-  assert.equal(findButton(host, '微信登录').state, 'disabled');
-  clickWidget(host, findButton(host, '微信登录'));
+  assert.equal(findButton(host, 'WeChat 登录').state, 'disabled');
+  clickWidget(host, findButton(host, 'WeChat 登录'));
   clickWidget(host, findButton(host, '游客登录'));
   assert.deepEqual(acts, ['guest']);
-  assert.ok(texts(host).some(t => t.includes('网页端暂不支持微信登录')), '置灰原因可见');
+  assert.ok(texts(host).some(t => t.includes('Web 不支持 WeChat 登录，选择游客登录')), '置灰原因可见');
 });
 
 test('start 页：setBusy 锁两个按钮、setFeedback 错误文案上树', () => {
@@ -138,10 +139,10 @@ test('start 页：setBusy 锁两个按钮、setFeedback 错误文案上树', () 
   const views = createOverlayViews({ host });
   const handle = views.renderStart({ wechatAvailable: true, onWechat() {}, onGuest() {} });
   handle.setBusy(true);
-  assert.equal(findButton(host, '微信登录').state, 'disabled');
+  assert.equal(findButton(host, 'WeChat 登录').state, 'disabled');
   assert.equal(findButton(host, '游客登录').state, 'disabled');
   handle.setBusy(false);
-  assert.equal(findButton(host, '微信登录').state, 'normal');
+  assert.equal(findButton(host, 'WeChat 登录').state, 'normal');
   assert.equal(findButton(host, '游客登录').state, 'normal');
   handle.setFeedback('微信登录失败：网络异常', true);
   assert.ok(texts(host).includes('微信登录失败：网络异常'));
@@ -159,7 +160,9 @@ test('select 页：List 渲染角色卡、点选换角色写本机、开始按�
   views.renderSelect(report.content, {
     onStartRun: id => { started = id; },
     onBack: () => {},
+    onShop: () => {},
   }, chars[0].id, 'guest');
+  assert.equal(host.overlay.scene.background, null, '选角页叠在 Web 海滨背景上');
   view2Pass(host);
 
   const list = findWidget(host, w => w instanceof List);
@@ -184,10 +187,11 @@ test('select 页：显示入口方式与技能/被动详情、返回回调，无
   const chars = playableCharacters(report.content);
   let back = 0;
   const views = createOverlayViews({ host });
-  views.renderSelect(report.content, { onStartRun() {}, onBack: () => { back++; } }, chars[0].id, 'wechat');
+  views.renderSelect(report.content, { onStartRun() {}, onBack: () => { back++; }, onShop() {} }, chars[0].id, 'wechat');
   view2Pass(host);
   const t = texts(host);
   assert.ok(t.includes('选择角色'));
+  assert.ok(t.includes('THUNDER RUN · 清风出发'));
   assert.ok(t.includes('登录方式：微信登录'), `入口方式可见，实得 ${JSON.stringify(t)}`);
   assert.ok(t.some(x => x.startsWith('技能：')) && t.some(x => x.startsWith('被动：')), '卡片技能/被动详情');
   assert.ok(!t.some(x => x.includes('配置来源')), '无开发期配置来源行');
@@ -254,47 +258,56 @@ test('result：新纪录标题/大分/技能释放次数/历史最佳 + 两按�
   assert.ok(t.some(x => x === '800 m' || x.includes('800 m')));
   assert.ok(t.includes('999'), '历史最佳=刷新后');
   clickWidget(host, findButton(host, '再跑一次'));
-  clickWidget(host, findButton(host, '返回选角'));
+  clickWidget(host, findButton(host, '返回主界面'));
   assert.deepEqual(acts, ['retry', 'select']);
 });
 
 // ---------------- mainFlow 真实主流程（不进 run：node 无 GL） ----------------
 
-test('flow（web）：boot→start→(游客)→select→返回→start；result→返回选角', async () => {
+test('flow（web）：boot 直达主菜单；开始跑酷使用默认角色；角色入口开发中、商店和结算返回主菜单', async () => {
   const { host, adapter } = hostFixture();
   const views = createOverlayViews({ host });
-  const flow = createGameFlow({ adapter, views, configResolve: name => `./${name}.json` });
+  const scenes = [];
+  const flow = createGameFlow({
+    adapter,
+    views,
+    configResolve: name => `./${name}.json`,
+    createScene: (_runHost, _adapter, sim, _content, callbacks) => {
+      const scene = { sim, callbacks, disposed: false, dispose() { scene.disposed = true; } };
+      scenes.push(scene);
+      return scene;
+    },
+  });
   seedConfigCache(adapter);
   await flow.boot();
   assert.equal(flow.machine.current(), 'start');
-  assert.ok(texts(host).includes('雷霆酷跑'));
-  assert.equal(findButton(host, '微信登录').state, 'disabled', 'web 壳 extras.login 是游客兜底，不作微信登录');
+  assert.ok(allButtons(host).includes('开始酷跑'));
+  assert.ok(!allButtons(host).some(label => label.includes('登录')));
+  assert.ok(!texts(host).includes('选择角色'));
 
-  clickWidget(host, findButton(host, '微信登录'));
-  await tick();
-  assert.equal(flow.machine.current(), 'start', '置灰的微信登录不触发流转');
-
-  clickWidget(host, findButton(host, '游客登录'));
-  assert.equal(flow.machine.current(), 'select');
-  assert.equal(adapter.storage.get(ENTRY_KEY), 'guest', '本机记住入口方式');
-  assert.ok(texts(host).includes('选择角色'));
-  assert.ok(texts(host).includes('登录方式：游客登录'));
-
-  clickWidget(host, findButton(host, '返回'));
-  assert.equal(flow.machine.current(), 'start');
-  clickWidget(host, findButton(host, '游客登录'));
-  assert.equal(flow.machine.current(), 'select');
-
-  flow.machine.go('result', {
+  clickWidget(host, findButton(host, '开始酷跑'));
+  assert.equal(flow.machine.current(), 'run');
+  assert.equal(scenes[0].sim.loadout.charId, 'char_volt', '主菜单开始使用当前默认角色');
+  scenes[0].callbacks.onEnd({
     t: 10, distance: 300, coins: 5, nearMiss: 1, hits: 0, score: 120, alive: false, casts: 1, charId: 'char_volt',
   });
   assert.equal(flow.machine.current(), 'result');
   assert.equal(adapter.storage.get(BEST_KEY), '120', '结算写最佳');
-  clickWidget(host, findButton(host, '返回选角'));
-  assert.equal(flow.machine.current(), 'select');
+  clickWidget(host, findButton(host, '返回主界面'));
+  assert.equal(flow.machine.current(), 'start');
+
+  clickWidget(host, findButton(host, '角色'));
+  assert.equal(flow.machine.current(), 'start', '角色页尚未支持时留在主菜单');
+  assert.ok(texts(host).includes('开发中'));
+
+  clickWidget(host, findButton(host, '商店'));
+  assert.equal(flow.machine.current(), 'shop');
+  assert.ok(texts(host).includes('商店'));
+  clickWidget(host, findButton(host, '返回'));
+  assert.equal(flow.machine.current(), 'start', '从主菜单商店返回主菜单');
 });
 
-test('flow（wx）：微信登录成功 → select 并记住 wechat；选角页显示入口方式', async () => {
+test('flow（wx）：即使提供 login 也直接进入主菜单，不自动登录', async () => {
   let calls = 0;
   const extras = { login: async () => { calls++; return { openid: 'wx-guest-abc', isGuest: true }; } };
   const { host, adapter } = hostFixture({ env: 'wx', extras });
@@ -302,30 +315,14 @@ test('flow（wx）：微信登录成功 → select 并记住 wechat；选角页�
   const flow = createGameFlow({ adapter, views, configResolve: name => `./${name}.json` });
   seedConfigCache(adapter);
   await flow.boot();
-  assert.equal(findButton(host, '微信登录').state, 'normal');
-  clickWidget(host, findButton(host, '微信登录'));
-  await tick();
-  assert.equal(calls, 1, '经注入的 extras.login() 登录');
-  assert.equal(flow.machine.current(), 'select');
-  assert.equal(adapter.storage.get(ENTRY_KEY), 'wechat');
-  assert.ok(texts(host).includes('登录方式：微信登录'));
-});
-
-test('flow（wx）：微信登录失败 → 停留 start、显示反馈、按钮恢复可重试', async () => {
-  const extras = { login: async () => { throw new Error('wx.login 失败: fail'); } };
-  const { host, adapter } = hostFixture({ env: 'wx', extras });
-  const views = createOverlayViews({ host });
-  const flow = createGameFlow({ adapter, views, configResolve: name => `./${name}.json` });
-  seedConfigCache(adapter);
-  await flow.boot();
-  clickWidget(host, findButton(host, '微信登录'));
-  await tick();
   assert.equal(flow.machine.current(), 'start');
-  assert.ok(texts(host).some(t => t.startsWith('微信登录失败') && t.includes('wx.login 失败')), '失败原因可见');
-  assert.equal(findButton(host, '微信登录').state, 'normal', '可重试');
-  assert.equal(adapter.storage.get(ENTRY_KEY) ?? null, null, '失败不记入口');
-  clickWidget(host, findButton(host, '游客登录'));
-  assert.equal(flow.machine.current(), 'select', '失败后仍可改选游客');
+  assert.ok(allButtons(host).includes('开始酷跑'));
+  assert.ok(!allButtons(host).some(label => label.includes('登录')));
+  clickWidget(host, findButton(host, '角色'));
+  assert.equal(flow.machine.current(), 'start');
+  assert.equal(calls, 0);
+  assert.equal(adapter.storage.get(ENTRY_KEY), null);
+  assert.ok(texts(host).includes('开发中'));
 });
 
 test('flow：配置全缺 → 停在 boot 并显示错误（不静默吞错）', async () => {

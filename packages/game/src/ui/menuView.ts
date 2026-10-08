@@ -1,7 +1,7 @@
 /**
  * 选角页（P3，由原主菜单拆出；开始页之后、每局结束/Esc 后回到这里）：角色卡片行 → 横向可滑动虚拟 List。
  * 卡内容：色块/名字/稀有度/皮肤数·id/技能/被动 + 选中态；点卡片换角色（即写本机记忆）；
- * 技能提示行按所选角色刷新；顶栏「返回」回开始页并显示本次入口方式；底部开始跑酷。
+ * 技能提示行按所选角色刷新；顶栏「返回」回开始页并显示本次入口方式；底部开始跑酷或打开商店。
  */
 import { Box, Button, Label, List, type NinePatchSource, type ThemeColors, type UiView } from '@tr/framework/ui/index.js';
 import type { GameContent } from '@tr/game/core/config/configTypes.js';
@@ -12,6 +12,11 @@ import { entryLabel, type EntryMethod } from '../flow/session.js';
 import { solidChip } from './parts.js';
 
 export const CHAR_KEY = 'thunderrun:character';
+
+const SEA_COLORS: ThemeColors = {
+  bg: '#9fe3e7', panel: '#fff5dc', card: '#fffaf0', line: '#d9aa69',
+  text: '#315667', muted: '#567b83', neon: '#167f8e', gold: '#bd7d36', danger: '#a8493f',
+};
 
 /** 选角页技能行：能量攒满所需里程由配置推导（skills.json energy.perMeter），不写死文案 */
 export function skillLine(load: Loadout): string {
@@ -50,7 +55,10 @@ class CharCard extends Box {
   private boundIndex = -1;
 
   constructor(private envCard: CardEnv, i: number, load: Loadout, picked: boolean) {
-    super({ direction: 'column', background: 'card', padding: 12, gap: 5, width: { percent: 100 } });
+    super({
+      direction: 'column', background: envCard.solid, backgroundColor: picked ? '#fff0c8' : SEA_COLORS.card,
+      backgroundOpacity: 0.97, padding: 12, gap: 5, width: { percent: 100 },
+    });
     const c = envCard.colors;
     this.chipHolder = new Box({ width: 34, height: 34, align: 'center', justify: 'center' });
     this.name = new Label({ text: load.name, fontSizePx: 15, color: picked ? c.gold : c.text });
@@ -60,8 +68,8 @@ class CharCard extends Box {
       color: load.rarity === 'SSR' ? c.gold : load.rarity === 'SR' ? c.neon : c.muted,
     });
     this.meta = new Label({ text: `皮肤 ×${envCard.skinOf(i)} · ${load.charId}`, fontSizePx: 11, color: c.muted });
-    this.skillL = new Label({ text: load.skill ? `技能：${load.skill.label} — ${load.skill.desc}` : '技能：无', fontSizePx: 12, opacity: 0.85 });
-    this.passiveL = new Label({ text: load.passive.length ? `被动：${load.talentLabel} — ${load.talentDesc}` : '被动：无', fontSizePx: 12, opacity: 0.85 });
+    this.skillL = new Label({ text: load.skill ? `技能：${load.skill.label} — ${load.skill.desc}` : '技能：无', fontSizePx: 12, color: c.text, opacity: 0.85 });
+    this.passiveL = new Label({ text: load.passive.length ? `被动：${load.talentLabel} — ${load.talentDesc}` : '被动：无', fontSizePx: 12, color: c.text, opacity: 0.85 });
     const info = new Box({ direction: 'column', flex: 1, gap: 2 }, [
       new Box({ direction: 'row', gap: 8, align: 'center' }, [this.name, this.pickedMark]),
       new Box({ direction: 'row', justify: 'spaceBetween', align: 'center' }, [this.rarity, this.meta]),
@@ -95,6 +103,7 @@ class CharCard extends Box {
 
   setPicked(picked: boolean): void {
     const c = this.envCard.colors;
+    this.bg?.setColor(picked ? '#fff0c8' : SEA_COLORS.card);
     this.name.setColor(picked ? c.gold : c.text);
     this.pickedMark.visible = picked;
   }
@@ -118,14 +127,14 @@ interface SelectPageDeps {
 export interface SelectPage { view: UiView }
 
 export function buildSelectPage(host: UiHost, d: SelectPageDeps): SelectPage {
-  const c = host.theme.colors;
+  const c = SEA_COLORS;
   const chars = playableCharacters(d.content);
   let chosen = chars.some(x => x.id === d.currentCharId) ? d.currentCharId : (chars[0]?.id ?? '');
   const loads = chars.map(x => buildLoadout(d.content, x.id));
 
   const live = new Set<CharCard>();
   const cardEnv: CardEnv = {
-    colors: c,
+    colors: SEA_COLORS,
     solid: host.solidSkin,
     tintOf: i => loads[i]?.tint ?? '#ffffff',
     skinOf: i => ((chars[i]?.skins as string[]) ?? []).length,
@@ -154,9 +163,19 @@ export function buildSelectPage(host: UiHost, d: SelectPageDeps): SelectPage {
     skillHint.setText(skillLine(buildLoadout(d.content, chosen)));
   }
 
-  const btnStart = new Button({ label: '开始 · 跑酷！', variant: 'primary', fontSizePx: 17, onClick: () => d.actions.onStartRun(chosen) });
-  const btnBack = new Button({ label: '返回', fontSizePx: 14, padding: { top: 6, bottom: 6, left: 14, right: 14 }, onClick: d.actions.onBack });
-  const entryText = new Label({ text: `登录方式：${entryLabel(d.entry)}`, fontSizePx: 12, color: c.muted });
+  const btnStart = new Button({
+    label: '开始 · 跑酷！', variant: 'primary', skin: host.solidSkin, labelColor: SEA_COLORS.neon,
+    fontSizePx: 17, onClick: () => d.actions.onStartRun(chosen),
+  });
+  const btnShop = new Button({
+    label: '商店', skin: host.solidSkin, labelColor: SEA_COLORS.text,
+    fontSizePx: 14, onClick: () => d.actions.onShop(chosen),
+  });
+  const btnBack = new Button({
+    label: '返回', skin: host.solidSkin, labelColor: SEA_COLORS.text,
+    fontSizePx: 14, padding: { top: 6, bottom: 6, left: 14, right: 14 }, onClick: d.actions.onBack,
+  });
+  const entryText = new Label({ text: `登录方式：${entryLabel(d.entry)}`, fontSizePx: 12, color: SEA_COLORS.muted });
 
   const view = host.makeView();
   view.add(new Box(
@@ -164,24 +183,26 @@ export function buildSelectPage(host: UiHost, d: SelectPageDeps): SelectPage {
     [new Box(
       {
         direction: 'column', width: { percent: 100 }, maxWidth: 720, flex: 1, align: 'stretch', gap: 12,
-        background: 'panel', backgroundOpacity: 0.72, padding: { top: 16, bottom: 16, left: 18, right: 18 },
+        background: host.solidSkin, backgroundColor: SEA_COLORS.panel, backgroundOpacity: 0.94,
+        padding: { top: 16, bottom: 16, left: 18, right: 18 },
       },
       [
         new Box({ direction: 'row', justify: 'spaceBetween', align: 'center' }, [
           new Box({ direction: 'row', gap: 12, align: 'center' }, [
             btnBack,
-            new Label({ text: '选择角色', fontSizePx: 20, color: c.text }),
+            new Label({ text: '选择角色', fontSizePx: 20, color: SEA_COLORS.text }),
           ]),
           entryText,
         ]),
+        new Label({ text: 'THUNDER RUN · 清风出发', fontSizePx: 12, color: SEA_COLORS.neon }),
         new Label({
-          text: '操作：← → 换道 · ↑/空格 跳 · ↓ 滑铲 · 双击或 E 放技能 · Esc 退出本局回选角。点卡片换角色。',
-          fontSizePx: 12, color: c.muted,
+          text: '操作：← → 换道 · ↑/空格 跳 · ↓ 滑铲 · 双击或 E 放技能 · Esc 退出本局回主菜单。点卡片换角色。',
+          fontSizePx: 12, color: SEA_COLORS.muted,
         }),
-        new Label({ text: '角色（左右滑动选择）', fontSizePx: 13, color: c.gold }),
+        new Label({ text: '角色（左右滑动选择）', fontSizePx: 13, color: SEA_COLORS.gold }),
         list,
         skillHint,
-        new Box({ direction: 'row', gap: 12, justify: 'center', padding: { top: 4 } }, [btnStart]),
+        new Box({ direction: 'row', gap: 12, justify: 'center', padding: { top: 4 } }, [btnStart, btnShop]),
       ],
     )],
   ));

@@ -1,8 +1,8 @@
 /**
  * 主流程测试（fake views，无 UI/GL）：
  * - 最佳分（对应 M2 审计：键名笔误迁移 + 脏值兜底）；
- * - 页面流转接线：start 两入口（微信登录仅 env==='wx' 可用、失败停留 + 反馈）、入口方式本机记忆、
- *   结算/局内 Esc 回选角页。content 未加载时 run/select 的 onEnter 空转，可直接驱动场景机。
+ * - 页面流转接线：启动直达主菜单、可进入角色页/跑酷，结算与局内 Esc 返回主菜单。
+ *   content 未加载时 run/select 的 onEnter 空转，可直接驱动场景机。
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -10,7 +10,6 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createGameFlow, BEST_KEY } from '../packages/game/dist/flow/mainFlow.js';
-import { ENTRY_KEY } from '../packages/game/dist/flow/session.js';
 import { parseAudioConfig } from '../packages/game/dist/core/audio/audioDirector.js';
 
 const root = join(fileURLToPath(import.meta.url), '..', '..');
@@ -19,7 +18,7 @@ const LEGACY_KEY = 'thunderrun:b\u2026st'; // 旧版笔误键：b + U+2026 省�
 
 function makeFlow(initial, { env, extras } = {}) {
   const store = new Map(Object.entries(initial ?? {}));
-  const seen = { best: null, summary: null, start: null, result: null, busy: [], feedback: [] };
+  const seen = { best: null, summary: null, start: null, menu: null, select: null, shop: null, result: null, busy: [], feedback: [], toasts: [] };
   const inputs = [];
   const adapter = {
     env,
@@ -40,17 +39,17 @@ function makeFlow(initial, { env, extras } = {}) {
         setFeedback: (text, isError) => seen.feedback.push({ text, isError }),
       };
     },
-    renderSelect: () => {},
+    renderMainMenu: actions => { seen.menu = actions; },
+    renderSelect: (_content, actions) => { seen.select = actions; },
+    renderShop: (_content, actions) => { seen.shop = actions; },
     mountHud: () => ({ update() {}, dispose() {} }),
     renderResult: (summary, best, actions) => { seen.summary = summary; seen.best = best; seen.result = actions; },
-    toast: () => {},
+    toast: msg => { seen.toasts.push(msg); },
   };
   const flow = createGameFlow({ adapter, views, configResolve: n => `./${n}.json` });
   const key = code => inputs.forEach(cb => cb({ type: 'key', code, phase: 'down' }));
   return { flow, store, seen, key };
 }
-
-const tick = () => new Promise(r => setImmediate(r));
 
 const summaryOf = score => ({
   t: 1, distance: 10, coins: 0, nearMiss: 0, hits: 0, score, alive: true, casts: 0, charId: 'char_volt',
@@ -96,76 +95,29 @@ test('平纪录不覆盖好值：score <= best 时不重写存储，best 原样�
 
 // ---------------- 页面流转接线 ----------------
 
-test('start：web 环境微信登录不可用（即便注入了 extras.login 游客兜底），onWechat 空转', async () => {
-  let calls = 0;
-  const { flow, store, seen } = makeFlow({}, { env: 'web', extras: { login: async () => { calls++; return { openid: 'g', isGuest: true }; } } });
+test('startup: start 场景显示主菜单，不触发登录；菜单操作与开发中入口可用', () => {
+  const { flow, store, seen } = makeFlow({}, { env: 'web', extras: { login: async () => ({ openid: 'g', isGuest: true }) } });
   flow.machine.go('start');
-  assert.equal(seen.start.wechatAvailable, false);
-  seen.start.onWechat();
-  await tick();
-  assert.equal(calls, 0);
+  assert.ok(seen.menu);
+  assert.equal(seen.start, null, '无需渲染登录/开始页');
+  assert.equal(store.has('thunderrun:entry'), false, '启动不创建登录入口记录');
+  seen.menu.onUnsupported();
+  assert.equal(seen.toasts.at(-1), '开发中');
   assert.equal(flow.machine.current(), 'start');
-  assert.equal(store.has(ENTRY_KEY), false);
+  seen.menu.onStartRun();
+  assert.equal(flow.machine.current(), 'run');
 });
 
-test('start：游客登录 → select 并记住 guest', () => {
-  const { flow, store, seen } = makeFlow();
-  flow.machine.go('start');
-  seen.start.onGuest();
-  assert.equal(flow.machine.current(), 'select');
-  assert.equal(store.get(ENTRY_KEY), 'guest');
-});
-
-test('start：wx 微信登录成功 → select 并记住 wechat；登录中重复点击不重复调用', async () => {
-  let calls = 0;
-  const { flow, store, seen } = makeFlow({}, { env: 'wx', extras: { login: async () => { calls++; return { openid: 'wx-guest-1', isGuest: true }; } } });
-  flow.machine.go('start');
-  assert.equal(seen.start.wechatAvailable, true);
-  seen.start.onWechat();
-  seen.start.onWechat();
-  seen.start.onGuest(); // 登录进行中：游客入口也被锁
-  assert.deepEqual(seen.busy, [true]);
-  await tick();
-  assert.equal(calls, 1);
-  assert.equal(flow.machine.current(), 'select');
-  assert.equal(store.get(ENTRY_KEY), 'wechat');
-});
-
-test('start：wx 微信登录失败 → 停留 start、错误反馈、解锁；不记入口', async () => {
-  const { flow, store, seen } = makeFlow({}, { env: 'wx', extras: { login: async () => { throw new Error('boom'); } } });
-  flow.machine.go('start');
-  seen.start.onWechat();
-  await tick();
-  assert.equal(flow.machine.current(), 'start');
-  assert.deepEqual(seen.busy, [true, false]);
-  const last = seen.feedback.at(-1);
-  assert.equal(last.isError, true);
-  assert.ok(last.text.includes('微信登录失败') && last.text.includes('boom'), last.text);
-  assert.equal(store.has(ENTRY_KEY), false);
-});
-
-test('start：登录返回前已离开开始页 → 结果丢弃，不强行跳转', async () => {
-  let resolve;
-  const { flow, store, seen } = makeFlow({}, { env: 'wx', extras: { login: () => new Promise(r => { resolve = r; }) } });
-  flow.machine.go('start');
-  seen.start.onWechat();
-  flow.machine.go('result', summaryOf(1));
-  resolve({ openid: 'x', isGuest: true });
-  await tick();
-  assert.equal(flow.machine.current(), 'result');
-  assert.equal(store.has(ENTRY_KEY), false);
-});
-
-test('导航：局内 Esc 与结算「返回选角」都回 select', () => {
+test('navigation: run Escape and result back both return to main menu', () => {
   const { flow, seen, key } = makeFlow();
   flow.machine.go('run'); // content 未加载：run.onEnter 空转
   key('Escape');
-  assert.equal(flow.machine.current(), 'select');
+  assert.equal(flow.machine.current(), 'start');
   flow.machine.go('result', summaryOf(3));
   seen.result.onSelect();
-  assert.equal(flow.machine.current(), 'select');
+  assert.equal(flow.machine.current(), 'start');
   key('Escape'); // 非 run 场景 Esc 无效
-  assert.equal(flow.machine.current(), 'select');
+  assert.equal(flow.machine.current(), 'start');
 });
 
 // ---------------- 音频 handoff（真实 config/*.json + 假场景，无 GL） ----------------
@@ -177,7 +129,7 @@ async function bootRealFlow({ withAudio = true } = {}) {
   const calls = [];
   const scenes = [];
   const inputs = [];
-  const seen = { select: null, result: null };
+  const seen = { menu: null, select: null, result: null };
   const store = new Map();
   const adapter = {
     storage: { get: k => store.get(k) ?? null, set: (k, v) => store.set(k, v), remove: k => store.delete(k) },
@@ -194,7 +146,9 @@ async function bootRealFlow({ withAudio = true } = {}) {
   const views = {
     renderBoot: () => ({ setStatus() {} }),
     renderStart: actions => { seen.start = actions; return { setBusy() {}, setFeedback() {} }; },
+    renderMainMenu: actions => { seen.menu = actions; },
     renderSelect: (_c, actions) => { seen.select = actions; },
+    renderShop: (_c, actions) => { seen.shop = actions; },
     mountHud: () => ({ update() {}, dispose() {} }),
     renderResult: (_s, _b, actions) => { seen.result = actions; },
     toast: () => {},
@@ -207,7 +161,7 @@ async function bootRealFlow({ withAudio = true } = {}) {
   const flow = createGameFlow({ adapter, views, configResolve: n => n, audioRandom: () => 0, createScene });
   await flow.boot();
   assert.equal(flow.machine.current(), 'start');
-  seen.start.onGuest();
+  flow.machine.go('select');
   const key = code => inputs.forEach(cb => cb({ type: 'key', code, phase: 'down' }));
   return { flow, calls, scenes, seen, key };
 }
@@ -242,7 +196,7 @@ test('音频 handoff：选角开局 → run BGM+开局音效；cast/pickup 回�
   assert.deepEqual(calls, [], '进入结算不应停掉死亡 BGM');
 });
 
-test('音频 handoff：结算「再来一局」先停死亡 BGM 再开新局；「返回选角」停死亡 BGM', async () => {
+test('音频 handoff：结算「再来一局」先停死亡 BGM 再开新局；返回主菜单停死亡 BGM', async () => {
   const { flow, calls, scenes, seen } = await bootRealFlow();
   seen.select.onStartRun('char_volt');
   scenes[0].cb.onDeath();
@@ -256,18 +210,19 @@ test('音频 handoff：结算「再来一局」先停死亡 BGM 再开新局；�
   scenes[1].cb.onEnd(summaryOf(1));
   calls.length = 0;
   seen.result.onSelect();
-  assert.equal(flow.machine.current(), 'select');
+  assert.equal(flow.machine.current(), 'start');
   assert.deepEqual(calls, [['stopMusic']]);
 });
 
-test('音频 handoff：死亡后结算前 Esc 回选角 → 停死亡 BGM；未死亡 Esc → 停 run BGM', async () => {
+test('音频 handoff：死亡后结算前 Esc 回主菜单 → 停死亡 BGM；未死亡 Esc → 停 run BGM', async () => {
   const { flow, calls, scenes, seen, key } = await bootRealFlow();
   seen.select.onStartRun('char_volt');
   scenes[0].cb.onDeath();
   calls.length = 0;
   key('Escape');
-  assert.equal(flow.machine.current(), 'select');
+  assert.equal(flow.machine.current(), 'start');
   assert.deepEqual(calls, [['stopMusic']]);
+  flow.machine.go('select');
   seen.select.onStartRun('char_volt');
   calls.length = 0;
   key('Escape');

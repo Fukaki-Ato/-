@@ -33,8 +33,19 @@ export interface StartHandle {
   setFeedback(text: string, isError: boolean): void;
 }
 
+export interface MainMenuActions {
+  onStartRun(): void;
+  onShop(): void;
+  onUnsupported(): void;
+}
+
 export interface SelectActions {
   onStartRun(charId: string): void;
+  onBack(): void;
+  onShop(charId: string): void;
+}
+
+export interface ShopActions {
   onBack(): void;
 }
 
@@ -52,12 +63,14 @@ export interface HudHandle {
 export interface GameViews {
   renderBoot(): BootHandle;
   renderStart(actions: StartActions): StartHandle;
+  renderMainMenu(actions: MainMenuActions): void;
   renderSelect(
     content: GameContent,
     actions: SelectActions,
     currentCharId: string,
     entry: EntryMethod | null,
   ): void;
+  renderShop(content: GameContent, actions: ShopActions): void;
   mountHud(): HudHandle;
   renderResult(summary: RunSummary, best: number, actions: ResultActions): void;
   toast(msg: string): void;

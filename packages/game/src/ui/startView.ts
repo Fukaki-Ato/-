@@ -13,38 +13,49 @@ export interface StartPage {
   handle: StartHandle;
 }
 
+const SEA = {
+  ink: '#315667',
+  muted: '#567b83',
+  teal: '#167f8e',
+  sand: '#bd7d36',
+  cream: '#fff5dc',
+};
+
 export function buildStartPage(host: UiHost, actions: StartActions): StartPage {
-  const c = host.theme.colors;
   const canWechat = actions.wechatAvailable;
 
   const btnWechat = new Button({
-    label: '微信登录', variant: 'primary', fontSizePx: 17, width: { percent: 100 },
+    label: 'WeChat 登录', variant: 'primary', skin: host.solidSkin, labelColor: SEA.teal,
+    fontSizePx: 17, width: { percent: 100 },
     disabled: !canWechat, onClick: actions.onWechat,
   });
-  const btnGuest = new Button({ label: '游客登录', fontSizePx: 16, width: { percent: 100 }, onClick: actions.onGuest });
-  const feedback = new Label({ text: '', fontSizePx: 12, color: c.muted, align: 'center' });
+  const btnGuest = new Button({
+    label: '游客登录', skin: host.solidSkin, labelColor: SEA.ink,
+    fontSizePx: 16, width: { percent: 100 }, onClick: actions.onGuest,
+  });
+  const feedback = new Label({ text: '', fontSizePx: 12, color: SEA.muted, align: 'center' });
   const note = new Label({
-    text: canWechat ? '进度暂存本机，账号云存档后续开放' : '网页端暂不支持微信登录，请选择游客登录',
-    fontSizePx: 11, color: c.muted, align: 'center',
+    text: canWechat ? '进度暂存本机，账号云存档后续开放' : 'Web 不支持 WeChat 登录，选择游客登录',
+    fontSizePx: 11, color: SEA.muted, align: 'center',
   });
 
-  // 霓虹双色跑道条（与启动页同款装饰，保持品牌一致）
   const stripe = new Box(
     { direction: 'row', width: { percent: 80 }, height: 6 },
     [
-      new Box({ flex: 60, height: 6, background: host.solidSkin, backgroundColor: c.neon, backgroundOpacity: 0.85 }),
-      new Box({ flex: 40, height: 6, background: host.solidSkin, backgroundColor: c.gold, backgroundOpacity: 0.6 }),
+      new Box({ flex: 60, height: 6, background: host.solidSkin, backgroundColor: SEA.teal, backgroundOpacity: 0.9 }),
+      new Box({ flex: 40, height: 6, background: host.solidSkin, backgroundColor: SEA.sand, backgroundOpacity: 0.86 }),
     ],
   );
 
   const card = new Panel(
     { width: { percent: 88 }, maxWidth: 400, direction: 'column', align: 'center', gap: 10,
+      background: host.solidSkin, backgroundColor: SEA.cream, backgroundOpacity: 0.94,
       padding: { top: 28, bottom: 22, left: 24, right: 24 } },
     [
-      new Label({ text: '雷霆酷跑', fontSizePx: 38, color: c.neon, align: 'center' }),
-      new Label({ text: 'THUNDER RUN · 霓虹雷暴都市', fontSizePx: 12, color: c.muted, align: 'center' }),
+      new Label({ text: '雷霆酷跑', fontSizePx: 38, color: SEA.ink, align: 'center' }),
+      new Label({ text: 'THUNDER RUN · 清风快跑', fontSizePx: 12, color: SEA.teal, align: 'center' }),
       new Box({ padding: { top: 6, bottom: 6 }, width: { percent: 100 }, align: 'center' }, [stripe]),
-      new Label({ text: '穿梭雷暴街区，闪避、收集、一路狂奔', fontSizePx: 13, color: c.text, align: 'center' }),
+      new Label({ text: '清风中穿行，闪避、收集、一路前行', fontSizePx: 13, color: SEA.ink, align: 'center' }),
       new Box({ direction: 'column', gap: 10, width: { percent: 100 }, align: 'stretch', padding: { top: 8 } },
         [btnWechat, btnGuest]),
       feedback,
@@ -64,7 +75,7 @@ export function buildStartPage(host: UiHost, actions: StartActions): StartPage {
       },
       setFeedback(text, isError) {
         feedback.setText(text);
-        feedback.setColor(isError ? c.danger : c.muted);
+        feedback.setColor(isError ? '#a8493f' : SEA.muted);
       },
     },
   };
