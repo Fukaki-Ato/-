@@ -8,8 +8,11 @@
  */
 import * as THREE from 'three';
 import { loadFontSet, resolveUiConfig, type UiConfig, type UiResources } from '@tr/framework/ui/index.js';
+import type { FontSet } from '@tr/framework/ui/text/metrics.js';
 import { UiHost } from '@tr/framework/ui/host.js';
 import type { PlatformAdapter } from '@tr/framework/platform/platformAdapter.js';
+import type { ShopImageAssets, ShopTexture } from '@tr/game/ui/shopImage.js';
+import { createShopAssetLoader } from './shopAssets.js';
 
 const resources: UiResources = {
   async loadJson(path: string) {
@@ -28,8 +31,72 @@ export interface UiShell {
   host: UiHost;
   renderer: THREE.WebGLRenderer;
   canvas: HTMLCanvasElement;
+  fonts: FontSet;
   config: UiConfig;
+  loadShopAssets(): Promise<ShopImageAssets | undefined>;
+  registerCleanup(cleanup: () => void): () => void;
   destroy(): void;
+}
+
+export interface ShellCleanupController {
+  registerCleanup(cleanup: () => void): () => void;
+  destroy(): void;
+}
+
+export function createShellCleanupController(disposeResources: () => void): ShellCleanupController {
+  const cleanups = new Set<() => void>();
+  let destroyed = false;
+  return {
+    registerCleanup(cleanup): () => void {
+      if (destroyed) { cleanup(); return () => undefined; }
+      cleanups.add(cleanup);
+      let registered = true;
+      return () => {
+        if (!registered) return;
+        registered = false;
+        cleanups.delete(cleanup);
+      };
+    },
+    destroy(): void {
+      if (destroyed) return;
+      destroyed = true;
+      let failure: unknown;
+      let hasFailure = false;
+      for (const cleanup of [...cleanups]) {
+        try { cleanup(); } catch (error) { if (!hasFailure) { failure = error; hasFailure = true; } }
+      }
+      cleanups.clear();
+      try { disposeResources(); } catch (error) { if (!hasFailure) { failure = error; hasFailure = true; } }
+      if (hasFailure) throw failure;
+    },
+  };
+}
+
+async function loadShopTexture(path: string, signal: AbortSignal): Promise<ShopTexture> {
+  const response = await fetch(path, { cache: 'no-store', signal });
+  if (!response.ok) throw new Error(`HTTP ${response.status} ${path}`);
+  const blob = await response.blob();
+  if (signal.aborted) throw new Error('商店素材加载已取消');
+  const image = await createImageBitmap(blob);
+  const bitmap = image as typeof image & { close?: () => void };
+  if (signal.aborted) {
+    bitmap.close?.();
+    throw new Error('商店素材加载已取消');
+  }
+  let texture: THREE.Texture | undefined;
+  try {
+    texture = new THREE.Texture(image as unknown as HTMLImageElement);
+    texture.flipY = false;
+    texture.generateMipmaps = false;
+    texture.minFilter = THREE.LinearFilter;
+    texture.magFilter = THREE.LinearFilter;
+    texture.needsUpdate = true;
+    return { texture, width: image.width, height: image.height, release: () => bitmap.close?.() };
+  } catch (error) {
+    texture?.dispose();
+    bitmap.close?.();
+    throw error;
+  }
 }
 
 export async function createUiShell(adapter: PlatformAdapter): Promise<UiShell> {
@@ -49,6 +116,11 @@ export async function createUiShell(adapter: PlatformAdapter): Promise<UiShell> 
     loadFontSet(resources, `${import.meta.env.BASE_URL}assets/fonts`),
     resources.loadJson(`${import.meta.env.BASE_URL}game.json`),
   ]);
+  const shopAssetLoader = createShopAssetLoader(loadShopTexture, {
+    sheet: `${import.meta.env.BASE_URL}assets/ui/shop-popup-generated.png`,
+    coin: `${import.meta.env.BASE_URL}assets/ui/badges/normal/coin.png`,
+    gem: `${import.meta.env.BASE_URL}assets/ui/badges/normal/gem.png`,
+  });
   const config = resolveUiConfig((gameJson as { params?: unknown }).params);
 
   const host = new UiHost({
@@ -73,16 +145,28 @@ export async function createUiShell(adapter: PlatformAdapter): Promise<UiShell> 
   canvas.addEventListener('pointerup', onUp);
   canvas.addEventListener('pointercancel', onCancel);
 
+  const lifecycle = createShellCleanupController(() => {
+    const disposers = [
+      () => canvas.removeEventListener('pointerdown', onDown),
+      () => canvas.removeEventListener('pointermove', onMove),
+      () => canvas.removeEventListener('pointerup', onUp),
+      () => canvas.removeEventListener('pointercancel', onCancel),
+      () => host.dispose(),
+      () => shopAssetLoader.dispose(),
+      () => renderer.dispose(),
+      () => canvas.remove(),
+    ];
+    let failure: unknown;
+    let hasFailure = false;
+    for (const dispose of disposers) {
+      try { dispose(); } catch (error) { if (!hasFailure) { failure = error; hasFailure = true; } }
+    }
+    if (hasFailure) throw failure;
+  });
+
   return {
-    host, renderer, canvas, config,
-    destroy() {
-      canvas.removeEventListener('pointerdown', onDown);
-      canvas.removeEventListener('pointermove', onMove);
-      canvas.removeEventListener('pointerup', onUp);
-      canvas.removeEventListener('pointercancel', onCancel);
-      host.dispose();
-      renderer.dispose();
-      canvas.remove();
-    },
+    host, renderer, canvas, fonts, config, loadShopAssets: shopAssetLoader.load,
+    registerCleanup: lifecycle.registerCleanup,
+    destroy: lifecycle.destroy,
   };
 }

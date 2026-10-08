@@ -1,0 +1,108 @@
+.tr-main-menu {
+  position: fixed;
+  inset: 0;
+  z-index: 8;
+  overflow: hidden;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+.tr-main-menu-stage {
+  position: absolute;
+  z-index: 1;
+  width: 750px;
+  height: 1624px;
+  transform-origin: center center;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: 100% 100%;
+}
+
+.main-menu-text-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  width: 100%;
+  height: 100%;
+  filter: drop-shadow(0 2px 1px #693a22);
+  pointer-events: none;
+}
+
+.tr-main-menu:not(.shop-font-ready) .shop-sdf-text {
+  visibility: hidden;
+}
+
+.tr-main-menu.shop-font-ready .shop-sdf-text {
+  color: transparent !important;
+  -webkit-text-fill-color: transparent !important;
+  text-shadow: none !important;
+}
+
+.main-menu-hotspot {
+  position: absolute;
+  z-index: 3;
+  display: block;
+  box-sizing: border-box;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.main-menu-hotspot:focus-visible {
+  border: 3px solid rgba(255, 237, 181, 0.9);
+  border-radius: 16px;
+  outline: 2px solid rgba(84, 50, 28, 0.9);
+  outline-offset: -5px;
+}
+
+.main-menu-currency-hit { border-radius: 50%; }
+
+.main-menu-bottom-nav {
+  position: absolute;
+  top: 1445px;
+  left: 0;
+  display: grid;
+  width: 750px;
+  height: 179px;
+  grid-template-columns: repeat(4, 187.5px);
+  pointer-events: none;
+}
+
+.main-menu-nav-hotspot {
+  position: relative;
+  width: 187.5px;
+  height: 179px;
+  pointer-events: auto;
+}
+
+.main-menu-toast {
+  position: absolute;
+  z-index: 5;
+  top: 50%;
+  left: 50%;
+  min-width: 180px;
+  box-sizing: border-box;
+  padding: 16px 38px;
+  border: 2px solid rgba(255, 229, 181, 0.66);
+  border-radius: 22px;
+  background: rgba(60, 37, 23, 0.9);
+  color: #fff3d0;
+  font: 700 28px/1.2 "Microsoft YaHei", "PingFang SC", system-ui, sans-serif;
+  text-align: center;
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, 8px);
+  transition: opacity 150ms ease, transform 150ms ease;
+}
+
+.main-menu-toast.is-visible {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .main-menu-toast { transition: none; }
+}
