@@ -1,7 +1,8 @@
 /**
  * 动作 clip 选择（纯函数、零依赖，node --test 直接回归；three 的播放胶水在 animAvatar.ts）
- * 数据来源：char_nailong → assets/characters/nailoong.glb 的 11 个命名动画 clip（资产契约：
- * Idle/Run/Laugh/Slide/Jump/TurnLeft/TurnRight/Fly/Land/Hit/Death，1 单位=1m、脚底在原点、面朝 -Z）。
+ * 数据来源：两个 GLB 资产的命名动画 clip（共同契约：1 单位=1m、脚底在原点、面朝 -Z）——
+ * char_nailong → nailoong.glb 带 Laugh（无缝循环的笑），char_bball → bball.glb 带 Basketball
+ * （投篮，首末姿差 117.16° 只能 LoopOnce）；其余 10 个核心 clip 两边同名同规格。
  * 优先级（上层压下层，逐条对应「玩家此刻在干什么」）：
  *   ① QA 锁 ?anim=<ClipName>（仅 dev/QA，见 readAnimLock）→ 强制循环
  *   ② !alive → Death 播一次保持末帧；进死亡那一下从 0 重起（restart）
@@ -14,7 +15,8 @@
  * 「离地」用 supportY 而非绝对高度：站在 2.4m 车顶/坡道上仍是跑，不是跳（同 avatarRig.pickAvatarMode
  * 的口径，历史上把它当滞空是「火车上跑步动画不正常」的根因）。
  * 循环口径（建模侧资产契约，逐字对应交付要求）：只有 Run/Slide/Laugh/Fly 首末无缝，可 LoopRepeat；
- * Idle/Jump/Hit/Land/TurnLeft/TurnRight/Death 一律 LoopOnce 播一次并保持末帧，由 animAvatar 在播完后收尾
+ * Idle/Jump/Hit/Land/TurnLeft/TurnRight/Death/Basketball 一律 LoopOnce 播一次并保持末帧，
+ * 由 animAvatar 在播完后收尾
  * （Idle 交回自身首帧做 0.12s 交叉淡化抹掉首末 110° 姿差；其余保持末帧，等状态切换自然淡出）。
  * 注：RunnerState 没有 speed 字段（simTypes.ts 逐字段确认），Run 的步频 timeScale 补偿放在
  * animAvatar 里按帧位移估算，本文件只决策「播哪个」，保持可纯函数回归。
@@ -22,13 +24,25 @@
 import type { FxState } from '@tr/game/core/effects/buffEngine.js';
 import type { RunnerState } from '@tr/game/core/sim/simTypes.js';
 
-/** 11 个 clip 名（与 glb 内 AnimationClip.name 逐字一致；缺任何一个即判资产不合格并回退程序化模型） */
-export const CLIP_NAMES = [
-  'Idle', 'Run', 'Laugh', 'Slide', 'Jump', 'TurnLeft', 'TurnRight', 'Fly', 'Land', 'Hit', 'Death',
+/** 核心 clip（10 个）：状态机每个分支都会落到它们，与 glb 内 AnimationClip.name 逐字一致；
+ *  缺任何一个即判资产不合格并回退程序化模型（半套动作比没有更糟：会静默少播受击/死亡等关键反馈）。 */
+export const CORE_CLIP_NAMES = [
+  'Idle', 'Run', 'Slide', 'Jump', 'TurnLeft', 'TurnRight', 'Fly', 'Land', 'Hit', 'Death',
 ] as const;
+/** 表演 clip（2 个）：不进状态机，只服务 ?anim= QA 锁（以及将来的道具触发演出）。
+ *  奶龙带 Laugh（无缝循环的笑），篮球小子带 Basketball（投篮）——两个资产的表演 clip 不同源，
+ *  所以按存在性装配：缺失不判资产不合格，pickClip 命中缺失的由 animAvatar.play() 回落 Run。
+ *  Basketball 不能改名成 Laugh 硬上：首末姿差 117.16°，而 Laugh 在 LOOPING_CLIPS 里是
+ *  LoopRepeat，直接改名会让它每圈硬跳一次。 */
+export const PERF_CLIP_NAMES = ['Laugh', 'Basketball'] as const;
+/** 全部合法 clip 名（CORE + PERF）：asClipName / readAnimLock 的合法集 */
+export const CLIP_NAMES = [...CORE_CLIP_NAMES, ...PERF_CLIP_NAMES] as const;
 export type ClipName = typeof CLIP_NAMES[number];
+export type CoreClipName = typeof CORE_CLIP_NAMES[number];
+export type PerfClipName = typeof PERF_CLIP_NAMES[number];
 
-/** 可无缝循环的 clip（建模侧实测首末姿一致）：其余一律只播一次 */
+/** 可无缝循环的 clip（建模侧实测首末姿一致）：其余一律只播一次。
+ *  Basketball 故意不在内：首末姿差 117.16°，LoopRepeat 会每圈硬跳（见 PERF_CLIP_NAMES 注释）。 */
 export const LOOPING_CLIPS = ['Run', 'Slide', 'Laugh', 'Fly'] as const;
 
 /** 该 clip 能否 LoopRepeat。QA 锁与状态映射共用同一口径，禁止两头各写一份 */
@@ -97,7 +111,10 @@ export function asClipName(name: string): ClipName | null {
   return (CLIP_NAMES as readonly string[]).includes(name) ? (name as ClipName) : null;
 }
 
-/** QA 锁读取（仅 dev/QA）：URLSearchParams 由壳层注入，本模块不 import 任何 app/宿主代码。 */
+/** QA 锁读取（仅 dev/QA）：URLSearchParams 由壳层注入，本模块不 import 任何 app/宿主代码。
+ *  注意一次性 clip 的锁由 animAvatar 在播完后自动解锁（本文件只管「锁哪个、什么循环口径」）：
+ *  URL 参数跨刷新持久，不自动解锁会把角色永久定在末帧（用户实测过的坑）。
+ */
 export function readAnimLock(urlParams?: URLSearchParams | null): ClipName | null {
   const raw = urlParams?.get('anim');
   return raw ? asClipName(raw) : null;

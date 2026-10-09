@@ -1,6 +1,6 @@
 /**
- * GLB 角色驱动（three 胶水）：把 assets/characters/*.glb 的蒙皮网格 + 11 个动画 clip 接进 render 层。
- * 铁律：任何一步失败（无 extras.readBinary / 拉取失败 / 解析失败 / clip 缺失）都返回 null，
+ * GLB 角色驱动（three 胶水）：把 assets/characters/*.glb 的蒙皮网格 + 动画 clip 接进 render 层。
+ * 铁律：任何一步失败（无 extras.readBinary / 拉取失败 / 解析失败 / 核心 clip 缺失）都返回 null，
  * 由 avatarRig 保留程序化 runnerModel —— 程序化模型是唯一回退路径，绝不让资产问题炸到局内。
  * 姿态来源：glb 的 clip（飞/滑翔俯角、死亡翻倒都做在动画里），外层只摆位置与换道侧倾。
  */
@@ -11,7 +11,7 @@ import type { FxState } from '@tr/game/core/effects/buffEngine.js';
 import { STEP_DT } from '@tr/game/core/sim/simTypes.js';
 import type { RunnerState } from '@tr/game/core/sim/simTypes.js';
 import {
-  CLIP_NAMES, createClipContext, loopsForever, pickClip, readAnimLock,
+  CORE_CLIP_NAMES, PERF_CLIP_NAMES, createClipContext, loopsForever, pickClip, readAnimLock,
   type ClipContext, type ClipName,
 } from './animClips.js';
 import { RUN_BONE_AMPS, amplifyClipSwing } from './animAmplify.js';
@@ -63,9 +63,13 @@ export interface AnimAvatar {
  * @param adapter 平台适配（extras.readBinary 不可用 → 直接返回 null，保留程序化模型）
  * @param prefabPath characters.json 的 model.prefab（web 壳同路径由 vite dev/build 服务）
  * @param scale characters.json 的 model.scale
+ * @param isDead 装配完成前的存活探测（场景已销毁 → 返回 true）：GLB 是异步的，重开一局/
+ *   回菜单时上一局的加载可能才回来——晚到的 build() 会把 __trAnim 全局探针覆盖成不再
+ *   update 的死实例（QA 采样读到 time=0/ts=0 的冻结快照，曾被误判成「动画卡死」）。
  */
 export function createAnimAvatar(
   adapter: PlatformAdapter, prefabPath: string, scale = 1, urlParams?: URLSearchParams | null,
+  isDead?: () => boolean,
 ): Promise<AnimAvatar | null> {
   if (!adapter.extras) {
     console.warn('[avatarRig] 平台无 extras（v2 契约 D7），跳过 GLB 角色（保留程序化模型）:', prefabPath);
@@ -75,7 +79,7 @@ export function createAnimAvatar(
     .then(buf => new Promise<AnimAvatar | null>(resolve => {
       new GLTFLoader().parse(buf, '', gltf => {
         try {
-          resolve(build(gltf.scene, gltf.animations, scale, urlParams));
+          resolve(build(gltf.scene, gltf.animations, scale, urlParams, isDead));
         } catch (e) {
           console.warn('[avatarRig] GLB 装配失败（回退程序化模型）', prefabPath, e);
           resolve(null);
@@ -93,23 +97,38 @@ export function createAnimAvatar(
 
 function build(
   root: THREE.Group, clips: THREE.AnimationClip[], scale: number, urlParams?: URLSearchParams | null,
+  isDead?: () => boolean,
 ): AnimAvatar | null {
-  // 11 个 clip 缺一即判资产不合格：半套动作比没有更糟（会静默少播受击/死亡等关键反馈）
-  const actions = {} as Record<ClipName, THREE.AnimationAction>;
+  // 核心 clip（10 个）缺一即判资产不合格：半套动作比没有更糟（会静默少播受击/死亡等关键反馈）。
+  // 表演 clip（Laugh/Basketball）按存在性装配：奶龙带 Laugh、篮球小子带 Basketball，
+  // 两个资产的表演 clip 不同源，缺一个不判失败——pickClip 命中缺失的由 play() 回落 Run。
+  const actions = {} as Record<ClipName, THREE.AnimationAction | null>;
   const mixer = new THREE.AnimationMixer(root);
-  for (const name of CLIP_NAMES) {
+  for (const name of CORE_CLIP_NAMES) {
     const clip = clips.find(c => c.name === name);
     if (!clip) {
-      console.warn('[avatarRig] GLB 缺少动画 clip:', name);
+      console.warn('[avatarRig] GLB 缺少核心动画 clip:', name);
       mixer.stopAllAction();
       return null;
     }
     actions[name] = mixer.clipAction(clip);
   }
+  for (const name of PERF_CLIP_NAMES) {
+    const clip = clips.find(c => c.name === name);
+    actions[name] = clip ? mixer.clipAction(clip) : null;
+  }
+  // 两个表演 clip 全缺 = 契约外资产（既不是奶龙也不是篮球小子），判不合格
+  if (!actions.Laugh && !actions.Basketball) {
+    console.warn('[avatarRig] GLB 无表演 clip（Laugh/Basketball 均缺），判资产不合格');
+    mixer.stopAllAction();
+    return null;
+  }
   // Run 步态放大（render 层解释，资产文件零改动）：v8 Run 是慢跑规格（脚行程 ~0.45m/周期），
   // baseSpeed 12 m/s 下一步覆盖 2.5m、timeScale 又被 TS_MAX 钳住，原样播就是「原地倒腾短腿+滑步」。
   // 只放大 Run 的四肢摆动；Idle/Jump/Land/Death… 一律逐字节不动，循环口径不受影响。
-  actions.Run = mixer.clipAction(amplifyClipSwing(clips.find(c => c.name === 'Run')!, RUN_BONE_AMPS));
+  // RUN_BONE_AMPS 的十个骨名（LegUpperL/R…ArmLowerL/R）奶龙与篮球小子都实测命中，放大同款生效。
+  const runAct = mixer.clipAction(amplifyClipSwing(clips.find(c => c.name === 'Run')!, RUN_BONE_AMPS));
+  actions.Run = runAct;
 
   root.scale.setScalar(scale);
   root.traverse(o => { o.frustumCulled = false; }); // 蒙皮包围盒不可靠，关剔除防人物突然消失
@@ -119,13 +138,18 @@ function build(
   const ctx: ClipContext = createClipContext();
   let current: ClipName | null = null;
   let tsSmooth = 1;                  // timeScale 平滑值，防帧位移抖动让跑步抽风
+  let ticks = 0;                     // update() 累计次数（探针 __trAnim.ticks：死实例停止增长）
   /** 落脚探测状态：两只脚各自「是否正踩在触地区里」与进入触地时的水平位置（判迈步方向） */
   let footfall: ((x: number, y: number, z: number) => void) | null = null;
   const inContact = { L: false, R: false };
   const entryZ = { L: 0, R: 0 };
   /** QA 探针（?debug/?test 时挂 window.__trAnim）：clip 切换时间线 + 正在播的 action 快照 */
   const clipLog: Array<{ clip: ClipName; loop: boolean; restart: boolean; t: number }> = [];
-  const lock = readAnimLock(urlParams); // QA 锁 ?anim=（dev/QA only，见 animClips.ts 头）
+  /** QA 锁 ?anim=（build 时读入；一次性 clip 播完自动置 null，见 update 里的解锁块）。
+   *  为什么必须自动解锁：锁是 URL 参数，会跨刷新/书签持久，而一次性 clip（Basketball 2s /
+   *  Death 1.1s）LoopOnce + clampWhenFinished 播完就永久定在末帧——用户实测「一开始是好的，
+   *  之后跑步没动作、下蹲也没动作」，就是验收地址 ?anim=Basketball 在 2s 后把角色定死。 */
+  let lock = readAnimLock(urlParams);
   const chestV = new THREE.Vector3();
   const footV = new THREE.Vector3();
 
@@ -134,7 +158,7 @@ function build(
    * 播完后用同 clip 的第二个 action 做 0.12s 交叉淡化交回自身首帧，抹掉硬跳。
    */
   const idleClip = clips.find(c => c.name === 'Idle');
-  let idleAct = actions.Idle;
+  let idleAct = actions.Idle as THREE.AnimationAction; // CORE 必存在（上面缺一即 return null）
   let idleSpare: THREE.AnimationAction | null = null;
   function idleCrossfadeToHead() {
     if (!idleClip) return;
@@ -148,22 +172,33 @@ function build(
     actions.Idle = idleAct;   // 后续 play('Idle') 与「播完」判定都指向正在播的那个实例
   }
 
-  /** 切 clip：同 clip 不重播；restart（死亡进场）强制从 0；其余走 0.12s 交叉淡化 */
+  /** 切 clip：同 clip 不重播；restart（死亡进场）强制从 0；其余走 0.12s 交叉淡化。
+   *  表演 clip 缺失回落 Run：pickClip 是纯函数、不认识资产有哪些 clip（篮球小子没有 Laugh、
+   *  奶龙没有 Basketball），QA 锁 ?anim=Laugh 锁到不存在的 clip 时也走这里，不静默不播。 */
   function play(name: ClipName, loop: boolean, restart: boolean) {
-    const next = actions[name];
+    let clip = name;
+    if (!actions[clip]) { clip = 'Run'; loop = loopsForever('Run'); restart = false; }
+    const next = actions[clip] as THREE.AnimationAction;
     next.setLoop(loop ? THREE.LoopRepeat : THREE.LoopOnce, Infinity);
-    next.clampWhenFinished = !loop; // 播一次的动作保持末帧（Death 倒地定格）
-    if (current === name && !restart) return;
-    if (current && current !== name) actions[current].fadeOut(XFADE);
+    next.clampWhenFinished = !loop; // 播一次的动作保持末帧（Death 倒地定格、Basketball 投篮定势）
+    if (current === clip && !restart) return;
+    if (current && current !== clip) actions[current]!.fadeOut(XFADE);
     next.reset();
-    if (current !== name) next.fadeIn(XFADE);
+    if (current !== clip) next.fadeIn(XFADE);
     next.play();
-    current = name;
-    clipLog.push({ clip: name, loop, restart: restart === true, t: +performance.now().toFixed(1) });
+    current = clip;
+    clipLog.push({ clip, loop, restart: restart === true, t: +performance.now().toFixed(1) });
     if (clipLog.length > 200) clipLog.splice(0, clipLog.length - 200); // 有界，防长局内存涨
   }
   // 装载完成到首帧 update 之间是待机，不是 T-pose；Idle 按契约只播一次（播完交回首帧）
   play('Idle', loopsForever('Idle'), false);
+
+  // 迟到装配防护（见 createAnimAvatar 的 isDead 注释）：场景已销毁就整体放弃，
+  // 绝不把 __trAnim 探针/几何体留给一个永远不会再 update 的实例。
+  if (isDead?.()) {
+    mixer.stopAllAction();
+    return null;
+  }
 
   // QA 探针（?debug/?test）：与 __trRun 同生命周期，只读快照，不影响播放
   if (urlParams?.has('debug') || urlParams?.has('test')) {
@@ -175,9 +210,14 @@ function build(
     };
     (globalThis as Record<string, unknown>).__trAnim = {
       get current() { return current; },
+      /** update() 累计调用次数：>0 且持续增长=探针所属实例活着（死实例的 ticks 停止增长） */
+      get ticks() { return ticks; },
+      /** 当前生效的 QA 锁（自动解锁后为 null；测试面板据此显示提示） */
+      get lock() { return lock; },
       get act() {
         if (!current) return null;
         const a = actions[current];
+        if (!a) return null;
         return { clip: current, time: +a.time.toFixed(2), dur: +a.getClip().duration.toFixed(2), weight: +a.getEffectiveWeight().toFixed(2), ts: +a.getEffectiveTimeScale().toFixed(2) };
       },
       /** 双脚世界坐标：验证 Run 步态放大（animAmplify）在局内的实际幅度 */
@@ -195,15 +235,20 @@ function build(
       return chest ? root.worldToLocal(chest.getWorldPosition(chestV)).y : CHEST_FALLBACK_Y * scale;
     },
     update(dt, s, fx) {
+      ticks++;
       const pick = pickClip(s, fx, ctx, dt, lock);
       play(pick.clip, pick.loop, pick.restart === true);
       mixer.update(dt);
       // 一次性 clip 播完的收尾：只有 Idle 交回自身首帧（首末差 110°，用交叉淡化抹掉硬跳）；
       // Jump/Hit/Land/TurnLeft/TurnRight/Death 一律保持末帧，等状态切换时自然淡出
       const act = actions[pick.clip];
-      if (!pick.loop && pick.clip === 'Idle' && act.time >= act.getClip().duration - 1e-4) {
+      if (!pick.loop && pick.clip === 'Idle' && act && act.time >= act.getClip().duration - 1e-4) {
         idleCrossfadeToHead();
       }
+      // QA 锁的一次性 clip 播完自动解锁：放完投篮/死亡演示就交还状态机，角色继续跑/滑。
+      // 循环锁（Run/Slide/Fly/Laugh）不受影响，持续锁播；死亡定格场景由状态机自己接管
+      // （仍 !alive → 继续返回 Death，观感不变）。
+      if (lock && !pick.loop && act && act.time >= act.getClip().duration - 1e-4) lock = null;
       // Run 步频补偿：用 sim 固定步长的精确速度（distance/prevDistance 是同一步的前后值，
       // STEP_DT 归一），不用「帧位移/dt」估——渲染帧率高于 sim 步频时（120Hz/144Hz 屏）
       // 没有 step 的渲染帧会被估成 0 速，timeScale 在 TS_MIN↔TS_MAX 之间振荡，步频一快一慢。
@@ -211,7 +256,7 @@ function build(
       const speed = (s.distance - s.prevDistance) / STEP_DT;
       const target = Math.min(TS_MAX, Math.max(TS_MIN, speed / STRIDE_M));
       tsSmooth += (target - tsSmooth) * Math.min(1, dt * 8);
-      actions.Run.setEffectiveTimeScale(tsSmooth);
+      runAct.setEffectiveTimeScale(tsSmooth);
       // 落脚探测：只在 Run（贴地且前进）时做。脚世界高度低于 ENTER 记一次触地并记住进入时的
       // 水平位置，向上穿出时若触地期间脚向前迈才算落点（向后=蹬地后收腿，跳过）。
       // y 用支撑面高度（s.y，车顶/坡道也正确），不等同于脚骨高度；x/z 取本帧脚世界坐标。
