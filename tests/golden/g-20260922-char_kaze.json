@@ -875,10 +875,10 @@
     ]
   },
   "expected": {
-    "frames": 903,
+    "frames": 905,
     "summary": {
-      "t": 15.05,
-      "distance": 195.25,
+      "t": 15.08,
+      "distance": 195.66,
       "coins": 12,
       "nearMiss": 1,
       "hits": 1,
@@ -895,7 +895,7 @@
       "nearMiss": 1,
       "protected": 1
     },
-    "eventsSha256": "5473da63424c5026bf2ffdac404e06dc9c10ff4d71ff8c090ed63d1d58fcfa6f",
+    "eventsSha256": "cc4eadaae25048998692cad4d87ec7ef2857dd1c0393978bfbd09000570a7ed3",
     "inputsSha256": "9618b37f782813472921bba50a736118a5519eb67f4f70e35e75f4c36c2f8dc6"
   }
 }
