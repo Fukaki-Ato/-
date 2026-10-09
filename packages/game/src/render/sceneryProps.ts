@@ -7,8 +7,11 @@
  *   far   远景房屋与椰树（更小更稀，补住地平线）
  * 排布规则：每种道具独占一条横向车道并错开相位，彼此不重叠；栅栏朝向固定 0 以与道路平行。
  * 全部单几何体实例化，draw call 恒定（约 20 个），微信低端机友好。
+ * 道具集按主题的 `scenery` 字段选（见 SCENERY_SETS）："blank" 这类未登记的 id 两侧什么都不摆。
  */
 import * as THREE from 'three';
+import { createCoastProps } from './coast/coastProps.js';
+import { createKonbiniProps } from './konbini/konbiniProps.js';
 
 /** 回收周期（米），与跑道长度同量级；出画即绕回远处 */
 const LOOP = 240;
@@ -140,12 +143,11 @@ function addPalmRow(scene: THREE.Scene, insts: Inst[], side: -1 | 1, base: numbe
   addShadow(scene, insts, at, 1.3);
 }
 
-export interface SceneryProps { update(move: number): void }
+export interface SceneryProps { update(move: number, t: number): void }
 
-export function createSceneryProps(scene: THREE.Scene): SceneryProps {
+/** 老「晴湾小镇」那套侧景（近景小件 + 中远景房屋/棕榈）：没有主题引用了，仍当 createTrackVisuals 的缺省集，emptyScene 与测试依赖它 */
+function createSeasideProps(scene: THREE.Scene): SceneryProps {
   const insts: Inst[] = [];
-
-  // ---- 近景小件：左侧礁石/草丛，右侧栅栏（朝向锁 0，与道路平行）/信箱/花盆/路灯 ----
   insts.push(addInst(scene, new THREE.DodecahedronGeometry(0.42, 0), std(0x9aa3ad), row(-1, 5.1, 41, 2, 0.2, { jx: 0.6, phase: 9 })));
   insts.push(addInst(scene, new THREE.ConeGeometry(0.2, 0.6, 5), std(0xb9c46a), row(-1, 4.4, 9, 3, 0.28, { jx: 0.6, phase: 4 })));
   const posts = row(1, 5.6, 1.7, 4, 0.36, { jx: 0, jz: 0, align: true });
@@ -184,4 +186,18 @@ export function createSceneryProps(scene: THREE.Scene): SceneryProps {
       }
     },
   };
+}
+
+/**
+ * 主题 config 的 `scenery` 字段 → 侧景道具集。
+ * 表里没有的 id（如占位场景的 "blank"）就是两侧什么都不摆。
+ */
+const SCENERY_SETS: Record<string, (scene: THREE.Scene) => SceneryProps> = {
+  seaside: createSeasideProps,
+  konbini: createKonbiniProps,
+  coast: createCoastProps,
+};
+
+export function createSceneryProps(scene: THREE.Scene, scenery: string = 'seaside'): SceneryProps {
+  return SCENERY_SETS[scenery]?.(scene) ?? { update: () => undefined };
 }

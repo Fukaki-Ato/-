@@ -31,6 +31,45 @@ function fixture(t) {
 
 const near = (a, b) => assert.ok(Math.abs(a - b) < 1e-9, `${a} != ${b}`);
 
+/** 侧景道具全是 InstancedMesh（道路/天穹那几件是普通 Mesh），数它就是数两侧摆了多少件 */
+const propCount = scene => scene.children.filter(o => o.isInstancedMesh).length;
+
+test('主题 scenery 选侧景道具集：blank 场景跑道两侧为空，seaside 照旧摆满', t => {
+  const colors = { baseColor: '#8ED0F2', flashColor: '#FFF3C4', tint: '#FFD98A', groundColor: '#E3CFA4' };
+  const mk = scenery => {
+    const scene = new THREE.Scene();
+    const track = createTrackVisuals(scene, 2.2, colors, scenery);
+    t.after(() => {
+      scene.traverse(o => {
+        if (o.geometry) o.geometry.dispose();
+        const mats = o.material ? (Array.isArray(o.material) ? o.material : [o.material]) : [];
+        for (const m of mats) m.dispose();
+      });
+    });
+    return { scene, track };
+  };
+  const seaside = mk('seaside');
+  const blank = mk('blank');
+  assert.ok(propCount(seaside.scene) > 10, `seaside 两侧应有成排道具，实得 ${propCount(seaside.scene)}`);
+  assert.equal(propCount(blank.scene), 0, 'blank 场景两侧不摆任何道具');
+  blank.track.update(3); // 空道具集照样能跟着滚动，不报错
+  seaside.track.update(3);
+});
+
+test('缺省 scenery 仍是 seaside（旧调用点如 emptyScene 不传第四个参数）', t => {
+  const scene = new THREE.Scene();
+  const track = createTrackVisuals(scene, 2.2, { baseColor: '#8ED0F2', flashColor: '#FFF3C4', tint: '#FFD98A' });
+  t.after(() => {
+    scene.traverse(o => {
+      if (o.geometry) o.geometry.dispose();
+      const mats = o.material ? (Array.isArray(o.material) ? o.material : [o.material]) : [];
+      for (const m of mats) m.dispose();
+    });
+  });
+  assert.ok(propCount(scene) > 10, `默认侧景不缩水，实得 ${propCount(scene)}`);
+  track.update(1);
+});
+
 test('闪白更新天空穹顶渐变并恢复天顶与地平线基色', t => {
   const { track, scene } = fixture(t);
   const dome = scene.children.find(o => o.isMesh && o.material?.isShaderMaterial);
