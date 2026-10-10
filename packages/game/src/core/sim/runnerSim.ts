@@ -249,7 +249,8 @@ export class RunnerSim {
         o.passed = true;
         if (isNearMiss(o, s, this.laneWidth)) { s.nearMiss++; this.events.push({ type: 'nearMiss' }); }
       }
-      if (hitsRunner(o, s, this.laneWidth)) { resolveHit(o, this.hitCtx); if (!s.alive) return; }
+      // 高杆门按角色净空判（loadout.clearance）：char_pony 站立可钻过，其余角色仍必须滑铲
+      if (hitsRunner(o, s, this.laneWidth, this.loadout.clearance)) { resolveHit(o, this.hitCtx); if (!s.alive) return; }
     }
   }
 

@@ -6,6 +6,7 @@
  */
 import type { EffectParams, StackRule } from '../effects/buffEngine.js';
 import type { GameContent, NamedEntry } from '../config/configTypes.js';
+import { STAND_H } from './simTypes.js';
 
 /** 一条待施加的原语 */
 export interface EffectSpec {
@@ -50,6 +51,11 @@ export interface Loadout {
   /** GLB 模型路径（characters.json model.prefab）：render/animAvatar 据此切 glb 驱动，
    *  缺失时回退程序化 runnerModel（平台 extras.readBinary 不可用时同理） */
   prefab?: string;
+  /** 角色站立碰撞净空高（米，characters.json clearance，缺省 STAND_H=1.7）：
+ *  高杆门 obs_gate_low 的碰撞判定读它——净空低于横杆下沿（BAR_BOTTOM=1.2）的角色
+ *  （char_pony，头 mesh 顶实测 1.18m）可不滑铲直接钻过；其余角色仍必须滑铲。
+ *  贝雷帽/马耳等超过横杆的装饰件不参与碰撞（视觉插杆属已知取舍，资产侧不改）。 */
+  clearance: number;
 }
 
 /** 可出战角色 = char_ 前缀且 status=live */
@@ -107,6 +113,7 @@ export function buildLoadout(content: GameContent, charId: string): Loadout {
     tint: text(c?.tint, '#7FD1FF'), rarity: String(c?.rarity ?? 'R'),
     skill: null, passive: [], talentLabel: '', talentDesc: '',
     skinId: '', bodyTint: text(c?.tint, '#7FD1FF'), emissive: text(c?.tint, '#7FD1FF'), modelScale: 1,
+    clearance: number(c?.['clearance'], STAND_H),
   };
   if (!c) return base;
 

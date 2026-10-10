@@ -92,6 +92,7 @@
       "model": { "prefab": "assets/characters/nailoong.glb", "scale": 1.0, "lod": [2, 6, 12] },
       "audio": { "voDir": "assets/audio/vo/nailong/", "footstep": "step_sneaker" },
       "tint": "#FFD84D",
+      "clearance": 1.70,
       "versions": [ { "ver": "1.0.0", "date": "2026-10-03", "change": "首发（GLB 驱动 11 动作 clip）" } ]
     },
     {
@@ -105,6 +106,7 @@
       "model": { "prefab": "assets/characters/bball.glb", "scale": 1.0, "lod": [2, 6, 12] },
       "audio": { "voDir": "assets/audio/vo/bball/", "footstep": "step_sneaker" },
       "tint": "#FFD84D",
+      "clearance": 1.70,
       "versions": [ { "ver": "1.0.0", "date": "2026-10-09", "change": "首发（GLB 驱动 11 动作 clip）" } ]
     },
     {
@@ -118,7 +120,22 @@
       "model": { "prefab": "assets/characters/whale.glb", "scale": 1.0, "lod": [2, 6, 12] },
       "audio": { "voDir": "assets/audio/vo/whale/", "footstep": "step_sneaker" },
       "tint": "#4A6FD6",
+      "clearance": 1.52,
       "versions": [ { "ver": "1.0.0", "date": "2026-10-10", "change": "首发（GLB 驱动 11 动作 clip）" } ]
+    },
+    {
+      "id": "char_pony", "status": "live",
+      "name": { "zh-CN": "马耳女仆", "en-US": "Pony Maid" },
+      "tagline": { "zh-CN": "捂嘴一笑，矮个也能直接过挡板" },
+      "rarity": "SR", "unlock": { "type": "coin", "cost": 3200 },
+      "skins": ["skin_pony_default"],
+      "skillRef": "skill_thunder_dash", "talentRef": "talent_volt_coin",
+      "growth": { "maxLevel": 10, "costPerLevel": [], "effectPerLevel": { "target": "skillRef", "paramScalePerLevel": 0.05 } },
+      "model": { "prefab": "assets/characters/pony.glb", "scale": 1.0, "lod": [2, 6, 12] },
+      "audio": { "voDir": "assets/audio/vo/pony/", "footstep": "step_sneaker" },
+      "tint": "#9A93C8",
+      "clearance": 1.19,
+      "versions": [ { "ver": "1.0.0", "date": "2026-10-10", "change": "首发（GLB 驱动 11 动作 clip + 矮净空被动：站立可钻滑铲门）" } ]
     },
     {
       "id": "skin_volt_default", "kind": "skin", "status": "live", "baseRef": "char_volt",
@@ -143,6 +160,7 @@
     { "id": "skin_bolt_storm", "kind": "skin", "status": "draft", "baseRef": "char_bolt", "name": { "zh-CN": "风暴警长" }, "rarity": "SSR", "materialOverrides": { "bodyTint": "#2A3350", "emissive": "#7FD1FF", "trailVfx": "vfx_trail_thunder" }, "model": { "prefab": "assets/skins/bolt_storm.glb" }, "unlock": { "type": "key", "cost": 12 }, "statMods": [], "versions": [ { "ver": "1.0.0", "date": "2026-09-22", "change": "围城活动商店（上线前 draft）" } ] },
     { "id": "skin_nailong_default", "kind": "skin", "status": "live", "baseRef": "char_nailong", "name": { "zh-CN": "默认涂装" }, "rarity": "SR", "materialOverrides": { "bodyTint": "#FFD84D", "emissive": "#FFE9A8" }, "model": { "prefab": "assets/characters/nailoong.glb" }, "unlock": { "type": "free" }, "statMods": [], "versions": [ { "ver": "1.0.0", "date": "2026-10-03", "change": "首发" } ] },
     { "id": "skin_bball_default", "kind": "skin", "status": "live", "baseRef": "char_bball", "name": { "zh-CN": "默认涂装" }, "rarity": "SR", "materialOverrides": { "bodyTint": "#FFD84D", "emissive": "#FFE9A8" }, "model": { "prefab": "assets/characters/bball.glb" }, "unlock": { "type": "free" }, "statMods": [], "versions": [ { "ver": "1.0.0", "date": "2026-10-09", "change": "首发" } ] },
-    { "id": "skin_whale_default", "kind": "skin", "status": "live", "baseRef": "char_whale", "name": { "zh-CN": "默认涂装" }, "rarity": "SR", "materialOverrides": { "bodyTint": "#FCF7FB", "emissive": "#7FD1FF" }, "model": { "prefab": "assets/characters/whale.glb" }, "unlock": { "type": "free" }, "statMods": [], "versions": [ { "ver": "1.0.0", "date": "2026-10-10", "change": "首发" } ] }
+    { "id": "skin_whale_default", "kind": "skin", "status": "live", "baseRef": "char_whale", "name": { "zh-CN": "默认涂装" }, "rarity": "SR", "materialOverrides": { "bodyTint": "#FCF7FB", "emissive": "#7FD1FF" }, "model": { "prefab": "assets/characters/whale.glb" }, "unlock": { "type": "free" }, "statMods": [], "versions": [ { "ver": "1.0.0", "date": "2026-10-10", "change": "首发" } ] },
+    { "id": "skin_pony_default", "kind": "skin", "status": "live", "baseRef": "char_pony", "name": { "zh-CN": "默认涂装" }, "rarity": "SR", "materialOverrides": { "bodyTint": "#9A93C8", "emissive": "#D8CDF0" }, "model": { "prefab": "assets/characters/pony.glb" }, "unlock": { "type": "free" }, "statMods": [], "versions": [ { "ver": "1.0.0", "date": "2026-10-10", "change": "首发" } ] }
   ]
 }

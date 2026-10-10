@@ -13,6 +13,14 @@ export const FLY_SPEED_CAP = 34;
 /** 高杆横杆的下沿高度：低于此高度可钻（滑铲），高于杆顶可跳越（弹跳鞋） */
 export const BAR_BOTTOM = 1.2;
 
+/** 角色站立碰撞净空高（米）：无 characters.json clearance 字段时的默认值（老角色/程序化模型）。
+ *  per-character 覆盖见 character.ts 的 Loadout.clearance——矮个角色（char_pony）净空低于
+ *  BAR_BOTTOM 时可不滑铲直接钻过高杆门，其余角色仍必须滑铲。 */
+export const STAND_H = 1.7;
+
+/** 滑铲碰撞净空高（米）：所有角色统一——滑铲是姿态不是身高，不按角色缩放 */
+export const SLIDE_H = 0.7;
+
 /** 输入缓冲 ≈120ms（game.json input.bufferMs 的步数化） */
 export const PENDING_STEPS = 7;
 
@@ -49,6 +57,7 @@ export const EMPTY_LOADOUT: Loadout = {
   charId: '', name: '跑者', tagline: '', tint: '#7FD1FF', rarity: 'R',
   skill: null, passive: [], talentLabel: '', talentDesc: '',
   skinId: '', bodyTint: '#F2F4F8', emissive: '#7FD1FF', modelScale: 1,
+  clearance: STAND_H,
 };
 
 /** 新建一局的状态初值 */

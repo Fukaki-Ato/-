@@ -4,7 +4,7 @@
  * 命中/近失的**结算**在 runnerSim.onHit()，这里只回答「会不会打到 / 算不算擦身」。
  */
 import type { ObstacleEntity } from './trackGen.js';
-import { BAR_BOTTOM, type RunnerState } from './simTypes.js';
+import { BAR_BOTTOM, SLIDE_H, STAND_H, type RunnerState } from './simTypes.js';
 
 /** 角色碰撞盒宽（docs/01 §3：0.8×1.7×0.8），与障碍宽度相加后取半 */
 export const HIT_BOX_W = 0.8;
@@ -68,10 +68,14 @@ export const RIDE_TOP_EPS = 0.30;
  *  （inDepthWindow 有 DEPTH_SLACK 前瞻，没有平顶会在坡中段被判「撞前脸」） */
 export const RAMP_TOP_FLAT_M = 0.8;
 
-/** 纵向判定：低障要跳够、高杆要钻或跃顶、电弧地面要跳起、满格与载具只能换道 */
-export function hitsRunner(o: ObstacleEntity, s: RunnerState, laneWidth: number): boolean {
+/** 纵向判定：低障要跳够、高杆要钻或跃顶、电弧地面要跳起、满格与载具只能换道。
+ *  @param clearance 角色站立净空高（米，sim 传 loadout.clearance）：高杆门按它判「头过不过杆」，
+ *    矮个角色（char_pony 1.19 < BAR_BOTTOM 1.2）可不滑铲直接钻过；缺省 STAND_H=1.7 保持老角色行为。 */
+export function hitsRunner(o: ObstacleEntity, s: RunnerState, laneWidth: number, clearance: number = STAND_H): boolean {
   if (lateralGap(o, s, laneWidth) > 0) return false;
-  const playerH = s.sliding ? 0.7 : 1.7;
+  // 防呆：配置脏数据（NaN/非正）回落标准身高，绝不让碰撞判定因一个坏字段失效
+  const standH = Number.isFinite(clearance) && clearance > 0 ? clearance : STAND_H;
+  const playerH = s.sliding ? SLIDE_H : standH;
   if (o.cls === 'low') return s.y < o.h * 0.75;
   if (o.cls === 'step') return false; // 板子：纯支撑面，永不判负（用于无弹跳鞋登火车）
   if (o.cls === 'high') return s.y < o.h && s.y + playerH > BAR_BOTTOM;
