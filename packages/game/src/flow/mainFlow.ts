@@ -1,11 +1,12 @@
 /**
  * 主流程装配（@tr/game）——从 apps/web/src/bootstrap.ts 提取，两端共用（redesign §3.5）。
  * 职责：平台适配（经 adapter 注入）→ 场景状态机 → 加载配置 → 驱动页面流转：
- *       boot（配置加载）→ start（主菜单）→ run / shop → result → start；
- *       select 场景保留角色视图实现，但当前 Web 主菜单不再进入该场景。
+ *       boot（配置加载）→ select（主界面兼选角，游客态直入）→ run → result → select；
+ *       start（微信/游客登录页）保留在场景机里但 boot 后不再可达——默认游客进入，
+ *       全程不调 adapter.extras.login()、不弹授权（issue：重构主界面并默认游客进入）；
  *       跑酷局内：每次进入 run 场景创建全新 RunnerSim（seed 记录在案，可复现），
  *       渲染场景消费 sim 事件；死亡 1.2s 后自动进结算页。
- * Web 启动直接进入主菜单，不展示登录或角色选择页。
+ * 微信登录只调注入的 adapter.extras.login()（wx 侧现为游客占位，服务端鉴权未接），见 session.ts。
  * 铁律：本包零 DOM/wx——挂载点与页面全部经 GameViews 由 apps/* 注入。
  */
 import { loadAllConfig } from '@tr/game/core/config/configLoader.js';
@@ -21,7 +22,7 @@ import { installTestApi, uninstallTestApi } from './testApi.js';
 import { createRunnerScene } from '@tr/game/render/runnerScene.js';
 import type { PlatformAdapter } from '@tr/framework/platform/platformAdapter.js';
 import type { GameViews, RunSummary } from './views.js';
-import { readEntry, type EntryMethod } from './session.js';
+import { readEntry, saveEntry, wechatAvailable, wechatLogin, type EntryMethod } from './session.js';
 
 /** 历史最佳分存储键（v2 修正键；旧版笔误键含真省略号 U+2026，见 LEGACY_BEST_KEY） */
 export const BEST_KEY = 'thunderrun:best';
@@ -29,6 +30,12 @@ export const BEST_KEY = 'thunderrun:best';
 const LEGACY_BEST_KEY = 'thunderrun:b\u2026st';
 export const CHAR_KEY = 'thunderrun:character';
 export const DEFAULT_CHAR = 'char_volt';
+/** 累计金币（大厅顶栏展示；结算时累加写入） */
+export const COINS_KEY = 'thunderrun:coins-total';
+/** 钻石总和（大厅顶栏展示；获取渠道待后续玩法接入，先预留键） */
+export const DIAMOND_KEY = 'thunderrun:diamonds-total';
+/** 大厅「场景切换」所选主题 id（run 进局时消费） */
+export const THEME_KEY = 'thunderrun:theme';
 
 export interface GameFlowDeps {
   adapter: PlatformAdapter;
@@ -83,22 +90,48 @@ export function createGameFlow(deps: GameFlowDeps): GameFlow {
   };
   /** 上次选的角色（本机记忆；账号级保存在 S9 接 extras.cloud 后端） */
   let charId = adapter.storage.get(CHAR_KEY) ?? DEFAULT_CHAR;
-  /** 已有会话信息仅用于可选的角色页展示；主菜单启动不经过登录流程。 */
+  /** 本机累计计数读取（脏值按 0，不把 NaN 带进大厅展示） */
+  const readCount = (key: string): number => {
+    const n = Number(adapter.storage.get(key) ?? '0');
+    return Number.isFinite(n) && n > 0 ? n : 0;
+  };
+  /** 上次在开始页选的入口（本机记忆，选角页展示）；无记忆＝游客态直入主界面 */
   let entry: EntryMethod | null = readEntry(adapter.storage);
-  let shopReturnScene: 'start' | 'select' = 'start';
+  /** 开始页进入代次：登录 promise 回来时若已离开/重进开始页则丢弃结果 */
+  let startGen = 0;
+
+  const enterSelect = (method: EntryMethod): void => {
+    entry = method;
+    saveEntry(adapter.storage, method);
+    machine.go('select');
+  };
 
   const machine = createSceneMachine<SceneName>({
     boot: {},
     start: {
       onEnter: () => {
-        audio?.stopDeathMusic();
-        views.renderMainMenu({
-          onStartRun: () => machine.go('run'),
-          onShop: () => {
-            shopReturnScene = 'start';
-            machine.go('shop');
+        const gen = ++startGen;
+        const canWechat = wechatAvailable(adapter);
+        let busy = false;
+        const handle = views.renderStart({
+          wechatAvailable: canWechat,
+          onGuest: () => { if (!busy) enterSelect('guest'); },
+          onWechat: () => {
+            if (!canWechat || busy) return;
+            busy = true;
+            handle.setBusy(true);
+            handle.setFeedback('微信登录中…', false);
+            wechatLogin(adapter).then(
+              () => { if (gen === startGen && machine.current() === 'start') enterSelect('wechat'); },
+              (err: unknown) => {
+                if (gen !== startGen || machine.current() !== 'start') return;
+                busy = false;
+                handle.setBusy(false);
+                const msg = err instanceof Error ? err.message : String(err);
+                handle.setFeedback(`微信登录失败：${msg}。可重试，或选择游客登录`, true);
+              },
+            );
           },
-          onUnsupported: () => views.toast('开发中'),
         });
       },
     },
@@ -108,18 +141,7 @@ export function createGameFlow(deps: GameFlowDeps): GameFlow {
         if (content) views.renderSelect(content, {
           onStartRun: id => { charId = id; adapter.storage.set(CHAR_KEY, id); machine.go('run'); },
           onBack: () => machine.go('start'),
-          onShop: id => {
-            charId = id;
-            adapter.storage.set(CHAR_KEY, id);
-            shopReturnScene = 'select';
-            machine.go('shop');
-          },
-        }, charId, entry);
-      },
-    },
-    shop: {
-      onEnter: () => {
-        if (content) views.renderShop(content, { onBack: () => machine.go(shopReturnScene) });
+        }, charId, entry, { coins: readCount(COINS_KEY), diamonds: readCount(DIAMOND_KEY) });
       },
     },
     run: {
@@ -139,7 +161,7 @@ export function createGameFlow(deps: GameFlowDeps): GameFlow {
           onCast: () => audio?.onCast(),
           onPickup: () => audio?.onPickup(),
           debug: deps.debug,
-        });
+        }, { themeId: adapter.storage.get(THEME_KEY) ?? undefined });
         if (deps.test) installTestApi(sim, content); // 测试面板数据面：?debug/?test 才挂
       },
       onExit: () => {
@@ -156,20 +178,22 @@ export function createGameFlow(deps: GameFlowDeps): GameFlow {
         if (content && summary.charId) summary.charName = buildLoadout(content, summary.charId).name;
         const best = bestScore();
         if (summary.score > best) adapter.storage.set(BEST_KEY, String(summary.score));
+        const coinsGot = summary.coins ?? 0;
+        if (coinsGot > 0) adapter.storage.set(COINS_KEY, String(readCount(COINS_KEY) + coinsGot));
         views.renderResult(summary, best, {
           onRetry: () => machine.go('run'),
-          onSelect: () => machine.go('start'),
+          onSelect: () => machine.go('select'),
         });
       },
-      // 离开结算（重开/回主菜单）：停死亡 BGM，避免与下一局 run BGM 重叠
+      // 离开结算（重开/回选角）：停死亡 BGM，避免与下一局 run BGM 重叠
       onExit: () => audio?.stopDeathMusic(),
     },
   }, 'boot');
 
-  // 全局按键：run 中 Esc 返回主菜单（v2 onInput 的 key 分支，替代 v1 adapter.onKey，S10 §7.3）
+  // 全局按键：run 中 Esc 退回选角页（v2 onInput 的 key 分支，替代 v1 adapter.onKey，S10 §7.3）
   adapter.onInput(e => {
     if (e.type === 'key' && e.phase === 'down' && e.code === 'Escape' && machine.current() === 'run') {
-      machine.go('start');
+      machine.go('select');
     }
   });
 
@@ -193,7 +217,13 @@ export function createGameFlow(deps: GameFlowDeps): GameFlow {
     audio = createAudioDirector(adapter, content.game.params, {
       random: deps.audioRandom ?? mulberry32(hashSeed('audio-' + Date.now())),
     });
-    machine.go('start');
+    // 游客态直入主界面：不要求登录、不调 adapter.extras.login()、不显示授权弹窗。
+    // 开始页（微信/游客两入口）保留在场景机里但不再有入口可达，登录代码零调用。
+    if (entry === null) {
+      entry = 'guest';
+      saveEntry(adapter.storage, 'guest');
+    }
+    machine.go('select');
   }
 
   return { machine, boot, currentSeed: () => lastSeed };

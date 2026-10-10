@@ -1,7 +1,7 @@
 /**
  * 结算页（P6）：对照 DOM screens.renderResult 逐行映射。
  * 信息：标题（新纪录判定）/大分数/里程/金币/惊险擦身/受击/技能释放(casts·charName)/历史最佳/
- * 两个按钮（再跑一次 / 返回主界面）。
+ * 两个按钮（再跑一次 / 返回选角）。
  */
 import { Box, Button, Label, Panel, type UiView } from '@tr/framework/ui/index.js';
 import type { UiHost } from '@tr/framework/ui/host.js';
@@ -41,7 +41,7 @@ export function buildResultPage(host: UiHost, d: ResultDeps): ResultPage {
         { direction: 'row', gap: 12, justify: 'center', padding: { top: 14 } },
         [
           new Button({ label: '再跑一次', variant: 'primary', fontSizePx: 17, onClick: d.actions.onRetry }),
-          new Button({ label: '返回主界面', fontSizePx: 15, onClick: d.actions.onSelect }),
+          new Button({ label: '返回选角', fontSizePx: 15, onClick: d.actions.onSelect }),
         ],
       ),
     ],

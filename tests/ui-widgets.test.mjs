@@ -277,3 +277,17 @@ test('ScrollView 子树材质带裁剪面 uniform（uClipCount=4）', () => {
   assert.equal(outside.mesh.atlasMeshes[0].material.uniforms.uClipCount.value, 0);
   view.dispose();
 });
+
+test('Box absolute 子项：产出顺序与 laidOut 对齐，sync 不会把矩形错配给别的子项', () => {
+  const view = makeView();
+  const abs = new Box({ absolute: true, top: 0, height: 100, background: 'panel' });
+  const flow = new Box({ height: 40, background: 'card' });
+  view.add(new Box({ direction: 'column', width: 400, height: 300 }, [abs, flow]));
+  const tree = view.relayout();
+  const f = findBox(tree, flow.id);
+  const a = findBox(tree, abs.id);
+  assert.ok(f && a, '两个子项都要在矩形树里');
+  assert.equal(f.rect.y, 0);
+  assert.equal(f.rect.h, 40, '常规子项拿自己的矩形');
+  assert.equal(a.rect.h, 100, '绝对子项拿自己的矩形');
+});

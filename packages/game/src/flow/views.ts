@@ -42,11 +42,14 @@ export interface MainMenuActions {
 export interface SelectActions {
   onStartRun(charId: string): void;
   onBack(): void;
-  onShop(charId: string): void;
 }
 
-export interface ShopActions {
-  onBack(): void;
+export interface ShopActions { onBack(): void }
+
+/** 大厅页本机统计（mainFlow 从 storage 读出注入；视图不直接碰存储键定义方） */
+export interface SelectExtras {
+  coins: number;
+  diamonds: number;
 }
 
 export interface ResultActions {
@@ -63,14 +66,13 @@ export interface HudHandle {
 export interface GameViews {
   renderBoot(): BootHandle;
   renderStart(actions: StartActions): StartHandle;
-  renderMainMenu(actions: MainMenuActions): void;
   renderSelect(
     content: GameContent,
     actions: SelectActions,
     currentCharId: string,
     entry: EntryMethod | null,
+    extras?: SelectExtras,
   ): void;
-  renderShop(content: GameContent, actions: ShopActions): void;
   mountHud(): HudHandle;
   renderResult(summary: RunSummary, best: number, actions: ResultActions): void;
   toast(msg: string): void;

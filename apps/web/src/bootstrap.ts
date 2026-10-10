@@ -3,9 +3,7 @@ import { createWebPlatform } from './platform/webPlatform.js';
 import { createGameFlow } from '@tr/game/flow/mainFlow.js';
 import { createOverlayViews } from '@tr/game/ui/overlayViews.js';
 import { createUiShell } from './uiShell.js';
-import { createShopOverlay } from './shopOverlay.js';
-import { createMainMenuOverlay } from './mainMenu.js';
-import { createMainBackdrop } from './mainBackdrop.js';
+import '../style.css';
 import { createTestPanel } from './testPanel.js';
 
 const mount = document.getElementById('screen')!;
@@ -17,12 +15,9 @@ async function main(): Promise<void> {
   const adapter = createWebPlatform({ mount });
   const shell = await createUiShell(adapter);
   const views = createOverlayViews({
-    host: shell.host,
-    loadShopAssets: shell.loadShopAssets,
-    shopRenderer: (content, actions) => createShopOverlay(content, actions, shell.fonts),
-    mainMenuRenderer: actions => createMainMenuOverlay(actions, shell.fonts),
+    host: shell.host, badges: shell.badges, backdrop: shell.backdrop,
+    onLobbyVisible: v => shell.setBackgroundVisible(v), // 背景视频只在大厅解码
   });
-  shell.registerCleanup(views.dispose);
   shell.host.start();
   // UI 就绪：撤掉 index.html 的静态占位文案（此后画布之上不再需要 DOM）
   mount.textContent = '';
@@ -35,10 +30,6 @@ async function main(): Promise<void> {
     debug,
     test: testMode,
   });
-  const mainBackdrop = createMainBackdrop();
-  const offSceneChange = flow.machine.onChange(next => mainBackdrop.setVisible(next === 'start' || next === 'select'));
-  shell.registerCleanup(mainBackdrop.dispose);
-  shell.registerCleanup(offSceneChange);
 
   // 测试模式面板（?debug/?test）：左侧技能开关，数据面为 __trTest（mainFlow 在 run 局挂载）
   const testPanel = createTestPanel();
