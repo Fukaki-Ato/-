@@ -20,3 +20,22 @@ body {
   color: #93A5C6; /* 仅静态占位文案用；UI 就绪即清 */
 }
 #screen canvas { width: 100%; height: 100%; display: block; }
+.tr-main-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 4;
+  pointer-events: none;
+  visibility: hidden;
+  opacity: 0;
+  background-color: #66c9d7;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  filter: blur(14px) saturate(1.08);
+  transform: scale(1.04);
+  transition: opacity 180ms ease;
+}
+.tr-main-backdrop.is-visible {
+  visibility: visible;
+  opacity: 1;
+}

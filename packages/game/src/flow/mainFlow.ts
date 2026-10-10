@@ -10,8 +10,8 @@
  * 铁律：本包零 DOM/wx——挂载点与页面全部经 GameViews 由 apps/* 注入。
  */
 import { loadAllConfig } from '@tr/game/core/config/configLoader.js';
-import type { GameContent } from '@tr/game/core/config/configTypes.js';
-import { buildLoadout } from '@tr/game/core/sim/character.js';
+import type { GameContent, NamedEntry } from '@tr/game/core/config/configTypes.js';
+import { buildLoadout, isCharacterLocked, playableCharacters } from '@tr/game/core/sim/character.js';
 import { RunnerSim } from '@tr/game/core/sim/runnerSim.js';
 import { createSceneMachine } from '@tr/game/core/scene/sceneMachine.js';
 import type { SceneName } from '@tr/game/core/scene/sceneMachine.js';
@@ -90,6 +90,30 @@ export function createGameFlow(deps: GameFlowDeps): GameFlow {
   };
   /** 上次选的角色（本机记忆；账号级保存在 S9 接 extras.cloud 后端） */
   let charId = adapter.storage.get(CHAR_KEY) ?? DEFAULT_CHAR;
+  const knownCharacter = (id: string): NamedEntry | undefined =>
+    content ? playableCharacters(content).find(character => character.id === id) : undefined;
+  const availableCharacter = (id: string): boolean => {
+    const character = knownCharacter(id);
+    return character !== undefined && !isCharacterLocked(character);
+  };
+  const fallbackCharacter = (): string => {
+    if (!content) return '';
+    const available = playableCharacters(content).filter(character => !isCharacterLocked(character));
+    return available.find(character => character.id === DEFAULT_CHAR)?.id ?? available[0]?.id ?? '';
+  };
+  function rememberCharacter(id: string): boolean {
+    if (!availableCharacter(id)) return false;
+    charId = id;
+    adapter.storage.set(CHAR_KEY, id);
+    return true;
+  }
+  function normalizeCharacter(): void {
+    if (!availableCharacter(charId)) charId = fallbackCharacter();
+    const stored = adapter.storage.get(CHAR_KEY);
+    if (charId) {
+      if (stored !== charId) adapter.storage.set(CHAR_KEY, charId);
+    } else if (stored !== null) adapter.storage.remove(CHAR_KEY);
+  }
   /** 本机累计计数读取（脏值按 0，不把 NaN 带进大厅展示） */
   const readCount = (key: string): number => {
     const n = Number(adapter.storage.get(key) ?? '0');
@@ -139,7 +163,8 @@ export function createGameFlow(deps: GameFlowDeps): GameFlow {
       onEnter: () => {
         audio?.stopDeathMusic(); // 死亡后 Esc 直接回选角：死亡 BGM 不带进选角页
         if (content) views.renderSelect(content, {
-          onStartRun: id => { charId = id; adapter.storage.set(CHAR_KEY, id); machine.go('run'); },
+          onStartRun: id => { if (rememberCharacter(id)) machine.go('run'); },
+          onChooseCharacter: id => rememberCharacter(id),
           onBack: () => machine.go('start'),
         }, charId, entry, { coins: readCount(COINS_KEY), diamonds: readCount(DIAMOND_KEY) });
       },
@@ -147,6 +172,8 @@ export function createGameFlow(deps: GameFlowDeps): GameFlow {
     run: {
       onEnter: () => {
         if (!content) return;
+        if (!availableCharacter(charId)) normalizeCharacter();
+        if (!charId || !availableCharacter(charId)) { views.toast('暂无可用角色'); return; }
         audio?.enterRun(charId);
         lastSeed = hashSeed('run-' + Date.now());
         const sim: RunnerSim = new RunnerSim(content, lastSeed, charId);
@@ -181,7 +208,7 @@ export function createGameFlow(deps: GameFlowDeps): GameFlow {
         const coinsGot = summary.coins ?? 0;
         if (coinsGot > 0) adapter.storage.set(COINS_KEY, String(readCount(COINS_KEY) + coinsGot));
         views.renderResult(summary, best, {
-          onRetry: () => machine.go('run'),
+          onRetry: () => { if (rememberCharacter(charId)) machine.go('run'); },
           onSelect: () => machine.go('select'),
         });
       },
@@ -214,6 +241,7 @@ export function createGameFlow(deps: GameFlowDeps): GameFlow {
       return;
     }
     content = report.content;
+    normalizeCharacter();
     audio = createAudioDirector(adapter, content.game.params, {
       random: deps.audioRandom ?? mulberry32(hashSeed('audio-' + Date.now())),
     });
