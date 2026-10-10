@@ -56,6 +56,11 @@ export function playableCharacters(content: GameContent): NamedEntry[] {
   return (content.characters.items ?? []).filter(c => String(c.id).startsWith('char_') && c.status !== 'draft' && c.status !== 'retired');
 }
 
+/** Characters explicitly marked locked remain visible, but cannot become the active runner. */
+export function isCharacterLocked(character: NamedEntry): boolean {
+  return String(character.status ?? '') === 'locked' || character['locked'] === true;
+}
+
 const text = (v: unknown, dflt = ''): string => {
   if (typeof v === 'string') return v;
   if (v && typeof v === 'object') {
