@@ -82,6 +82,19 @@
       "versions": [ { "ver": "1.0.0", "date": "2026-09-22", "change": "首发（活动限定）" } ]
     },
     {
+      "id": "char_nailong", "status": "live",
+      "name": { "zh-CN": "奶龙", "en-US": "Nailoong" },
+      "tagline": { "zh-CN": "奶声奶气，跑得比谁都快" },
+      "rarity": "SR", "unlock": { "type": "coin", "cost": 3200 },
+      "skins": ["skin_nailong_default"],
+      "skillRef": "skill_thunder_dash", "talentRef": "talent_volt_coin",
+      "growth": { "maxLevel": 10, "costPerLevel": [], "effectPerLevel": { "target": "skillRef", "paramScalePerLevel": 0.05 } },
+      "model": { "prefab": "assets/characters/nailoong.glb", "scale": 1.0, "lod": [2, 6, 12] },
+      "audio": { "voDir": "assets/audio/vo/nailong/", "footstep": "step_sneaker" },
+      "tint": "#FFD84D",
+      "versions": [ { "ver": "1.0.0", "date": "2026-10-03", "change": "首发（GLB 驱动 11 动作 clip）" } ]
+    },
+    {
       "id": "skin_volt_default", "kind": "skin", "status": "live", "baseRef": "char_volt",
       "name": { "zh-CN": "默认涂装" }, "rarity": "R",
       "materialOverrides": { "bodyTint": "#F2F4F8", "emissive": "#FFD84D" },
@@ -101,6 +114,7 @@
     { "id": "skin_kaze_default", "kind": "skin", "status": "live", "baseRef": "char_kaze", "name": { "zh-CN": "默认涂装" }, "rarity": "SR", "materialOverrides": { "bodyTint": "#EAF4FF", "emissive": "#7FD1FF" }, "model": { "prefab": "assets/characters/kaze.glb" }, "unlock": { "type": "free" }, "statMods": [], "versions": [ { "ver": "1.0.0", "date": "2026-09-22", "change": "首发" } ] },
     { "id": "skin_rina_default", "kind": "skin", "status": "live", "baseRef": "char_rina", "name": { "zh-CN": "默认涂装" }, "rarity": "SSR", "materialOverrides": { "bodyTint": "#FBE7F1", "emissive": "#FF5FA2" }, "model": { "prefab": "assets/characters/rina.glb" }, "unlock": { "type": "free" }, "statMods": [], "versions": [ { "ver": "1.0.0", "date": "2026-09-22", "change": "首发" } ] },
     { "id": "skin_bolt_default", "kind": "skin", "status": "live", "baseRef": "char_bolt", "name": { "zh-CN": "警长制服" }, "rarity": "SSR", "materialOverrides": { "bodyTint": "#E8E6F8", "emissive": "#B48CFF" }, "model": { "prefab": "assets/characters/bolt.glb" }, "unlock": { "type": "free" }, "statMods": [], "versions": [ { "ver": "1.0.0", "date": "2026-09-22", "change": "首发" } ] },
-    { "id": "skin_bolt_storm", "kind": "skin", "status": "draft", "baseRef": "char_bolt", "name": { "zh-CN": "风暴警长" }, "rarity": "SSR", "materialOverrides": { "bodyTint": "#2A3350", "emissive": "#7FD1FF", "trailVfx": "vfx_trail_thunder" }, "model": { "prefab": "assets/skins/bolt_storm.glb" }, "unlock": { "type": "key", "cost": 12 }, "statMods": [], "versions": [ { "ver": "1.0.0", "date": "2026-09-22", "change": "围城活动商店（上线前 draft）" } ] }
+    { "id": "skin_bolt_storm", "kind": "skin", "status": "draft", "baseRef": "char_bolt", "name": { "zh-CN": "风暴警长" }, "rarity": "SSR", "materialOverrides": { "bodyTint": "#2A3350", "emissive": "#7FD1FF", "trailVfx": "vfx_trail_thunder" }, "model": { "prefab": "assets/skins/bolt_storm.glb" }, "unlock": { "type": "key", "cost": 12 }, "statMods": [], "versions": [ { "ver": "1.0.0", "date": "2026-09-22", "change": "围城活动商店（上线前 draft）" } ] },
+    { "id": "skin_nailong_default", "kind": "skin", "status": "live", "baseRef": "char_nailong", "name": { "zh-CN": "默认涂装" }, "rarity": "SR", "materialOverrides": { "bodyTint": "#FFD84D", "emissive": "#FFE9A8" }, "model": { "prefab": "assets/characters/nailoong.glb" }, "unlock": { "type": "free" }, "statMods": [], "versions": [ { "ver": "1.0.0", "date": "2026-10-03", "change": "首发" } ] }
   ]
 }
