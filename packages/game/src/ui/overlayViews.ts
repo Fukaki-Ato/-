@@ -92,13 +92,11 @@ export function createOverlayViews(deps: OverlayViewsDeps): OverlayViews {
       extras?: SelectExtras,
     ): void {
       clearTransient();
-      const mainSize = deps.backdrop?.main.texSize;
-      const stageAspect = mainSize ? mainSize.w / mainSize.h : undefined;
       const page = buildLobbyPage(host, {
         content,
         actions,
         currentCharId,
-        extras: { coins: extras?.coins ?? 0, diamonds: extras?.diamonds ?? 0, badges: deps.badges, stageAspect },
+        extras: { coins: extras?.coins ?? 0, diamonds: extras?.diamonds ?? 0, badges: deps.badges },
         slots: { onShop: actions.onShop },
       });
       stopBackdrop();
