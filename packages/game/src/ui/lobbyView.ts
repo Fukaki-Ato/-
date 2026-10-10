@@ -3,9 +3,10 @@
  * 顶栏＝合并货币胶囊（金币+钻石各带「+」）｜右上角设置；左＝活动、任务；右＝成就、排行榜；
  * 中下＝「开始酷跑」大牌匾（设计稿原字整块抠图）；底部棕条＝商店｜福利手册｜仓库｜角色＋竖分隔线。
  * 布局坐标全走 menuLayout 常量表（等比缩放、顶贴顶/底贴底锚定）；控件一律 absolute 叠在背景上。
- * 未定义入口（设置/活动/成就/任务/排行榜/商店/手册/仓库/货币+）只有按下/松开视觉反馈
+ * 未定义入口（活动/成就/任务/排行榜/商店/手册/仓库/货币+）只有按下/松开视觉反馈
  * （badgeButton 换 glow 帧），不导航不弹窗不读写——LobbySlotHandlers 留作后续注入真实实现。
  * 选角面板复用现有选角 UI（lobbyPanels），由「角色」格开关；开始酷跑沿用 选角→跑酷 流程。
+ * 「设置」已定义：开 settingsPanel（切换跑酷场景），与选角面板同一个槽位互斥开合。
  */
 import { Box, Label, type UiView } from '@tr/framework/ui/index.js';
 import type { GameContent } from '@tr/game/core/config/configTypes.js';
@@ -13,6 +14,7 @@ import type { UiHost } from '@tr/framework/ui/host.js';
 import type { SelectActions } from '../flow/views.js';
 import { badgeButton, badgeImage, type BadgeSet } from './badges.js';
 import { buildCharPanel } from './lobbyPanels.js';
+import { buildSettingsPanel } from './settingsPanel.js';
 import { menuLayout, uiSafeFrom, type Rect } from './menuLayout.js';
 
 export interface LobbyExtras {
@@ -93,30 +95,43 @@ export function buildLobbyPage(host: UiHost, d: LobbyDeps): LobbyPage {
     ],
   );
 
-  // ---------- 选角面板（角色格开关） ----------
+  // ---------- 中段面板：选角 / 设置共用一个槽位 ----------
   // 面板宿主盒只在开着时挂上：框架命中是「反向扫描第一个 rect 含命中点的分支就返回」，
   // 常驻的空宿主盒哪怕 passthrough 也会把它那一带的点击判死；高度给足面板自然高，
   // 否则 absolute 父盒高度 0 会把子的自动高度压成 0（List 塌掉点不中）。
   let chosen = d.currentCharId;
   let panelHost: Box | null = null;
+  let panelKind: 'char' | 'settings' | null = null;
   // 背景由 menuBackdrop 的网格铺（视频/静态图同一套），这里只留透明容器；
   // absolute 子项排在常规子项之后 ⇒ 控件叠在背景上、命中优先
   const root = new Box({ direction: 'column', flex: 1 }, []);
-  const toggleChar = (): void => {
-    if (panelHost) {
+  function togglePanel(kind: 'char' | 'settings'): void {
+    if (panelKind === kind && panelHost) {
       root.remove(panelHost);
-      panelHost = null;
+      panelHost = null; panelKind = null;
       return;
     }
-    panelHost = new Box({ absolute: true, left: L.panel.x, top: L.panel.y, width: L.panel.w, height: dpx(268) });
-    const cp = buildCharPanel(host, {
-      content: d.content, currentCharId: chosen, width: L.panel.w,
-      onClose: toggleChar, onChoose: id => { chosen = id; },
+    if (panelHost) root.remove(panelHost);   // 换面板：同槽位不能叠两个，否则底下那个点不中
+    panelKind = kind;
+    panelHost = new Box({
+      absolute: true, left: L.panel.x, top: L.panel.y, width: L.panel.w,
+      height: dpx(kind === 'char' ? 268 : 176),
     });
-    panelHost.add(cp.panel);
+    const built = kind === 'char'
+      ? buildCharPanel(host, {
+        content: d.content, currentCharId: chosen, width: L.panel.w,
+        onClose: () => togglePanel('char'), onChoose: id => { chosen = id; },
+      })
+      : buildSettingsPanel(host, {
+        content: d.content, width: L.panel.w, badges: set, onClose: () => togglePanel('settings'),
+      });
+    panelHost.add(built.panel);
     root.add(panelHost);
-    cp.refresh();
-  };
+    built.refresh();
+  }
+  const toggleChar = (): void => togglePanel('char');
+  /** 设置入口：壳注入了真实实现就用它，否则开本仓自带的设置面板（切换场景） */
+  const settingsTap = d.slots?.onSettings ?? ((): void => togglePanel('settings'));
 
   // ---------- 底栏：四格 + 竖分隔线 ----------
   const cell = (name: Parameters<typeof badgeButton>[1], tag: string, onTap: () => void): Box =>
@@ -142,7 +157,7 @@ export function buildLobbyPage(host: UiHost, d: LobbyDeps): LobbyPage {
   const view = host.makeView();
   for (const child of [
     at(L.pill, pill),
-    at(L.settings, badge(L.settings, 'settings', slot('onSettings'), '设置')),
+    at(L.settings, badge(L.settings, 'settings', settingsTap, '设置')),
     at(L.event, badge(L.event, 'event', slot('onEvent'), '活动')),
     at(L.task, badge(L.task, 'task', slot('onTasks'), '任务')),
     at(L.achieve, badge(L.achieve, 'achieve', slot('onAchievements'), '成就')),
