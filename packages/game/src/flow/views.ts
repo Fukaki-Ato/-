@@ -33,10 +33,18 @@ export interface StartHandle {
   setFeedback(text: string, isError: boolean): void;
 }
 
+export interface MainMenuActions {
+  onStartRun(): void;
+  onShop(): void;
+  onUnsupported(): void;
+}
+
 export interface SelectActions {
   onStartRun(charId: string): void;
   onBack(): void;
 }
+
+export interface ShopActions { onBack(): void }
 
 /** 大厅页本机统计（mainFlow 从 storage 读出注入；视图不直接碰存储键定义方） */
 export interface SelectExtras {
