@@ -1,7 +1,7 @@
 /**
  * 主流程装配（@tr/game）——从 apps/web/src/bootstrap.ts 提取，两端共用（redesign §3.5）。
  * 职责：平台适配（经 adapter 注入）→ 场景状态机 → 加载配置 → 驱动页面流转：
- *       boot（配置加载）→ select（主界面兼选角，游客态直入）→ run → result → select；
+ *       boot（配置加载）→ select（游客主界面）↔ characterSelect（Web 角色页）↔ shop → run → result → select；
  *       start（微信/游客登录页）保留在场景机里但 boot 后不再可达——默认游客进入，
  *       全程不调 adapter.extras.login()、不弹授权（issue：重构主界面并默认游客进入）；
  *       跑酷局内：每次进入 run 场景创建全新 RunnerSim（seed 记录在案，可复现），
@@ -90,12 +90,15 @@ export function createGameFlow(deps: GameFlowDeps): GameFlow {
   };
   /** 上次选的角色（本机记忆；账号级保存在 S9 接 extras.cloud 后端） */
   let charId = adapter.storage.get(CHAR_KEY) ?? DEFAULT_CHAR;
-  const knownCharacter = (id: string): NamedEntry | undefined =>
+  const knownCharacterEntry = (id: string): NamedEntry | undefined =>
     content ? playableCharacters(content).find(character => character.id === id) : undefined;
-  const availableCharacter = (id: string): boolean => {
-    const character = knownCharacter(id);
-    return character !== undefined && !isCharacterLocked(character);
+  const knownCharacter = (id: string): boolean => knownCharacterEntry(id) !== undefined;
+  const explicitlyLockedId = (id: string): boolean => {
+    const character = knownCharacterEntry(id);
+    return character ? isCharacterLocked(character) : false;
   };
+  const availableCharacter = (id: string): boolean =>
+    content !== null && playableCharacters(content).some(character => character.id === id && !isCharacterLocked(character));
   const fallbackCharacter = (): string => {
     if (!content) return '';
     const available = playableCharacters(content).filter(character => !isCharacterLocked(character));
@@ -129,6 +132,7 @@ export function createGameFlow(deps: GameFlowDeps): GameFlow {
     saveEntry(adapter.storage, method);
     machine.go('select');
   };
+  let shopBack: (() => void) | null = null;
 
   const machine = createSceneMachine<SceneName>({
     boot: {},
@@ -166,8 +170,40 @@ export function createGameFlow(deps: GameFlowDeps): GameFlow {
           onStartRun: id => { if (rememberCharacter(id)) machine.go('run'); },
           onChooseCharacter: id => rememberCharacter(id),
           onBack: () => machine.go('start'),
+          onCharacterSelect: views.renderCharacterSelectPage ? () => machine.go('characterSelect') : undefined,
+          onShop: () => machine.go('shop', { returnTo: 'select' }),
         }, charId, entry, { coins: readCount(COINS_KEY), diamonds: readCount(DIAMOND_KEY) });
       },
+    },
+    characterSelect: {
+      onEnter: ctx => {
+        audio?.stopDeathMusic();
+        if (!content || !views.renderCharacterSelectPage) { machine.go('select'); return; }
+        const requested = typeof ctx === 'object' && ctx !== null ? (ctx as { characterId?: unknown }).characterId : undefined;
+        const selected = typeof requested === 'string' && knownCharacter(requested) ? requested : charId;
+        views.renderCharacterSelectPage(content, {
+          onSelect: id => { rememberCharacter(id); },
+          onStartRun: id => { if (rememberCharacter(id)) machine.go('run'); },
+          onBack: () => machine.go('select'),
+          onShop: id => {
+            if (!knownCharacter(id)) return;
+            if (!explicitlyLockedId(id)) rememberCharacter(id);
+            machine.go('shop', { returnTo: 'characterSelect', characterId: id });
+          },
+        }, selected, entry);
+      },
+    },
+    shop: {
+      onEnter: ctx => {
+        const request = typeof ctx === 'object' && ctx !== null ? ctx as { returnTo?: unknown; characterId?: unknown } : {};
+        const returnTo = request.returnTo === 'characterSelect' ? 'characterSelect' : 'select';
+        const characterId = typeof request.characterId === 'string' && knownCharacter(request.characterId)
+          ? request.characterId : undefined;
+        if (!content) { machine.go('select'); return; }
+        shopBack = () => machine.go(returnTo, returnTo === 'characterSelect' ? { characterId } : undefined);
+        views.renderShop(content, { onBack: () => shopBack?.() });
+      },
+      onExit: () => { shopBack = null; },
     },
     run: {
       onEnter: () => {
@@ -219,9 +255,8 @@ export function createGameFlow(deps: GameFlowDeps): GameFlow {
 
   // 全局按键：run 中 Esc 退回选角页（v2 onInput 的 key 分支，替代 v1 adapter.onKey，S10 §7.3）
   adapter.onInput(e => {
-    if (e.type === 'key' && e.phase === 'down' && e.code === 'Escape' && machine.current() === 'run') {
-      machine.go('select');
-    }
+    if (e.type === 'key' && e.phase === 'down' && e.code === 'Escape' && machine.current() === 'run') machine.go('select');
+    else if (e.type === 'key' && e.phase === 'down' && e.code === 'Escape' && machine.current() === 'shop') shopBack?.();
   });
 
   async function boot(): Promise<void> {

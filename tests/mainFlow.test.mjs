@@ -9,7 +9,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createGameFlow, BEST_KEY } from '../packages/game/dist/flow/mainFlow.js';
+import { createGameFlow, BEST_KEY, CHAR_KEY } from '../packages/game/dist/flow/mainFlow.js';
 import { ENTRY_KEY } from '../packages/game/dist/flow/session.js';
 import { parseAudioConfig } from '../packages/game/dist/core/audio/audioDirector.js';
 
@@ -173,16 +173,24 @@ test('导航：局内 Esc 与结算「返回选角」都回 select', () => {
 const audioCfg = parseAudioConfig(JSON.parse(readFileSync(join(root, 'config', 'game.json'), 'utf8')).params);
 
 /** 真实配置启动的流程：假场景工厂捕获 RunCallbacks（cast/pickup/death 即 sim 事件回调），假音频记录调用。 */
-async function bootRealFlow({ withAudio = true } = {}) {
+async function bootRealFlow({ withAudio = true, pageSupport = false, storedCharId, lockedCharId } = {}) {
   const calls = [];
   const scenes = [];
   const inputs = [];
   const logins = [];
-  const seen = { select: null, result: null };
+  const seen = { select: null, selectPage: null, result: null };
   const store = new Map();
+  if (storedCharId !== undefined) store.set(CHAR_KEY, storedCharId);
   const adapter = {
     storage: { get: k => store.get(k) ?? null, set: (k, v) => store.set(k, v), remove: k => store.delete(k) },
-    fetchJson: async url => JSON.parse(readFileSync(join(root, 'config', `${url}.json`), 'utf8')),
+    fetchJson: async url => {
+      const config = JSON.parse(readFileSync(join(root, 'config', `${url}.json`), 'utf8'));
+      if (url === 'characters' && lockedCharId) {
+        const character = config.items.find(item => item.id === lockedCharId);
+        if (character) character.status = 'locked';
+      }
+      return config;
+    },
     canvas: { mainCanvas: () => ({}), windowSize: () => ({ width: 390, height: 844, dpr: 2 }) },
     onInput: cb => { inputs.push(cb); return () => {}; },
     // 游客态直入：boot 全程不得触达登录；真被调用就记一笔供断言
@@ -198,6 +206,7 @@ async function bootRealFlow({ withAudio = true } = {}) {
     renderBoot: () => ({ setStatus() {} }),
     renderStart: actions => { seen.start = actions; return { setBusy() {}, setFeedback() {} }; },
     renderSelect: (_c, actions) => { seen.select = actions; },
+    renderCharacterSelectPage: pageSupport ? (...args) => { seen.selectPage = args; } : undefined,
     mountHud: () => ({ update() {}, dispose() {} }),
     renderResult: (_s, _b, actions) => { seen.result = actions; },
     toast: () => {},
@@ -213,8 +222,45 @@ async function bootRealFlow({ withAudio = true } = {}) {
   assert.equal(flow.machine.current(), 'select');
   assert.equal(store.get(ENTRY_KEY), 'guest');
   const key = code => inputs.forEach(cb => cb({ type: 'key', code, phase: 'down' }));
-  return { flow, calls, scenes, seen, key, logins };
+  return { flow, calls, scenes, seen, key, logins, store };
 }
+
+test('角色入口打开独立选角页；选角记忆、返回和开跑沿用有效角色', async () => {
+  const { flow, scenes, seen, store } = await bootRealFlow({ pageSupport: true });
+  assert.equal(flow.machine.current(), 'select');
+  seen.select.onCharacterSelect();
+  assert.equal(flow.machine.current(), 'characterSelect');
+  assert.equal(seen.selectPage[2], 'char_volt');
+  seen.selectPage[1].onSelect('char_kaze');
+  assert.equal(store.get(CHAR_KEY), 'char_kaze');
+  seen.selectPage[1].onBack();
+  assert.equal(flow.machine.current(), 'select');
+  seen.select.onCharacterSelect();
+  seen.selectPage[1].onStartRun('char_kaze');
+  assert.equal(flow.machine.current(), 'run');
+  assert.equal(scenes[0].sim.loadout.charId, 'char_kaze');
+});
+
+test('角色入口拒绝锁定和未知 ID，并在启动时修正无效存档', async () => {
+  const { flow, scenes, seen, store } = await bootRealFlow({
+    pageSupport: true, storedCharId: 'char_missing', lockedCharId: 'char_ama',
+  });
+  assert.equal(store.get(CHAR_KEY), 'char_volt');
+  seen.select.onCharacterSelect();
+  seen.selectPage[1].onSelect('char_ama');
+  assert.equal(store.get(CHAR_KEY), 'char_volt');
+  seen.selectPage[1].onStartRun('char_ama');
+  assert.equal(flow.machine.current(), 'characterSelect');
+  assert.equal(scenes.length, 0);
+  seen.selectPage[1].onSelect('char_missing');
+  seen.selectPage[1].onStartRun('char_missing');
+  assert.equal(store.get(CHAR_KEY), 'char_volt');
+  assert.equal(scenes.length, 0);
+  seen.selectPage[1].onSelect('char_kaze');
+  seen.selectPage[1].onStartRun('char_kaze');
+  assert.equal(flow.machine.current(), 'run');
+  assert.equal(scenes[0].sim.loadout.charId, 'char_kaze');
+});
 
 const sfxOpt = { volume: audioCfg.sfxVolume };
 const runBgm = ['playMusic', audioCfg.bgmRun, { loop: true, volume: audioCfg.musicVolume }];

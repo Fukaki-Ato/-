@@ -3,8 +3,8 @@
  * 顶栏＝合并货币胶囊（金币+钻石各带「+」）｜右上角设置；左＝活动、任务；右＝成就、排行榜；
  * 中下＝「开始酷跑」大牌匾（设计稿原字整块抠图）；底部棕条＝商店｜福利手册｜仓库｜角色＋竖分隔线。
  * 布局坐标全走 menuLayout 常量表（等比缩放、顶贴顶/底贴底锚定）；控件一律 absolute 叠在背景上。
- * 未定义入口（设置/活动/成就/任务/排行榜/商店/手册/仓库/货币+）只有按下/松开视觉反馈
- * （badgeButton 换 glow 帧），不导航不弹窗不读写——LobbySlotHandlers 留作后续注入真实实现。
+ * 未定义入口（设置/活动/成就/任务/排行榜/手册/仓库/货币+）只有按下/松开视觉反馈
+ * （badgeButton 换 glow 帧）；商店通过 LobbySlotHandlers 注入只读商店导航。
  * 选角面板复用现有选角 UI（lobbyPanels），由「角色」格开关；开始酷跑沿用 选角→跑酷 流程。
  */
 import { Box, Label, type UiView } from '@tr/framework/ui/index.js';
@@ -107,6 +107,10 @@ export function buildLobbyPage(host: UiHost, d: LobbyDeps): LobbyPage {
   // absolute 子项排在常规子项之后 ⇒ 控件叠在背景上、命中优先
   const root = new Box({ direction: 'column', flex: 1 }, []);
   const toggleChar = (): void => {
+    if (d.actions.onCharacterSelect) {
+      d.actions.onCharacterSelect();
+      return;
+    }
     if (panelHost) {
       root.remove(panelHost);
       panelHost = null;
