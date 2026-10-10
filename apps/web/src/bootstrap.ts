@@ -15,6 +15,10 @@ const testMode = debug || location.search.includes('test');
 
 async function main(): Promise<void> {
   const adapter = createWebPlatform({ mount });
+  // QA 锁角色 ?char=<id>：覆盖本机记忆的出战角色（mainFlow 的初值就是读这个 storage 键，
+  // 键名与 mainFlow.CHAR_KEY 一致，改它两边要同步）。不传则维持原有 UI 选角流程。
+  const charParam = new URLSearchParams(location.search).get('char');
+  if (charParam) adapter.storage.set('thunderrun:character', charParam);
   const shell = await createUiShell(adapter);
   const views = createOverlayViews({
     host: shell.host,

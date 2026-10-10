@@ -104,7 +104,7 @@ export function createRunnerScene(
     baseColor: sky.baseColor, flashColor: sky.flashColor, tint, groundColor,
     sky: { zenith: sky.baseColor, horizon: fogColor },
   });
-  const avatar = createAvatar(scene, laneWidth, sim.loadout);
+  const avatar = createAvatar(scene, laneWidth, sim.loadout, adapter);
   const coinField = createCoinField(scene, laneWidth);
   const obstacleLayer = createObstacleLayer(scene, laneWidth);
   const pickupLayer = createPickupLayer(scene, laneWidth);
@@ -181,7 +181,7 @@ export function createRunnerScene(
     // 插值距离：消除固定步长与渲染帧率不同步的跳动
     const dist = s.prevDistance + (s.distance - s.prevDistance) * alpha;
 
-    avatar.update(s, fx);
+    avatar.update(s, fx, dt);
     chestX = s.x; chestY = s.y + avatar.chestY;
     coinField.update({ coins: sim.coinsArr, t: s.t, dist, magnetOn: fx.magnetT > 0, playerX: chestX, playerY: chestY });
     obstacleLayer.update(sim.obstacles, dist, s.t);
@@ -273,6 +273,7 @@ export function createRunnerScene(
     adapter.cancelFrame(raf);
     offInput(); offResize(); offVisibility();
     if (cb.debug) uninstallRunProbe(); // ?debug 探针随场景销毁卸载，避免 __trRun 指向已销毁的 sim
+    avatar.dispose(); // GLB 混流器停摆（几何体/材质由下面的 traverse 统一销毁）
     lightning.dispose();
     renderer.dispose();
     scene.traverse(o => {
