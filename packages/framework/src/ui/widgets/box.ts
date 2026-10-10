@@ -101,6 +101,20 @@ export class Box extends Widget {
     return true;
   }
 
+  /**
+   * 就地改背景乘色/不透明度（不重建控件 ⇒ 不打断命中注册与按压态机）。
+   * 供「同一张贴图靠明暗表达可用性」用：亮态白乘色全不透明，暗态压暗乘色并降透明度。
+   * 皮肤是自定义源时才生效（主题皮肤键由 onBind 解析，改了也不会重解析）。
+   */
+  setBackground(v: { color?: string; opacity?: number }): void {
+    const bg = this.opts.background;
+    if (typeof bg !== 'object' || bg === null) return;
+    this.opts.backgroundColor = v.color ?? this.opts.backgroundColor;
+    this.opts.backgroundOpacity = v.opacity ?? this.opts.backgroundOpacity;
+    this.bg?.setColor(this.opts.backgroundColor ?? '#ffffff');
+    this.bg?.setOpacity(this.opts.backgroundOpacity ?? 1);
+  }
+
   node(): LayoutNode {
     const o = this.opts;
     const vis = this.children.filter(c => c.visible);
