@@ -26,6 +26,12 @@ export interface RunCallbacks {
     buffs: { name: string; left: number }[];
     /** cd=冷却剩余秒；charge=下滑积攒门槛（{now, need}），无门槛技能为 null */
     skill: { label: string; cd: number; ready: boolean; charge: { now: number; need: number } | null } | null;
+    /**
+     * 被动天赋的亮灯状态（HUD 技能图标用）：
+     * active=此刻增益正在生效（图标亮）；charges=叠层被动的层数（0=无层数语义）。
+     * 被动不可释放，这两项只表达「可触发」。
+     */
+    passive: { label: string; active: boolean; charges: number } | null;
   }): void;
   onEnd(summary: ReturnType<RunnerSim['summary']>): void;
   /** 死亡瞬间回调（音频等表现层用；endTimer 计时与 onEnd 节奏不变） */
@@ -232,6 +238,10 @@ export function createRunnerScene(
     // 滑翔提示不能写死 1s：按当前高度换算真实剩余（glideS≈1.8s），gliding 结束后自然不再 push
     if (s.gliding) buffs.push({ name: '滑翔降落', left: Math.max(0, s.y / glideFallMps) });
     const sk = sim.loadout.skill;
+    // 被动亮灯：无被动天赋的角色给 null（图标位留空而不是亮一个假的）
+    const passive = sim.loadout.passive.length
+      ? { label: sim.loadout.talentLabel, active: sim.passiveActive(), charges: sim.passiveCharges() }
+      : null;
     cb.onHud({
       score: s.score, coins: s.coins, distance: s.distance, hits: s.hits, lives: sim.lives, buffs,
       skill: sk ? {
@@ -240,6 +250,7 @@ export function createRunnerScene(
         ready: sim.canCastSkill(),
         charge: sk.chargeSlides > 0 ? { now: Math.min(s.slideCount, sk.chargeSlides), need: sk.chargeSlides } : null,
       } : null,
+      passive,
     });
   }
 

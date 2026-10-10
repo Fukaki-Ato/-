@@ -7,7 +7,7 @@
  */
 import type { GameContent } from '@tr/game/core/config/configTypes.js';
 import type {
-  BootHandle, CharacterSelectPageActions, GameViews, HudHandle, ResultActions, RunSummary,
+  BootHandle, CharacterSelectPageActions, GameViews, HudActions, HudHandle, ResultActions, RunSummary,
   SelectActions, SelectExtras, ShopActions, StartActions, StartHandle,
 } from '../flow/views.js';
 import type { EntryMethod } from '../flow/session.js';
@@ -20,11 +20,16 @@ import { buildResultPage } from './resultView.js';
 import { buildShopPage } from './shopView.js';
 import { createMenuBackdrop, type BackdropSet, type MenuBackdrop } from './menuBackdrop.js';
 import type { BadgeSet } from './badges.js';
+import type { SkillIconSet } from './skillIcons.js';
 
 export interface OverlayViewsDeps {
   host: UiHost;
   /** 大厅徽标贴图（壳侧加载注入；缺省时徽标位退化为空槽） */
   badges?: BadgeSet;
+  /** 局内技能图标贴图（主动/被动各一张；缺省时图标位退化为纯色圆） */
+  icons?: SkillIconSet;
+  /** 配置内容：给 HUD 提供安全区（params.ui.safeTop/safeBottom） */
+  content?: GameContent;
   /** 主界面背景贴图（Web 为循环视频；缺省回主题纯色底） */
   backdrop?: BackdropSet;
   /**
@@ -131,10 +136,10 @@ export function createOverlayViews(deps: OverlayViewsDeps): OverlayViews {
       host.mount(buildShopPage(host, content, actions).view);
     },
 
-    mountHud(): HudHandle {
+    mountHud(actions?: HudActions): HudHandle {
       clearTransient();
       stopBackdrop();
-      const page = buildHudPage(host);
+      const page = buildHudPage(host, { icons: deps.icons, content: deps.content, actions });
       host.mount(page.view, { transparent: true });
       return page.handle;
     },

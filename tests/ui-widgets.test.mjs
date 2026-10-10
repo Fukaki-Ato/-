@@ -291,3 +291,60 @@ test('Box absolute 子项：产出顺序与 laidOut 对齐，sync 不会把矩�
   assert.equal(f.rect.h, 40, '常规子项拿自己的矩形');
   assert.equal(a.rect.h, 100, '绝对子项拿自己的矩形');
 });
+
+// ---------------- setBackground（技能图标的亮/暗态靠它，不重建控件） ----------------
+
+/** 自定义背景源：headless 下只要 insets/texSize 齐就能建片，texture 不参与几何 */
+const skinSrc = () => ({
+  texture: {}, insets: { left: 8, top: 8, right: 8, bottom: 8 }, texSize: { w: 64, h: 64 },
+});
+const bgUniforms = w => w.bg.material.uniforms;
+
+test('Box.setBackground：自定义源就地改乘色与不透明度，不重建背景片', () => {
+  const view = makeView();
+  const box = new Box({ background: skinSrc(), width: 40, height: 40 });
+  view.add(box);
+  view.relayout();
+  const mesh = box.bg.mesh;
+
+  // 断言取纯黑：THREE 的 Color 有 sRGB↔linear 往返，0x80 读回来是 0xbc，只有 0/1 精确可逆
+  box.setBackground({ color: '#000000', opacity: 0.4 });
+  const u = bgUniforms(box);
+  assert.equal(u.uColor.value.getHexString(), '000000', '乘色应落到渲染对象上');
+  assert.equal(u.uOpacity.value, 0.4, '不透明度应落到渲染对象上');
+  assert.equal(box.opts.backgroundColor, '#000000', 'opts 要同步，避免下次 relayout 回弹');
+  assert.equal(box.bg.mesh, mesh, '必须就地改：重建会打断命中注册与按压态机');
+  view.dispose();
+});
+
+test('Box.setBackground：无背景时静默 no-op（不抛、不造片）', () => {
+  const view = makeView();
+  const bare = new Box({ width: 40, height: 40 });
+  view.add(bare);
+  view.relayout();
+  bare.setBackground({ color: '#000000', opacity: 0.5 });
+  assert.equal(bare.bg, null, '没有背景的 Box 不该被造出背景片');
+  assert.equal(bare.opts.backgroundColor, undefined, 'no-op 不该留下脏 opts');
+  view.dispose();
+});
+
+test('Button.setBackground：只改视觉，不改按压态机的可点身份', () => {
+  const view = makeView();
+  const btn = new Button({ skin: skinSrc(), label: '', width: 40, height: 40, onClick: () => {} });
+  view.add(btn);
+  view.relayout();
+
+  btn.setBackground({ color: '#000000', opacity: 0.4 });
+  assert.equal(bgUniforms(btn).uColor.value.getHexString(), '000000', '暗态乘色应落上');
+  assert.equal(bgUniforms(btn).uOpacity.value, 0.4);
+  assert.equal(btn.state, 'normal', 'setBackground 只改视觉，不该动按压态');
+
+  btn.setDisabled(true);
+  assert.equal(bgUniforms(btn).uOpacity.value, 0.45, 'setDisabled 会覆盖视觉（disabled 自带 0.45）');
+  assert.equal(bgUniforms(btn).uColor.value.getHexString(), 'ffffff', '同上：乘色被重置回白');
+  btn.setBackground({ color: '#000000', opacity: 0.7 });
+  assert.equal(bgUniforms(btn).uColor.value.getHexString(), '000000',
+    '两者先后顺序决定最终值：想压住 disabled 的默认视觉，必须后调 setBackground');
+  assert.equal(bgUniforms(btn).uOpacity.value, 0.7);
+  view.dispose();
+});

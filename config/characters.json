@@ -1,6 +1,6 @@
 {
   "$schema": "../schema/config.schema.json#/characters",
-  "configVersion": "1.1.2",
+  "configVersion": "1.2.0",
   "minEngineVersion": "1.0.0",
   "updatedAt": "2026-10-05",
   "items": [
@@ -98,7 +98,9 @@
       "model": { "prefab": "assets/characters/frog.glb", "scale": 0.92, "lod": [2, 6, 12] },
       "audio": { "voDir": "assets/audio/vo/frog/", "footstep": "step_sneaker" },
       "tint": "#B6F24E",
-      "versions": [ { "ver": "1.1.0", "date": "2026-10-04", "change": "新增：捧腹大笑 10 秒无敌 + 每 10 秒一次强跳（沿用现有一套程序化建模，体量偏小）" } ]
+      "versions": [
+        { "ver": "1.1.0", "date": "2026-10-04", "change": "新增：捧腹大笑 10 秒无敌 + 弹跳之力每 10 秒叠一层充能，起跳消耗一层跃起 3.1 米（沿用现有一套程序化建模，体量偏小）" }
+      ]
     },
     {
       "id": "char_mambo", "status": "live",

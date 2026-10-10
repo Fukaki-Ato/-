@@ -215,8 +215,12 @@ export function createGameFlow(deps: GameFlowDeps): GameFlow {
         const sim: RunnerSim = new RunnerSim(content, lastSeed, charId);
         // v2：主画布幂等单例 + 即时窗口尺寸（S10 §7.2；跨局复用同一画布，不新建）
         const host = { canvas: adapter.canvas.mainCanvas(), size: adapter.canvas.windowSize() };
-        hud = views.mountHud();
-        hud.update({ score: 0, coins: 0, distance: 0, hits: 0, lives: sim.lives, buffs: [], skill: null });
+        // 技能图标点击 = 主动技能释放（与双击/E 同一入口 sim.canCastSkill 自行把关门槛与冷却）
+        hud = views.mountHud({ onCastSkill: () => sim.applyAction('skill') });
+        hud.update({
+          score: 0, coins: 0, distance: 0, hits: 0, lives: sim.lives, buffs: [],
+          skill: null, passive: null,
+        });
         scene = (deps.createScene ?? createRunnerScene)(host, adapter, sim, content, {
           onHud: h => hud?.update(h),
           onEnd: summary => machine.go('result', summary),

@@ -25,6 +25,12 @@ const RISE_LERP = 3.2;
 /** 判定「仍在空中」的高度阈值（米） */
 const AIRBORNE_Y = 0.2;
 
+/** 起跳时向引擎要的判定口（movement 不持有引擎，只问「有没有充能」并就地扣除） */
+export interface JumpHooks {
+  /** 有跳跃充能则扣一层并返回 true；无则 false，走弹跳鞋/基础跳 */
+  consumeJumpCharge(): boolean;
+}
+
 export class Movement {
   /** 起身后的滑铲冷却（禁止连续下滑） */
   slideCd = 0;
@@ -42,6 +48,7 @@ export class Movement {
     private readonly P: MovementParams,
     private readonly fly: FlightShape,
     private readonly obstacles: ObstacleEntity[],
+    private readonly hooks: JumpHooks = { consumeJumpCharge: () => false },
   ) {}
 
   /** ↑/空格：滑行中按跳=起身直接跳；空中按跳=进缓冲等落地 */
@@ -57,8 +64,17 @@ export class Movement {
     else this.slide(s, fx);
   }
 
+  /**
+   * 起跳初速的乘区优先级：跳跃充能 > 弹跳鞋 > 1。
+   * 充能层数要先问引擎再读 fx.jumpChargeMul——扣掉最后一层会立刻 recompute，
+   * 届时 jumpChargeMul 已回落基线 1，按值取会在最后一跳丢倍率。
+   */
   private jump(s: RunnerState, fx: FxState) {
-    s.vy = this.P.jumpVelocity * (fx.bootsT > 0 ? fx.jumpMul : 1); // 弹跳鞋：跳跃初速乘区
+    // 倍率先取再扣层：扣掉最后一层会立刻 recompute，fx.jumpChargeMul 随之回落基线 1，
+    // 放在 consume 之后读会让「最后一跳」丢倍率（实测充能跳顶点只有 2.29m）。
+    const chargeMul = fx.jumpChargeMul;
+    const mul = this.hooks.consumeJumpCharge() ? chargeMul : (fx.bootsT > 0 ? fx.jumpMul : 1);
+    s.vy = this.P.jumpVelocity * mul;
     if (s.y <= 0) s.y = 0.001; // 从支撑面起跳：车顶（y>0）不重置高度
   }
 

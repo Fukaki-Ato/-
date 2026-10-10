@@ -490,11 +490,11 @@ function view2Pass(host) {
 
 // ---------------- HUD（onHud 推送数据源） ----------------
 
-test('HUD：分数/金币/里程/爱心 + buff 同名合并 + 技能三态文案', () => {
+test('HUD：分数/金币/里程/爱心 + buff 同名合并', () => {
   const { host } = hostFixture();
   const views = createOverlayViews({ host });
   const hud = views.mountHud();
-  hud.update({ score: 1234, coins: 9, distance: 105.2, hits: 1, lives: 3, buffs: [], skill: null });
+  hud.update({ score: 1234, coins: 9, distance: 105.2, hits: 1, lives: 3, buffs: [], skill: null, passive: null });
   const line = texts(host).find(t => t.includes('分 ·'));
   assert.ok(line.includes('1,234 分') && line.includes('9 金币') && line.includes('105 m') && line.includes('❤'), line);
   assert.ok(line.includes('♡'), '受击掉心');
@@ -502,15 +502,11 @@ test('HUD：分数/金币/里程/爱心 + buff 同名合并 + 技能三态文案
     score: 2000, coins: 10, distance: 200, hits: 0, lives: 3,
     buffs: [{ name: '雷神护体', left: 5 }, { name: '雷神护体', left: 8 }, { name: '永固', left: Infinity }],
     skill: { label: '雷霆瞬步', cd: 0, ready: false, charge: { now: 5, need: 10 } },
+    passive: { label: '静电收藏家', active: true, charges: 0 },
   });
   const t2 = texts(host);
   assert.ok(t2.some(x => x.includes('雷神护体 8s') && !x.includes('5s')), '同名 buff 取最长剩余');
   assert.ok(t2.some(x => x.includes('永固') && !/永固 \d/.test(x)), '永久被动不显倒计时');
-  assert.ok(t2.some(x => x === '雷霆瞬步：下滑 5/10'), '充能已移除：未就绪时显示下滑积攒进度');
-  hud.update({ score: 2000, coins: 10, distance: 200, hits: 0, lives: 3, buffs: [], skill: { label: '雷霆瞬步', cd: 2.5, ready: false, charge: null } });
-  assert.ok(texts(host).some(x => x.startsWith('雷霆瞬步：冷却 2.5s')));
-  hud.update({ score: 2000, coins: 10, distance: 200, hits: 0, lives: 3, buffs: [], skill: { label: '雷霆瞬步', cd: 0, ready: true, charge: null } });
-  assert.ok(texts(host).some(x => x.includes('就绪（双击 / E）')));
   hud.dispose();
   assert.equal(host.overlay.current, null, 'dispose 即卸页');
 });

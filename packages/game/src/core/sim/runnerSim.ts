@@ -14,6 +14,7 @@ import { collectCoins, collectPickups, type CollectDeps } from './collect.js';
 import { hitsRunner, inDepthWindow, isNearMiss, relZ, safestLane } from './collision.js';
 import { clearSkyCoins } from './landing.js';
 import { Movement } from './movement.js';
+import { passiveView } from './passiveView.js';
 import { resolveHit, type HitCtx } from './resolveHit.js';
 import { TrackGen, type CloudEntity, type CoinEntity, type ObstacleEntity, type PickupEntity } from './trackGen.js';
 import { createSimWorld } from './simWorld.js';
@@ -87,6 +88,7 @@ export class RunnerSim {
       },
       { heightM: this.fly.heightM, glideS: this.fly.glideS },
       this.obstacles,
+      { consumeJumpCharge: () => this.buffs.consumeJumpCharge() },
     );
     this.buffs = new BuffEngine(createSimWorld({
       state: this.state, obstacles: this.obstacles, coins: this.coinsArr, pickups: this.pickupsArr,
@@ -118,6 +120,17 @@ export class RunnerSim {
 
   /** HUD 用的 buff 列表（名称来自配置，含剩余秒数） */
   buffList(): BuffView[] { return this.buffs.list(this.hudBuffs); }
+
+  /**
+   * 被动天赋此刻是否正在生效（HUD 被动图标亮灯依据）。
+   * 判定规则在 passiveView.ts（拆出以守 300 行）：按 fx 派生位逐条看，不按角色硬编码。
+   */
+  passiveActive(): boolean {
+    return passiveView(this.loadout.passive.map(s => s.primitive), this.fx).active;
+  }
+
+  /** 叠层被动（jumpCharge）的层数；无层数语义的原语返回 0 */
+  passiveCharges(): number { return this.fx.jumpCharges; }
 
   /** 取走并清空事件（渲染/音效每帧调用） */
   drainEvents(): SimEvent[] {
