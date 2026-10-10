@@ -9,6 +9,7 @@
  */
 import { Box, Label, type UiView } from '@tr/framework/ui/index.js';
 import type { GameContent } from '@tr/game/core/config/configTypes.js';
+import { isCharacterLocked, playableCharacters } from '@tr/game/core/sim/character.js';
 import type { UiHost } from '@tr/framework/ui/host.js';
 import type { SelectActions } from '../flow/views.js';
 import { badgeButton, badgeImage, type BadgeSet } from './badges.js';
@@ -97,7 +98,10 @@ export function buildLobbyPage(host: UiHost, d: LobbyDeps): LobbyPage {
   // 面板宿主盒只在开着时挂上：框架命中是「反向扫描第一个 rect 含命中点的分支就返回」，
   // 常驻的空宿主盒哪怕 passthrough 也会把它那一带的点击判死；高度给足面板自然高，
   // 否则 absolute 父盒高度 0 会把子的自动高度压成 0（List 塌掉点不中）。
-  let chosen = d.currentCharId;
+  const roster = playableCharacters(d.content);
+  const initial = roster.find(character => character.id === d.currentCharId && !isCharacterLocked(character))
+    ?? roster.find(character => !isCharacterLocked(character));
+  let chosen = initial?.id ?? '';
   let panelHost: Box | null = null;
   // 背景由 menuBackdrop 的网格铺（视频/静态图同一套），这里只留透明容器；
   // absolute 子项排在常规子项之后 ⇒ 控件叠在背景上、命中优先
@@ -111,7 +115,12 @@ export function buildLobbyPage(host: UiHost, d: LobbyDeps): LobbyPage {
     panelHost = new Box({ absolute: true, left: L.panel.x, top: L.panel.y, width: L.panel.w, height: dpx(268) });
     const cp = buildCharPanel(host, {
       content: d.content, currentCharId: chosen, width: L.panel.w,
-      onClose: toggleChar, onChoose: id => { chosen = id; },
+      onClose: toggleChar,
+      onChoose: id => {
+        if (!d.actions.onChooseCharacter(id)) return false;
+        chosen = id;
+        return true;
+      },
     });
     panelHost.add(cp.panel);
     root.add(panelHost);

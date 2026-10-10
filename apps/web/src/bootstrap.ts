@@ -3,6 +3,7 @@ import { createWebPlatform } from './platform/webPlatform.js';
 import { createGameFlow } from '@tr/game/flow/mainFlow.js';
 import { createOverlayViews } from '@tr/game/ui/overlayViews.js';
 import { createUiShell } from './uiShell.js';
+import '../style.css';
 import { createTestPanel } from './testPanel.js';
 
 const mount = document.getElementById('screen')!;
