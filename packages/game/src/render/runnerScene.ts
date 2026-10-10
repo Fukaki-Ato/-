@@ -112,7 +112,7 @@ export function createRunnerScene(
   const track = createTrackVisuals(scene, laneWidth, {
     baseColor: sky.baseColor, flashColor: sky.flashColor, tint, groundColor,
     sky: { zenith: sky.baseColor, horizon: fogColor },
-  });
+  }, (theme?.['scenery'] as string | undefined) ?? 'seaside');
   const avatar = createAvatar(scene, laneWidth, sim.loadout);
   const coinField = createCoinField(scene, laneWidth);
   const obstacleLayer = createObstacleLayer(scene, laneWidth);
@@ -197,7 +197,7 @@ export function createRunnerScene(
     pickupLayer.update(sim.pickupsArr, dist, s.t);
     cloudLayer.update(sim.cloudsArr, dist, s.t, s.prevDistance, chestX, fx.flyT > 0 || s.gliding,
       (x, y, z) => bursts.fireAt(x, y, z, CLOUD_BURST_COLOR));
-    track.update(dist);
+    track.update(dist, s.t);
 
     // 相机：水平跟随人物，垂直按地面/空中两套目标平滑随动，注视点前探 9.5m。
     // 目标全部由 cameraRig 派生：地面 s.y*0.5+4.6、camZ 9.2（俯角 12.8°，四轮「高度够了但远」收距后的口径）；

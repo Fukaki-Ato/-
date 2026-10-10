@@ -67,7 +67,10 @@ function makeGroundTexture(): THREE.DataTexture {
   return tex;
 }
 
-export function createTrackVisuals(scene: THREE.Scene, laneWidth: number, colors: TrackColors) {
+export function createTrackVisuals(scene: THREE.Scene, laneWidth: number, colors: TrackColors,
+  /** 主题 config 的 scenery 字段：选哪一套跑道侧景道具（缺省 seaside，未登记的 id 两侧为空） */
+  scenery: string = 'seaside',
+) {
   const roadWidth = 3 * laneWidth + 1.2;
   const zenith = colors.sky?.zenith ?? colors.baseColor;
   const horizon = colors.sky?.horizon ?? colors.baseColor;
@@ -110,8 +113,8 @@ export function createTrackVisuals(scene: THREE.Scene, laneWidth: number, colors
     d.rotation.x = -Math.PI / 2; d.position.set(lane * laneWidth, 0.014, -190 + i * 12); scene.add(d); dashes.push(d);
   }
 
-  // 侧景全部由真 3D 几何承担（近景小件 + 中景房屋/棕榈 + 远景房屋/棕榈），见 sceneryProps
-  const props: SceneryProps = createSceneryProps(scene);
+  // 侧景全部由真 3D 几何承担（近景小件 + 中景房屋/棕榈 + 远景房屋/棕榈），道具集由主题 scenery 选定
+  const props: SceneryProps = createSceneryProps(scene, scenery);
 
   let lastDist = 0;
   return {
@@ -120,8 +123,8 @@ export function createTrackVisuals(scene: THREE.Scene, laneWidth: number, colors
       (skyDome.uniforms['top'].value as THREE.Color).copy(zenithBase).lerp(tint, amount);
       (skyDome.uniforms['bottom'].value as THREE.Color).copy(horizonBase).lerp(tint, amount);
     },
-    /** 用插值距离推动沙地纹理、虚线与侧景滚动（与角色同步，不掉帧抖动） */
-    update(dist: number) {
+    /** 用插值距离推动沙地纹理、虚线与侧景滚动（与角色同步，不掉帧抖动）；t 给侧景里那些按秒动的动件 */
+    update(dist: number, t: number = 0) {
       const move = dist - lastDist; lastDist = dist;
       // 地面旋转后 UV 的 v 轴朝 -Z；正偏移让草斑向 +Z（角色身后）移动。
       // 每 6m 平铺一轮，按绝对距离取相位：不累积漂移，也不移走地面网格露出边缘。
@@ -130,7 +133,7 @@ export function createTrackVisuals(scene: THREE.Scene, laneWidth: number, colors
         d.position.z += move;
         if (d.position.z > DASH_RESET_Z) d.position.z -= DASH_LOOP;
       }
-      props.update(move);
+      props.update(move, t);
     },
   };
 }
