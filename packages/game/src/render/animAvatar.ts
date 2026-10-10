@@ -131,14 +131,17 @@ function build(
 
   /**
    * Idle 的双实例交替：Idle 首末姿差 110°（建模侧实测，不可直接循环），按契约 LoopOnce 播一次，
-   * 播完后用同 clip 的第二个 action 做 0.12s 交叉淡化交回自身首帧，抹掉硬跳。
+   * 播完后用第二个 action 做 0.12s 交叉淡化交回自身首帧，抹掉硬跳。
+   * 第二个实例必须建在 clone 的 clip 上：three 按 clip+root 缓存 action，对同一 clip 再调
+   * clipAction 只会拿回同一个实例，fadeOut 会被紧随的 reset() 取消，交叉退化成一帧瞬跳。
    */
   const idleClip = clips.find(c => c.name === 'Idle');
+  const idleAltClip = idleClip?.clone() ?? null;
   let idleAct = actions.Idle;
   let idleSpare: THREE.AnimationAction | null = null;
   function idleCrossfadeToHead() {
-    if (!idleClip) return;
-    const spare = idleSpare ?? mixer.clipAction(idleClip);
+    if (!idleClip || !idleAltClip) return;
+    const spare = idleSpare ?? mixer.clipAction(idleAltClip);
     spare.setLoop(THREE.LoopOnce, Infinity);
     spare.clampWhenFinished = true;
     idleAct.fadeOut(XFADE);

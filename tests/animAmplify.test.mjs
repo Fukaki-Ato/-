@@ -53,6 +53,30 @@ test('amplifyQuaternion：接近 ref / 相对角≈π 时原样返回（不炸�
   assert.ok(out.angleTo(far) < 1e-9, 'π 病态帧原样');
 });
 
+test('amplifyQuaternion：4D 长弧（q 与 ref 反号）键按短弧放大，不被近-π 守卫跳过', () => {
+  // 真实资产命中过：nailoong.glb Run 的 LegUpperR 有 14/30 键是反号存储（rel.w<0）。
+  // 旧实现把这些长弧键（angle>π）误判成「相对角≈π 的轴病态帧」原样返回，
+  // 右腿半段摆幅没被放大、步幅比左腿窄 12%（脚 z 行程 0.572m vs 0.650m）。
+  const ref = rotX(0.4);
+  const flipped = new THREE.Quaternion(-Math.sin(0.3), 0, 0, -Math.cos(0.3)); // -rotX(0.6) ≡ rotX(0.6)
+  const out = new THREE.Quaternion();
+  amplifyQuaternion(ref, flipped, 2, out);
+  assert.ok(out.angleTo(rotX(0.8)) < 1e-6, '相对 +0.2rad 的等旋转长弧表示 → 按短弧放大到 +0.4rad');
+
+  const clip = new THREE.AnimationClip('Run', 0.5, [
+    new THREE.QuaternionKeyframeTrack('LegUpperL.quaternion', [0, 0.5], [
+      ...rotX(0.2), -Math.sin(0.3), 0, 0, -Math.cos(0.3),
+    ]),
+  ]);
+  const ampClip = amplifyClipSwing(clip, { LegUpperL: 2 });
+  const k0 = new THREE.Quaternion().fromArray(ampClip.tracks[0].values, 0);
+  const k1 = new THREE.Quaternion().fromArray(ampClip.tracks[0].values, 4);
+  // 符号对齐均值 = rotX(0.4)：q0 偏差 -0.2 → rotX(0)；反号键偏差 +0.2 → rotX(0.8)。
+  // 轨道值经 Float32Array 存储，角度分辨率 ~1e-3 rad，容差按该口径给。
+  assert.ok(k0.angleTo(rotX(0)) < 2e-3, '键 0：-0.2rad × 2 → rotX(0)');
+  assert.ok(k1.angleTo(rotX(0.8)) < 2e-3, '反号键：+0.2rad × 2 → rotX(0.8)（旧实现停在 rotX(0.6)）');
+});
+
 test('amplifyClipSwing：只放大列出的骨骼的 quaternion 轨道', () => {
   const trackX = new THREE.QuaternionKeyframeTrack('LegUpperL.quaternion', [0, 0.5], [
     ...rotX(0.1), ...rotX(0.3),

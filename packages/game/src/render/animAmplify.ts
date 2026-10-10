@@ -63,6 +63,9 @@ export function meanQuaternion(qs: readonly THREE.Quaternion[]): THREE.Quaternio
 
 /**
  * 绕 ref 放大 q 的相对旋转 amp 倍：q' = ref * (ref⁻¹·q)^amp（轴角直接放大，支持 amp>1 外插）。
+ * q 与 -q 是同一旋转：rel.w<0（4D 长弧表示）时先翻到短弧再放大。否则 angle>π 会让下面
+ * 「接近 π」的守卫恒真、这些键被静默跳过放大——真实资产已命中过（nailoong.glb 的 Run
+ * 里 LegUpperR 30 键有 14 键是反号存储，修复前右腿整段摆幅没被放大、步幅比左腿窄 12%）。
  * 接近 ref（相对角 <1e-4 rad）或相对角接近 π（轴不稳定）时原样返回——单帧无偏差可放，
  * 轴病态帧放大会把姿势炸掉。
  */
@@ -70,6 +73,7 @@ export function amplifyQuaternion(
   ref: THREE.Quaternion, q: THREE.Quaternion, amp: number, out: THREE.Quaternion,
 ): THREE.Quaternion {
   const rel = ref.clone().invert().multiply(q).normalize();
+  if (rel.w < 0) rel.set(-rel.x, -rel.y, -rel.z, -rel.w); // 取短弧表示（同旋转的另一符号）
   const w = Math.min(1, Math.max(-1, rel.w));
   const angle = 2 * Math.acos(w);
   if (angle < 1e-4 || Math.PI - angle < 1e-4) return out.copy(q);
