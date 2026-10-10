@@ -41,6 +41,8 @@ export interface MainMenuActions {
 
 export interface SelectActions {
   onStartRun(charId: string): void;
+  /** Validate and persist a role choice made by the built-in lobby panel. */
+  onChooseCharacter(charId: string): boolean;
   onBack(): void;
 }
 

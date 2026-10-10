@@ -17,7 +17,7 @@ import { createGameFlow, BEST_KEY, CHAR_KEY, COINS_KEY, DIAMOND_KEY } from '../p
 import { ENTRY_KEY } from '../packages/game/dist/flow/session.js';
 import { loadAllConfig } from '../packages/game/dist/core/config/configLoader.js';
 import { CONTENT_NAMES } from '../packages/game/dist/core/config/configTypes.js';
-import { buildLoadout, playableCharacters } from '../packages/game/dist/core/sim/character.js';
+import { buildLoadout, isCharacterLocked, playableCharacters } from '../packages/game/dist/core/sim/character.js';
 import { readJson, loadTestFontSet } from './ui-helpers.mjs';
 
 const W = 800, H = 600;
@@ -169,6 +169,7 @@ test('select 页（主界面）：参考图板块齐全且等比不裁出、角�
   const views = createOverlayViews({ host });
   views.renderSelect(report.content, {
     onStartRun: id => { started = id; },
+    onChooseCharacter: id => { adapter.storage.set(CHAR_KEY, id); return true; },
     onBack: () => {},
   }, chars[0].id, 'guest');
   view2Pass(host);
@@ -208,12 +209,46 @@ test('select 页（主界面）：参考图板块齐全且等比不裁出、角�
   assert.equal(started, chars[1].id);
 });
 
+test('built-in lobby marks locked roles and rejects them without changing the active role', async () => {
+  const { host, adapter } = hostFixture();
+  const report = await loadContent();
+  const chars = playableCharacters(report.content);
+  const active = chars[0];
+  const locked = chars[1];
+  assert.ok(active && locked, 'fixture has at least two roles');
+  locked.status = 'locked';
+  adapter.storage.set(CHAR_KEY, active.id);
+  let chooseCalls = 0;
+  const views = createOverlayViews({ host });
+  views.renderSelect(report.content, {
+    onStartRun() {},
+    onChooseCharacter(id) {
+      chooseCalls++;
+      const candidate = playableCharacters(report.content).find(character => character.id === id);
+      if (!candidate || isCharacterLocked(candidate)) return false;
+      adapter.storage.set(CHAR_KEY, id);
+      return true;
+    },
+    onBack() {},
+  }, active.id, 'guest');
+  view2Pass(host);
+  clickWidget(host, findWidget(host, cellOf('角色')));
+  const list = findWidget(host, widget => widget instanceof List);
+  const box = findBox(host.overlay.current.relayout(), list.id);
+  host.pushInput({ type: 'down', x: box.contentRect.x + 150 * 1.5, y: box.contentRect.y + 20, t: 0 });
+  host.pushInput({ type: 'up', x: box.contentRect.x + 150 * 1.5, y: box.contentRect.y + 20, t: 0.05 });
+  assert.ok(texts(host).includes('未解锁'), 'locked fallback card is visibly marked');
+  assert.equal(chooseCalls, 0, 'locked card is disabled before flow selection');
+  assert.equal(adapter.storage.get(CHAR_KEY), active.id);
+  host.dispose();
+});
+
 test('select 页（主界面）：未定义入口仅按压反馈（无 toast/无弹窗/无导航）、角色面板详情在', async () => {
   const { host } = hostFixture();
   const report = await loadContent();
   const chars = playableCharacters(report.content);
   const views = createOverlayViews({ host });
-  views.renderSelect(report.content, { onStartRun() {}, onBack: () => {} }, chars[0].id, 'wechat');
+  views.renderSelect(report.content, { onStartRun() {}, onChooseCharacter: () => true, onBack: () => {} }, chars[0].id, 'wechat');
   view2Pass(host);
   const t = texts(host);
   assert.ok(t.includes('仓库') && !t.some(x => x.includes('宝箱')), '底栏第四格＝仓库');
@@ -362,7 +397,7 @@ test('toast：出现在画面中间并随时间向下漂走，不占页面高度
   const report = await loadContent();
   const chars = playableCharacters(report.content);
   createOverlayViews({ host }).renderSelect(report.content,
-    { onStartRun() {}, onBack: () => {} }, chars[0].id, 'guest');
+    { onStartRun() {}, onChooseCharacter: () => true, onBack: () => {} }, chars[0].id, 'guest');
   view2Pass(host);
   const v = host.overlay.current;
   // 旧版 toast 层是 in-flow 列 + padding.bottom 28，会从页面高度里扣掉 28px，
