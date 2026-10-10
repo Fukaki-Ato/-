@@ -44,6 +44,6 @@ export function createSceneMachine<S extends string>(scenes: Record<S, SceneDef>
 
 /**
  * 本项目的场景名常量：boot（配置加载）→ select（主界面）↔ characterSelect（Web 角色页）↔ shop（只读商店）
- * → run → result → select。start（微信/游客入口）保留但 boot 后不再可达。
+ * ↔ settings（设置页，首项＝切换跑酷场景）→ run → result → select。start（微信/游客入口）保留但 boot 后不再可达。
  */
-export type SceneName = 'boot' | 'start' | 'select' | 'characterSelect' | 'shop' | 'run' | 'result';
+export type SceneName = 'boot' | 'start' | 'select' | 'characterSelect' | 'shop' | 'settings' | 'run' | 'result';
