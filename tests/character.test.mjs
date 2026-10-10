@@ -21,9 +21,9 @@ const SIM_SEED = () => hashSeed('char-test');
 /** 跑 n 秒（不注入任何操作，只让 sim 自己走） */
 function run(sim, seconds) { for (let i = 0; i < 60 * seconds; i++) { sim.step(); sim.drainEvents(); } }
 
-test('首发 5 个角色都能装配出完整装备（主动技能 + 被动天赋）', () => {
+test('首发 7 个角色都能装配出完整装备（主动技能 + 被动天赋）', () => {
   const chars = playableCharacters(content);
-  assert.equal(chars.length, 5, `应为 5 个可玩角色，实际 ${chars.length}`);
+  assert.equal(chars.length, 7, `应为 7 个可玩角色，实际 ${chars.length}`);
   for (const c of chars) {
     const l = buildLoadout(content, c.id);
     assert.equal(l.charId, c.id);
@@ -43,6 +43,10 @@ test('被动天赋在开局即生效（run_start 触发）', () => {
     char_kaze: s => assert.equal(s.fx.slideAddS, 0.2, '风剃：滑铲 +0.2s'),
     char_rina: s => assert.equal(s.fx.shieldLayers, 1, '莉娜：开局 1 层护盾'),
     char_bolt: s => assert.equal(s.fx.cooldownMul, 0.8, '博尔特警长：冷却 ×0.8'),
+    // 奶龙复用小电的技能/天赋（GLB 外观角色，玩法不出圈）；模型走 nailoong.glb
+    char_nailong: s => assert.equal(s.fx.coinPct, 5, '奶龙：金币 +5%'),
+    // 篮球小子同样复用冲刺技能 + 金币天赋（GLB 外观角色，玩法不出圈）；模型走 bball.glb
+    char_bball: s => assert.equal(s.fx.coinPct, 5, '篮球小子：金币 +5%'),
   };
   for (const [id, check] of Object.entries(cases)) {
     const sim = new RunnerSim(content, SIM_SEED(), id);
@@ -167,6 +171,13 @@ test('渲染装配同样来自配置：体色/发光色/体量读皮肤 material
   assert.equal(volt.emissive, '#FFD84D');
   assert.equal(volt.modelScale, 1.0);
   assert.equal(buildLoadout(content, 'char_bolt').modelScale, 1.05, '警长应比小电高 5%');
+
+  // prefab 直通：GLB 路径进 Loadout（render/animAvatar 据此切 glb 驱动；文件不存在则回退程序化）
+  assert.equal(buildLoadout(content, 'char_nailong').prefab, 'assets/characters/nailoong.glb');
+  assert.equal(buildLoadout(content, 'char_nailong').bodyTint, '#FFD84D');
+  assert.equal(buildLoadout(content, 'char_volt').prefab, 'assets/characters/volt.glb');
+  assert.equal(buildLoadout(content, 'char_bball').prefab, 'assets/characters/bball.glb');
+  assert.equal(buildLoadout(content, 'char_bball').modelScale, 1.0, '篮球小子 1 单位=1m，不缩放');
 
   const edited = load();
   edited.characters.items.find(c => c.id === 'skin_volt_default').materialOverrides.emissive = '#00FF88';
