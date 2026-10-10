@@ -1,7 +1,7 @@
 /**
  * 主流程装配（@tr/game）——从 apps/web/src/bootstrap.ts 提取，两端共用（redesign §3.5）。
  * 职责：平台适配（经 adapter 注入）→ 场景状态机 → 加载配置 → 驱动页面流转：
- *       boot（配置加载）→ select（游客主界面）↔ characterSelect（Web 角色页）↔ shop → run → result → select；
+ *       boot（配置加载）→ select（游客主界面）↔ characterSelect（Web 角色页）↔ shop ↔ settings → run → result → select；
  *       start（微信/游客登录页）保留在场景机里但 boot 后不再可达——默认游客进入，
  *       全程不调 adapter.extras.login()、不弹授权（issue：重构主界面并默认游客进入）；
  *       跑酷局内：每次进入 run 场景创建全新 RunnerSim（seed 记录在案，可复现），
@@ -19,6 +19,7 @@ import { createAudioDirector } from '@tr/game/core/audio/audioDirector.js';
 import type { AudioDirector } from '@tr/game/core/audio/audioDirector.js';
 import { hashSeed, mulberry32 } from '@tr/game/core/rng.js';
 import { installTestApi, uninstallTestApi } from './testApi.js';
+import { createSettingsScene, currentThemeId, pruneThemeSelection } from './settingsScene.js';
 import { createRunnerScene } from '@tr/game/render/runnerScene.js';
 import type { PlatformAdapter } from '@tr/framework/platform/platformAdapter.js';
 import type { GameViews, RunSummary } from './views.js';
@@ -34,8 +35,7 @@ export const DEFAULT_CHAR = 'char_volt';
 export const COINS_KEY = 'thunderrun:coins-total';
 /** 钻石总和（大厅顶栏展示；获取渠道待后续玩法接入，先预留键） */
 export const DIAMOND_KEY = 'thunderrun:diamonds-total';
-/** 大厅「场景切换」所选主题 id（run 进局时消费） */
-export const THEME_KEY = 'thunderrun:theme';
+export { THEME_KEY } from './settingsScene.js'; // 定义与读写语义见 settingsScene.ts
 
 export interface GameFlowDeps {
   adapter: PlatformAdapter;
@@ -172,6 +172,7 @@ export function createGameFlow(deps: GameFlowDeps): GameFlow {
           onBack: () => machine.go('start'),
           onCharacterSelect: views.renderCharacterSelectPage ? () => machine.go('characterSelect') : undefined,
           onShop: () => machine.go('shop', { returnTo: 'select' }),
+          onSettings: () => machine.go('settings'),
         }, charId, entry, { coins: readCount(COINS_KEY), diamonds: readCount(DIAMOND_KEY) });
       },
     },
@@ -205,6 +206,10 @@ export function createGameFlow(deps: GameFlowDeps): GameFlow {
       },
       onExit: () => { shopBack = null; },
     },
+    settings: createSettingsScene({
+      storage: adapter.storage, views, content: () => content,
+      goSelect: () => machine.go('select'), stopDeathMusic: () => audio?.stopDeathMusic(),
+    }),
     run: {
       onEnter: () => {
         if (!content) return;
@@ -224,7 +229,7 @@ export function createGameFlow(deps: GameFlowDeps): GameFlow {
           onCast: () => audio?.onCast(),
           onPickup: () => audio?.onPickup(),
           debug: deps.debug,
-        }, { themeId: adapter.storage.get(THEME_KEY) ?? undefined });
+        }, { themeId: currentThemeId(adapter.storage, content) ?? undefined });
         if (deps.test) installTestApi(sim, content); // 测试面板数据面：?debug/?test 才挂
       },
       onExit: () => {
@@ -257,6 +262,7 @@ export function createGameFlow(deps: GameFlowDeps): GameFlow {
   adapter.onInput(e => {
     if (e.type === 'key' && e.phase === 'down' && e.code === 'Escape' && machine.current() === 'run') machine.go('select');
     else if (e.type === 'key' && e.phase === 'down' && e.code === 'Escape' && machine.current() === 'shop') shopBack?.();
+    else if (e.type === 'key' && e.phase === 'down' && e.code === 'Escape' && machine.current() === 'settings') machine.go('select');
   });
 
   async function boot(): Promise<void> {
@@ -277,6 +283,7 @@ export function createGameFlow(deps: GameFlowDeps): GameFlow {
     }
     content = report.content;
     normalizeCharacter();
+    pruneThemeSelection(adapter.storage, content); // 存档主题已删/改名 → 清掉，不把无效 id 带进渲染
     audio = createAudioDirector(adapter, content.game.params, {
       random: deps.audioRandom ?? mulberry32(hashSeed('audio-' + Date.now())),
     });

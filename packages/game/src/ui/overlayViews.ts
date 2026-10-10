@@ -8,7 +8,7 @@
 import type { GameContent } from '@tr/game/core/config/configTypes.js';
 import type {
   BootHandle, CharacterSelectPageActions, GameViews, HudHandle, ResultActions, RunSummary,
-  SelectActions, SelectExtras, ShopActions, StartActions, StartHandle,
+  SelectActions, SelectExtras, SettingsActions, ShopActions, StartActions, StartHandle,
 } from '../flow/views.js';
 import type { EntryMethod } from '../flow/session.js';
 import type { UiHost } from '@tr/framework/ui/host.js';
@@ -18,6 +18,7 @@ import { buildLobbyPage } from './lobbyView.js';
 import { buildHudPage } from './hudView.js';
 import { buildResultPage } from './resultView.js';
 import { buildShopPage } from './shopView.js';
+import { buildSettingsPage } from './settingsView.js';
 import { createMenuBackdrop, type BackdropSet, type MenuBackdrop } from './menuBackdrop.js';
 import type { BadgeSet } from './badges.js';
 
@@ -92,7 +93,7 @@ export function createOverlayViews(deps: OverlayViewsDeps): OverlayViews {
         actions,
         currentCharId,
         extras: { coins: extras?.coins ?? 0, diamonds: extras?.diamonds ?? 0, badges: deps.badges },
-        slots: { onShop: actions.onShop },
+        slots: { onShop: actions.onShop, onSettings: actions.onSettings },
       });
       stopBackdrop();
       let frame: ((t: number) => void) | undefined;
@@ -129,6 +130,12 @@ export function createOverlayViews(deps: OverlayViewsDeps): OverlayViews {
         return;
       }
       host.mount(buildShopPage(host, content, actions).view);
+    },
+
+    renderSettings(content: GameContent, actions: SettingsActions, currentThemeId: string | null): void {
+      clearTransient();
+      stopBackdrop();
+      host.mount(buildSettingsPage(host, { content, actions, currentThemeId }).view);
     },
 
     mountHud(): HudHandle {
