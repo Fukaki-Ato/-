@@ -45,7 +45,7 @@ export interface PlatformAdapter {
   now(): number;
 
   /** wx 专属能力（可选注入，见 extras.ts）；wx 实现必供，web 壳给 no-op/兜底实现。 */
-  readonly extras?: WxExtras;
+  readonly extras?: PlatformExtras;
 
   /** 音频播放（web/wx 均提供，见 audio.ts）；纯逻辑测试壳可缺省，业务代码须容忍 undefined。 */
   readonly audio?: AudioService;
@@ -60,4 +60,13 @@ export type {
 } from './input.js';
 export { GESTURE_DEFAULTS, createGestureClassifier } from './gestureClassifier.js';
 export type { CloudBridge, ShareOptions, WxExtras, WxIdentity } from './extras.js';
+
+export interface PlatformExtras extends WxExtras {
+  /**
+   * extras 的调试扩展（QA）：web 壳注入 location.search 解出的 URLSearchParams，
+   * 供 render 层读 ?anim=<ClipName> 锁动作 / ?char=<id> 锁角色（见 render/animClips.ts）。
+   * wx 无 location.search 概念，缺省 undefined；packages/** 只读不 import 任何 app/宿主代码。
+   */
+  urlParams?: URLSearchParams;
+}
 export type { AudioOptions, AudioService } from './audio.js';

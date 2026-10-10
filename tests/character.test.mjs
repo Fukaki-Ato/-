@@ -21,9 +21,9 @@ const SIM_SEED = () => hashSeed('char-test');
 /** 跑 n 秒（不注入任何操作，只让 sim 自己走） */
 function run(sim, seconds) { for (let i = 0; i < 60 * seconds; i++) { sim.step(); sim.drainEvents(); } }
 
-test('8 个角色都能装配出完整装备（主动技能 + 被动天赋）', () => {
+test('9 个角色都能装配出完整装备（主动技能 + 被动天赋）', () => {
   const chars = playableCharacters(content);
-  assert.equal(chars.length, 8, `应为 8 个可玩角色，实际 ${chars.length}`);
+  assert.equal(chars.length, 9, `应为 9 个可玩角色，实际 ${chars.length}`);
   for (const c of chars) {
     const l = buildLoadout(content, c.id);
     assert.equal(l.charId, c.id);
@@ -55,6 +55,8 @@ test('被动天赋在开局即生效（run_start 触发）', () => {
     // 周期被动（奶蛙弹跳之力 / 阿牛蛮牛冲撞）第一步才真正挂上子效果，见各自用例
     char_frog: s => assert.ok(s.buffs.left('periodic') > 0, '奶蛙：周期被动应登记为永久槽位'),
     char_niu: s => assert.ok(s.buffs.left('periodic') > 0, '阿牛：周期被动应登记为永久槽位'),
+    // 奶龙复用小电的技能/天赋（GLB 外观角色，玩法不出圈）；模型走 nailoong.glb
+    char_nailong: s => assert.equal(s.fx.coinPct, 5, '奶龙：金币 +5%'),
   };
   for (const [id, check] of Object.entries(cases)) {
     const sim = new RunnerSim(content, SIM_SEED(), id);

@@ -2,9 +2,10 @@
  * WxExtras 的网页兜底实现（S10 契约 §4 映射表 extras 行 / D7）。
  * 目的：业务代码可无分支调用 adapter.extras，网页调试壳全流程不被 wx 能力缺失卡死。
  * 语义：login→本地游客、share→console、cloud 存档→localStorage 镜像（callFunction/submitScore
- * reject 'unsupported'）、readJson→fetchJson、readBinary→fetch().arrayBuffer()。
+ * reject 'unsupported'）、readJson→fetchJson、readBinary→fetch().arrayBuffer()、
+ * urlParams→location.search（?anim= 锁动作 / ?char= 锁角色的 QA 入口，wx 侧无此概念）。
  */
-import type { CloudBridge, SyncStorage, WxExtras, WxIdentity } from '@tr/framework/platform/platformAdapter.js';
+import type { CloudBridge, PlatformExtras, SyncStorage, WxIdentity } from '@tr/framework/platform/platformAdapter.js';
 
 const OPENID_KEY = 'thunderrun:…penid';
 const PROGRESS_PREFIX = 'thunderrun:progress:';
@@ -22,7 +23,7 @@ async function webLogin(storage: SyncStorage): Promise<WxIdentity> {
 export function createWebExtras(deps: {
   storage: SyncStorage;
   fetchJson: (url: string) => Promise<unknown>;
-}): WxExtras {
+}): PlatformExtras {
   const { storage } = deps;
   const unsupported = (name: string) => new Error(`unsupported (web 壳无 wx 云能力): ${name}`);
 
@@ -47,6 +48,8 @@ export function createWebExtras(deps: {
       if (!res.ok) throw new Error(`HTTP ${res.status} ${path}`);
       return res.arrayBuffer();
     },
+    // QA 参数入口：render 层读 ?anim= 锁动作 clip；微信端无 location.search，这个字段缺省
+    urlParams: new URLSearchParams(location.search),
     // showRewardAd / requestSubscribeMessage 不提供（S10 §4：web 侧缺省，S9.4 仅 wx 预留）
   };
 }

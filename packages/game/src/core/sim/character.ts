@@ -49,6 +49,9 @@ export interface Loadout {
   bodyTint: string;
   emissive: string;
   modelScale: number;
+  /** GLB 模型路径（characters.json model.prefab）：render/animAvatar 据此切 glb 驱动，
+   *  缺失时回退程序化 runnerModel（平台 extras.readBinary 不可用时同理） */
+  prefab?: string;
 }
 
 /** 可出战角色 = char_ 前缀且 status=live */
@@ -123,6 +126,12 @@ export function buildLoadout(content: GameContent, charId: string): Loadout {
   base.skinId = skinId;
   base.bodyTint = text(overrides.bodyTint, base.tint);
   base.emissive = text(overrides.emissive, base.tint);
+
+  // GLB 模型路径：角色自己的 model.prefab 优先，其次默认皮肤的 model.prefab。
+  // 没有 prefab（或平台无 extras.readBinary）时 render 层走程序化 runnerModel，行为不变。
+  const skinModel = ((skin?.['model'] ?? {}) as Record<string, unknown>).prefab;
+  const prefab = [model.prefab, skinModel].find(p => typeof p === 'string' && p.length > 0);
+  if (typeof prefab === 'string') base.prefab = prefab;
 
   const skillEntry = findEntry(content, c.skillRef);
   if (skillEntry && skillEntry['kind'] === 'active') {
