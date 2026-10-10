@@ -1,6 +1,6 @@
 {
   "$schema": "../schema/config.schema.json#/skills",
-  "configVersion": "1.1.1",
+  "configVersion": "1.2.0",
   "minEngineVersion": "1.1.0",
   "updatedAt": "2026-10-05",
   "items": [
@@ -148,15 +148,20 @@
     },
     {
       "id": "talent_frog_bounce", "kind": "passive", "status": "live",
-      "name": { "zh-CN": "弹跳之力" }, "desc": { "zh-CN": "每 10 秒自动获得一次强力跳跃" },
+      "name": { "zh-CN": "弹跳之力" }, "desc": { "zh-CN": "每 10 秒充能 1 层，可叠加；起跳消耗 1 层，跃起 3.1 米" },
       "trigger": "run_start",
       "effects": [
         {
           "primitive": "periodic", "durationS": 3600, "everyS": 10,
-          "effects": [ { "primitive": "jumpBoost", "durationS": 2.5, "mul": 1.1 } ]
+          "effects": [
+            { "primitive": "jumpCharge", "mul": 1.1369, "stackRule": "stack" }
+          ]
         }
       ],
-      "versions": [ { "ver": "1.1.0", "date": "2026-10-04", "change": "新增（奶蛙）：周期被动，每次给 2.5 秒强跳窗口（mul 1.1 = 弹跳鞋定稿值）" } ]
+      "versions": [
+        { "ver": "1.1.0", "date": "2026-10-04", "change": "新增（奶蛙）：周期被动，每次给 2.5 秒强跳窗口（mul 1.1 = 弹跳鞋定稿值）" },
+        { "ver": "1.2.0", "date": "2026-10-05", "change": "改为充能式：周期原语每 10 秒叠一层 jumpCharge，起跳消耗一层、顶点 2.90m→3.10m。理由：旧口径下满格墙（3.0m）与强跳顶点只差 0.10m，玩家反馈「跳不过高障碍」实为 2.5 秒窗口只覆盖全程 25%，窗口外顶点 2.40m 连 2.6m 高杆都过不去。充能可叠加后攒几层就能连续高跳，窗口外不再有手感断档。mul 1.1369 = sqrt(2×38×3.1)/13.5，按 gravity -38 / jumpVelocity 13.5 反解" }
+      ]
     },
     {
       "id": "talent_mambo_height", "kind": "passive", "status": "live",

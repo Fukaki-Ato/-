@@ -76,10 +76,18 @@ export interface ResultActions {
   onSelect(): void;
 }
 
-/** 局内 HUD：挂载即创建（DOM 层 append 由实现方自理），dispose 即移除 */
+/**
+ * 局内 HUD：挂载即创建（DOM 层 append 由实现方自理），dispose 即移除。
+ * onCastSkill：技能图标点击回调（主动技能亮了可点）。缺省时图标只做状态展示。
+ */
 export interface HudHandle {
   update(h: HudData): void;
   dispose(): void;
+}
+
+/** mountHud 的入参：主动技能图标的点击出口 */
+export interface HudActions {
+  onCastSkill?(): void;
 }
 
 export interface GameViews {
@@ -101,7 +109,7 @@ export interface GameViews {
   renderShop(content: GameContent, actions: ShopActions): void;
   /** 设置页（每个游戏都必须有）：当前首项＝切换跑酷场景；currentThemeId 为流程解析出的生效主题 */
   renderSettings(content: GameContent, actions: SettingsActions, currentThemeId: string | null): void;
-  mountHud(): HudHandle;
+  mountHud(actions?: HudActions): HudHandle;
   renderResult(summary: RunSummary, best: number, actions: ResultActions): void;
   toast(msg: string): void;
 }

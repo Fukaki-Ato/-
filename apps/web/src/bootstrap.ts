@@ -6,6 +6,7 @@ import { createUiShell } from './uiShell.js';
 import '../style.css';
 import { createCharacterSelectOverlay } from './characterSelectOverlay.js';
 import { createShopOverlay } from './shopOverlay.js';
+import { injectObstaclePosters, injectPickupTiles } from './runAssets.js';
 import { createTestPanel } from './testPanel.js';
 
 const mount = document.getElementById('screen')!;
@@ -21,7 +22,7 @@ async function main(): Promise<void> {
   if (charParam) adapter.storage.set('thunderrun:character', charParam);
   const shell = await createUiShell(adapter);
   const views = createOverlayViews({
-    host: shell.host, badges: shell.badges, backdrop: shell.backdrop,
+    host: shell.host, badges: shell.badges, icons: shell.skillIcons, backdrop: shell.backdrop,
     onLobbyVisible: v => shell.setBackgroundVisible(v), // 背景视频只在大厅解码
     selectRenderer: (content, actions, currentCharId, entry) =>
       createCharacterSelectOverlay(content, actions, currentCharId, entry, shell.fonts),
@@ -51,7 +52,8 @@ async function main(): Promise<void> {
   }
 
   // ---------------- 启动 ----------------
-  await flow.boot();
+  // 局内贴图（障碍海报·道具箱方砖）与配置并行取：进局才读，boot 完到玩家点开始之间还有一段时间，够用
+  await Promise.all([flow.boot(), injectObstaclePosters(), injectPickupTiles()]);
 }
 
 main().catch(err => {

@@ -348,3 +348,4 @@ test('Box absolute 子项：产出顺序与 laidOut 对齐，sync 不会把矩�
   assert.equal(f.rect.h, 40, '常规子项拿自己的矩形');
   assert.equal(a.rect.h, 100, '绝对子项拿自己的矩形');
 });
+

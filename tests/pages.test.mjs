@@ -13,7 +13,7 @@ import { createOverlayViews } from '../packages/game/dist/ui/overlayViews.js';
 import { SlideBox } from '../packages/game/dist/ui/slideOverlay.js';
 import { AVATAR_KEYS, buildProfileOverlay } from '../packages/game/dist/ui/profileView.js';
 import { PLAYER_AVATAR_KEY, PLAYER_NAME_KEY, PLAYER_RENAMES_KEY, profileParamsFrom } from '../packages/game/dist/core/profile/playerProfile.js';
-import { createGameFlow, BEST_KEY, CHAR_KEY, COINS_KEY, DIAMOND_KEY } from '../packages/game/dist/flow/mainFlow.js';
+import { createGameFlow, BEST_KEY, CHAR_KEY, COINS_KEY, DIAMOND_KEY, THEME_KEY } from '../packages/game/dist/flow/mainFlow.js';
 import { ENTRY_KEY } from '../packages/game/dist/flow/session.js';
 import { loadAllConfig } from '../packages/game/dist/core/config/configLoader.js';
 import { CONTENT_NAMES } from '../packages/game/dist/core/config/configTypes.js';
@@ -300,8 +300,9 @@ test('select 页（主界面）：未定义入口仅按压反馈（无 toast/无
   assert.equal(findButton(host, '开始 · 跑酷！'), null, '旧文字按钮已换牌匾徽标');
 
   // 未定义入口：点一遍全部板块，不得产生任何文案/弹窗/导航（仅 glow 帧按压反馈）
+  // 「设置」不在此列——它已接到设置面板，自身行为见下面的用例
   const before = texts(host).join('|');
-  for (const tag of ['成就', '任务', '活动', '排行榜', '设置', '商店', '福利手册', '仓库']) {
+  for (const tag of ['成就', '任务', '活动', '排行榜', '商店', '福利手册', '仓库']) {
     clickWidget(host, findWidget(host, cellOf(tag)), host.overlay.current.relayout());
   }
   assert.equal(texts(host).join('|'), before, '未定义入口零副作用');
@@ -310,6 +311,35 @@ test('select 页（主界面）：未定义入口仅按压反馈（无 toast/无
   clickWidget(host, findWidget(host, cellOf('角色')), host.overlay.current.relayout());
   const t2 = texts(host);
   assert.ok(t2.some(x => x.includes('技能：') && x.includes('被动：')), '面板技能/被动详情');
+});
+
+test('select 页（主界面）：设置徽标开面板、点切换场景写 THEME_KEY、收起出树', async () => {
+  const { host, adapter } = hostFixture();
+  const report = await loadContent();
+  const chars = playableCharacters(report.content);
+  const themes = report.content.themes.items ?? [];
+  assert.ok(themes.length >= 2, `夹具需 ≥2 个场景主题，实得 ${themes.length}`);
+  const views = createOverlayViews({ host });
+  views.renderSelect(report.content, { onStartRun() {}, onBack: () => {} }, chars[0].id, 'guest');
+  view2Pass(host);
+
+  assert.equal(adapter.storage.get(THEME_KEY), null, '没打开设置就不预写主题');
+  clickWidget(host, findWidget(host, cellOf('设置')), host.overlay.current.relayout());
+  view2Pass(host);
+  const live = themes.find(x => x.status === 'live') ?? themes[0];
+  assert.ok(texts(host).some(x => x.includes(`跑酷场景：${live.name['zh-CN']}`)),
+    `面板显示当前场景名，实得 ${JSON.stringify(texts(host))}`);
+
+  // 点徽标 = 换下一个场景，点选即保存（下一局 run 由 mainFlow 读 THEME_KEY 注入）
+  clickWidget(host, findButton(host, '切换场景'), host.overlay.current.relayout());
+  const picked = themes.find(x => x.id !== live.id);
+  assert.equal(adapter.storage.get(THEME_KEY), picked.id, '点切换场景即写本机');
+  const t1 = texts(host);
+  assert.ok(t1.some(x => x.includes(`跑酷场景：${picked.name['zh-CN']}`)), `文案跟着换，实得 ${JSON.stringify(t1)}`);
+  assert.ok(t1.some(x => x.includes('下一局生效')), '提示生效时机');
+
+  clickWidget(host, findButton(host, '收起'), host.overlay.current.relayout());
+  assert.equal(findButton(host, '切换场景'), null, '收起后面板整棵出树（不留空槽挡点击）');
 });
 
 // ---------------- 玩家档案半屏弹层（主界面不接线，直接挂载测其自身行为） ----------------
@@ -490,11 +520,11 @@ function view2Pass(host) {
 
 // ---------------- HUD（onHud 推送数据源） ----------------
 
-test('HUD：分数/金币/里程/爱心 + buff 同名合并 + 技能三态文案', () => {
+test('HUD：分数/金币/里程/爱心 + buff 同名合并', () => {
   const { host } = hostFixture();
   const views = createOverlayViews({ host });
   const hud = views.mountHud();
-  hud.update({ score: 1234, coins: 9, distance: 105.2, hits: 1, lives: 3, buffs: [], skill: null });
+  hud.update({ score: 1234, coins: 9, distance: 105.2, hits: 1, lives: 3, buffs: [], skill: null, passive: null });
   const line = texts(host).find(t => t.includes('分 ·'));
   assert.ok(line.includes('1,234 分') && line.includes('9 金币') && line.includes('105 m') && line.includes('❤'), line);
   assert.ok(line.includes('♡'), '受击掉心');
@@ -502,15 +532,11 @@ test('HUD：分数/金币/里程/爱心 + buff 同名合并 + 技能三态文案
     score: 2000, coins: 10, distance: 200, hits: 0, lives: 3,
     buffs: [{ name: '雷神护体', left: 5 }, { name: '雷神护体', left: 8 }, { name: '永固', left: Infinity }],
     skill: { label: '雷霆瞬步', cd: 0, ready: false, charge: { now: 5, need: 10 } },
+    passive: { label: '静电收藏家', active: true, charges: 0 },
   });
   const t2 = texts(host);
   assert.ok(t2.some(x => x.includes('雷神护体 8s') && !x.includes('5s')), '同名 buff 取最长剩余');
   assert.ok(t2.some(x => x.includes('永固') && !/永固 \d/.test(x)), '永久被动不显倒计时');
-  assert.ok(t2.some(x => x === '雷霆瞬步：下滑 5/10'), '充能已移除：未就绪时显示下滑积攒进度');
-  hud.update({ score: 2000, coins: 10, distance: 200, hits: 0, lives: 3, buffs: [], skill: { label: '雷霆瞬步', cd: 2.5, ready: false, charge: null } });
-  assert.ok(texts(host).some(x => x.startsWith('雷霆瞬步：冷却 2.5s')));
-  hud.update({ score: 2000, coins: 10, distance: 200, hits: 0, lives: 3, buffs: [], skill: { label: '雷霆瞬步', cd: 0, ready: true, charge: null } });
-  assert.ok(texts(host).some(x => x.includes('就绪（双击 / E）')));
   hud.dispose();
   assert.equal(host.overlay.current, null, 'dispose 即卸页');
 });

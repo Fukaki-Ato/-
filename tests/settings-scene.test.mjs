@@ -20,6 +20,9 @@ const W = 800, H = 600;
 
 const readConfig = name => JSON.parse(readFileSync(join(root, 'config', `${name}.json`), 'utf8'));
 
+/** 第一条主题的显示名（取当前配置；主题改名不用改测试） */
+const baseThemeName = () => readConfig('themes').items[0].name['zh-CN'];
+
 /** 真实配置 + 追加一条演示主题（测试内构造，不改仓库配置）：让「切换场景」至少有两个可选 */
 function themesWithDemo() {
   const themes = readConfig('themes');
@@ -98,16 +101,16 @@ test('设置页：场景列表来自配置、当前项标「使用中」、点�
   host.overlay.current.relayout();
 
   const t = texts(host);
-  for (const s of ['设置', '跑酷场景', '点选即保存，下一局生效', '晴湾小镇', '演示夜景']) {
+  for (const s of ['设置', '跑酷场景', '点选即保存，下一局生效', baseThemeName(), '演示夜景']) {
     assert.ok(t.includes(s), `设置页含「${s}」，实得 ${JSON.stringify(t)}`);
   }
-  assert.equal(markerOf(host, '晴湾小镇'), '使用中', '当前主题标记');
+  assert.equal(markerOf(host, baseThemeName()), '使用中', '当前主题标记');
   assert.equal(markerOf(host, '演示夜景'), '选择');
 
   clickWidget(host, findWidget(host, cellOf('演示夜景')));
   assert.deepEqual(seen, ['theme_demo_night'], '点选回传主题 id');
   assert.equal(markerOf(host, '演示夜景'), '使用中', '标记迁到新主题');
-  assert.equal(markerOf(host, '晴湾小镇'), '选择');
+  assert.equal(markerOf(host, baseThemeName()), '选择');
 
   clickWidget(host, findWidget(host, cellOf('演示夜景')));
   assert.deepEqual(seen, ['theme_demo_night'], '重复点已选主题不重复回调');
@@ -130,7 +133,7 @@ test('设置页：流程拒绝的主题不落标（保持原选择）', () => {
   clickWidget(host, findWidget(host, cellOf('演示夜景')));
   assert.equal(calls, 1);
   assert.equal(markerOf(host, '演示夜景'), '选择', '流程拒绝后不标使用中');
-  assert.equal(markerOf(host, '晴湾小镇'), '使用中');
+  assert.equal(markerOf(host, baseThemeName()), '使用中');
   host.dispose();
 });
 

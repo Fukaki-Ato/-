@@ -4,8 +4,7 @@
  *       boot（配置加载）→ select（游客主界面）↔ characterSelect（Web 角色页）↔ shop ↔ settings → run → result → select；
  *       start（微信/游客登录页）保留在场景机里但 boot 后不再可达——默认游客进入，
  *       全程不调 adapter.extras.login()、不弹授权（issue：重构主界面并默认游客进入）；
- *       跑酷局内：每次进入 run 场景创建全新 RunnerSim（seed 记录在案，可复现），
- *       渲染场景消费 sim 事件；死亡 1.2s 后自动进结算页。
+ *       跑酷局内：每次进入 run 场景创建全新 RunnerSim（seed 记录在案，可复现），渲染场景消费 sim 事件；死亡 1.2s 后自动进结算页。
  * 微信登录只调注入的 adapter.extras.login()（wx 侧现为游客占位，服务端鉴权未接），见 session.ts。
  * 铁律：本包零 DOM/wx——挂载点与页面全部经 GameViews 由 apps/* 注入。
  */
@@ -220,8 +219,8 @@ export function createGameFlow(deps: GameFlowDeps): GameFlow {
         const sim: RunnerSim = new RunnerSim(content, lastSeed, charId);
         // v2：主画布幂等单例 + 即时窗口尺寸（S10 §7.2；跨局复用同一画布，不新建）
         const host = { canvas: adapter.canvas.mainCanvas(), size: adapter.canvas.windowSize() };
-        hud = views.mountHud();
-        hud.update({ score: 0, coins: 0, distance: 0, hits: 0, lives: sim.lives, buffs: [], skill: null });
+        hud = views.mountHud({ onCastSkill: () => sim.applyAction('skill') }); // 图标点击＝主动技能释放（阈值/冷却由 sim 把关）
+        hud.update({ score: 0, coins: 0, distance: 0, hits: 0, lives: sim.lives, buffs: [], skill: null, passive: null });
         scene = (deps.createScene ?? createRunnerScene)(host, adapter, sim, content, {
           onHud: h => hud?.update(h),
           onEnd: summary => machine.go('result', summary),

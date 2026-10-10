@@ -140,6 +140,22 @@ export class BuffEngine {
     return s.layers;
   }
 
+  /** 消耗一层跳跃充能（起跳时调用）：有层数则扣一层并返回 true，否则 false（普通跳） */
+  consumeJumpCharge(): boolean {
+    const s = this.slots.find(x => x.primitive === 'jumpCharge');
+    if (!s || s.layers <= 0) return false;
+    s.layers -= 1;
+    if (s.layers <= 0) this.remove('jumpCharge');
+    else this.recompute();
+    return true;
+  }
+
+  /** 某原语此刻是否有生效中的槽位（周期子效果亮灯判定用） */
+  has(primitive: string): boolean {
+    const s = this.slots.find(x => x.primitive === primitive);
+    return !!s && (s.layers > 0 || s.left > 0);
+  }
+
   /** 移除某原语（头盔挡刀后消失、滑板碎板） */
   remove(primitive: string) {
     const i = this.slots.findIndex(s => s.primitive === primitive);
@@ -173,7 +189,7 @@ export class BuffEngine {
     const everyS = Math.max(0.1, num(s.params, 'everyS', 10));
     s.nextAt += everyS;
     if (s.nextAt <= 0) s.nextAt = everyS;
-    for (const c of s.children ?? []) this.add(c.primitive, c.params, s.label, ctx);
+    for (const c of s.children ?? []) this.add(c.primitive, c.params, s.label, ctx, c.stackRule);
   }
 
   private durationBonus(): number {
@@ -231,6 +247,14 @@ export class BuffEngine {
         case 'slideGuard': f.slideGuardCharges += s.layers; break;
         case 'duckPass': f.duckPass = true; break;
         case 'buffDurationFlat': f.buffAddS += num(p, 'addS', 0); break;
+        case 'jumpCharge':
+          f.jumpCharges += s.layers;
+          f.jumpChargeMul = Math.max(f.jumpChargeMul, num(p, 'mul', 1.25));
+          break;
+        case 'periodic':
+          // 周期槽位自身不衰减，但「子效果此刻生效」是 HUD 被动图标的亮灯依据
+          if (s.children?.some(c => this.has(c.primitive))) f.periodicLive = true;
+          break;
         default: break; // xpMul / periodic：仅占位计时，不直接参与局内数值
       }
     }
