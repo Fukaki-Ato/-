@@ -33,11 +33,10 @@ export function scanTargets(root) {
     }
   };
   walkTs(pagesRoot);
-  // S4 起自绘 UI 文案入库即入字符集（?ui=demo 验收页）
-  for (const rel of ['apps/web/src/uiDemoView.ts']) {
-    const p = join(root, rel);
-    try { readFileSync(p, 'utf8'); files.push(p); } catch { /* 尚未落地则跳过 */ }
-  }
+  // Web 壳自绘覆盖层文案同样入库：apps/web/src（角色选择页 / 商店 / 主菜单 / ?ui=demo 等）。
+  // 2026-10-10 回归：奶龙入 main 后 charset/图集未重建，选角页 '龙' 字形缺失。此后新增文案
+  //（含 apps/web 覆盖层）都要按 README 重建：npm run charset && npm run gen:cjk。
+  walkTs(join(root, 'apps', 'web', 'src'));
   const cfgDir = join(root, 'config');
   for (const name of readdirSync(cfgDir).sort()) {
     if (name.endsWith('.json')) files.push(join(cfgDir, name));
