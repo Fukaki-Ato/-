@@ -46,7 +46,7 @@ test('8 个角色都能装配出完整装备（主动技能 + 被动天赋）', 
 
 test('被动天赋在开局即生效（run_start 触发）', () => {
   const cases = {
-    char_volt: s => assert.equal(s.fx.coinPct, 5, '小电：金币 +5%'),
+    char_volt: s => assert.equal(s.fx.coinPct, 5, '牢大：金币 +5%'),
     char_ama: s => assert.equal(s.fx.buffPct, 15, '阿玛拉：道具时长 +15%'),
     char_kaze: s => assert.equal(s.fx.slideAddS, 0.2, '风剃：滑铲 +0.2s'),
     char_rina: s => assert.equal(s.fx.shieldLayers, 1, '莉娜：开局 1 层护盾'),
@@ -97,7 +97,7 @@ test('时间延缓（时空行者）：道具持续时间按固定秒数拉长',
   assert.ok(Math.abs(slow.buffs.left('jumpBoost') - 12) < 0.01, `应拉长到 12s，实际 ${slow.buffs.left('jumpBoost')}`);
 });
 
-test('雷霆冲刺（小电）：释放后进入无敌并自动避障，撞墙不判负', () => {
+test('雷霆冲刺（牢大）：释放后进入无敌并自动避障，撞墙不判负', () => {
   const sim = new RunnerSim(content, SIM_SEED(), 'char_volt');
   run(sim, 8);
   sim.state.invulnT = 0;
@@ -298,7 +298,7 @@ test('渲染装配同样来自配置：体色/发光色/体量读皮肤 material
   assert.equal(volt.bodyTint, '#F2F4F8');
   assert.equal(volt.emissive, '#FFD84D');
   assert.equal(volt.modelScale, 1.0);
-  assert.equal(buildLoadout(content, 'char_bolt').modelScale, 1.05, '时空行者应比小电高 5%');
+  assert.equal(buildLoadout(content, 'char_bolt').modelScale, 1.05, '时空行者应比牢大高 5%');
 
   const edited = load();
   edited.characters.items.find(c => c.id === 'skin_volt_default').materialOverrides.emissive = '#00FF88';

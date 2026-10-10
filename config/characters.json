@@ -1,12 +1,12 @@
 {
   "$schema": "../schema/config.schema.json#/characters",
-  "configVersion": "1.1.1",
+  "configVersion": "1.1.2",
   "minEngineVersion": "1.0.0",
   "updatedAt": "2026-10-05",
   "items": [
     {
       "id": "char_volt", "status": "live",
-      "name": { "zh-CN": "小电", "en-US": "Volt" },
+      "name": { "zh-CN": "牢大", "en-US": "Volt" },
       "tagline": { "zh-CN": "最便宜的伙伴，最稳的发挥" },
       "rarity": "R", "unlock": { "type": "free" },
       "skins": ["skin_volt_default", "skin_volt_thunder"],
@@ -27,7 +27,10 @@
       "model": { "prefab": "assets/characters/volt.glb", "scale": 1.0, "lod": [2, 6, 12] },
       "audio": { "voDir": "assets/audio/vo/volt/", "footstep": "step_sneaker" },
       "tint": "#FFD84D",
-      "versions": [ { "ver": "1.0.0", "date": "2026-09-22", "change": "首发" } ]
+      "versions": [
+        { "ver": "1.0.0", "date": "2026-09-22", "change": "首发" },
+        { "ver": "1.1.2", "date": "2026-10-05", "change": "显示名「小电」改「牢大」（用户定稿）。只改 name.zh-CN：内部 id `char_volt`、皮肤 `skin_volt_*`、碎片 `shard_volt`、en-US 标签与音效目录 `assets/audio/sfx/char/char_volt/` 全部不动，音效素材也不换（音频不变）" }
+      ]
     },
     {
       "id": "char_ama", "status": "live",
