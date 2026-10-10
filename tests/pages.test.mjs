@@ -243,6 +243,48 @@ test('built-in lobby marks locked roles and rejects them without changing the ac
   host.dispose();
 });
 
+test('角色格在提供独立选角页时将导航交给流程', async () => {
+  const { host } = hostFixture();
+  const report = await loadContent();
+  const chars = playableCharacters(report.content);
+  let opened = 0;
+  const views = createOverlayViews({ host });
+  views.renderSelect(report.content, {
+    onStartRun() {},
+    onChooseCharacter: () => true,
+    onBack() {},
+    onCharacterSelect: () => { opened++; },
+  }, chars[0].id, 'guest');
+  view2Pass(host);
+  clickWidget(host, findWidget(host, cellOf('角色')), host.overlay.current.relayout());
+  assert.equal(opened, 1);
+});
+
+test('独立角色页使用 Web renderer，并在挂载下一页时释放', async () => {
+  const { host } = hostFixture();
+  const report = await loadContent();
+  const chars = playableCharacters(report.content);
+  const actions = { onSelect() {}, onStartRun() {}, onBack() {}, onShop() {} };
+  let received;
+  let disposed = 0;
+  const views = createOverlayViews({
+    host,
+    selectRenderer: (...args) => {
+      received = args;
+      return () => { disposed++; };
+    },
+  });
+  views.renderCharacterSelectPage(report.content, actions, chars[0].id, 'guest');
+  assert.equal(received[0], report.content);
+  assert.equal(received[1], actions);
+  assert.equal(received[2], chars[0].id);
+  assert.equal(received[3], 'guest');
+  assert.equal(host.overlay.scene.background, null);
+  views.renderSelect(report.content, { onStartRun() {}, onChooseCharacter: () => true, onBack() {} }, chars[0].id, 'guest');
+  assert.equal(disposed, 1);
+  host.dispose();
+});
+
 test('select 页（主界面）：未定义入口仅按压反馈（无 toast/无弹窗/无导航）、角色面板详情在', async () => {
   const { host } = hostFixture();
   const report = await loadContent();

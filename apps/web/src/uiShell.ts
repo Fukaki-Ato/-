@@ -9,6 +9,7 @@
 import * as THREE from 'three';
 import { loadFontSet, resolveUiConfig, type NinePatchSource, type UiConfig, type UiResources } from '@tr/framework/ui/index.js';
 import { UiHost } from '@tr/framework/ui/host.js';
+import type { FontSet } from '@tr/framework/ui/text/metrics.js';
 import { BADGE_NAMES, type BadgeSet } from '@tr/game/ui/badges.js';
 import type { SkillIconSet } from '@tr/game/ui/skillIcons.js';
 import type { BackdropSet } from '@tr/game/ui/menuBackdrop.js';
@@ -32,6 +33,7 @@ export interface UiShell {
   renderer: THREE.WebGLRenderer;
   canvas: HTMLCanvasElement;
   config: UiConfig;
+  fonts: FontSet;
   badges: BadgeSet;
   /** 局内技能图标（主动/被动各一张；取不到时 HUD 图标位退化为纯色圆） */
   skillIcons: SkillIconSet;
@@ -130,6 +132,8 @@ async function loadStill(url: string): Promise<NinePatchSource | undefined> {
 
 export async function createUiShell(adapter: PlatformAdapter): Promise<UiShell> {
   const canvas = document.createElement('canvas');
+  canvas.className = 'tr-ui-canvas';
+  canvas.tabIndex = -1;
   Object.assign(canvas.style, {
     position: 'fixed', inset: '0', width: '100%', height: '100%',
     display: 'block', zIndex: '5', touchAction: 'none',
@@ -194,7 +198,7 @@ export async function createUiShell(adapter: PlatformAdapter): Promise<UiShell> 
   canvas.addEventListener('pointercancel', onCancel);
 
   return {
-    host, renderer, canvas, config, badges, skillIcons, backdrop,
+    host, renderer, canvas, config, fonts, badges, skillIcons, backdrop,
     // 静态图兜底时 bgVideo 是 undefined ⇒ 空操作，调用方不用区分
     setBackgroundVisible: (visible: boolean) => { bgVideo?.setVisible(visible); },
     destroy() {
