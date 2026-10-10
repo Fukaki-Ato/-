@@ -1,14 +1,14 @@
 /**
  * 跑酷玩法模拟（core/sim 层，纯逻辑、固定步长、确定性）——docs/01 §2-§9、docs/02 §5、docs/08 §2。
  * 分工：运动学 movement.ts / 几何判定 collision.ts / 拾取 collect.ts /
- *       buff 计时合并 effects/buffEngine.ts / 引擎→世界作用面 simWorld.ts。
+ *       buff 计时合并 effects/buffEngine.ts / 引擎→世界作用面 simWorld.ts / 实体回收 entitySweep.ts。
  *       本文件只做输入路由、逐帧推进与结算。
  * 原则：只暴露 step()/applyAction()（渲染层读状态不写）；事件由调用方 drainEvents() 取走，
  *       所以 step 外产生的施放事件不会丢；全部数值来自 config/*.json（调手感不改代码）。
  */
 import { RunRng } from '../rng.js';
 import type { GameContent } from '../config/configTypes.js';
-import { BuffEngine, type BuffView, type FxState } from '../effects/buffEngine.js';
+import { BuffEngine, type BuffView, type CastContext, type FxState } from '../effects/buffEngine.js';
 import { buildLoadout, itemEffects, type EffectSpec, type Loadout } from './character.js';
 import { collectCoins, collectPickups, type CollectDeps } from './collect.js';
 import { hitsRunner, inDepthWindow, isNearMiss, relZ, safestLane } from './collision.js';
@@ -17,6 +17,7 @@ import { Movement } from './movement.js';
 import { resolveHit, type HitCtx } from './resolveHit.js';
 import { TrackGen, type CloudEntity, type CoinEntity, type ObstacleEntity, type PickupEntity } from './trackGen.js';
 import { createSimWorld } from './simWorld.js';
+import { cullByWorldZ, cullObstacles, smashAhead } from './entitySweep.js';
 import {
   EMPTY_LOADOUT, FLY_SPEED_CAP, STEP_DT, initialRunnerState,
   type RunnerState, type SimAction, type SimEvent,
@@ -61,6 +62,8 @@ export class RunnerSim {
   private readonly hitCtx: HitCtx;
   /** 金币收益的小数累计（coinValueAdd 的 +5% / ×2 靠它凑整，不逐枚四舍五入） */
   private coinCarry = 0;
+  /** 传给 buff 引擎的可复用上下文（里程/车道）：每步就地改写，避免热路径分配 */
+  private readonly buffCtx: CastContext = { distance: 0, lane: 0 };
   /** scoreAdd 原语与技能释放奖励的额外分 */
   private bonusScore = 0;
 
@@ -90,6 +93,7 @@ export class RunnerSim {
       clouds: this.cloudsArr, events: this.events, gen: this.gen, fly: this.fly,
       coinSpacing: ((p.coins ?? {}) as Record<string, number>).spacingM ?? 1.5,
       addBonus: (n) => { this.bonusScore += n; },
+      creditCoins: (n) => this.creditCoinsBulk(n),
       onFlightStart: () => { this.mv.flyWasActive = true; },
     }));
     this.loadout = charId ? buildLoadout(content, charId) : EMPTY_LOADOUT;
@@ -134,19 +138,23 @@ export class RunnerSim {
     else if (a === 'slide') this.mv.slideInput(s, this.fx);
   }
 
-  /** 主动技能可释放：能量满 + 冷却结束 + 活着（docs/01 §6.2） */
+  /**
+   * 主动技能可释放：冷却结束 + 活着 + 积攒门槛达标（docs/01 §6.2）。
+   * 无积攒门槛的技能开局第 0 秒即亮（充能制已移除，纯冷却）。
+   */
   canCastSkill(): boolean {
     const sk = this.loadout.skill;
     const s = this.state;
-    return !!sk && s.alive && s.skillCd <= 0 && s.energy >= sk.energyMax;
+    if (!sk || !s.alive || s.skillCd > 0) return false;
+    return sk.chargeSlides <= 0 || s.slideCount >= sk.chargeSlides;
   }
 
   private castSkill() {
     const sk = this.loadout.skill;
     if (!sk || !this.canCastSkill()) return;
     const s = this.state;
-    s.energy = 0;
-    s.skillCd = sk.cooldownS * this.fx.cooldownMul; // 被动 cooldownMul（博尔特警长 -20%）在此生效
+    if (sk.chargeSlides > 0) s.slideCount = 0; // 积攒清空（不叠加：释放即归零）
+    s.skillCd = sk.cooldownS * this.fx.cooldownMul; // 被动 cooldownMul（冷却缩减）在此生效
     s.casts++;
     this.applyEffects(sk.effects, sk.label);
     this.bonusScore += Math.max(0, this.SC.perSkillCast ?? 0);
@@ -161,8 +169,9 @@ export class RunnerSim {
   /** 把一组原语规格施加到引擎（技能/被动/道具共用一条通路） */
   private applyEffects(effects: EffectSpec[], fallbackLabel: string) {
     const s = this.state;
-    const ctx = { distance: s.distance, lane: s.lane };
-    for (const eff of effects) this.buffs.add(eff.primitive, eff.params, eff.label || fallbackLabel, ctx, eff.stackRule);
+    this.buffCtx.distance = s.distance;
+    this.buffCtx.lane = s.lane;
+    for (const eff of effects) this.buffs.add(eff.primitive, eff.params, eff.label || fallbackLabel, this.buffCtx, eff.stackRule);
   }
 
   private grantItem(itemRef: string) {
@@ -177,6 +186,12 @@ export class RunnerSim {
     this.coinCarry -= whole;
   }
 
+  /** 批量入账（穿梭时空掠取一路金币）：逐枚走加成累计，反馈事件只推一条，不让爆点同帧刷屏 */
+  private creditCoinsBulk(n: number) {
+    for (let i = 0; i < n; i++) this.creditCoin();
+    if (n > 0) this.events.push({ type: 'coin' });
+  }
+
   /** 前进一个固定步长 */
   step() {
     const s = this.state;
@@ -184,7 +199,9 @@ export class RunnerSim {
     if (!s.alive) { s.topple = Math.min(s.topple + STEP_DT * TOPPLE_RATE, TOPPLE_MAX); return; }
 
     s.t += STEP_DT;
-    this.buffs.tick(STEP_DT);
+    this.buffCtx.distance = s.distance;
+    this.buffCtx.lane = s.lane;
+    this.buffs.tick(STEP_DT, this.buffCtx); // 周期被动、按米数到期的效果都要知道当前里程
     const fx = this.fx;
     s.stunT = Math.max(0, s.stunT - STEP_DT);
     s.invulnT = Math.max(0, s.invulnT - STEP_DT);
@@ -207,11 +224,8 @@ export class RunnerSim {
     for (const o of this.obstacles) {
       if (!o.moveZ || o.done) continue;
       o.worldZ += o.moveZ * STEP_DT;
-      if (o.moveZ < 0) this.smashAhead(o);
+      if (o.moveZ < 0) smashAhead(this.obstacles, o, s.t);
     }
-
-    const sk = this.loadout.skill;
-    if (sk) s.energy = Math.min(sk.energyMax, s.energy + sk.energyPerMeter * dm);
 
     if (fx.avoidLookahead > 0) s.lane = safestLane(this.obstacles, s, fx.avoidLookahead);
     this.mv.advanceLateral(s, STEP_DT);
@@ -253,35 +267,13 @@ export class RunnerSim {
     }
   }
 
-  /** 冲撞体沿途撞飞同车道障碍：标记 done+clearT 交渲染下沉，不再阻挡/判负（就地标记，不摘数组） */
-  private smashAhead(rusher: ObstacleEntity) {
-    const s = this.state;
-    for (const b of this.obstacles) {
-      if (b === rusher || b.done) continue;
-      if (b.rideTop === true) continue; // 火车不撞火车：rideTop 载具（列车）不可被冲撞体撞飞
-      if (b.lane !== rusher.lane) continue;
-      if (Math.abs(b.worldZ - rusher.worldZ) >= (rusher.d + b.d) / 2 + 0.2) continue;
-      b.done = true;
-      b.passed = true;
-      b.clearT = s.t;
-    }
-  }
-
   /** 清理已掠过 CULL_BEHIND_M 的实体（swap-pop，O(1) 摊销） */
   private cull() {
     const s = this.state;
-    for (let i = this.obstacles.length - 1; i >= 0; i--) {
-      if (relZ(this.obstacles[i], s.distance) > CULL_BEHIND_M) { this.obstacles[i] = this.obstacles[this.obstacles.length - 1]; this.obstacles.pop(); }
-    }
-    for (let i = this.coinsArr.length - 1; i >= 0; i--) {
-      if (s.distance - this.coinsArr[i].worldZ > CULL_BEHIND_M) { this.coinsArr[i] = this.coinsArr[this.coinsArr.length - 1]; this.coinsArr.pop(); }
-    }
-    for (let i = this.pickupsArr.length - 1; i >= 0; i--) {
-      if (s.distance - this.pickupsArr[i].worldZ > CULL_BEHIND_M) { this.pickupsArr[i] = this.pickupsArr[this.pickupsArr.length - 1]; this.pickupsArr.pop(); }
-    }
-    for (let i = this.cloudsArr.length - 1; i >= 0; i--) {
-      if (s.distance - this.cloudsArr[i].worldZ > CULL_BEHIND_M) { this.cloudsArr[i] = this.cloudsArr[this.cloudsArr.length - 1]; this.cloudsArr.pop(); }
-    }
+    cullObstacles(this.obstacles, s.distance, CULL_BEHIND_M);
+    cullByWorldZ(this.coinsArr, s.distance, CULL_BEHIND_M);
+    cullByWorldZ(this.pickupsArr, s.distance, CULL_BEHIND_M);
+    cullByWorldZ(this.cloudsArr, s.distance, CULL_BEHIND_M);
   }
 
   /** 结算摘要（快照测试与结果页共用） */

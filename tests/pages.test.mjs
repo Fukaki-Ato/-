@@ -17,7 +17,7 @@ import { createGameFlow, BEST_KEY, CHAR_KEY, COINS_KEY, DIAMOND_KEY } from '../p
 import { ENTRY_KEY } from '../packages/game/dist/flow/session.js';
 import { loadAllConfig } from '../packages/game/dist/core/config/configLoader.js';
 import { CONTENT_NAMES } from '../packages/game/dist/core/config/configTypes.js';
-import { buildLoadout, playableCharacters } from '../packages/game/dist/core/sim/character.js';
+import { buildLoadout, isCharacterLocked, playableCharacters } from '../packages/game/dist/core/sim/character.js';
 import { readJson, loadTestFontSet } from './ui-helpers.mjs';
 
 const W = 800, H = 600;
@@ -169,6 +169,7 @@ test('select 页（主界面）：参考图板块齐全且等比不裁出、角�
   const views = createOverlayViews({ host });
   views.renderSelect(report.content, {
     onStartRun: id => { started = id; },
+    onChooseCharacter: id => { adapter.storage.set(CHAR_KEY, id); return true; },
     onBack: () => {},
   }, chars[0].id, 'guest');
   view2Pass(host);
@@ -208,12 +209,88 @@ test('select 页（主界面）：参考图板块齐全且等比不裁出、角�
   assert.equal(started, chars[1].id);
 });
 
+test('built-in lobby marks locked roles and rejects them without changing the active role', async () => {
+  const { host, adapter } = hostFixture();
+  const report = await loadContent();
+  const chars = playableCharacters(report.content);
+  const active = chars[0];
+  const locked = chars[1];
+  assert.ok(active && locked, 'fixture has at least two roles');
+  locked.status = 'locked';
+  adapter.storage.set(CHAR_KEY, active.id);
+  let chooseCalls = 0;
+  const views = createOverlayViews({ host });
+  views.renderSelect(report.content, {
+    onStartRun() {},
+    onChooseCharacter(id) {
+      chooseCalls++;
+      const candidate = playableCharacters(report.content).find(character => character.id === id);
+      if (!candidate || isCharacterLocked(candidate)) return false;
+      adapter.storage.set(CHAR_KEY, id);
+      return true;
+    },
+    onBack() {},
+  }, active.id, 'guest');
+  view2Pass(host);
+  clickWidget(host, findWidget(host, cellOf('角色')));
+  const list = findWidget(host, widget => widget instanceof List);
+  const box = findBox(host.overlay.current.relayout(), list.id);
+  host.pushInput({ type: 'down', x: box.contentRect.x + 150 * 1.5, y: box.contentRect.y + 20, t: 0 });
+  host.pushInput({ type: 'up', x: box.contentRect.x + 150 * 1.5, y: box.contentRect.y + 20, t: 0.05 });
+  assert.ok(texts(host).includes('未解锁'), 'locked fallback card is visibly marked');
+  assert.equal(chooseCalls, 0, 'locked card is disabled before flow selection');
+  assert.equal(adapter.storage.get(CHAR_KEY), active.id);
+  host.dispose();
+});
+
+test('角色格在提供独立选角页时将导航交给流程', async () => {
+  const { host } = hostFixture();
+  const report = await loadContent();
+  const chars = playableCharacters(report.content);
+  let opened = 0;
+  const views = createOverlayViews({ host });
+  views.renderSelect(report.content, {
+    onStartRun() {},
+    onChooseCharacter: () => true,
+    onBack() {},
+    onCharacterSelect: () => { opened++; },
+  }, chars[0].id, 'guest');
+  view2Pass(host);
+  clickWidget(host, findWidget(host, cellOf('角色')), host.overlay.current.relayout());
+  assert.equal(opened, 1);
+});
+
+test('独立角色页使用 Web renderer，并在挂载下一页时释放', async () => {
+  const { host } = hostFixture();
+  const report = await loadContent();
+  const chars = playableCharacters(report.content);
+  const actions = { onSelect() {}, onStartRun() {}, onBack() {}, onShop() {} };
+  let received;
+  let disposed = 0;
+  const views = createOverlayViews({
+    host,
+    selectRenderer: (...args) => {
+      received = args;
+      return () => { disposed++; };
+    },
+  });
+  views.renderCharacterSelectPage(report.content, actions, chars[0].id, 'guest');
+  assert.equal(received[0], report.content);
+  assert.equal(received[1], actions);
+  assert.equal(received[2], chars[0].id);
+  assert.equal(received[3], 'guest');
+  assert.equal(host.overlay.scene.background, null);
+  views.renderSelect(report.content, { onStartRun() {}, onChooseCharacter: () => true, onBack() {} }, chars[0].id, 'guest');
+  assert.equal(disposed, 1);
+  host.dispose();
+});
+
 test('select 页（主界面）：未定义入口仅按压反馈（无 toast/无弹窗/无导航）、角色面板详情在', async () => {
   const { host } = hostFixture();
   const report = await loadContent();
   const chars = playableCharacters(report.content);
   const views = createOverlayViews({ host });
-  views.renderSelect(report.content, { onStartRun() {}, onBack: () => {} }, chars[0].id, 'wechat');
+  views.renderSelect(report.content, { onStartRun() {}, onChooseCharacter: () => true, onBack: () => {} }, chars[0].id, 'wechat');
   view2Pass(host);
   const t = texts(host);
   assert.ok(t.includes('仓库') && !t.some(x => x.includes('宝箱')), '底栏第四格＝仓库');
@@ -362,7 +439,7 @@ test('toast：出现在画面中间并随时间向下漂走，不占页面高度
   const report = await loadContent();
   const chars = playableCharacters(report.content);
   createOverlayViews({ host }).renderSelect(report.content,
-    { onStartRun() {}, onBack: () => {} }, chars[0].id, 'guest');
+    { onStartRun() {}, onChooseCharacter: () => true, onBack: () => {} }, chars[0].id, 'guest');
   view2Pass(host);
   const v = host.overlay.current;
   // 旧版 toast 层是 in-flow 列 + padding.bottom 28，会从页面高度里扣掉 28px，
@@ -424,15 +501,15 @@ test('HUD：分数/金币/里程/爱心 + buff 同名合并 + 技能三态文案
   hud.update({
     score: 2000, coins: 10, distance: 200, hits: 0, lives: 3,
     buffs: [{ name: '雷神护体', left: 5 }, { name: '雷神护体', left: 8 }, { name: '永固', left: Infinity }],
-    skill: { label: '雷霆瞬步', energy: 0.5, cd: 0, ready: false },
+    skill: { label: '雷霆瞬步', cd: 0, ready: false, charge: { now: 5, need: 10 } },
   });
   const t2 = texts(host);
   assert.ok(t2.some(x => x.includes('雷神护体 8s') && !x.includes('5s')), '同名 buff 取最长剩余');
   assert.ok(t2.some(x => x.includes('永固') && !/永固 \d/.test(x)), '永久被动不显倒计时');
-  assert.ok(t2.some(x => x === '雷霆瞬步：能量 50%'), '技能能量态');
-  hud.update({ score: 2000, coins: 10, distance: 200, hits: 0, lives: 3, buffs: [], skill: { label: '雷霆瞬步', energy: 1, cd: 2.5, ready: false } });
+  assert.ok(t2.some(x => x === '雷霆瞬步：下滑 5/10'), '充能已移除：未就绪时显示下滑积攒进度');
+  hud.update({ score: 2000, coins: 10, distance: 200, hits: 0, lives: 3, buffs: [], skill: { label: '雷霆瞬步', cd: 2.5, ready: false, charge: null } });
   assert.ok(texts(host).some(x => x.startsWith('雷霆瞬步：冷却 2.5s')));
-  hud.update({ score: 2000, coins: 10, distance: 200, hits: 0, lives: 3, buffs: [], skill: { label: '雷霆瞬步', energy: 1, cd: 0, ready: true } });
+  hud.update({ score: 2000, coins: 10, distance: 200, hits: 0, lives: 3, buffs: [], skill: { label: '雷霆瞬步', cd: 0, ready: true, charge: null } });
   assert.ok(texts(host).some(x => x.includes('就绪（双击 / E）')));
   hud.dispose();
   assert.equal(host.overlay.current, null, 'dispose 即卸页');

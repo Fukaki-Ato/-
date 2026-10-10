@@ -194,7 +194,7 @@ export function createShopOverlay(content: GameContent, actions: ShopActions, fo
   pageNav.append(previous, pageText, next);
   frame.append(pageNav);
 
-  const close = makeButton('×', 'shop-close-button', '返回主菜单');
+  const close = makeButton('×', 'shop-close-button', '返回上一页');
   close.classList.remove('shop-sdf-text');
   place(close, 852, 86, 72, 72);
   close.addEventListener('click', actions.onBack);

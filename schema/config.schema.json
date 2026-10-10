@@ -53,6 +53,11 @@
             "slideExtend",
             "cooldownMul",
             "boardArmor",
+            "buffDurationFlat",
+            "slideGuard",
+            "duckPass",
+            "smashAhead",
+            "periodic",
             "xpMul"
           ]
         }

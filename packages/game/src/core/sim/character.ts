@@ -1,7 +1,7 @@
 /**
  * 角色装配（docs/09 T2.4；设计见 docs/01 §6、docs/03 §4.1-4.2）
  * 职责：把 characters.json 的一行变成 sim 能用的「装备包」：
- *   主动技能（能量/冷却/原语组合）+ 被动天赋（开局施加的原语）。
+ *   主动技能（冷却/积攒门槛/原语组合）+ 被动天赋（开局施加的原语）。
  * 铁律：本文件不出现任何角色专属分支——换角色或调技能只改 JSON（C3）。
  */
 import type { EffectParams, StackRule } from '../effects/buffEngine.js';
@@ -16,15 +16,17 @@ export interface EffectSpec {
   stackRule: StackRule;
 }
 
-/** 主动技能（含能量与冷却） */
+/** 主动技能（含冷却与释放门槛） */
 export interface ActiveSkill {
   id: string;
   label: string;
   desc: string;
   cooldownS: number;
-  /** 每米积累的能量（game.json/skills.json energy.perMeter） */
-  energyPerMeter: number;
-  energyMax: number;
+  /**
+   * 释放门槛：需要累计多少次主动下滑（skills.json charge.slides）。
+   * 0 = 无积攒门槛，只看冷却（开局第 0 秒即可释放）。
+   */
+  chargeSlides: number;
   /** 释放方式（skills.json trigger，如 double_tap） */
   trigger: string;
   effects: EffectSpec[];
@@ -52,6 +54,11 @@ export interface Loadout {
 /** 可出战角色 = char_ 前缀且 status=live */
 export function playableCharacters(content: GameContent): NamedEntry[] {
   return (content.characters.items ?? []).filter(c => String(c.id).startsWith('char_') && c.status !== 'draft' && c.status !== 'retired');
+}
+
+/** Characters explicitly marked locked remain visible, but cannot become the active runner. */
+export function isCharacterLocked(character: NamedEntry): boolean {
+  return String(character.status ?? '') === 'locked' || character['locked'] === true;
 }
 
 const text = (v: unknown, dflt = ''): string => {
@@ -119,16 +126,14 @@ export function buildLoadout(content: GameContent, charId: string): Loadout {
 
   const skillEntry = findEntry(content, c.skillRef);
   if (skillEntry && skillEntry['kind'] === 'active') {
-    const energy = (skillEntry['energy'] ?? {}) as Record<string, unknown>;
-    const mode = String(energy['mode'] ?? 'distance');
+    const charge = (skillEntry['charge'] ?? {}) as Record<string, unknown>;
     base.skill = {
       id: skillEntry.id,
       label: text(skillEntry.name, skillEntry.id),
       desc: text(skillEntry.desc),
       cooldownS: Math.max(0, number(skillEntry['cooldownS'], 18)),
-      // 非 distance 模式（如金币充能）留待 M3 经济系统，当前按满能量处理
-      energyPerMeter: mode === 'distance' ? Math.max(0, number(energy['perMeter'], 0.02)) : Number.POSITIVE_INFINITY,
-      energyMax: Math.max(0, number(energy['max'], 1)),
+      // 仅支持下滑积攒（slides）；配置写了别的 mode 就退回「只看冷却」
+      chargeSlides: charge['type'] === 'slideCount' ? Math.max(0, Math.round(number(charge['slides'], 0))) : 0,
       trigger: String(skillEntry['trigger'] ?? 'double_tap'),
       effects: toSpecs(skillEntry, 'refresh'),
     };

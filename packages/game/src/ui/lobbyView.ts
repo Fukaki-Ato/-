@@ -3,12 +3,13 @@
  * 顶栏＝合并货币胶囊（金币+钻石各带「+」）｜右上角设置；左＝活动、任务；右＝成就、排行榜；
  * 中下＝「开始酷跑」大牌匾（设计稿原字整块抠图）；底部棕条＝商店｜福利手册｜仓库｜角色＋竖分隔线。
  * 布局坐标全走 menuLayout 常量表（等比缩放、顶贴顶/底贴底锚定）；控件一律 absolute 叠在背景上。
- * 未定义入口（设置/活动/成就/任务/排行榜/商店/手册/仓库/货币+）只有按下/松开视觉反馈
- * （badgeButton 换 glow 帧），不导航不弹窗不读写——LobbySlotHandlers 留作后续注入真实实现。
+ * 未定义入口（设置/活动/成就/任务/排行榜/手册/仓库/货币+）只有按下/松开视觉反馈
+ * （badgeButton 换 glow 帧）；商店通过 LobbySlotHandlers 注入只读商店导航。
  * 选角面板复用现有选角 UI（lobbyPanels），由「角色」格开关；开始酷跑沿用 选角→跑酷 流程。
  */
 import { Box, Label, type UiView } from '@tr/framework/ui/index.js';
 import type { GameContent } from '@tr/game/core/config/configTypes.js';
+import { isCharacterLocked, playableCharacters } from '@tr/game/core/sim/character.js';
 import type { UiHost } from '@tr/framework/ui/host.js';
 import type { SelectActions } from '../flow/views.js';
 import { badgeButton, badgeImage, type BadgeSet } from './badges.js';
@@ -97,12 +98,19 @@ export function buildLobbyPage(host: UiHost, d: LobbyDeps): LobbyPage {
   // 面板宿主盒只在开着时挂上：框架命中是「反向扫描第一个 rect 含命中点的分支就返回」，
   // 常驻的空宿主盒哪怕 passthrough 也会把它那一带的点击判死；高度给足面板自然高，
   // 否则 absolute 父盒高度 0 会把子的自动高度压成 0（List 塌掉点不中）。
-  let chosen = d.currentCharId;
+  const roster = playableCharacters(d.content);
+  const initial = roster.find(character => character.id === d.currentCharId && !isCharacterLocked(character))
+    ?? roster.find(character => !isCharacterLocked(character));
+  let chosen = initial?.id ?? '';
   let panelHost: Box | null = null;
   // 背景由 menuBackdrop 的网格铺（视频/静态图同一套），这里只留透明容器；
   // absolute 子项排在常规子项之后 ⇒ 控件叠在背景上、命中优先
   const root = new Box({ direction: 'column', flex: 1 }, []);
   const toggleChar = (): void => {
+    if (d.actions.onCharacterSelect) {
+      d.actions.onCharacterSelect();
+      return;
+    }
     if (panelHost) {
       root.remove(panelHost);
       panelHost = null;
@@ -111,7 +119,12 @@ export function buildLobbyPage(host: UiHost, d: LobbyDeps): LobbyPage {
     panelHost = new Box({ absolute: true, left: L.panel.x, top: L.panel.y, width: L.panel.w, height: dpx(268) });
     const cp = buildCharPanel(host, {
       content: d.content, currentCharId: chosen, width: L.panel.w,
-      onClose: toggleChar, onChoose: id => { chosen = id; },
+      onClose: toggleChar,
+      onChoose: id => {
+        if (!d.actions.onChooseCharacter(id)) return false;
+        chosen = id;
+        return true;
+      },
     });
     panelHost.add(cp.panel);
     root.add(panelHost);

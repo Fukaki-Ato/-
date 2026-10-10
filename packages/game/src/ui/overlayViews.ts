@@ -1,5 +1,5 @@
 /**
- * GameViews 的 overlay 版实现（S5，两端同源）：把五页面装配接到 UiHost。
+ * GameViews 的 overlay 版实现（S5，两端同源）：把页面装配接到 UiHost。
  * 页面代码全部来自同目录 ui/*（@tr/ui 控件树），本文件只做「场景机视图接口 ↔ 页面构造器」胶水。
  * 主界面额外挂分层背景动效（menuBackdrop）：网格进宿主现有场景、时间走 mount 的 frame
  * 回调——页面卸载时 frame 钩子随宿主清空、动效对象在此 dispose，天然「离开即暂停」。
@@ -7,7 +7,8 @@
  */
 import type { GameContent } from '@tr/game/core/config/configTypes.js';
 import type {
-  BootHandle, GameViews, HudHandle, ResultActions, RunSummary, SelectActions, SelectExtras, StartActions, StartHandle,
+  BootHandle, CharacterSelectPageActions, GameViews, HudHandle, ResultActions, RunSummary,
+  SelectActions, SelectExtras, ShopActions, StartActions, StartHandle,
 } from '../flow/views.js';
 import type { EntryMethod } from '../flow/session.js';
 import type { UiHost } from '@tr/framework/ui/host.js';
@@ -16,6 +17,7 @@ import { buildStartPage } from './startView.js';
 import { buildLobbyPage } from './lobbyView.js';
 import { buildHudPage } from './hudView.js';
 import { buildResultPage } from './resultView.js';
+import { buildShopPage } from './shopView.js';
 import { createMenuBackdrop, type BackdropSet, type MenuBackdrop } from './menuBackdrop.js';
 import type { BadgeSet } from './badges.js';
 
@@ -30,18 +32,39 @@ export interface OverlayViewsDeps {
    * （本包禁令：零 DOM），所以由壳层注入回调，视图只报可见性。缺省＝没人管视频。
    */
   onLobbyVisible?(visible: boolean): void;
+  shopRenderer?: (content: GameContent, actions: ShopActions) => () => void;
+  selectRenderer?: (
+    content: GameContent,
+    actions: CharacterSelectPageActions,
+    currentCharId: string,
+    entry: EntryMethod | null,
+  ) => () => void;
 }
 
-export type OverlayViews = GameViews;
+export interface OverlayViews extends GameViews { dispose(): void }
 
 export function createOverlayViews(deps: OverlayViewsDeps): OverlayViews {
   const { host } = deps;
   let backdrop: MenuBackdrop | null = null;
+  let disposeCharacterSelect: (() => void) | null = null;
+  let disposeShopRenderer: (() => void) | null = null;
+  const clearShopRenderer = (): void => {
+    const dispose = disposeShopRenderer;
+    disposeShopRenderer = null;
+    dispose?.();
+  };
+  const clearCharacterSelect = (): void => {
+    const dispose = disposeCharacterSelect;
+    disposeCharacterSelect = null;
+    dispose?.();
+  };
+  const clearTransient = (): void => { clearCharacterSelect(); clearShopRenderer(); };
   const lobby = (visible: boolean): void => deps.onLobbyVisible?.(visible);
   const stopBackdrop = (): void => { backdrop?.dispose(); backdrop = null; lobby(false); };
 
   return {
     renderBoot(): BootHandle {
+      clearTransient();
       stopBackdrop();
       const page = buildBootPage(host);
       host.mount(page.view);
@@ -49,6 +72,7 @@ export function createOverlayViews(deps: OverlayViewsDeps): OverlayViews {
     },
 
     renderStart(actions: StartActions): StartHandle {
+      clearTransient();
       stopBackdrop();
       const page = buildStartPage(host, actions);
       host.mount(page.view);
@@ -62,11 +86,13 @@ export function createOverlayViews(deps: OverlayViewsDeps): OverlayViews {
       _entry: EntryMethod | null,
       extras?: SelectExtras,
     ): void {
+      clearTransient();
       const page = buildLobbyPage(host, {
         content,
         actions,
         currentCharId,
         extras: { coins: extras?.coins ?? 0, diamonds: extras?.diamonds ?? 0, badges: deps.badges },
+        slots: { onShop: actions.onShop },
       });
       stopBackdrop();
       let frame: ((t: number) => void) | undefined;
@@ -79,7 +105,34 @@ export function createOverlayViews(deps: OverlayViewsDeps): OverlayViews {
       lobby(true);
     },
 
+    ...(deps.selectRenderer ? {
+      renderCharacterSelectPage(
+        content: GameContent,
+        actions: CharacterSelectPageActions,
+        currentCharId: string,
+        entry: EntryMethod | null,
+      ): void {
+        clearTransient();
+        stopBackdrop();
+        host.mount(host.makeView(), { transparent: true });
+        const renderer = deps.selectRenderer;
+        if (renderer) disposeCharacterSelect = renderer(content, actions, currentCharId, entry);
+      },
+    } : {}),
+
+    renderShop(content: GameContent, actions: ShopActions): void {
+      clearTransient();
+      stopBackdrop();
+      if (deps.shopRenderer) {
+        host.mount(host.makeView(), { transparent: true });
+        disposeShopRenderer = deps.shopRenderer(content, actions);
+        return;
+      }
+      host.mount(buildShopPage(host, content, actions).view);
+    },
+
     mountHud(): HudHandle {
+      clearTransient();
       stopBackdrop();
       const page = buildHudPage(host);
       host.mount(page.view, { transparent: true });
@@ -87,12 +140,18 @@ export function createOverlayViews(deps: OverlayViewsDeps): OverlayViews {
     },
 
     renderResult(summary: RunSummary, best: number, actions: ResultActions): void {
+      clearTransient();
       stopBackdrop();
       host.mount(buildResultPage(host, { summary, best, actions }).view);
     },
 
     toast(msg: string): void {
       host.toast(msg);
+    },
+
+    dispose(): void {
+      clearTransient();
+      stopBackdrop();
     },
   };
 }

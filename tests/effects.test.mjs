@@ -247,6 +247,124 @@ test('xpMul 是局外原语：施加后不影响任何局内数值', () => {
   assert.equal(sim.state.alive, true);
 });
 
+// ---------------- 人物改版新增原语（2026-10-04） ----------------
+test('buffDurationFlat：按固定秒数拉长后续 buff，与百分比加成同时生效', () => {
+  const sim = cleanSim(95);
+  grant(sim, 'buffDurationFlat', { durationS: 3600, addS: 2 });
+  grant(sim, 'buffDurationAdd', { durationS: 3600, pct: 50 });
+  grant(sim, 'magnet', { durationS: 6, radiusM: 8 });
+  // 6 ×(1+50%) +2 = 11 秒
+  assert.ok(Math.abs(sim.buffs.left('magnet') - 11) < 0.01, `实际 ${sim.buffs.left('magnet')}`);
+});
+
+test('distanceM：按里程到期，跑满米数即失效（「无敌 20 米」这类）', () => {
+  const sim = cleanSim(96);
+  grant(sim, 'invincible', { distanceM: 20 });
+  assert.equal(sim.fx.invincible, true);
+  let guard = 0;
+  while (sim.fx.invincible && guard++ < 600) { sim.obstacles.length = 0; sim.step(); sim.drainEvents(); }
+  assert.equal(sim.fx.invincible, false, '到里程后应自动解除');
+  assert.ok(sim.state.distance >= 20 && sim.state.distance < 22, `应在 20 米处解除，实际 ${sim.state.distance.toFixed(2)}`);
+});
+
+test('smashAhead：清除前方纵深内全部车道障碍，金币与道具箱不动、不计近失', () => {
+  const sim = cleanSim(97);
+  const d = sim.state.distance;
+  for (const [lane, ahead] of [[-1, 10], [0, 25], [1, 40], [0, 80]]) wall(sim, 'full', lane, ahead);
+  sim.coinsArr.push({ lane: 0, worldZ: d + 15 });
+  sim.pickupsArr.push({ itemRef: 'item_shield', lane: 0, worldZ: d + 20 });
+  const nm0 = sim.state.nearMiss;
+  grant(sim, 'smashAhead', { aheadM: 50 });
+  assert.equal(sim.obstacles.length, 1, '50 米外的障碍应留下');
+  assert.equal(sim.coinsArr.length, 1, '金币必须保留');
+  assert.equal(sim.pickupsArr.length, 1, '道具箱必须保留');
+  assert.equal(sim.state.nearMiss, nm0, '清除障碍不该算近失');
+});
+
+test('blink + collectCoins：位移把经过纵深里的金币全部入账（不分车道、不论高度）', () => {
+  const sim = cleanSim(98);
+  const d = sim.state.distance;
+  const coins = [{ lane: -1, worldZ: d + 10 }, { lane: 1, worldZ: d + 25, y: 4.6 }, { lane: 0, worldZ: d + 60 }];
+  sim.coinsArr.push(...coins);
+  grant(sim, 'blink', { distanceM: 40, phase: true, collectCoins: true });
+  assert.ok(coins[0].taken && coins[1].taken, '40 米内的金币（含异车道与空中带）应被掠走');
+  assert.equal(coins[2].taken, undefined, '60 米外的不该收');
+  assert.equal(sim.state.coins, 2, `应入账 2 枚，实际 ${sim.state.coins}`);
+  assert.ok(sim.state.distance >= d + 40 - 0.01, '仍按 blink 位移');
+});
+
+test('slideGuard：只对小型障碍（low）生效，次数用尽即失效', () => {
+  const sim = cleanSim(99);
+  grant(sim, 'slideGuard', { durationS: 12, charges: 2 }, 'stack');
+  assert.equal(sim.fx.slideGuardCharges, 2, 'charges 应登记为可用次数');
+  const hitLow = () => {
+    sim.obstacles.length = 0;
+    sim.state.sliding = true;
+    sim.state.slideT = 9;
+    sim.state.invulnT = 0; // 每次判定后的无敌帧会吞掉下一次碰撞，逐轮手动解除
+    wall(sim, 'low', 0, 4);
+    run(sim, 30);
+  };
+  hitLow();
+  assert.equal(sim.state.alive, true, '第一次应穿过去');
+  assert.equal(sim.fx.slideGuardCharges, 1);
+  hitLow();
+  assert.equal(sim.state.alive, true, '第二次应穿过去');
+  assert.equal(sim.fx.slideGuardCharges, 0, '两次用尽后槽位应移除');
+  hitLow();
+  assert.equal(sim.state.alive, false, '没有护体次数时低障照常判负');
+});
+
+test('slideGuard 不认高杆：滑行中撞高杆仍按普通碰撞结算', () => {
+  const sim = cleanSim(100);
+  grant(sim, 'slideGuard', { durationS: 12, charges: 2 }, 'stack');
+  sim.state.sliding = true;
+  sim.state.slideT = 9;
+  sim.state.invulnT = 0;
+  wall(sim, 'high', 0, 4); // 高杆在滑铲姿态下本就可通过（playerH 0.7），此处只验护体次数不被误消耗
+  run(sim, 30);
+  assert.equal(sim.fx.slideGuardCharges, 2, '高杆不该消耗下滑护体');
+});
+
+test('duckPass：需下滑的高杆直接穿过，满格墙与闪电圈不受影响', () => {
+  const sim = cleanSim(101);
+  grant(sim, 'duckPass', { durationS: 3600 });
+  assert.equal(sim.fx.duckPass, true);
+  wall(sim, 'high', 0, 4); // 站着不滑
+  run(sim, 30);
+  assert.equal(sim.state.alive, true, '高杆应直接穿过');
+  sim.obstacles.length = 0;
+  wall(sim, 'full', 0, 4);
+  run(sim, 30);
+  assert.equal(sim.state.alive, false, '满格墙不在穿透范围内');
+});
+
+test('periodic：每 everyS 秒重新施加一组子效果，槽位常驻只有一个', () => {
+  const sim = cleanSim(102);
+  // 周期测试要跑好几秒，生成器会不断补障碍——逐帧清空，只验 buff 计时本身
+  const steps = (sec) => { for (let i = 0; i < 60 * sec; i++) { sim.obstacles.length = 0; sim.step(); sim.drainEvents(); } };
+  grant(sim, 'periodic', { everyS: 2, effects: [{ primitive: 'magnet', durationS: 0.6, radiusM: 8 }] });
+  assert.equal(sim.fx.magnetT, 0, '施加当帧不触发，交给下一个固定步');
+  sim.step(); sim.drainEvents();
+  assert.ok(sim.fx.magnetT > 0, '第一步即触发一次（开局就有一次窗口）');
+  steps(1.0); // 累计约 1.02s：0.6 秒窗口已过，下一个周期在 2 秒处
+  assert.equal(sim.fx.magnetT, 0, '子效果窗口过后应进入空档');
+  steps(1.2); // 累计约 2.2s：第二次触发已过约 0.2s
+  assert.ok(sim.fx.magnetT > 0, '每 everyS 秒应再次触发');
+  assert.equal(sim.buffList().filter(b => b.primitive === 'periodic').length, 1, '周期槽位应常驻且唯一');
+});
+
+test('periodic 参数边界：非法 everyS、空 effects、子效果里再套 periodic 都不产生槽位', () => {
+  const sim = cleanSim(103);
+  grant(sim, 'periodic', { everyS: 0, effects: [{ primitive: 'magnet', durationS: 2 }] });
+  grant(sim, 'periodic', { everyS: 5, effects: [] });
+  grant(sim, 'periodic', { everyS: 5, effects: [{ primitive: 'periodic', everyS: 1 }] });
+  grant(sim, 'periodic', { everyS: 5, effects: [{ primitive: 'notAPrimitive', durationS: 1 }] });
+  assert.equal(sim.buffs.left('periodic'), 0, '四份非法配置都应被拒');
+  for (let i = 0; i < 60; i++) { sim.obstacles.length = 0; sim.step(); sim.drainEvents(); }
+  assert.equal(sim.state.alive, true);
+});
+
 // ---------------- B 同类叠加（stackRule） ----------------
 test('stackRule=refresh：同原语再施加刷新时长与参数，不叠层', () => {
   const sim = cleanSim(86);
@@ -335,11 +453,20 @@ test('边界：同一步内挂满所有原语，fx 合并正确、整局不崩',
   const sim = cleanSim(94);
   const c = ctx(sim);
   for (const [name, def] of Object.entries(PRIMITIVES)) {
-    sim.buffs.add(name, { durationS: 6, radiusM: 8, mul: 1.1, worldMul: 0.9, layers: 1, pct: 5, addS: 0.1, lookaheadM: 15, flat: 50, distanceM: 4 }, name, c, def.kind === 'instant' ? 'replace' : 'stack');
+    const params = { durationS: 6, radiusM: 8, mul: 1.1, worldMul: 0.9, layers: 1, pct: 5, addS: 0.1, lookaheadM: 15, flat: 50 };
+    // distanceM 是「按里程到期」口径，这里只交给瞬时原语当位移量：
+    // 若一并给所有 timed 原语，整身 buff 会在 4 米后集体到期，那就测不出合并结果了
+    if (def.kind === 'instant') params.distanceM = 4;
+    if (name === 'smashAhead') params.aheadM = 20;
+    if (name === 'periodic') { params.everyS = 2; params.effects = [{ primitive: 'magnet', durationS: 6, radiusM: 8 }]; }
+    sim.buffs.add(name, params, name, c, def.kind === 'instant' ? 'replace' : 'stack');
   }
   run(sim, 60 * 3);
   assert.equal(sim.state.alive, true);
   assert.ok(sim.fx.magnetT > 0 && sim.fx.shieldLayers >= 1 && sim.fx.avoidLookahead > 0);
+  assert.ok(sim.fx.slideGuardCharges >= 1, 'slideGuard 应并入护体次数');
+  assert.equal(sim.fx.duckPass, true, 'duckPass 应并入穿透旗标');
+  assert.ok(sim.fx.buffAddS >= 0.1, 'buffDurationFlat 应并入固定时长加成');
   assert.ok(sim.buffList().length <= 24, '槽位有上限，不会无限增长');
 });
 

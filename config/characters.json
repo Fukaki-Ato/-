@@ -1,12 +1,12 @@
 {
   "$schema": "../schema/config.schema.json#/characters",
-  "configVersion": "1.0.0",
+  "configVersion": "1.1.2",
   "minEngineVersion": "1.0.0",
-  "updatedAt": "2026-09-22",
+  "updatedAt": "2026-10-05",
   "items": [
     {
       "id": "char_volt", "status": "live",
-      "name": { "zh-CN": "小电", "en-US": "Volt" },
+      "name": { "zh-CN": "牢大", "en-US": "Volt" },
       "tagline": { "zh-CN": "最便宜的伙伴，最稳的发挥" },
       "rarity": "R", "unlock": { "type": "free" },
       "skins": ["skin_volt_default", "skin_volt_thunder"],
@@ -27,7 +27,10 @@
       "model": { "prefab": "assets/characters/volt.glb", "scale": 1.0, "lod": [2, 6, 12] },
       "audio": { "voDir": "assets/audio/vo/volt/", "footstep": "step_sneaker" },
       "tint": "#FFD84D",
-      "versions": [ { "ver": "1.0.0", "date": "2026-09-22", "change": "首发" } ]
+      "versions": [
+        { "ver": "1.0.0", "date": "2026-09-22", "change": "首发" },
+        { "ver": "1.1.2", "date": "2026-10-05", "change": "显示名「小电」改「牢大」（用户定稿）。只改 name.zh-CN：内部 id `char_volt`、皮肤 `skin_volt_*`、碎片 `shard_volt`、en-US 标签与音效目录 `assets/audio/sfx/char/char_volt/` 全部不动，音效素材也不换（音频不变）" }
+      ]
     },
     {
       "id": "char_ama", "status": "live",
@@ -70,19 +73,63 @@
     },
     {
       "id": "char_bolt", "status": "live",
-      "name": { "zh-CN": "博尔特警长", "en-US": "Sheriff Bolt" },
-      "tagline": { "zh-CN": "退休前最后一次执勤" },
+      "name": { "zh-CN": "时空行者", "en-US": "Chrono" },
+      "tagline": { "zh-CN": "他不追终点，他把终点挪过来" },
       "rarity": "SSR", "unlock": { "type": "event", "eventRef": "event_thunder_beast_siege" },
       "skins": ["skin_bolt_default", "skin_bolt_storm"],
-      "skillRef": "skill_storm_domain", "talentRef": "talent_bolt_cool",
+      "skillRef": "skill_chrono_leap", "talentRef": "talent_chrono_slow",
       "growth": { "maxLevel": 10, "costPerLevel": [], "effectPerLevel": { "target": "skillRef", "paramScalePerLevel": 0.05 } },
       "model": { "prefab": "assets/characters/bolt.glb", "scale": 1.05, "lod": [2, 6, 12] },
       "audio": { "voDir": "assets/audio/vo/bolt/", "footstep": "step_boot" },
       "tint": "#B48CFF",
-      "versions": [ { "ver": "1.0.0", "date": "2026-09-22", "change": "首发（活动限定）" } ]
+      "versions": [
+        { "ver": "1.0.0", "date": "2026-09-22", "change": "首发（活动限定）" },
+        { "ver": "1.1.0", "date": "2026-10-04", "change": "用户定稿：「博尔特警长」改名「时空行者」，技能换成穿梭时空（瞬移 100 米收金币），被动换成时间延缓。id 与碎片/皮肤引用保持不变" }
+      ]
     },
     {
-      "id": "skin_volt_default", "kind": "skin", "status": "live", "baseRef": "char_volt",
+      "id": "char_frog", "status": "live",
+      "name": { "zh-CN": "奶蛙", "en-US": "Milky" },
+      "tagline": { "zh-CN": "天塌下来，先笑完这十秒" },
+      "rarity": "SR", "unlock": { "type": "coin", "cost": 5000 },
+      "skins": ["skin_frog_default"],
+      "skillRef": "skill_belly_laugh", "talentRef": "talent_frog_bounce",
+      "growth": { "maxLevel": 10, "costPerLevel": [], "effectPerLevel": { "target": "skillRef", "paramScalePerLevel": 0.05 } },
+      "model": { "prefab": "assets/characters/frog.glb", "scale": 0.92, "lod": [2, 6, 12] },
+      "audio": { "voDir": "assets/audio/vo/frog/", "footstep": "step_sneaker" },
+      "tint": "#B6F24E",
+      "versions": [ { "ver": "1.1.0", "date": "2026-10-04", "change": "新增：捧腹大笑 10 秒无敌 + 每 10 秒一次强跳（沿用现有一套程序化建模，体量偏小）" } ]
+    },
+    {
+      "id": "char_mambo", "status": "live",
+      "name": { "zh-CN": "曼波", "en-US": "Mambo" },
+      "tagline": { "zh-CN": "矮，是一种战术" },
+      "rarity": "SR", "unlock": { "type": "coin", "cost": 7000 },
+      "skins": ["skin_mambo_default"],
+      "skillRef": "skill_mambo_power", "talentRef": "talent_mambo_height",
+      "growth": { "maxLevel": 10, "costPerLevel": [], "effectPerLevel": { "target": "skillRef", "paramScalePerLevel": 0.05 } },
+      "model": { "prefab": "assets/characters/mambo.glb", "scale": 0.75, "lod": [2, 6, 12] },
+      "audio": { "voDir": "assets/audio/vo/mambo/", "footstep": "step_sneaker" },
+      "tint": "#FF9A3C",
+      "versions": [ { "ver": "1.1.0", "date": "2026-10-04", "change": "新增：下滑 10 次攒出曼波之力（2 次下滑护体）+ 身高优势直接穿高杆。用户指定体量明显偏小（scale 0.75）" } ]
+    },
+    {
+      "id": "char_niu", "status": "live",
+      "name": { "zh-CN": "阿牛", "en-US": "Moo" },
+      "tagline": { "zh-CN": "妈妈说了，挡路的都不用留" },
+      "rarity": "SSR", "unlock": { "type": "loot", "lootRef": "loot_thunder_box" },
+      "skins": ["skin_niu_default"],
+      "skillRef": "skill_mama_save", "talentRef": "talent_niu_rush",
+      "growth": { "maxLevel": 10, "costPerLevel": [], "effectPerLevel": { "target": "skillRef", "paramScalePerLevel": 0.05 } },
+      "model": { "prefab": "assets/characters/niu.glb", "scale": 1.08, "lod": [2, 6, 12] },
+      "audio": { "voDir": "assets/audio/vo/niu/", "footstep": "step_boot" },
+      "tint": "#E45C5C",
+      "versions": [
+        { "ver": "1.1.0", "date": "2026-10-04", "change": "新增：妈妈救我清空前方 50 米障碍 + 每 20 秒自动蛮牛冲撞（三倍速、20 米无敌）" },
+        { "ver": "1.1.1", "date": "2026-10-05", "change": "issue #16 校正口径：蛮牛冲撞按 talent_niu_rush 1.1.1 改为「速度顶到地面 maxSpeed 26、冲过 45 米」，上面的「三倍速、20 米」是当时未核钳位的说法" }
+      ]
+    },
+    { "id": "skin_volt_default", "kind": "skin", "status": "live", "baseRef": "char_volt",
       "name": { "zh-CN": "默认涂装" }, "rarity": "R",
       "materialOverrides": { "bodyTint": "#F2F4F8", "emissive": "#FFD84D" },
       "model": { "prefab": "assets/characters/volt.glb" },
@@ -100,7 +147,10 @@
     { "id": "skin_ama_default", "kind": "skin", "status": "live", "baseRef": "char_ama", "name": { "zh-CN": "默认涂装" }, "rarity": "SR", "materialOverrides": { "bodyTint": "#E8F6EE", "emissive": "#43D9A3" }, "model": { "prefab": "assets/characters/ama.glb" }, "unlock": { "type": "free" }, "statMods": [], "versions": [ { "ver": "1.0.0", "date": "2026-09-22", "change": "首发" } ] },
     { "id": "skin_kaze_default", "kind": "skin", "status": "live", "baseRef": "char_kaze", "name": { "zh-CN": "默认涂装" }, "rarity": "SR", "materialOverrides": { "bodyTint": "#EAF4FF", "emissive": "#7FD1FF" }, "model": { "prefab": "assets/characters/kaze.glb" }, "unlock": { "type": "free" }, "statMods": [], "versions": [ { "ver": "1.0.0", "date": "2026-09-22", "change": "首发" } ] },
     { "id": "skin_rina_default", "kind": "skin", "status": "live", "baseRef": "char_rina", "name": { "zh-CN": "默认涂装" }, "rarity": "SSR", "materialOverrides": { "bodyTint": "#FBE7F1", "emissive": "#FF5FA2" }, "model": { "prefab": "assets/characters/rina.glb" }, "unlock": { "type": "free" }, "statMods": [], "versions": [ { "ver": "1.0.0", "date": "2026-09-22", "change": "首发" } ] },
-    { "id": "skin_bolt_default", "kind": "skin", "status": "live", "baseRef": "char_bolt", "name": { "zh-CN": "警长制服" }, "rarity": "SSR", "materialOverrides": { "bodyTint": "#E8E6F8", "emissive": "#B48CFF" }, "model": { "prefab": "assets/characters/bolt.glb" }, "unlock": { "type": "free" }, "statMods": [], "versions": [ { "ver": "1.0.0", "date": "2026-09-22", "change": "首发" } ] },
-    { "id": "skin_bolt_storm", "kind": "skin", "status": "draft", "baseRef": "char_bolt", "name": { "zh-CN": "风暴警长" }, "rarity": "SSR", "materialOverrides": { "bodyTint": "#2A3350", "emissive": "#7FD1FF", "trailVfx": "vfx_trail_thunder" }, "model": { "prefab": "assets/skins/bolt_storm.glb" }, "unlock": { "type": "key", "cost": 12 }, "statMods": [], "versions": [ { "ver": "1.0.0", "date": "2026-09-22", "change": "围城活动商店（上线前 draft）" } ] }
+    { "id": "skin_bolt_default", "kind": "skin", "status": "live", "baseRef": "char_bolt", "name": { "zh-CN": "默认涂装" }, "rarity": "SSR", "materialOverrides": { "bodyTint": "#E8E6F8", "emissive": "#B48CFF" }, "model": { "prefab": "assets/characters/bolt.glb" }, "unlock": { "type": "free" }, "statMods": [], "versions": [ { "ver": "1.0.0", "date": "2026-09-22", "change": "首发" }, { "ver": "1.1.0", "date": "2026-10-04", "change": "随角色改名，皮肤名由「警长制服」改为「默认涂装」" } ] },
+    { "id": "skin_bolt_storm", "kind": "skin", "status": "draft", "baseRef": "char_bolt", "name": { "zh-CN": "风暴行者" }, "rarity": "SSR", "materialOverrides": { "bodyTint": "#2A3350", "emissive": "#7FD1FF", "trailVfx": "vfx_trail_thunder" }, "model": { "prefab": "assets/skins/bolt_storm.glb" }, "unlock": { "type": "key", "cost": 12 }, "statMods": [], "versions": [ { "ver": "1.0.0", "date": "2026-09-22", "change": "围城活动商店（上线前 draft）" }, { "ver": "1.1.0", "date": "2026-10-04", "change": "随角色改名，皮肤名由「风暴警长」改为「风暴行者」" } ] },
+    { "id": "skin_frog_default", "kind": "skin", "status": "live", "baseRef": "char_frog", "name": { "zh-CN": "默认涂装" }, "rarity": "SR", "materialOverrides": { "bodyTint": "#F4FBE8", "emissive": "#B6F24E" }, "model": { "prefab": "assets/characters/frog.glb" }, "unlock": { "type": "free" }, "statMods": [], "versions": [ { "ver": "1.1.0", "date": "2026-10-04", "change": "新增" } ] },
+    { "id": "skin_mambo_default", "kind": "skin", "status": "live", "baseRef": "char_mambo", "name": { "zh-CN": "默认涂装" }, "rarity": "SR", "materialOverrides": { "bodyTint": "#FFF1E4", "emissive": "#FF9A3C" }, "model": { "prefab": "assets/characters/mambo.glb" }, "unlock": { "type": "free" }, "statMods": [], "versions": [ { "ver": "1.1.0", "date": "2026-10-04", "change": "新增" } ] },
+    { "id": "skin_niu_default", "kind": "skin", "status": "live", "baseRef": "char_niu", "name": { "zh-CN": "默认涂装" }, "rarity": "SSR", "materialOverrides": { "bodyTint": "#FBE9E7", "emissive": "#E45C5C" }, "model": { "prefab": "assets/characters/niu.glb" }, "unlock": { "type": "free" }, "statMods": [], "versions": [ { "ver": "1.1.0", "date": "2026-10-04", "change": "新增" } ] }
   ]
 }

@@ -24,7 +24,8 @@ export interface RunCallbacks {
   onHud(h: {
     score: number; coins: number; distance: number; hits: number; lives: number;
     buffs: { name: string; left: number }[];
-    skill: { label: string; energy: number; cd: number; ready: boolean } | null;
+    /** cd=冷却剩余秒；charge=下滑积攒门槛（{now, need}），无门槛技能为 null */
+    skill: { label: string; cd: number; ready: boolean; charge: { now: number; need: number } | null } | null;
   }): void;
   onEnd(summary: ReturnType<RunnerSim['summary']>): void;
   /** 死亡瞬间回调（音频等表现层用；endTimer 计时与 onEnd 节奏不变） */
@@ -168,7 +169,7 @@ export function createRunnerScene(
       }
       // 施放技能：爆点 + 轻微震屏，拖尾/光环等完整表现在 M4 T4.4
       else if (ev.type === 'cast') { fireAtPlayer(); shakeT = 0.12; cb.onCast?.(); }
-      else if (ev.type === 'shieldBreak' || ev.type === 'boardBreak') { fireAtPlayer(); shakeT = 0.18; }
+      else if (ev.type === 'shieldBreak' || ev.type === 'boardBreak' || ev.type === 'slideGuard') { fireAtPlayer(); shakeT = 0.18; }
       else if (ev.type === 'zap') {
         fireAtPlayer(ZAP_BURST_COLOR); shakeT = 0.32;
         lightning.strike(ev.lane, ev.worldZ, laneWidth); // MC 式雷电：天→落点 + 全场闪白
@@ -235,9 +236,9 @@ export function createRunnerScene(
       score: s.score, coins: s.coins, distance: s.distance, hits: s.hits, lives: sim.lives, buffs,
       skill: sk ? {
         label: sk.label,
-        energy: sk.energyMax > 0 ? Math.min(1, s.energy / sk.energyMax) : 1,
         cd: s.skillCd,
         ready: sim.canCastSkill(),
+        charge: sk.chargeSlides > 0 ? { now: Math.min(s.slideCount, sk.chargeSlides), need: sk.chargeSlides } : null,
       } : null,
     });
   }

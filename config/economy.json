@@ -9,7 +9,10 @@
       { "id": "shard_ama", "grants": "char_ama", "need": { "1": 60, "2": 90, "3": 140, "4": 200, "5": 300 } },
       { "id": "shard_kaze", "grants": "char_kaze", "need": { "1": 60, "2": 90, "3": 140, "4": 200, "5": 300 } },
       { "id": "shard_rina", "grants": "char_rina", "need": { "1": 80, "2": 120, "3": 180, "4": 260, "5": 360 } },
-      { "id": "shard_bolt", "grants": "char_bolt", "need": { "1": 80, "2": 120, "3": 180, "4": 260, "5": 360 } }
+      { "id": "shard_bolt", "grants": "char_bolt", "need": { "1": 80, "2": 120, "3": 180, "4": 260, "5": 360 } },
+      { "id": "shard_frog", "grants": "char_frog", "need": { "1": 60, "2": 90, "3": 140, "4": 200, "5": 300 } },
+      { "id": "shard_mambo", "grants": "char_mambo", "need": { "1": 60, "2": 90, "3": 140, "4": 200, "5": 300 } },
+      { "id": "shard_niu", "grants": "char_niu", "need": { "1": 80, "2": 120, "3": 180, "4": 260, "5": 360 } }
     ],
     "lootTables": [
       { "id": "loot_coin_chest", "cost": { "coin": 2000 },
@@ -30,9 +33,13 @@
         "entries": [
           { "ref": "shard_ama:15", "weight": 200, "rarity": "rare" },
           { "ref": "shard_kaze:15", "weight": 200, "rarity": "rare" },
+          { "ref": "shard_frog:15", "weight": 200, "rarity": "rare" },
+          { "ref": "shard_mambo:15", "weight": 200, "rarity": "rare" },
           { "ref": "skin_volt_thunder", "weight": 60, "rarity": "sr" },
           { "ref": "shard_rina:25", "weight": 40, "rarity": "sr" },
-          { "ref": "char_rina", "weight": 8, "rarity": "ssr" }
+          { "ref": "shard_niu:25", "weight": 40, "rarity": "sr" },
+          { "ref": "char_rina", "weight": 8, "rarity": "ssr" },
+          { "ref": "char_niu", "weight": 8, "rarity": "ssr" }
         ] }
     ],
     "shop": {

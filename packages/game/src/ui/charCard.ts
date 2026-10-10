@@ -25,12 +25,12 @@ export class MiniCard extends Box {
   private chipTint = '';
   private boundIndex = -1;
 
-  constructor(private envCard: CardEnv, i: number, load: Loadout, picked: boolean) {
+  constructor(private envCard: CardEnv, i: number, load: Loadout, picked: boolean, locked = false) {
     super({ direction: 'column', background: 'card', padding: 8, gap: 4, align: 'center', width: { percent: 100 } });
     this.chipHolder = new Box({ width: 26, height: 26, align: 'center', justify: 'center' });
-    this.nameL = new Label({ text: load.name, fontSizePx: 13, color: this.envCard.colors.text });
+    this.nameL = new Label({ text: load.name, fontSizePx: 13, color: locked ? this.envCard.colors.muted : this.envCard.colors.text });
     this.rarityL = new Label({ text: load.rarity, fontSizePx: 11, color: rarityColor(this.envCard.colors, load.rarity) });
-    this.markL = new Label({ text: picked ? '✔ 已选' : '', fontSizePx: 11, color: this.envCard.colors.neon });
+    this.markL = new Label({ text: locked ? '未解锁' : picked ? '✔ 已选' : '', fontSizePx: 11, color: locked ? this.envCard.colors.muted : this.envCard.colors.neon });
     this.add(new Box({ direction: 'row', gap: 6, align: 'center' }, [this.chipHolder, this.nameL]));
     this.add(this.rarityL, this.markL);
     this.setChip(this.envCard.tintOf(i));
@@ -38,17 +38,19 @@ export class MiniCard extends Box {
     this.envCard.live.add(this);
   }
 
-  setData(i: number, load: Loadout, picked: boolean): void {
+  setData(i: number, load: Loadout, picked: boolean, locked = false): void {
     this.boundIndex = i;
     this.setChip(this.envCard.tintOf(i));
     this.nameL.setText(load.name);
+    this.nameL.setColor(locked ? this.envCard.colors.muted : this.envCard.colors.text);
     this.rarityL.setText(load.rarity);
     this.rarityL.setColor(rarityColor(this.envCard.colors, load.rarity));
-    this.setPicked(picked);
+    this.setPicked(picked, locked);
   }
 
-  setPicked(picked: boolean): void {
-    this.markL.setText(picked ? '✔ 已选' : '');
+  setPicked(picked: boolean, locked = false): void {
+    this.markL.setText(locked ? '未解锁' : picked ? '✔ 已选' : '');
+    this.markL.setColor(locked ? this.envCard.colors.muted : this.envCard.colors.neon);
   }
 
   get slotIndex(): number { return this.boundIndex; }
