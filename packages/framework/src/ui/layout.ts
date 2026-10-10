@@ -48,13 +48,15 @@ export function measureNode(node: LayoutNode, basisW: number, basisH: number): S
   const gap = node.gap ?? 0
   const scrolling = isScroll(node)
   const kids = node.children ?? []
+  // 绝对定位子项不占常规流：既不贡献父的主轴长度，也不参与 gap 计数
+  const flow = kids.filter(c => !c.absolute)
   // 滚动容器：子项在滚动轴上按无限空间测量（内容可超出视口）
   const childBasisW = scrolling && horizontal ? INF : contentW
   const childBasisH = scrolling && !horizontal ? INF : contentH
 
   let main = 0
   let cross = 0
-  for (const c of kids) {
+  for (const c of flow) {
     const cm = edges(c.margin)
     const s = measureNode(c, childBasisW, childBasisH)
     const outerW = s.w + cm.left + cm.right
@@ -62,12 +64,12 @@ export function measureNode(node: LayoutNode, basisW: number, basisH: number): S
     if (horizontal) { main += outerW; cross = Math.max(cross, outerH) }
     else { main += outerH; cross = Math.max(cross, outerW) }
   }
-  if (kids.length > 1) main += gap * (kids.length - 1)
+  if (flow.length > 1) main += gap * (flow.length - 1)
 
   const leafW = node.content?.w ?? 0
   const leafH = node.content?.h ?? 0
-  const desiredW = kids.length ? (horizontal ? main : cross) : leafW
-  const desiredH = kids.length ? (horizontal ? cross : main) : leafH
+  const desiredW = flow.length ? (horizontal ? main : cross) : leafW
+  const desiredH = flow.length ? (horizontal ? cross : main) : leafH
 
   // auto 尺寸收缩到可用空间（basis 有限时），再过 min/max；声明尺寸只过 min/max
   const autoW = Number.isFinite(basisW) ? Math.min(desiredW + padW, basisW) : desiredW + padW
@@ -159,7 +161,9 @@ function arrange(node: LayoutNode, rect: Rect): LayoutBox {
     h: Math.max(0, rect.h - pad.top - pad.bottom),
   }
   const box: LayoutBox = { id: node.id, rect, contentRect: content, passthrough: node.passthrough, children: [] }
-  const kids = node.children ?? []
+  const all = node.children ?? []
+  const flow = all.filter(c => !c.absolute)
+  const abs = all.filter(c => c.absolute)
   const horizontal = (node.direction ?? 'column') === 'row'
   const scrolling = isScroll(node)
   const gap = node.gap ?? 0
@@ -167,7 +171,7 @@ function arrange(node: LayoutNode, rect: Rect): LayoutBox {
   if (scrolling) {
     box.clip = { ...content }
   }
-  if (!kids.length) {
+  if (!all.length) {
     if (scrolling) {
       const axis = scrollAxisOf(node)
       box.scroll = { axis, offset: node.scrollOffset ?? 0, content: 0, viewport: axis === 'x' ? content.w : content.h, maxOffset: 0 }
@@ -175,7 +179,7 @@ function arrange(node: LayoutNode, rect: Rect): LayoutBox {
     return box
   }
 
-  const frames = childFrames(node, content, horizontal, scrolling)
+  const frames = childFrames({ ...node, children: flow }, content, horizontal, scrolling)
   let totalMain = frames.reduce((s, f) => s + f.baseMain, 0)
   const mainAvail = horizontal ? content.w : content.h
   if (!scrolling) {
@@ -203,6 +207,19 @@ function arrange(node: LayoutNode, rect: Rect): LayoutBox {
         }
     box.children.push(arrange(f.node, childRect))
     cursor += mainLead + (horizontal ? f.w : f.h) + mainTrail + between
+  }
+
+  // 绝对定位子项：相对父内容盒贴边，统一在常规子项之后产出 ⇒ 绘制在上、命中优先。
+  // 只支持 px 偏移（弹层动画要逐帧改 top，百分比反而用不上；尺寸仍可用 percent 声明）。
+  for (const c of abs) {
+    const ms = measureNode(c, content.w, content.h)
+    const w = applyMinMax(resolveLength(c.width, content.w) ?? ms.w, c.minWidth, c.maxWidth)
+    const h = applyMinMax(resolveLength(c.height, content.h) ?? ms.h, c.minHeight, c.maxHeight)
+    const x = c.left !== undefined ? content.x + c.left
+      : c.right !== undefined ? content.x + content.w - w - c.right : content.x
+    const y = c.top !== undefined ? content.y + c.top
+      : c.bottom !== undefined ? content.y + content.h - h - c.bottom : content.y
+    box.children.push(arrange(c, { x, y, w, h }))
   }
 
   if (scrolling) {

@@ -1,0 +1,22 @@
+<!doctype html>
+<!-- 无头截图页（保留）：Chrome headless 点不了「游客登录」，这里在 boot 完成后自动跳大厅，
+     供 tools 侧 CDP 截图脚本取证用（见会话记录 2026-10-03）。只被 dev server 服务，
+     不进 build:web 产物（vite 只打包 index.html 引用的入口）。 -->
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>雷霆酷跑 · 截图页</title>
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <main id="screen">正在加载资源…</main>
+  <script type="module" src="/src/bootstrap.ts"></script>
+  <script type="module">
+    const t = setInterval(() => {
+      const m = window.__trMachine;
+      if (m && m.current() === 'start') { clearInterval(t); m.go('select'); }
+    }, 200);
+  </script>
+</body>
+</html>

@@ -7,12 +7,16 @@ import { fileURLToPath } from 'node:url';
 const assetsDir = fileURLToPath(new URL('../../assets', import.meta.url));
 const MIME: Record<string, string> = {
   '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
   '.json': 'application/json; charset=utf-8',
   '.txt': 'text/plain; charset=utf-8',
   // 音频：dev 中间件按真实 MIME 下发，避免 <audio> 依赖嗅探
   '.mp3': 'audio/mpeg',
   '.m4a': 'audio/mp4',
   '.ogg': 'audio/ogg',
+  // 大厅背景循环视频：<video> 对 octet-stream 直接拒绝解码，MIME 必须给对
+  '.mp4': 'video/mp4',
 };
 
 function trAssets(): Plugin {
@@ -48,6 +52,7 @@ function trAssets(): Plugin {
 }
 
 export default defineConfig({
+  base: process.env.TR_WEB_BASE ?? '/',
   publicDir: '../../config',
   plugins: [trAssets()],
   server: {

@@ -1,0 +1,17 @@
+{
+  "name": "@tr/fontgen",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "雷霆酷跑 SDF 位图字体工具链：TTF + 字符集 -> SDF 图集 PNG + metrics.json（S12，供 S4 自绘 UI Label 使用）",
+  "scripts": {
+    "charset": "node charset.mjs",
+    "gen": "node gen.mjs --all",
+    "gen:latin": "node gen.mjs --preset latin",
+    "gen:cjk": "node gen.mjs --preset cjk",
+    "preview": "node preview.mjs"
+  },
+  "dependencies": {
+    "opentype.js": "^1.3.4"
+  }
+}

@@ -135,6 +135,9 @@ async function main() {
     mkdirSync(pkg, { recursive: true });
     copyDir(join(root, 'config'), join(pkg, 'config'), n => n.endsWith('.json'));
     copyDir(join(root, 'assets/fonts'), join(pkg, 'assets/fonts'), n => /\.(png|metrics\.json)$/.test(n));
+    // 主界面 UI 资源随分包走（徽标两帧/纯背景/分层动效贴图；只收 png——
+    // 微信小游戏没有 <video> 通路，背景动效在 wx 端由这些贴图驱动，视频不进包）
+    copyDir(join(root, 'assets/ui'), join(pkg, 'assets/ui'), n => n.endsWith('.png'));
     // 真实音频随分包走（game.json params.audio 的 'assets/audio/...' 由 WX 音频实现映射到此处）
     const audio = copyAudioAssets(root, pkg);
     const placeholders = writeAssetPlaceholders(pkg);

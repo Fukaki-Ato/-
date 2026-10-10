@@ -57,15 +57,17 @@ const FOG_NEAR = 22, FOG_FAR = 120;
 export function createRunnerScene(
   host: { canvas: GLCanvas; size: WindowSize },
   adapter: PlatformAdapter, sim: RunnerSim, content: GameContent, cb: RunCallbacks,
+  opts?: { themeId?: string },
 ) {
   const runner = (content.game.params.runner ?? {}) as Record<string, number>;
   const laneWidth = runner.laneWidth ?? 2.2;
   /** 滑翔倒计时换算：core 以 heightM/glideS 匀速下降（movement.ts），HUD 显示与 s.gliding 一致的真实剩余秒数 */
   const flight = (content.game.params.flight ?? {}) as Record<string, number>;
   const glideFallMps = (flight.heightM ?? 4.6) / (flight.glideS ?? 1.8);
-  // 默认主题 = 首个 live 条目（主题切换尚未做，先不硬编码 id，避免删主题时漏改）
+  // 默认主题 = 大厅「场景切换」所选（storage 经 mainFlow 注入）；缺省回首个 live 条目（不硬编码 id，避免删主题时漏改）
   const themeItems = (content.themes.items ?? []) as Record<string, unknown>[];
-  const theme = themeItems.find(t => t['status'] === 'live') ?? themeItems[0];
+  const theme = (opts?.themeId ? themeItems.find(t => t['id'] === opts.themeId) : undefined)
+    ?? themeItems.find(t => t['status'] === 'live') ?? themeItems[0];
   const sky = (theme?.sky ?? { baseColor: '#8ED0F2', flashColor: '#FFF3C4' }) as { baseColor: string; flashColor: string };
   const fogColor = ((theme?.fog as Record<string, unknown> | undefined)?.color as string | undefined) ?? sky.baseColor;
   const tint = (theme?.vfxTint as string | undefined) ?? '#FFD98A';

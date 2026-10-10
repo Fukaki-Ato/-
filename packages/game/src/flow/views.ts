@@ -33,9 +33,23 @@ export interface StartHandle {
   setFeedback(text: string, isError: boolean): void;
 }
 
+export interface MainMenuActions {
+  onStartRun(): void;
+  onShop(): void;
+  onUnsupported(): void;
+}
+
 export interface SelectActions {
   onStartRun(charId: string): void;
   onBack(): void;
+}
+
+export interface ShopActions { onBack(): void }
+
+/** 大厅页本机统计（mainFlow 从 storage 读出注入；视图不直接碰存储键定义方） */
+export interface SelectExtras {
+  coins: number;
+  diamonds: number;
 }
 
 export interface ResultActions {
@@ -57,6 +71,7 @@ export interface GameViews {
     actions: SelectActions,
     currentCharId: string,
     entry: EntryMethod | null,
+    extras?: SelectExtras,
   ): void;
   mountHud(): HudHandle;
   renderResult(summary: RunSummary, best: number, actions: ResultActions): void;

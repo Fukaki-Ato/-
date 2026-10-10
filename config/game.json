@@ -32,6 +32,19 @@
       "perSkillCast": 150,
       "perNearMiss": 25
     },
+    "profile": {
+      "idDigits": 10,
+      "nameMaxChars": 6,
+      "freeRenames": 1,
+      "renameCostDiamonds": 20,
+      "panelHeightPct": 55,
+      "slideDurationMs": 240,
+      "nameCandidates": ["小跑者", "闪电少年", "海滨酷跑王", "椰子骑士", "风驰电掣", "钻石收藏家"]
+    },
+    "ui": {
+      "safeTop": 10,
+      "safeBottom": 10
+    },
     "revive": {
       "maxPerRun": 2,
       "invincibleS": 3,

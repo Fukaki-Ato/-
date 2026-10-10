@@ -13,7 +13,7 @@ import {
   UiView, Box, Panel, Label, List, ScrollView, createOverlay, createTheme, createSkinTexture,
   gestureToInputs, applySwipeScroll,
   type FontSet, type NinePatchSource, type Overlay, type OverlayHost, type Theme,
-  type UiConfig, type UiInput,
+  type UiConfig, type UiInput, type Widget,
 } from '@tr/framework/ui/index.js';
 import type { PlatformAdapter, WindowSize } from '@tr/framework/platform/platformAdapter.js';
 
@@ -41,6 +41,41 @@ export interface MountOptions {
 }
 
 const TOAST_LIFE_S = 2.2;
+const TOAST_W = 240;        // 胶囊宽度：装得下最长的占位提示，超出就折行
+const TOAST_START = 0.45;   // 出现位置＝画面纵向 45%（视觉上居中）
+const TOAST_DRIFT = 90;     // 寿命内向下漂移的像素
+const TOAST_ROW = 40;       // 多条提示同时存在时的纵向错位
+
+/**
+ * toast 胶囊：自己按寿命向下漂移，到期由 UiHost 摘掉。
+ * 它挂在零宽锚点上（见 UiHost.mount 的 toastLayer）——框架的命中规则是「反向扫描到第一个
+ * rect 含命中点的分支就返回」，哪怕整条链都是 passthrough，也会把底下页面的点击判死；
+ * 提示条盖在画面中间，绝不能吃掉它身下的按钮。锚点宽度 0 ⇒ 不含任何命中点 ⇒ 整棵 toast
+ * 子树天然不参与命中，正好是想要的「只看不拦」。
+ */
+class ToastChip extends Panel {
+  private age = 0;
+  private readonly top0: number;
+  private readonly drift: number;
+
+  constructor(top0: number, left: number, drift: number, children: Widget[]) {
+    super({
+      absolute: true, top: top0, left, width: TOAST_W, align: 'stretch',
+      passthrough: true, background: 'card',
+      padding: { top: 8, right: 18, bottom: 8, left: 18 },
+    }, children);
+    this.top0 = top0;
+    this.drift = drift;
+  }
+
+  override step(dt: number): void {
+    super.step(dt);
+    if (this.age >= TOAST_LIFE_S) return; // 停摆后等宿主摘除，不再逐帧重排
+    const t = Math.min(1, (this.age += dt) / TOAST_LIFE_S);
+    this.opts.top = this.top0 + this.drift * t * t; // 越落越快，收尾干脆
+    this.env?.invalidate();
+  }
+}
 
 export class UiHost {
   readonly overlay: Overlay;
@@ -89,9 +124,12 @@ export class UiHost {
     this.transparent = mo?.transparent === true;
     this.frameHook = mo?.frame ?? null;
     this.overlay.scene.background = this.transparent ? null : new THREE.Color(this.theme.colors.bg);
+    // 零宽满高的锚点：absolute 且不占常规流。旧版是 in-flow 列 + padding.bottom 28 托底，
+    // 结果从页面高度里扣掉 28px，屏幕底下永远露出一条主题底色的暗带（用户反馈的「黑框」）。
+    // 宽度取 0 ⇒ 锚点自身不含任何命中点，整棵 toast 子树不参与命中（见 ToastChip 注释）；
+    // 高度必须给满：auto 尺寸会「收缩到可用空间」，锚点高度为 0 会把胶囊压成 0 高。
     this.toastLayer = new Box({
-      direction: 'column', align: 'center', gap: 6,
-      passthrough: true, padding: { bottom: 28 },
+      absolute: true, top: 0, left: 0, width: 0, height: { percent: 100 }, passthrough: true,
     });
     view.add(this.toastLayer);
     this.overlay.mount(view);
@@ -116,10 +154,11 @@ export class UiHost {
   /** 通用小提示条（挂当前页底部；无页面挂载时忽略——与 DOM 版 body 级 toast 等价语义） */
   toast(msg: string): void {
     if (!this.view || !this.toastLayer) return;
-    const chip = new Panel({
-      background: 'card', padding: { top: 8, right: 18, bottom: 8, left: 18 },
-    }, []);
-    chip.add(new Label({ text: msg, fontSizePx: 13, color: this.theme.colors.text, align: 'center' }));
+    const v = this.view;
+    const top = Math.round(v.height * TOAST_START) + this.toasts.length * TOAST_ROW;
+    const left = Math.max(8, Math.round((v.width - TOAST_W) / 2));
+    const chip = new ToastChip(top, left, TOAST_DRIFT,
+      [new Label({ text: msg, fontSizePx: 13, color: this.theme.colors.text, align: 'center' })]);
     this.toastLayer.add(chip);
     this.toasts.push({ w: chip, until: this.clock + TOAST_LIFE_S });
   }

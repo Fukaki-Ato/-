@@ -45,6 +45,18 @@ export interface LayoutNode {
   content?: Size
   /** true=自身不参与命中（如全屏 HUD 底板），子节点仍可命中 */
   passthrough?: boolean
+  /**
+   * true=脱离常规流：不占父容器主轴空间、不参与父尺寸测量，按 top/left（或 right/bottom）
+   * 相对父内容盒定位。半屏弹层、全屏点击捕获层必需——用负 margin 伪造叠层会被 flex 增长
+   * 吸收掉（子项落点只取决于其 outer 尺寸，与 margin.top 无关），调不动位置。
+   * 绝对子项统一排在常规子项之后产出 ⇒ 绘制在其上、命中优先。
+   */
+  absolute?: boolean
+  /** 绝对定位偏移 px（仅 absolute=true 时消费；缺省贴父内容盒对应边） */
+  top?: number
+  left?: number
+  right?: number
+  bottom?: number
   children?: LayoutNode[]
 }
 
