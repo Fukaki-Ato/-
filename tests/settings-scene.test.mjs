@@ -13,12 +13,24 @@ import { Box, Button, Label, defaultUiConfig, findBox } from '../packages/framew
 import { UiHost } from '../packages/framework/dist/ui/host.js';
 import { createOverlayViews } from '../packages/game/dist/ui/overlayViews.js';
 import { createGameFlow, DEFAULT_CHAR, THEME_KEY } from '../packages/game/dist/flow/mainFlow.js';
+import { themeOptions } from '../packages/game/dist/ui/settingsView.js';
 import { loadTestFontSet } from './ui-helpers.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const W = 800, H = 600;
 
 const readConfig = name => JSON.parse(readFileSync(join(root, 'config', `${name}.json`), 'utf8'));
+
+test('当前主题配置让设置页同时提供白日海景与雨夜便利店', () => {
+  const options = themeOptions({ themes: readConfig('themes') });
+  assert.deepEqual(options.map(option => option.id), ['theme_seaside_day', 'theme_rain_konbini']);
+  assert.deepEqual(options.map(option => option.name), ['白日海景', '雨夜便利店']);
+
+  const glyphs = new Set(JSON.parse(readFileSync(join(root, 'assets/fonts/cjk.metrics.json'), 'utf8')).glyphs.map(g => g.char));
+  for (const label of [...options.map(option => option.name), '龙']) {
+    for (const ch of label) assert.ok(glyphs.has(ch), `字体图集缺少设置/选角文案字形「${ch}」`);
+  }
+});
 
 /** 真实配置 + 追加一条演示主题（测试内构造，不改仓库配置）：让「切换场景」至少有两个可选 */
 function themesWithDemo() {
@@ -98,16 +110,16 @@ test('设置页：场景列表来自配置、当前项标「使用中」、点�
   host.overlay.current.relayout();
 
   const t = texts(host);
-  for (const s of ['设置', '跑酷场景', '点选即保存，下一局生效', '晴湾小镇', '演示夜景']) {
+  for (const s of ['设置', '跑酷场景', '点选即保存，下一局生效', '白日海景', '演示夜景']) {
     assert.ok(t.includes(s), `设置页含「${s}」，实得 ${JSON.stringify(t)}`);
   }
-  assert.equal(markerOf(host, '晴湾小镇'), '使用中', '当前主题标记');
+  assert.equal(markerOf(host, '白日海景'), '使用中', '当前主题标记');
   assert.equal(markerOf(host, '演示夜景'), '选择');
 
   clickWidget(host, findWidget(host, cellOf('演示夜景')));
   assert.deepEqual(seen, ['theme_demo_night'], '点选回传主题 id');
   assert.equal(markerOf(host, '演示夜景'), '使用中', '标记迁到新主题');
-  assert.equal(markerOf(host, '晴湾小镇'), '选择');
+  assert.equal(markerOf(host, '白日海景'), '选择');
 
   clickWidget(host, findWidget(host, cellOf('演示夜景')));
   assert.deepEqual(seen, ['theme_demo_night'], '重复点已选主题不重复回调');
@@ -130,7 +142,7 @@ test('设置页：流程拒绝的主题不落标（保持原选择）', () => {
   clickWidget(host, findWidget(host, cellOf('演示夜景')));
   assert.equal(calls, 1);
   assert.equal(markerOf(host, '演示夜景'), '选择', '流程拒绝后不标使用中');
-  assert.equal(markerOf(host, '晴湾小镇'), '使用中');
+  assert.equal(markerOf(host, '白日海景'), '使用中');
   host.dispose();
 });
 

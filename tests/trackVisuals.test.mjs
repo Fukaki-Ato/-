@@ -15,14 +15,12 @@ function fixture(t) {
   const texture = ground.material.map;
   const tileM = ground.geometry.parameters.height / texture.repeat.y;
   t.after(() => {
+    track.dispose();
     const resources = new Set();
     scene.traverse(o => {
       if (o.geometry) resources.add(o.geometry);
       const materials = o.material ? (Array.isArray(o.material) ? o.material : [o.material]) : [];
-      for (const material of materials) {
-        resources.add(material);
-        if (material.map) resources.add(material.map);
-      }
+      for (const material of materials) resources.add(material);
     });
     for (const resource of resources) resource.dispose();
   });
@@ -30,6 +28,77 @@ function fixture(t) {
 }
 
 const near = (a, b) => assert.ok(Math.abs(a - b) < 1e-9, `${a} != ${b}`);
+
+/** 侧景道具全是 InstancedMesh（道路/天穹那几件是普通 Mesh），数它就是数两侧摆了多少件 */
+const propCount = scene => scene.children.filter(o => o.isInstancedMesh).length;
+
+test('主题 scenery 选侧景道具集：blank 场景跑道两侧为空，seaside 照旧摆满', t => {
+  const colors = { baseColor: '#8ED0F2', flashColor: '#FFF3C4', tint: '#FFD98A', groundColor: '#E3CFA4' };
+  const mk = scenery => {
+    const scene = new THREE.Scene();
+    const track = createTrackVisuals(scene, 2.2, colors, scenery);
+    t.after(() => {
+      track.dispose();
+      scene.traverse(o => {
+        if (o.geometry) o.geometry.dispose();
+        const mats = o.material ? (Array.isArray(o.material) ? o.material : [o.material]) : [];
+        for (const m of mats) m.dispose();
+      });
+    });
+    return { scene, track };
+  };
+  const seaside = mk('seaside');
+  const blank = mk('blank');
+  assert.ok(propCount(seaside.scene) > 10, `seaside 两侧应有成排道具，实得 ${propCount(seaside.scene)}`);
+  assert.equal(propCount(blank.scene), 0, 'blank 场景两侧不摆任何道具');
+  blank.track.update(3); // 空道具集照样能跟着滚动，不报错
+  seaside.track.update(3);
+});
+
+test('缺省 scenery 仍是 seaside（旧调用点如 emptyScene 不传第四个参数）', t => {
+  const scene = new THREE.Scene();
+  const track = createTrackVisuals(scene, 2.2, { baseColor: '#8ED0F2', flashColor: '#FFF3C4', tint: '#FFD98A' });
+  t.after(() => {
+    track.dispose();
+    scene.traverse(o => {
+      if (o.geometry) o.geometry.dispose();
+      const mats = o.material ? (Array.isArray(o.material) ? o.material : [o.material]) : [];
+      for (const m of mats) m.dispose();
+    });
+  });
+  assert.ok(propCount(scene) > 10, `默认侧景不缩水，实得 ${propCount(scene)}`);
+  track.update(1);
+});
+
+test('track disposal releases its ground map and per-scene toon ramp', t => {
+  const scene = new THREE.Scene();
+  const track = createTrackVisuals(scene, 2.2, {
+    baseColor: '#1A2340', flashColor: '#9FD8FF', tint: '#9FD8FF', groundColor: '#2C313D',
+  }, 'konbini');
+  const textures = new Set();
+  scene.traverse(o => {
+    const materials = o.material ? (Array.isArray(o.material) ? o.material : [o.material]) : [];
+    for (const material of materials) {
+      if (material.map) textures.add(material.map);
+      if (material.gradientMap) textures.add(material.gradientMap);
+    }
+  });
+  const disposed = new Set();
+  for (const texture of textures) texture.addEventListener('dispose', () => disposed.add(texture));
+  t.after(() => {
+    track.dispose();
+    scene.traverse(o => {
+      if (o.geometry) o.geometry.dispose();
+      const materials = o.material ? (Array.isArray(o.material) ? o.material : [o.material]) : [];
+      for (const material of materials) material.dispose();
+    });
+  });
+  assert.equal(textures.size, 2, 'track owns the ground DataTexture and scenery toon ramp');
+  track.dispose();
+  assert.equal(disposed.size, textures.size, 'owned textures are explicitly released');
+  track.dispose();
+  assert.equal(disposed.size, textures.size, 'disposal is idempotent');
+});
 
 test('闪白更新天空穹顶渐变并恢复天顶与地平线基色', t => {
   const { track, scene } = fixture(t);
