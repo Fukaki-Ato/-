@@ -6,17 +6,35 @@
   "items": [
     {
       "id": "theme_seaside_day", "status": "live",
-      "name": { "zh-CN": "晴湾小镇" },
-      "sky": { "shader": "thunder_sky", "baseColor": "#8ED0F2", "flashColor": "#FFF3C4", "flashEveryS": [9999, 9999] },
-      "fog": { "color": "#CFE9F7", "density": 0.011 },
+      "name": { "zh-CN": "白日海景" },
+      "sky": { "shader": "thunder_sky", "baseColor": "#4FA6DE", "flashColor": "#FFFFFF", "flashEveryS": [9999, 9999] },
+      "fog": { "color": "#CFE9F6", "density": 0.011 },
       "track": { "railMat": "mat_seaside_rail", "groundTiles": ["tile_beach_a", "tile_beach_b"] },
       "props": [],
-      "groundColor": "#E3CFA4",
+      "scenery": "coast",
+      "groundColor": "#EFDDB8",
       "music": "assets/audio/bgm/run.mp3", "sfxSet": "city",
-      "vfxTint": "#FFD98A",
+      "vfxTint": "#FFF0C8",
       "versions": [
         { "ver": "1.0.0", "date": "2026-09-22", "change": "首发默认主题（霓虹下城）" },
-        { "ver": "2.0.0", "date": "2026-09-29", "change": "替换为白天海滨主题：删除霓虹下城与风暴上层，新增晴天天空/淡雾/暖沙地面配色" }
+        { "ver": "2.0.0", "date": "2026-09-29", "change": "替换为白天海滨主题：删除霓虹下城与风暴上层，新增晴天天空/淡雾/暖沙地面配色" },
+        { "ver": "2.1.0", "date": "2026-10-06", "change": "补 scenery 字段声明侧景道具集（seaside = sceneryProps 的既有那套），供设置面板切换场景时按主题取侧景" },
+        { "ver": "3.0.0", "date": "2026-10-08", "change": "改名「白日海景」并切到 coast 道具集：右侧每 100m 一栋双层海景别墅（正方形平台底座 + 全屋落地玻璃 + 室内满陈设），左侧 100m 一节的海滩（木栅栏/长椅/礁石/椰林/浅滩/薄雾），沙地摆遮阳伞躺椅；海面起伏、波光、薄雾、玻璃反光、室内呼吸灯、草灌风动六组轻量化动效" }
+      ]
+    },
+    {
+      "id": "theme_rain_konbini", "status": "draft",
+      "name": { "zh-CN": "雨夜便利店" },
+      "sky": { "shader": "thunder_sky", "baseColor": "#1A2340", "flashColor": "#9FD8FF", "flashEveryS": [9999, 9999] },
+      "fog": { "color": "#243050", "density": 0.011 },
+      "track": { "railMat": "mat_rain_rail", "groundTiles": ["tile_wet_a"] },
+      "props": [],
+      "scenery": "konbini",
+      "groundColor": "#2C313D",
+      "music": "assets/audio/bgm/run.mp3", "sfxSet": "city",
+      "vfxTint": "#9FD8FF",
+      "versions": [
+        { "ver": "1.0.0", "date": "2026-10-06", "change": "第二个跑酷场景：雨夜日式便利店街角。三条跑道沿用，两侧改为「便利店（每 100m 两侧交替）+ 有围栏小花园（中间段）+ 远景楼群」，纯程序化几何零素材，含降雨/滴水/涟漪/雨痕/自动门/招牌闪烁/信号灯七组手写动效" }
       ]
     }
   ]

@@ -66,6 +66,7 @@ export function createEmptyScene(adapter: PlatformAdapter): EmptySceneHandle {
       running = false;
       adapter.cancelFrame(raf);
       offResize();
+      track.dispose();
       renderer.dispose();
       scene.traverse(o => {
         const m = o as THREE.Mesh;
