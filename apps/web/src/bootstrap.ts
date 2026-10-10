@@ -15,7 +15,7 @@ async function main(): Promise<void> {
   const adapter = createWebPlatform({ mount });
   const shell = await createUiShell(adapter);
   const views = createOverlayViews({
-    host: shell.host, badges: shell.badges, backdrop: shell.backdrop,
+    host: shell.host, badges: shell.badges, icons: shell.skillIcons, backdrop: shell.backdrop,
     onLobbyVisible: v => shell.setBackgroundVisible(v), // 背景视频只在大厅解码
   });
   shell.host.start();

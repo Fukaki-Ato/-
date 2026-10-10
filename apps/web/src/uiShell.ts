@@ -10,6 +10,7 @@ import * as THREE from 'three';
 import { loadFontSet, resolveUiConfig, type NinePatchSource, type UiConfig, type UiResources } from '@tr/framework/ui/index.js';
 import { UiHost } from '@tr/framework/ui/host.js';
 import { BADGE_NAMES, type BadgeSet } from '@tr/game/ui/badges.js';
+import type { SkillIconSet } from '@tr/game/ui/skillIcons.js';
 import type { BackdropSet } from '@tr/game/ui/menuBackdrop.js';
 import type { PlatformAdapter } from '@tr/framework/platform/platformAdapter.js';
 
@@ -32,6 +33,8 @@ export interface UiShell {
   canvas: HTMLCanvasElement;
   config: UiConfig;
   badges: BadgeSet;
+  /** 局内技能图标（主动/被动各一张；取不到时 HUD 图标位退化为纯色圆） */
+  skillIcons: SkillIconSet;
   /** 主界面背景（Web＝循环视频，取不到时回落静态图；缺省时回主题纯色底） */
   backdrop?: BackdropSet;
   /** 背景视频只在大厅解码：进大厅播、离开就停（跑一局看不见还解码，白烧 GPU 和电） */
@@ -156,6 +159,14 @@ export async function createUiShell(adapter: PlatformAdapter): Promise<UiShell> 
     } catch { /* 单帧缺失不阻塞页面 */ }
   })));
 
+  // 局内技能图标：所有角色同一套（tools/gen_skill_icons.py 产出亮态单帧，
+  // 暗态由 UI 层乘暗得到）。缺文件不阻塞进局，图标位退化为纯色圆。
+  const skillIcons: SkillIconSet = {};
+  await Promise.all((['active', 'passive'] as const).map(async k => {
+    const src = await loadStill(`${import.meta.env.BASE_URL}assets/ui/skills/${k}.png`);
+    if (src) skillIcons[k] = src;
+  }));
+
   const bg = await loadBackdrop(import.meta.env.BASE_URL);
   const backdrop = bg?.set;
   const bgVideo = bg?.video;
@@ -183,7 +194,7 @@ export async function createUiShell(adapter: PlatformAdapter): Promise<UiShell> 
   canvas.addEventListener('pointercancel', onCancel);
 
   return {
-    host, renderer, canvas, config, badges, backdrop,
+    host, renderer, canvas, config, badges, skillIcons, backdrop,
     // 静态图兜底时 bgVideo 是 undefined ⇒ 空操作，调用方不用区分
     setBackgroundVisible: (visible: boolean) => { bgVideo?.setVisible(visible); },
     destroy() {
@@ -192,6 +203,7 @@ export async function createUiShell(adapter: PlatformAdapter): Promise<UiShell> 
       canvas.removeEventListener('pointerup', onUp);
       canvas.removeEventListener('pointercancel', onCancel);
       for (const src of [...Object.values(badges.normal), ...Object.values(badges.glow)]) src.texture?.dispose();
+      for (const src of Object.values(skillIcons)) src.texture?.dispose();
       bgVideo?.el.pause();          // 背景视频是壳层建的 DOM 节点，销毁归这里收
       bgVideo?.el.remove();
       backdrop?.loopCover?.texture?.dispose();
