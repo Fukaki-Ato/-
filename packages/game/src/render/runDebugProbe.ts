@@ -40,7 +40,7 @@ export function installRunProbe(
         lane: s.lane, x: r2(s.x), supportY: r2(s.supportY),
         coinN: coinField ? coinField.lastCount : -1,
         shocks: s.shocks,
-        energy: r2(s.energy), cd: r2(s.skillCd), gliding: s.gliding, cam: camera(), draw: renderInfo(),
+        slides: s.slideCount, cd: r2(s.skillCd), gliding: s.gliding, cam: camera(), draw: renderInfo(),
         burstFired: bursts.fired,
         obstacles: sim.obstacles.length, coins: sim.coinsArr.length,
         pickups: sim.pickupsArr.length, clouds: sim.cloudsArr.length,

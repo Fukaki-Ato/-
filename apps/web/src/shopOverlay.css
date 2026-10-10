@@ -205,9 +205,9 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 3px;
+  gap: 1px;
   overflow: hidden;
-  padding: 3px 6px;
+  padding: 0 4px;
   text-align: center;
 }
 
@@ -222,6 +222,7 @@
 }
 
 .shop-product-reward {
+  min-height: 2.1em;
   color: #633419;
   font-weight: 750;
   line-height: 1.05;
@@ -229,6 +230,7 @@
 }
 
 .shop-product-status {
+  min-height: 1em;
   color: #805323;
   font-size: 20px;
   font-weight: 650;

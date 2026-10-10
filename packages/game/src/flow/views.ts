@@ -41,10 +41,29 @@ export interface MainMenuActions {
 
 export interface SelectActions {
   onStartRun(charId: string): void;
+  /** Validate and persist a role choice made by the built-in lobby panel. */
+  onChooseCharacter(charId: string): boolean;
   onBack(): void;
+  onCharacterSelect?(): void;
+  onShop?(): void;
+  /** 打开设置页（右上「设置」徽标）；缺省＝该入口只有按压反馈 */
+  onSettings?(): void;
+}
+
+export interface CharacterSelectPageActions {
+  onSelect(charId: string): void;
+  onStartRun(charId: string): void;
+  onBack(): void;
+  onShop(charId: string): void;
 }
 
 export interface ShopActions { onBack(): void }
+
+/** 设置页动作：返回大厅；选定跑酷场景主题（流程校验并写本机记忆，返回是否生效） */
+export interface SettingsActions {
+  onBack(): void;
+  onSelectTheme(themeId: string): boolean;
+}
 
 /** 大厅页本机统计（mainFlow 从 storage 读出注入；视图不直接碰存储键定义方） */
 export interface SelectExtras {
@@ -73,6 +92,15 @@ export interface GameViews {
     entry: EntryMethod | null,
     extras?: SelectExtras,
   ): void;
+  renderCharacterSelectPage?(
+    content: GameContent,
+    actions: CharacterSelectPageActions,
+    currentCharId: string,
+    entry: EntryMethod | null,
+  ): void;
+  renderShop(content: GameContent, actions: ShopActions): void;
+  /** 设置页（每个游戏都必须有）：当前首项＝切换跑酷场景；currentThemeId 为流程解析出的生效主题 */
+  renderSettings(content: GameContent, actions: SettingsActions, currentThemeId: string | null): void;
   mountHud(): HudHandle;
   renderResult(summary: RunSummary, best: number, actions: ResultActions): void;
   toast(msg: string): void;

@@ -1,7 +1,7 @@
 /**
  * 主流程装配（@tr/game）——从 apps/web/src/bootstrap.ts 提取，两端共用（redesign §3.5）。
  * 职责：平台适配（经 adapter 注入）→ 场景状态机 → 加载配置 → 驱动页面流转：
- *       boot（配置加载）→ select（主界面兼选角，游客态直入）→ run → result → select；
+ *       boot（配置加载）→ select（游客主界面）↔ characterSelect（Web 角色页）↔ shop ↔ settings → run → result → select；
  *       start（微信/游客登录页）保留在场景机里但 boot 后不再可达——默认游客进入，
  *       全程不调 adapter.extras.login()、不弹授权（issue：重构主界面并默认游客进入）；
  *       跑酷局内：每次进入 run 场景创建全新 RunnerSim（seed 记录在案，可复现），
@@ -10,8 +10,8 @@
  * 铁律：本包零 DOM/wx——挂载点与页面全部经 GameViews 由 apps/* 注入。
  */
 import { loadAllConfig } from '@tr/game/core/config/configLoader.js';
-import type { GameContent } from '@tr/game/core/config/configTypes.js';
-import { buildLoadout } from '@tr/game/core/sim/character.js';
+import type { GameContent, NamedEntry } from '@tr/game/core/config/configTypes.js';
+import { buildLoadout, isCharacterLocked, playableCharacters } from '@tr/game/core/sim/character.js';
 import { RunnerSim } from '@tr/game/core/sim/runnerSim.js';
 import { createSceneMachine } from '@tr/game/core/scene/sceneMachine.js';
 import type { SceneName } from '@tr/game/core/scene/sceneMachine.js';
@@ -19,6 +19,7 @@ import { createAudioDirector } from '@tr/game/core/audio/audioDirector.js';
 import type { AudioDirector } from '@tr/game/core/audio/audioDirector.js';
 import { hashSeed, mulberry32 } from '@tr/game/core/rng.js';
 import { installTestApi, uninstallTestApi } from './testApi.js';
+import { createSettingsScene, currentThemeId, pruneThemeSelection } from './settingsScene.js';
 import { createRunnerScene } from '@tr/game/render/runnerScene.js';
 import type { PlatformAdapter } from '@tr/framework/platform/platformAdapter.js';
 import type { GameViews, RunSummary } from './views.js';
@@ -34,8 +35,7 @@ export const DEFAULT_CHAR = 'char_volt';
 export const COINS_KEY = 'thunderrun:coins-total';
 /** 钻石总和（大厅顶栏展示；获取渠道待后续玩法接入，先预留键） */
 export const DIAMOND_KEY = 'thunderrun:diamonds-total';
-/** 大厅「场景切换」所选主题 id（run 进局时消费） */
-export const THEME_KEY = 'thunderrun:theme';
+export { THEME_KEY } from './settingsScene.js'; // 定义与读写语义见 settingsScene.ts
 
 export interface GameFlowDeps {
   adapter: PlatformAdapter;
@@ -90,6 +90,33 @@ export function createGameFlow(deps: GameFlowDeps): GameFlow {
   };
   /** 上次选的角色（本机记忆；账号级保存在 S9 接 extras.cloud 后端） */
   let charId = adapter.storage.get(CHAR_KEY) ?? DEFAULT_CHAR;
+  const knownCharacterEntry = (id: string): NamedEntry | undefined =>
+    content ? playableCharacters(content).find(character => character.id === id) : undefined;
+  const knownCharacter = (id: string): boolean => knownCharacterEntry(id) !== undefined;
+  const explicitlyLockedId = (id: string): boolean => {
+    const character = knownCharacterEntry(id);
+    return character ? isCharacterLocked(character) : false;
+  };
+  const availableCharacter = (id: string): boolean =>
+    content !== null && playableCharacters(content).some(character => character.id === id && !isCharacterLocked(character));
+  const fallbackCharacter = (): string => {
+    if (!content) return '';
+    const available = playableCharacters(content).filter(character => !isCharacterLocked(character));
+    return available.find(character => character.id === DEFAULT_CHAR)?.id ?? available[0]?.id ?? '';
+  };
+  function rememberCharacter(id: string): boolean {
+    if (!availableCharacter(id)) return false;
+    charId = id;
+    adapter.storage.set(CHAR_KEY, id);
+    return true;
+  }
+  function normalizeCharacter(): void {
+    if (!availableCharacter(charId)) charId = fallbackCharacter();
+    const stored = adapter.storage.get(CHAR_KEY);
+    if (charId) {
+      if (stored !== charId) adapter.storage.set(CHAR_KEY, charId);
+    } else if (stored !== null) adapter.storage.remove(CHAR_KEY);
+  }
   /** 本机累计计数读取（脏值按 0，不把 NaN 带进大厅展示） */
   const readCount = (key: string): number => {
     const n = Number(adapter.storage.get(key) ?? '0');
@@ -105,6 +132,7 @@ export function createGameFlow(deps: GameFlowDeps): GameFlow {
     saveEntry(adapter.storage, method);
     machine.go('select');
   };
+  let shopBack: (() => void) | null = null;
 
   const machine = createSceneMachine<SceneName>({
     boot: {},
@@ -139,14 +167,54 @@ export function createGameFlow(deps: GameFlowDeps): GameFlow {
       onEnter: () => {
         audio?.stopDeathMusic(); // 死亡后 Esc 直接回选角：死亡 BGM 不带进选角页
         if (content) views.renderSelect(content, {
-          onStartRun: id => { charId = id; adapter.storage.set(CHAR_KEY, id); machine.go('run'); },
+          onStartRun: id => { if (rememberCharacter(id)) machine.go('run'); },
+          onChooseCharacter: id => rememberCharacter(id),
           onBack: () => machine.go('start'),
+          onCharacterSelect: views.renderCharacterSelectPage ? () => machine.go('characterSelect') : undefined,
+          onShop: () => machine.go('shop', { returnTo: 'select' }),
+          onSettings: () => machine.go('settings'),
         }, charId, entry, { coins: readCount(COINS_KEY), diamonds: readCount(DIAMOND_KEY) });
       },
     },
+    characterSelect: {
+      onEnter: ctx => {
+        audio?.stopDeathMusic();
+        if (!content || !views.renderCharacterSelectPage) { machine.go('select'); return; }
+        const requested = typeof ctx === 'object' && ctx !== null ? (ctx as { characterId?: unknown }).characterId : undefined;
+        const selected = typeof requested === 'string' && knownCharacter(requested) ? requested : charId;
+        views.renderCharacterSelectPage(content, {
+          onSelect: id => { rememberCharacter(id); },
+          onStartRun: id => { if (rememberCharacter(id)) machine.go('run'); },
+          onBack: () => machine.go('select'),
+          onShop: id => {
+            if (!knownCharacter(id)) return;
+            if (!explicitlyLockedId(id)) rememberCharacter(id);
+            machine.go('shop', { returnTo: 'characterSelect', characterId: id });
+          },
+        }, selected, entry);
+      },
+    },
+    shop: {
+      onEnter: ctx => {
+        const request = typeof ctx === 'object' && ctx !== null ? ctx as { returnTo?: unknown; characterId?: unknown } : {};
+        const returnTo = request.returnTo === 'characterSelect' ? 'characterSelect' : 'select';
+        const characterId = typeof request.characterId === 'string' && knownCharacter(request.characterId)
+          ? request.characterId : undefined;
+        if (!content) { machine.go('select'); return; }
+        shopBack = () => machine.go(returnTo, returnTo === 'characterSelect' ? { characterId } : undefined);
+        views.renderShop(content, { onBack: () => shopBack?.() });
+      },
+      onExit: () => { shopBack = null; },
+    },
+    settings: createSettingsScene({
+      storage: adapter.storage, views, content: () => content,
+      goSelect: () => machine.go('select'), stopDeathMusic: () => audio?.stopDeathMusic(),
+    }),
     run: {
       onEnter: () => {
         if (!content) return;
+        if (!availableCharacter(charId)) normalizeCharacter();
+        if (!charId || !availableCharacter(charId)) { views.toast('暂无可用角色'); return; }
         audio?.enterRun(charId);
         lastSeed = hashSeed('run-' + Date.now());
         const sim: RunnerSim = new RunnerSim(content, lastSeed, charId);
@@ -161,7 +229,7 @@ export function createGameFlow(deps: GameFlowDeps): GameFlow {
           onCast: () => audio?.onCast(),
           onPickup: () => audio?.onPickup(),
           debug: deps.debug,
-        }, { themeId: adapter.storage.get(THEME_KEY) ?? undefined });
+        }, { themeId: currentThemeId(adapter.storage, content) ?? undefined });
         if (deps.test) installTestApi(sim, content); // 测试面板数据面：?debug/?test 才挂
       },
       onExit: () => {
@@ -181,7 +249,7 @@ export function createGameFlow(deps: GameFlowDeps): GameFlow {
         const coinsGot = summary.coins ?? 0;
         if (coinsGot > 0) adapter.storage.set(COINS_KEY, String(readCount(COINS_KEY) + coinsGot));
         views.renderResult(summary, best, {
-          onRetry: () => machine.go('run'),
+          onRetry: () => { if (rememberCharacter(charId)) machine.go('run'); },
           onSelect: () => machine.go('select'),
         });
       },
@@ -192,9 +260,9 @@ export function createGameFlow(deps: GameFlowDeps): GameFlow {
 
   // 全局按键：run 中 Esc 退回选角页（v2 onInput 的 key 分支，替代 v1 adapter.onKey，S10 §7.3）
   adapter.onInput(e => {
-    if (e.type === 'key' && e.phase === 'down' && e.code === 'Escape' && machine.current() === 'run') {
-      machine.go('select');
-    }
+    if (e.type === 'key' && e.phase === 'down' && e.code === 'Escape' && machine.current() === 'run') machine.go('select');
+    else if (e.type === 'key' && e.phase === 'down' && e.code === 'Escape' && machine.current() === 'shop') shopBack?.();
+    else if (e.type === 'key' && e.phase === 'down' && e.code === 'Escape' && machine.current() === 'settings') machine.go('select');
   });
 
   async function boot(): Promise<void> {
@@ -214,6 +282,8 @@ export function createGameFlow(deps: GameFlowDeps): GameFlow {
       return;
     }
     content = report.content;
+    normalizeCharacter();
+    pruneThemeSelection(adapter.storage, content); // 存档主题已删/改名 → 清掉，不把无效 id 带进渲染
     audio = createAudioDirector(adapter, content.game.params, {
       random: deps.audioRandom ?? mulberry32(hashSeed('audio-' + Date.now())),
     });

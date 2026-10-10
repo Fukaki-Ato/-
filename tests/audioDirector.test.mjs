@@ -163,6 +163,33 @@ test('真实配置：解析出 run/death BGM、开局音效、7 条死亡池与 
   }
 });
 
+test('真实配置：奶蛙/曼波/阿牛 cue 部分覆盖，路径合目录约定且文件真存在；缺的事件不凭空响', () => {
+  const cfg = parseAudioConfig(realParams);
+  const covered = { char_mambo: ['cast', 'pickup'], char_frog: ['cast'], char_niu: ['cast'] };
+  for (const [id, events] of Object.entries(covered)) {
+    const cues = cfg.characters.get(id);
+    assert.ok(cues, `${id} 应登记进角色 cue 表`);
+    for (const ev of ['cast', 'pickup', 'death']) {
+      const p = cues[ev];
+      if (events.includes(ev)) {
+        assert.equal(p, `assets/audio/sfx/char/${id}/${ev}.mp3`, `${id}.${ev} 路径必须与目录约定一字不差（大小写敏感）`);
+        assert.ok(existsSync(join(root, p)), `配置引用的音频不存在：${p}`);
+      } else {
+        assert.ok(!p, `${id} 没交付 ${ev}，配置里不该凭空出现引用`);
+      }
+    }
+  }
+  // 缺事件时只响全局层：奶蛙没有 pickup / death cue
+  const { calls, adapter } = makeAdapter();
+  const d = createAudioDirector(adapter, realParams, { random: () => 0.5 });
+  d.enterRun('char_frog');
+  d.onPickup();
+  d.onDeath();
+  assert.deepEqual(calls.filter(c => c[0] === 'playSfx').map(c => c[1]), [cfg.startSfx, cfg.deathSfx[3]],
+    '拾取与角色死亡音效都不该出现，只剩开局音效与全局死亡池那一条');
+  d.dispose();
+});
+
 test('真实配置 handoff：开局 BGM+开局音效 → 技能/拾取 → 死亡停 run BGM、播不循环死亡 BGM + 池中一条 + 角色死亡音效', () => {
   const cfg = parseAudioConfig(realParams);
   const { calls, adapter } = makeAdapter();

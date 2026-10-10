@@ -23,6 +23,8 @@ export interface SimWorldDeps {
   coinSpacing: number;
   /** scoreAdd 原语的加分入口 */
   addBonus(points: number): void;
+  /** 批量金币入账（blink 的 collectCoins）：按 coinValueAdd 加成结算，反馈事件只推一条，避免同帧几十次爆点 */
+  creditCoins(n: number): void;
   /** fly 原语触发瞬间：sim 需要知道「已进入飞行」以正确衔接滑翔降落 */
   onFlightStart(): void;
 }
@@ -64,6 +66,21 @@ export function createSimWorld(d: SimWorldDeps): EffectWorld {
       }
       return best;
     },
+
+    collectCoinsAlong: (fromD, toD) => {
+      let n = 0;
+      for (const c of d.coins) {
+        if (c.taken || c.worldZ < fromD || c.worldZ > toD) continue;
+        c.taken = true;
+        c.takenAt = d.state.t;
+        n++;
+      }
+      if (n > 0) d.creditCoins(n);
+      return n;
+    },
+
+    // 破坏型技能：整段摘除障碍（金币与道具箱不在障碍数组里，天然保留）
+    smashObstacles: (fromD, toD) => d.gen.clearObstacles(d.obstacles, fromD, toD),
 
     grantCoinRow: (lanes, startM, lengthM, spacingM, y) => {
       const spacing = spacingM > 0 ? spacingM : d.coinSpacing;
