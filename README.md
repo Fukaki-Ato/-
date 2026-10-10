@@ -34,6 +34,7 @@ Useful commands:
 - `npm run build`: compile all project references.
 - `npm test`: run deterministic simulation, UI, replay, and platform tests.
 - `npm run build:web`: create the Web bundle in `apps/web/dist`.
+- `TR_WEB_BASE=/thunder-run/ npm run build:web`: create a bundle with URLs rooted at the isolated test-site path.
 - `npm run build:wx -- --minify`: create a WX Developer Tools package in `apps/wx/dist`.
 
 ## Current Scope

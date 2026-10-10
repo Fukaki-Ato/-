@@ -52,6 +52,7 @@ function trAssets(): Plugin {
 }
 
 export default defineConfig({
+  base: process.env.TR_WEB_BASE ?? '/',
   publicDir: '../../config',
   plugins: [trAssets()],
   server: {

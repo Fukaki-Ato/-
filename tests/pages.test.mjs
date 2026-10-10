@@ -6,6 +6,7 @@
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { Box, Button, Label, List, defaultUiConfig, findBox, hitPath, topTarget } from '../packages/framework/dist/ui/index.js';
 import { UiHost } from '../packages/framework/dist/ui/host.js';
 import { createOverlayViews } from '../packages/game/dist/ui/overlayViews.js';
@@ -20,6 +21,13 @@ import { buildLoadout, playableCharacters } from '../packages/game/dist/core/sim
 import { readJson, loadTestFontSet } from './ui-helpers.mjs';
 
 const W = 800, H = 600;
+
+test('production Web bootstrap loads the full-viewport stylesheet before measuring #screen', () => {
+  const bootstrap = readFileSync(new URL('../apps/web/src/bootstrap.ts', import.meta.url), 'utf8');
+  const stylesheet = readFileSync(new URL('../apps/web/style.css', import.meta.url), 'utf8');
+  assert.match(bootstrap, /import ['"]\.\.\/style\.css['"]/);
+  assert.match(stylesheet, /#screen\s*\{\s*position:\s*fixed;\s*inset:\s*0;/);
+});
 
 function makeHost(env = 'web', extras = undefined) {
   const store = new Map();

@@ -64,10 +64,10 @@ reach the director through `RunCallbacks.onCast` / `onPickup` / `onDeath` in
 | Sim `pickup` event (item box, not coins) | selected character's `sfx.pickup` |
 | Sim `death` event (once per run) | run BGM stops; `bgm.death` plays once (no loop); one `sfx.death` pool entry; selected character's `sfx.death` |
 | `run` → `result` | death BGM keeps playing on the result screen |
-| Leave `result` (retry / back to select) | death BGM stops before the next scene starts |
+| Leave `result` (retry / back to main menu) | death BGM stops before the next scene starts |
 | Esc during `run` (alive) | run BGM stops |
-| Esc after death, before result | death BGM stops on entering `select` |
-| Start / select | silent (no menu BGM yet) |
+| Esc after death, before result | death BGM stops on entering the main menu |
+| Main menu | silent (no menu BGM yet) |
 
 Retry re-enters `run` only after the death BGM has stopped, so the two tracks never overlap.
 Cast/pickup cues are ignored after death.
@@ -105,7 +105,7 @@ npm run dev     # 手动：开局 BGM+开局音效；死亡停 BGM、播死亡�
 - `tests/audioDirector.test.mjs` — parsing (legacy/pool/malformed), the lifecycle against the
   real `config/game.json`, and injected randomness.
 - `tests/mainFlow.test.mjs` — scene handoff with the real config and a fake scene: character
-  selection, cast/pickup/death callbacks, death BGM through result, retry/select/Esc cleanup.
+  selection, cast/pickup/death callbacks, death BGM through result, retry/menu/Esc cleanup.
 - `tests/platform-wx.test.mjs` — WX path resolution and `InnerAudioContext.src`.
 - `tests/wxbuild.test.mjs` — the real audio files are copied into the subpackage and counted in
   its size.
