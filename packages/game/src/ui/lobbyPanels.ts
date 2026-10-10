@@ -1,23 +1,22 @@
 /**
  * 主界面内复用的选角面板（issue #12：「开始酷跑」沿用现有选角 → 跑酷流程，
  * 已有可复用页面只复用不扩展）。从 lobbyView 拆出以守住单文件 300 行门禁。
- * 点选即写本机记忆 CHAR_KEY（既有行为，不新增数据读写）。
+ * 角色选择经流程回调验证并记忆；视图自身不直接写角色存档。
  */
 import { Box, Button, Label, List } from '@tr/framework/ui/index.js';
 import type { GameContent } from '@tr/game/core/config/configTypes.js';
-import { buildLoadout, playableCharacters, type Loadout } from '@tr/game/core/sim/character.js';
+import { buildLoadout, isCharacterLocked, playableCharacters, type Loadout } from '@tr/game/core/sim/character.js';
 import type { UiHost } from '@tr/framework/ui/host.js';
-import { CHAR_KEY } from '../flow/mainFlow.js';
 import { MiniCard, type CardEnv } from './charCard.js';
 
-/** 选角面板技能行：能量攒满所需里程由配置推导（skills.json energy.perMeter），不写死文案 */
+/** 选角面板技能行：释放门槛与冷却全部由 skills.json 推导（charge.slides / cooldownS），不写死文案 */
 export function skillLine(load: Loadout): string {
   const sk = load.skill;
   if (!sk) return '技能：无';
-  const need = Number.isFinite(sk.energyPerMeter) && sk.energyPerMeter > 0
-    ? `跑满 ${Math.ceil(sk.energyMax / sk.energyPerMeter)} 米攒满能量`
-    : '开局即可释放';
-  return `技能：${sk.label} — ${sk.desc}（双击屏幕 / E 释放；${need}，冷却 ${sk.cooldownS}s）`;
+  const gate = sk.chargeSlides > 0
+    ? `主动下滑 ${sk.chargeSlides} 次可释放${sk.cooldownS > 0 ? `，之后冷却 ${sk.cooldownS}s` : ''}`
+    : `开局即可释放，冷却 ${sk.cooldownS}s`;
+  return `技能：${sk.label} — ${sk.desc}（双击屏幕 / E 释放；${gate}）`;
 }
 
 /** 被动行：与技能行同规格展示 */
@@ -32,29 +31,38 @@ export interface CharPanelDeps {
   width: number;
   onClose(): void;
   /** 点选角色时回传 id（主界面据此决定「开始酷跑」跑谁） */
-  onChoose?(id: string): void;
+  onChoose?(id: string): boolean;
 }
 
 export function buildCharPanel(host: UiHost, d: CharPanelDeps): { panel: Box; refresh(): void } {
   const c = host.theme.colors;
   const chars = playableCharacters(d.content);
   const loads = chars.map(x => buildLoadout(d.content, x.id));
-  let chosen = chars.some(x => x.id === d.currentCharId) ? d.currentCharId : (chars[0]?.id ?? '');
-  const chosenIndex = (): number => Math.max(0, chars.findIndex(x => x.id === chosen));
+  const initial = chars.find(x => x.id === d.currentCharId && !isCharacterLocked(x))
+    ?? chars.find(x => !isCharacterLocked(x));
+  let chosen = initial?.id ?? '';
+  const chosenIndex = (): number => chars.findIndex(x => x.id === chosen);
 
   const live = new Set<MiniCard>();
   const cardEnv: CardEnv = { colors: c, solid: host.solidSkin, tintOf: i => loads[i]?.tint ?? '#ffffff', live };
   const infoL = new Label({ text: '', fontSizePx: 12, color: c.muted, align: 'center' });
-  const refreshMarks = (): void => { for (const card of live) card.setPicked(card.slotIndex === chosenIndex()); };
-  const choose = (i: number): void => {
-    const id = chars[i]?.id;
-    if (!id) return;
-    chosen = id;
-    host.adapter.storage.set(CHAR_KEY, id);
-    d.onChoose?.(id);
-    const load = loads[i]!;
-    infoL.setText(`${load.name}：${skillLine(load)}　${passiveLine(load)}`);
+  const refreshMarks = (): void => {
+    for (const card of live) {
+      const character = chars[card.slotIndex];
+      card.setPicked(card.slotIndex === chosenIndex(), character ? isCharacterLocked(character) : false);
+    }
+  };
+  const refreshInfo = (): void => {
+    const load = loads[chosenIndex()];
+    infoL.setText(load ? `${load.name}：${skillLine(load)}　${passiveLine(load)}` : '暂无可用角色');
     refreshMarks();
+  };
+  const choose = (i: number): void => {
+    const character = chars[i];
+    if (!character || isCharacterLocked(character)) return;
+    if (d.onChoose?.(character.id) === false) return;
+    chosen = character.id;
+    refreshInfo();
   };
 
   const list = new List({
@@ -63,8 +71,10 @@ export function buildCharPanel(host: UiHost, d: CharPanelDeps): { panel: Box; re
     gap: 10,
     axis: 'x',
     height: 118,
-    buildItem: i => new MiniCard(cardEnv, i, loads[i]!, chosen === chars[i]!.id),
-    updateItem: (w, i) => { (w as MiniCard).setData(i, loads[i]!, chosen === chars[i]!.id); },
+    buildItem: i => new MiniCard(cardEnv, i, loads[i]!, chosen === chars[i]!.id, isCharacterLocked(chars[i]!)),
+    updateItem: (w, i) => {
+      (w as MiniCard).setData(i, loads[i]!, chosen === chars[i]!.id, isCharacterLocked(chars[i]!));
+    },
     onSelect: i => choose(i),
   });
   const panel = new Box(
@@ -79,5 +89,5 @@ export function buildCharPanel(host: UiHost, d: CharPanelDeps): { panel: Box; re
     ],
   );
   // 首次刷新交给调用方在 panel 入视图后调（Label.setText 的 bind 语义：入视图前不可布局）
-  return { panel, refresh: () => choose(chosenIndex()) };
+  return { panel, refresh: refreshInfo };
 }

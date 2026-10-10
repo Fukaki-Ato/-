@@ -1,6 +1,6 @@
 /**
  * 场景状态机（core 层）
- * 对应文档：docs/02 §5（场景机；现流转 Boot → Start → Select → Run → Result → Select）。
+ * 对应文档：docs/02 §5（Boot → Select ↔ CharacterSelect ↔ Shop → Run → Result → Select）。
  * M0 只需要状态定义与切换钩子；具体页面在 ui 层实现。
  */
 
@@ -43,7 +43,7 @@ export function createSceneMachine<S extends string>(scenes: Record<S, SceneDef>
 }
 
 /**
- * 本项目的场景名常量：boot（配置加载）→ start（品牌开始页 · 微信/游客入口）→ select（选角）
- * → run → result → select。原 login（账号输入）/ menu（主菜单）已拆为 start + select。
+ * 本项目的场景名常量：boot（配置加载）→ select（主界面）↔ characterSelect（Web 角色页）↔ shop（只读商店）
+ * → run → result → select。start（微信/游客入口）保留但 boot 后不再可达。
  */
-export type SceneName = 'boot' | 'start' | 'select' | 'run' | 'result';
+export type SceneName = 'boot' | 'start' | 'select' | 'characterSelect' | 'shop' | 'run' | 'result';

@@ -40,6 +40,12 @@ export interface FxState {
   cooldownMul: number;
   /** 道具箱吸取剩余时间 */
   pickupAllT: number;
+  /** 下滑护体剩余次数（slideGuard）：滑行中可穿过「小型障碍」的次数，用掉即作废、不叠加 */
+  slideGuardCharges: number;
+  /** 身高优势（duckPass）：需要下滑躲避的高杆障碍直接穿过 */
+  duckPass: boolean;
+  /** 其他 buff 时长的固定增量（buffDurationFlat，秒） */
+  buffAddS: number;
 }
 
 /** 瞬时原语的作用上下文：调用 add 时把「此刻我在哪」传进来，引擎不反向读 sim 状态 */
@@ -53,6 +59,10 @@ export interface EffectWorld {
   destroyObstacles(lane: number, fromD: number, toD: number): number;
   /** [fromD,toD] 内该车道第一个不可穿越障碍的起点 z；无则返回 null（blink 无 phase 时的止步点） */
   firstBlocker(lane: number, fromD: number, toD: number): number | null;
+  /** 收走 [fromD,toD] 纵深内的全部金币（blink 的 collectCoins：位移途中掠取，不分车道），返回枚数 */
+  collectCoinsAlong(fromD: number, toD: number): number;
+  /** 清除 [fromD,toD] 纵深内全部车道的障碍（smashAhead），金币与道具箱不受影响，返回清除数 */
+  smashObstacles(fromD: number, toD: number): number;
   /** 在指定车道生成金币排（奖励技 spawnCoinsRow） */
   grantCoinRow(lanes: number[], startM: number, lengthM: number, spacingM: number, y: number): void;
   /** 立即加分（scoreAdd） */
@@ -69,5 +79,6 @@ export function freshFx(): FxState {
     magnetT: 0, magnetRadius: 0, bootsT: 0, jumpMul: 1, flyT: 0, helmetT: 0,
     shieldLayers: 0, shieldT: 0, boardT: 0, invincible: false, speedMul: 1, timeSlowMul: 1,
     avoidLookahead: 0, coinPct: 0, slideAddS: 0, buffPct: 0, cooldownMul: 1, pickupAllT: 0,
+    slideGuardCharges: 0, duckPass: false, buffAddS: 0,
   };
 }

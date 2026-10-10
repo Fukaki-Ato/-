@@ -1,6 +1,6 @@
 /**
  * 局内 HUD（run 页）：数据源仍是 runnerScene 的 onHud 推送（HudData 与 render 层同源）。
- * 对照 DOM createRunHud：分数·金币·里程·爱心 + buff 合并行；技能行三态（冷却/就绪/能量%），
+ * 对照 DOM createRunHud：分数·金币·里程·爱心 + buff 合并行；技能行三态（冷却/就绪/下滑积攒），
  * 就绪金色高亮。buff 合并规则（同名取最长剩余、永久被动不显倒计时）逐字移植。
  */
 import { Box, Label, Panel, type UiView } from '@tr/framework/ui/index.js';
@@ -41,10 +41,11 @@ export function buildHudPage(host: UiHost): HudPage {
       line.setText(`${h.score.toLocaleString()} 分 · ${h.coins} 金币 · ${Math.floor(h.distance)} m · ${hearts}${buffs ? ' · ' + buffs : ''}`);
       const sk = h.skill;
       if (!sk) { skill.setText(''); return; }
-      const pct = Math.round(Math.max(0, Math.min(1, sk.energy)) * 100);
+      // 未就绪且不在冷却 = 下滑积攒没满（或本局已结束），门槛文案来自配置推导的 need
+      const gate = sk.charge ? `下滑 ${sk.charge.now}/${sk.charge.need}` : '准备中';
       skill.setText(sk.cd > 0
         ? `${sk.label}：冷却 ${sk.cd.toFixed(1)}s`
-        : sk.ready ? `${sk.label}：就绪（双击 / E）` : `${sk.label}：能量 ${pct}%`);
+        : sk.ready ? `${sk.label}：就绪（双击 / E）` : `${sk.label}：${gate}`);
       skill.setColor(sk.ready ? c.gold : c.muted);
     },
     dispose() {

@@ -21,9 +21,9 @@ const SIM_SEED = () => hashSeed('char-test');
 /** 跑 n 秒（不注入任何操作，只让 sim 自己走） */
 function run(sim, seconds) { for (let i = 0; i < 60 * seconds; i++) { sim.step(); sim.drainEvents(); } }
 
-test('首发 5 个角色都能装配出完整装备（主动技能 + 被动天赋）', () => {
+test('8 个角色都能装配出完整装备（主动技能 + 被动天赋）', () => {
   const chars = playableCharacters(content);
-  assert.equal(chars.length, 5, `应为 5 个可玩角色，实际 ${chars.length}`);
+  assert.equal(chars.length, 8, `应为 8 个可玩角色，实际 ${chars.length}`);
   for (const c of chars) {
     const l = buildLoadout(content, c.id);
     assert.equal(l.charId, c.id);
@@ -32,7 +32,15 @@ test('首发 5 个角色都能装配出完整装备（主动技能 + 被动天�
     assert.ok(l.skill, `${c.id} 应装配主动技能`);
     assert.ok(l.skill.effects.length >= 1, `${c.id} 的技能应至少由 1 个原语组成`);
     assert.equal(l.passive.length >= 1, true, `${c.id} 应有被动天赋`);
-    assert.ok(l.skill.cooldownS >= 14 && l.skill.cooldownS <= 24, `技能冷却应在 14-24s（docs/01 §6.2），实际 ${l.skill.cooldownS}`);
+    // 释放门槛二选一：下滑积攒型不设冷却窗口，纯冷却型必须在 14-32s 区间
+    // （上限 32 是 2026-10-04 人物改版定稿：穿梭时空 25s、捧腹大笑 30s）
+    if (l.skill.chargeSlides > 0) {
+      assert.ok(l.skill.chargeSlides >= 5 && l.skill.chargeSlides <= 20,
+        `${c.id} 下滑积攒门槛应在 5-20 次，实际 ${l.skill.chargeSlides}`);
+    } else {
+      assert.ok(l.skill.cooldownS >= 14 && l.skill.cooldownS <= 32,
+        `${c.id} 技能冷却应在 14-32s，实际 ${l.skill.cooldownS}`);
+    }
   }
 });
 
@@ -42,7 +50,11 @@ test('被动天赋在开局即生效（run_start 触发）', () => {
     char_ama: s => assert.equal(s.fx.buffPct, 15, '阿玛拉：道具时长 +15%'),
     char_kaze: s => assert.equal(s.fx.slideAddS, 0.2, '风剃：滑铲 +0.2s'),
     char_rina: s => assert.equal(s.fx.shieldLayers, 1, '莉娜：开局 1 层护盾'),
-    char_bolt: s => assert.equal(s.fx.cooldownMul, 0.8, '博尔特警长：冷却 ×0.8'),
+    char_bolt: s => assert.equal(s.fx.buffAddS, 2, '时空行者：道具时长 +2s'),
+    char_mambo: s => assert.equal(s.fx.duckPass, true, '曼波：身高优势常驻'),
+    // 周期被动（奶蛙弹跳之力 / 阿牛蛮牛冲撞）第一步才真正挂上子效果，见各自用例
+    char_frog: s => assert.ok(s.buffs.left('periodic') > 0, '奶蛙：周期被动应登记为永久槽位'),
+    char_niu: s => assert.ok(s.buffs.left('periodic') > 0, '阿牛：周期被动应登记为永久槽位'),
   };
   for (const [id, check] of Object.entries(cases)) {
     const sim = new RunnerSim(content, SIM_SEED(), id);
@@ -50,30 +62,22 @@ test('被动天赋在开局即生效（run_start 触发）', () => {
   }
 });
 
-test('能量按里程积累：跑满 perMeter 规定的米数后技能就绪', () => {
-  const sim = new RunnerSim(content, SIM_SEED(), 'char_volt');
-  const sk = sim.loadout.skill;
-  const needM = sk.energyMax / sk.energyPerMeter; // 1 / 0.02 = 50 米
-  assert.equal(needM, 50);
-  assert.equal(sim.canCastSkill(), false, '开局能量为 0');
-  let readyAt = -1;
-  for (let i = 0; i < 60 * 12 && readyAt < 0; i++) {
-    sim.step();
-    sim.drainEvents();
-    if (sim.canCastSkill()) readyAt = sim.state.distance;
+test('纯冷却释放：开局第 0 秒技能即亮，不再需要跑里程攒能量', () => {
+  for (const id of ['char_volt', 'char_ama', 'char_bolt']) {
+    const sim = new RunnerSim(content, SIM_SEED(), id);
+    assert.equal(sim.canCastSkill(), true, `${id} 开局应可直接释放（充能已移除）`);
+    assert.equal(sim.state.skillCd, 0);
   }
-  assert.ok(readyAt > 0, `${needM} 米后应攒满能量`);
-  assert.ok(readyAt >= needM - 3 && readyAt <= needM + 6, `就绪里程应接近 ${needM}m，实际 ${readyAt.toFixed(1)}m`);
 });
 
-test('释放技能：消耗能量、进入冷却、计入次数与 perSkillCast 加分', () => {
+test('释放技能：进入冷却、计入次数与 perSkillCast 加分', () => {
   const sim = new RunnerSim(content, SIM_SEED(), 'char_volt');
-  run(sim, 8); // 攒满能量（且越过新手保护）
+  run(sim, 8); // 越过新手保护窗口，避免保护期吞掉后续判定
   assert.equal(sim.canCastSkill(), true);
   const scoreBefore = sim.state.score;
   sim.applyAction('skill');
   assert.equal(sim.state.casts, 1);
-  assert.equal(sim.state.energy, 0, '能量应清空');
+  assert.equal(sim.state.skillCd > 0, true, '释放后应进入冷却');
   assert.ok(Math.abs(sim.state.skillCd - sim.loadout.skill.cooldownS) < 0.01, '冷却应开始计时');
   assert.equal(sim.canCastSkill(), false, '冷却中不可再次释放');
   sim.step(); // score 是 step 里派生的，释放后走一步才会体现加分
@@ -83,11 +87,14 @@ test('释放技能：消耗能量、进入冷却、计入次数与 perSkillCast 
   assert.ok(seen.has('cast'), '应产生 cast 事件供渲染层表现');
 });
 
-test('冷却中的被动减益生效：警长的 22 秒冷却被天赋缩到 17.6 秒', () => {
-  const sim = new RunnerSim(content, SIM_SEED(), 'char_bolt');
-  run(sim, 8);
-  sim.applyAction('skill');
-  assert.ok(Math.abs(sim.state.skillCd - 22 * 0.8) < 0.01, `skillCd=${sim.state.skillCd}`);
+test('时间延缓（时空行者）：道具持续时间按固定秒数拉长', () => {
+  const plain = new RunnerSim(content, SIM_SEED(), 'char_volt');
+  const slow = new RunnerSim(content, SIM_SEED(), 'char_bolt');
+  const ctx = { distance: 0, lane: 0 };
+  plain.buffs.add('jumpBoost', { durationS: 10, mul: 1.1 }, '弹跳鞋', ctx);
+  slow.buffs.add('jumpBoost', { durationS: 10, mul: 1.1 }, '弹跳鞋', ctx);
+  assert.ok(Math.abs(plain.buffs.left('jumpBoost') - 10) < 0.01, `无该被动仍 10s，实际 ${plain.buffs.left('jumpBoost')}`);
+  assert.ok(Math.abs(slow.buffs.left('jumpBoost') - 12) < 0.01, `应拉长到 12s，实际 ${slow.buffs.left('jumpBoost')}`);
 });
 
 test('雷霆冲刺（小电）：释放后进入无敌并自动避障，撞墙不判负', () => {
@@ -136,20 +143,145 @@ test('雷神之翼（莉娜）：释放后进入飞行段并生成空中金币�
   assert.ok(sim.cloudsArr.length >= 1, '应有云团');
 });
 
-test('时缓领域（博尔特警长）：世界推进变慢 30%，角色操作不变', () => {
-  const plain = new RunnerSim(content, SIM_SEED(), 'char_bolt');
-  run(plain, 8);
-  const d0 = plain.state.distance;
-  plain.step(); plain.drainEvents();
-  const normalDm = plain.state.distance - d0;
+test('穿梭时空（时空行者）：瞬移 100 米并把沿途金币全部收走', () => {
+  const sim = new RunnerSim(content, SIM_SEED(), 'char_bolt');
+  run(sim, 8);
+  const d0 = sim.state.distance, coins0 = sim.state.coins;
+  const near = [
+    { lane: -1, worldZ: d0 + 20 }, { lane: 0, worldZ: d0 + 60 }, { lane: 1, worldZ: d0 + 95 },
+  ];
+  const far = { lane: 0, worldZ: d0 + 200 }; // 100 米之外，不该被掠走
+  sim.coinsArr.push(...near, far);
+  sim.applyAction('skill');
+  assert.ok(sim.state.distance - d0 >= 100 - 0.5, `应位移约 100 米，实际 ${(sim.state.distance - d0).toFixed(1)}`);
+  assert.ok(near.every(c => c.taken), '沿途三枚金币应全部入手');
+  assert.equal(far.taken, undefined, '100 米外的金币不该被收走');
+  assert.ok(sim.state.coins - coins0 >= 3, `入账至少 3 枚，实际 +${sim.state.coins - coins0}`);
+  assert.equal(sim.fx.invincible, true, '落点应带短无敌，避免瞬移终点正卡在障碍里当场判负');
+});
 
-  const slowed = new RunnerSim(content, SIM_SEED(), 'char_bolt');
-  run(slowed, 8);
-  slowed.applyAction('skill');
-  const s0 = slowed.state.distance;
-  slowed.step(); slowed.drainEvents();
-  const slowDm = slowed.state.distance - s0;
-  assert.ok(Math.abs(slowDm / normalDm - 0.7) < 0.02, `世界速率比 ${(slowDm / normalDm).toFixed(3)} 应约 0.7`);
+test('捧腹大笑（奶蛙）：10 秒无敌，期间撞墙不判负', () => {
+  const sim = new RunnerSim(content, SIM_SEED(), 'char_frog');
+  sim.state.t = 20;
+  sim.applyAction('skill');
+  assert.equal(sim.fx.invincible, true);
+  assert.ok(Math.abs(sim.buffs.left('invincible') - 10) < 0.01, `无敌应 10 秒，实际 ${sim.buffs.left('invincible')}`);
+  sim.obstacles.length = 0;
+  sim.obstacles.push({ obsRef: 't_full', cls: 'full', w: 2, h: 3.2, d: 0.8, lane: sim.state.lane, worldZ: sim.state.distance + 8 });
+  run(sim, 3);
+  assert.equal(sim.state.alive, true, '无敌期撞墙不应出局');
+});
+
+test('弹跳之力（奶蛙被动）：每 10 秒自动给一次强跳窗口，窗口过后进入空档', () => {
+  const sim = new RunnerSim(content, SIM_SEED(), 'char_frog');
+  // 逐帧清障：只验周期计时，别让中途死亡把 buff 时钟冻住
+  const steps = (sec) => { for (let i = 0; i < 60 * sec; i++) { sim.obstacles.length = 0; sim.step(); sim.drainEvents(); } };
+  steps(0.2); // 周期被动在第一步就触发
+  assert.ok(sim.fx.bootsT > 0, '首个周期应已挂上强跳');
+  assert.ok(Math.abs(sim.fx.jumpMul - 1.1) < 1e-9, `强跳倍率应读配置（弹跳鞋同值），实际 ${sim.fx.jumpMul}`);
+  steps(3); // 2.5 秒窗口过后
+  assert.equal(sim.fx.bootsT, 0, '窗口结束应失效');
+  steps(7); // 累计约 10 秒 → 下一周期
+  assert.ok(sim.fx.bootsT > 0, '下一个 10 秒周期应再次挂上');
+});
+
+test('曼波之力：主动下滑 10 次才亮，释放后计数归零', () => {
+  const sim = new RunnerSim(content, SIM_SEED(), 'char_mambo');
+  assert.equal(sim.canCastSkill(), false, '开局下滑次数为 0，技能不该亮');
+  for (let i = 0; i < 9; i++) { sim.obstacles.length = 0; sim.applyAction('slide'); run(sim, 1); }
+  assert.equal(sim.state.slideCount, 9);
+  assert.equal(sim.canCastSkill(), false, '9 次还不够');
+  sim.obstacles.length = 0;
+  sim.applyAction('slide');
+  run(sim, 1);
+  assert.equal(sim.state.slideCount, 10);
+  assert.equal(sim.canCastSkill(), true, '第 10 次下滑应解锁');
+  sim.applyAction('skill');
+  assert.equal(sim.state.slideCount, 0, '释放后积攒清零（不叠加）');
+  assert.equal(sim.fx.slideGuardCharges, 2, '护体次数应读配置');
+});
+
+test('下滑护体（曼波）：滑行中穿过小型障碍，两次用尽后照常判负', () => {
+  const sim = new RunnerSim(content, SIM_SEED(), 'char_mambo');
+  sim.state.t = 20; // 越过新手保护，避免保护期替技能挡刀
+  assert.equal(sim.state.alive, true);
+  // 攒够 10 次下滑留给上一条用例，这里直接经引擎施加护体，只验消耗规则
+  sim.buffs.add('slideGuard', { durationS: 12, charges: 2 }, '曼波之力', { distance: sim.state.distance, lane: sim.state.lane });
+  const hitLow = () => {
+    sim.obstacles.length = 0;
+    sim.state.sliding = true;
+    sim.state.slideT = 9;
+    sim.state.invulnT = 0;
+    sim.obstacles.push({ obsRef: 't_low', cls: 'low', w: 2, h: 1.2, d: 0.8, lane: sim.state.lane, worldZ: sim.state.distance + 4 });
+    run(sim, 0.5);
+  };
+  hitLow();
+  assert.equal(sim.state.alive, true, '第一次护体应挡下低障');
+  assert.equal(sim.fx.slideGuardCharges, 1, '应消耗一次');
+  hitLow();
+  assert.equal(sim.state.alive, true, '第二次护体应挡下低障');
+  assert.equal(sim.fx.slideGuardCharges, 0, '两次用尽');
+  hitLow();
+  assert.equal(sim.state.alive, false, '护体用尽后低障照常判负');
+});
+
+test('身高优势（曼波被动）：不下滑也能穿过高杆，满格墙仍挡死', () => {
+  const sim = new RunnerSim(content, SIM_SEED(), 'char_mambo');
+  sim.state.t = 20;
+  sim.obstacles.length = 0;
+  sim.obstacles.push({ obsRef: 't_high', cls: 'high', w: 2, h: 2.6, d: 0.8, lane: sim.state.lane, worldZ: sim.state.distance + 4 });
+  run(sim, 0.5);
+  assert.equal(sim.state.alive, true, '需下滑的高杆应直接穿过');
+  sim.obstacles.length = 0;
+  sim.obstacles.push({ obsRef: 't_full', cls: 'full', w: 2, h: 3.2, d: 0.8, lane: sim.state.lane, worldZ: sim.state.distance + 4 });
+  run(sim, 0.5);
+  assert.equal(sim.state.alive, false, '满格墙不在身高优势覆盖范围内');
+});
+
+test('妈妈救我（阿牛）：前方 50 米障碍全部消失，金币与道具箱原样保留', () => {
+  const sim = new RunnerSim(content, SIM_SEED(), 'char_niu');
+  const d0 = sim.state.distance;
+  sim.obstacles.length = 0;
+  sim.coinsArr.length = 0;
+  sim.pickupsArr.length = 0;
+  for (const [lane, ahead] of [[-1, 10], [0, 30], [1, 45], [0, 80]]) {
+    sim.obstacles.push({ obsRef: 't_full', cls: 'full', w: 2, h: 3.2, d: 0.8, lane, worldZ: d0 + ahead });
+  }
+  sim.coinsArr.push({ lane: 0, worldZ: d0 + 25 });
+  sim.pickupsArr.push({ itemRef: 'item_shield', lane: 0, worldZ: d0 + 35 });
+  sim.applyAction('skill');
+  assert.equal(sim.obstacles.length, 1, '50 米内三个障碍消失，只剩 80 米处那一个');
+  assert.equal(sim.obstacles[0].worldZ, d0 + 80);
+  assert.equal(sim.coinsArr.length, 1, '金币必须保留');
+  assert.equal(sim.pickupsArr.length, 1, '道具箱必须保留');
+});
+
+test('蛮牛冲撞（阿牛被动）：每 20 秒自动提速，速度顶到地面 maxSpeed，无敌按配置里程到期', () => {
+  const talent = content.skills.items.find(s => s.id === 'talent_niu_rush');
+  const [speed, inv] = talent.effects[0].effects;
+  const maxSpeed = content.game.params.runner.maxSpeed;
+  assert.equal(speed.primitive, 'speedMul');
+  assert.equal(inv.primitive, 'invincible');
+  assert.equal(speed.distanceM, inv.distanceM, '提速与无敌同属一次冲撞，到期里程应一致');
+  // mul 写成顶满上限所需的最小值：baseSpeed 12 × 2.2 已 ≥ maxSpeed，再大也只跑 maxSpeed（虚标）
+  assert.ok(speed.mul * (content.game.params.runner.baseSpeed ?? 12) >= maxSpeed,
+    `提速该顶到上限，实际 ${speed.mul} × baseSpeed 不够`);
+
+  const sim = new RunnerSim(content, SIM_SEED(), 'char_niu');
+  sim.obstacles.length = 0;
+  sim.step(); sim.drainEvents(); // 周期被动在第一步触发，触发时里程仍为 0
+  assert.equal(sim.fx.invincible, true, '第一个周期应触发冲撞');
+  assert.ok(sim.fx.speedMul > 1, '冲撞期应提速');
+  const d0 = sim.state.distance, t0 = sim.state.t;
+  for (let i = 0; i < 30; i++) { sim.obstacles.length = 0; sim.step(); sim.drainEvents(); }
+  const v = (sim.state.distance - d0) / (sim.state.t - t0);
+  assert.ok(Math.abs(v - maxSpeed) < 0.5, `冲撞期实测速度应顶到 maxSpeed ${maxSpeed}，实际 ${v.toFixed(1)}`);
+  let guard = 0;
+  while (sim.fx.invincible && guard++ < 60 * 60) { sim.obstacles.length = 0; sim.step(); sim.drainEvents(); }
+  assert.equal(sim.fx.invincible, false, '按里程到期后应解除');
+  assert.ok(sim.state.distance >= speed.distanceM, `应跑满 ${speed.distanceM} 米才解除，实际 ${sim.state.distance.toFixed(1)}`);
+  assert.ok(sim.state.distance < speed.distanceM + 1, `解除不应明显拖过 ${speed.distanceM} 米，实际 ${sim.state.distance.toFixed(1)}`);
+  assert.equal(sim.fx.speedMul, 1, '提速与无敌同属一次冲撞，应一起结束');
 });
 
 test('被动天赋整局常驻：跑满 60 秒仍在身上，HUD 不会显示 3595s 这种倒计时', () => {
@@ -166,7 +298,7 @@ test('渲染装配同样来自配置：体色/发光色/体量读皮肤 material
   assert.equal(volt.bodyTint, '#F2F4F8');
   assert.equal(volt.emissive, '#FFD84D');
   assert.equal(volt.modelScale, 1.0);
-  assert.equal(buildLoadout(content, 'char_bolt').modelScale, 1.05, '警长应比小电高 5%');
+  assert.equal(buildLoadout(content, 'char_bolt').modelScale, 1.05, '时空行者应比小电高 5%');
 
   const edited = load();
   edited.characters.items.find(c => c.id === 'skin_volt_default').materialOverrides.emissive = '#00FF88';
