@@ -4,7 +4,9 @@
  * char_nailong → nailoong.glb 带 Laugh（无缝循环的笑），char_bball → bball.glb 带 Basketball
  * （投篮，首末姿差 117.16° 只能 LoopOnce）；其余 10 个核心 clip 两边同名同规格。
  * 优先级（上层压下层，逐条对应「玩家此刻在干什么」）：
- *   ① QA 锁 ?anim=<ClipName>（仅 dev/QA，见 readAnimLock）→ 强制循环
+ *   ① QA 锁 ?anim=<ClipName>（仅 dev/QA，见 readAnimLock）→ 强制循环；
+ *     表演 clip（Laugh/Basketball）锁播满一期自动交还状态机（演示用，不永久接管），
+ *     核心循环锁持续锁播、核心一次性锁播完即解锁（解锁实现都在 animAvatar）
  *   ② !alive → Death 播一次保持末帧；进死亡那一下从 0 重起（restart）
  *   ③ stunT>0 → Hit 循环
  *   ④ fx.flyT>0 || s.gliding → Fly 循环
@@ -44,6 +46,11 @@ export type PerfClipName = typeof PERF_CLIP_NAMES[number];
 /** 可无缝循环的 clip（建模侧实测首末姿一致）：其余一律只播一次。
  *  Basketball 故意不在内：首末姿差 117.16°，LoopRepeat 会每圈硬跳（见 PERF_CLIP_NAMES 注释）。 */
 export const LOOPING_CLIPS = ['Run', 'Slide', 'Laugh', 'Fly'] as const;
+
+/** 是否表演 clip（QA 锁的「演示一期」语义只对它们生效，见 animAvatar 的解锁块） */
+export function isPerfClip(name: ClipName): boolean {
+  return (PERF_CLIP_NAMES as readonly string[]).includes(name);
+}
 
 /** 该 clip 能否 LoopRepeat。QA 锁与状态映射共用同一口径，禁止两头各写一份 */
 export function loopsForever(name: ClipName): boolean {

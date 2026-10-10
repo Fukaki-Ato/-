@@ -10,7 +10,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   CLIP_NAMES, CORE_CLIP_NAMES, PERF_CLIP_NAMES, LOOPING_CLIPS, asClipName, createClipContext,
-  loopsForever, pickClip, readAnimLock,
+  isPerfClip, loopsForever, pickClip, readAnimLock,
 } from '../packages/game/dist/render/animClips.js';
 
 /** RunnerState 夹具（字段与 simTypes.ts 对齐；空装备默认值） */
@@ -34,6 +34,9 @@ test('资产契约：CORE 10 + PERF 2 共 12 个 clip 名，与 glb 内 Animatio
     ['Death', 'Fly', 'Hit', 'Idle', 'Jump', 'Land', 'Run', 'Slide', 'TurnLeft', 'TurnRight']);
   assert.deepEqual([...PERF_CLIP_NAMES].sort(), ['Basketball', 'Laugh'],
     '奶龙带 Laugh、篮球小子带 Basketball，两个资产的表演 clip 不同源');
+  assert.deepEqual([...PERF_CLIP_NAMES].filter(isPerfClip).sort(), ['Basketball', 'Laugh']);
+  assert.equal(isPerfClip('Run'), false, '核心 clip 不是表演 clip（锁播一期语义只对表演 clip 生效）');
+  assert.equal(isPerfClip('Death'), false);
   assert.equal(CLIP_NAMES.length, 12, 'CORE 10 + PERF 2');
   assert.deepEqual([...CLIP_NAMES].sort(),
     ['Basketball', 'Death', 'Fly', 'Hit', 'Idle', 'Jump', 'Land', 'Laugh', 'Run', 'Slide', 'TurnLeft', 'TurnRight']);

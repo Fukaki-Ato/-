@@ -11,7 +11,7 @@ import type { FxState } from '@tr/game/core/effects/buffEngine.js';
 import { STEP_DT } from '@tr/game/core/sim/simTypes.js';
 import type { RunnerState } from '@tr/game/core/sim/simTypes.js';
 import {
-  CORE_CLIP_NAMES, PERF_CLIP_NAMES, createClipContext, loopsForever, pickClip, readAnimLock,
+  CORE_CLIP_NAMES, PERF_CLIP_NAMES, createClipContext, isPerfClip, loopsForever, pickClip, readAnimLock,
   type ClipContext, type ClipName,
 } from './animClips.js';
 import { RUN_BONE_AMPS, amplifyClipSwing } from './animAmplify.js';
@@ -143,6 +143,9 @@ function build(
   let footfall: ((x: number, y: number, z: number) => void) | null = null;
   const inContact = { L: false, R: false };
   const entryZ = { L: 0, R: 0 };
+  /** 表演 clip 锁播累计秒与当前 clip：满一期交还状态机（LoopRepeat 的 time 会归零，不能靠 time 判） */
+  let perfLockT = 0;
+  let perfLockClip: ClipName | null = null;
   /** QA 探针（?debug/?test 时挂 window.__trAnim）：clip 切换时间线 + 正在播的 action 快照 */
   const clipLog: Array<{ clip: ClipName; loop: boolean; restart: boolean; t: number }> = [];
   /** QA 锁 ?anim=（build 时读入；一次性 clip 播完自动置 null，见 update 里的解锁块）。
@@ -249,6 +252,13 @@ function build(
       // 循环锁（Run/Slide/Fly/Laugh）不受影响，持续锁播；死亡定格场景由状态机自己接管
       // （仍 !alive → 继续返回 Death，观感不变）。
       if (lock && !pick.loop && act && act.time >= act.getClip().duration - 1e-4) lock = null;
+      // 表演 clip 锁播满一期同样交还：?anim=Laugh 播 2s 欢呼后自动回跑（状态机永不播表演 clip）
+      if (lock && isPerfClip(pick.clip)) {
+        if (perfLockClip !== pick.clip) { perfLockClip = pick.clip; perfLockT = 0; }
+        perfLockT += dt;
+        const pa = actions[pick.clip];
+        if (pa && perfLockT >= pa.getClip().duration) { lock = null; perfLockClip = null; perfLockT = 0; }
+      } else if (perfLockClip) { perfLockClip = null; perfLockT = 0; }
       // Run 步频补偿：用 sim 固定步长的精确速度（distance/prevDistance 是同一步的前后值，
       // STEP_DT 归一），不用「帧位移/dt」估——渲染帧率高于 sim 步频时（120Hz/144Hz 屏）
       // 没有 step 的渲染帧会被估成 0 速，timeScale 在 TS_MIN↔TS_MAX 之间振荡，步频一快一慢。

@@ -21,9 +21,9 @@ const SIM_SEED = () => hashSeed('char-test');
 /** 跑 n 秒（不注入任何操作，只让 sim 自己走） */
 function run(sim, seconds) { for (let i = 0; i < 60 * seconds; i++) { sim.step(); sim.drainEvents(); } }
 
-test('首发 7 个角色都能装配出完整装备（主动技能 + 被动天赋）', () => {
+test('首发 8 个角色都能装配出完整装备（主动技能 + 被动天赋）', () => {
   const chars = playableCharacters(content);
-  assert.equal(chars.length, 7, `应为 7 个可玩角色，实际 ${chars.length}`);
+  assert.equal(chars.length, 8, `应为 8 个可玩角色，实际 ${chars.length}`);
   for (const c of chars) {
     const l = buildLoadout(content, c.id);
     assert.equal(l.charId, c.id);
@@ -47,6 +47,8 @@ test('被动天赋在开局即生效（run_start 触发）', () => {
     char_nailong: s => assert.equal(s.fx.coinPct, 5, '奶龙：金币 +5%'),
     // 篮球小子同样复用冲刺技能 + 金币天赋（GLB 外观角色，玩法不出圈）；模型走 bball.glb
     char_bball: s => assert.equal(s.fx.coinPct, 5, '篮球小子：金币 +5%'),
+    // 鲸鱼女仆同样复用冲刺技能 + 金币天赋（GLB 外观角色，玩法不出圈）；模型走 whale.glb
+    char_whale: s => assert.equal(s.fx.coinPct, 5, '鲸鱼女仆：金币 +5%'),
   };
   for (const [id, check] of Object.entries(cases)) {
     const sim = new RunnerSim(content, SIM_SEED(), id);
@@ -178,6 +180,8 @@ test('渲染装配同样来自配置：体色/发光色/体量读皮肤 material
   assert.equal(buildLoadout(content, 'char_volt').prefab, 'assets/characters/volt.glb');
   assert.equal(buildLoadout(content, 'char_bball').prefab, 'assets/characters/bball.glb');
   assert.equal(buildLoadout(content, 'char_bball').modelScale, 1.0, '篮球小子 1 单位=1m，不缩放');
+  assert.equal(buildLoadout(content, 'char_whale').prefab, 'assets/characters/whale.glb');
+  assert.equal(buildLoadout(content, 'char_whale').modelScale, 1.0, '鲸鱼女仆 Q 版 1.52m，按 1.0 试玩不定档');
 
   const edited = load();
   edited.characters.items.find(c => c.id === 'skin_volt_default').materialOverrides.emissive = '#00FF88';
