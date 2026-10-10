@@ -4,6 +4,8 @@ import { createGameFlow } from '@tr/game/flow/mainFlow.js';
 import { createOverlayViews } from '@tr/game/ui/overlayViews.js';
 import { createUiShell } from './uiShell.js';
 import '../style.css';
+import { createCharacterSelectOverlay } from './characterSelectOverlay.js';
+import { createShopOverlay } from './shopOverlay.js';
 import { createTestPanel } from './testPanel.js';
 
 const mount = document.getElementById('screen')!;
@@ -17,9 +19,12 @@ async function main(): Promise<void> {
   const views = createOverlayViews({
     host: shell.host, badges: shell.badges, backdrop: shell.backdrop,
     onLobbyVisible: v => shell.setBackgroundVisible(v), // 背景视频只在大厅解码
+    selectRenderer: (content, actions, currentCharId, entry) =>
+      createCharacterSelectOverlay(content, actions, currentCharId, entry, shell.fonts),
+    shopRenderer: (content, actions) => createShopOverlay(content, actions, shell.fonts),
   });
   shell.host.start();
-  // UI 就绪：撤掉 index.html 的静态占位文案（此后画布之上不再需要 DOM）
+  // UI 就绪：撤掉 index.html 的静态占位文案；角色选择页与商店按需挂载 Web DOM overlay
   mount.textContent = '';
 
   const flow = createGameFlow({
