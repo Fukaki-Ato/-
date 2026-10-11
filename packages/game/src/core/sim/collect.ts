@@ -11,10 +11,16 @@ import { VACUUM_RANGE_M, type RunnerState, type SimEvent } from './simTypes.js';
 const COIN_Y_TOL = 1.3;
 /** 金币横向判定：车道中心 ±0.9 米 */
 const COIN_X_TOL = 0.9;
-/** 道具箱横向/纵向判定（箱子比金币大，容差略宽） */
+/** 道具箱横向判定（箱子比金币大，容差略宽） */
 const PICKUP_X_TOL = 1.0;
 const PICKUP_Y_TOL = 1.4;
-const PICKUP_CENTER_Y = 0.75;
+/**
+ * 道具箱的悬浮中心高度（米）：渲染层直接用这一个数（entityLayers 贴砖图时同源），
+ * 免得「看得见的位置」和「吃得到的位置」各写各的。2026-10-07 从 0.75 抬到 1.15：
+ * 砖图正面贴徽标后需要正对玩家才认得出道具，抬到胸口高度既更显眼也不挡路面视线。
+ * 容差 1.4m 远大于抬升量，地面跑动照旧必吃（|0.9-1.15|=0.25）。
+ */
+export const PICKUP_CENTER_Y = 1.15;
 
 export interface CollectDeps {
   state: RunnerState;
