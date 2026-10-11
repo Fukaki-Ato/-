@@ -14,6 +14,9 @@ interface Row {
   time: HTMLSpanElement;
 }
 
+/** __trAnim.lock 的类型（packages/game 探针；本文件只读不 import，保持 web 壳边界） */
+type ClipLock = string | null;
+
 const CSS = `
 .tr-test { position: fixed; left: 10px; top: 50%; transform: translateY(-50%); z-index: 20;
   width: 208px; max-height: 82vh; display: flex; flex-direction: column;
@@ -39,6 +42,7 @@ const CSS = `
   color: #e8f1ff; background: rgba(127, 209, 255, .12); border: 1px solid rgba(127, 209, 255, .3); font-size: 11px; }
 .tr-test .act:hover { background: rgba(127, 209, 255, .22); }
 .tr-test .note { padding: 6px; color: #8fa3c4; font-size: 11px; }
+.tr-test .lock { padding: 6px; color: #ffd84d; font-size: 11px; border-top: 1px solid rgba(255, 216, 77, .3); }
 `;
 
 export interface TestPanel { dispose(): void }
@@ -73,6 +77,11 @@ export function createTestPanel(): TestPanel {
 
   const rows: Row[] = [];
   const actBtns: { primitive: string; el: HTMLButtonElement }[] = [];
+  /** 动画锁提示行：?anim= QA 锁曾把角色永久定在末帧（用户实测「一开始好的之后没动作」），
+ *  这里让锁的状态可见——生效中 / 已播完自动解锁，并告知去掉 URL 参数即恢复。 */
+  const lockNote = document.createElement('div');
+  lockNote.className = 'lock';
+  lockNote.style.display = 'none';
   let built = false;
   let expanded = true;
 
@@ -86,6 +95,7 @@ export function createTestPanel(): TestPanel {
       note.className = 'note';
       note.textContent = '已开启（?debug）。进入跑酷局后这里会列出可开关的技能。';
       body.appendChild(note);
+      body.appendChild(lockNote);
       rows.length = 0; actBtns.length = 0;
       built = false;
       return;
@@ -138,11 +148,25 @@ export function createTestPanel(): TestPanel {
       body.appendChild(btn);
       actBtns.push({ primitive: act.primitive, el: btn });
     }
+    body.appendChild(lockNote);
   }
 
   function sync() {
     build();
     const a = api();
+    // 动画锁提示：局内以 __trAnim.lock 为准（一次性 clip 播完会自动解锁），局外看 URL
+    const anim = (globalThis as Record<string, unknown>).__trAnim as { lock?: ClipLock } | undefined;
+    const urlLock = new URLSearchParams(location.search).get('anim');
+    const active = anim ? (anim.lock ?? null) : urlLock;
+    if (active) {
+      lockNote.textContent = `动画锁 ?anim=${active} 生效中（QA 演示；去掉 URL 里的 anim 参数即恢复）`;
+      lockNote.style.display = '';
+    } else if (urlLock && anim) {
+      lockNote.textContent = `动画锁 ${urlLock} 已播完，自动解锁（角色已回状态机）`;
+      lockNote.style.display = '';
+    } else {
+      lockNote.style.display = 'none';
+    }
     if (!a) return;
     const state = a.state();
     for (const r of rows) {
