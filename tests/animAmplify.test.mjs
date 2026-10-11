@@ -54,7 +54,7 @@ test('amplifyQuaternion：接近 ref / 相对角≈π 时原样返回（不炸�
 });
 
 test('amplifyQuaternion：4D 长弧（q 与 ref 反号）键按短弧放大，不被近-π 守卫跳过', () => {
-  // 真实资产命中过：nailoong.glb Run 的 LegUpperR 有 14/30 键是反号存储（rel.w<0）。
+  // 真实资产命中过：frog.glb Run 的 LegUpperR 有 14/30 键是反号存储（rel.w<0）。
   // 旧实现把这些长弧键（angle>π）误判成「相对角≈π 的轴病态帧」原样返回，
   // 右腿半段摆幅没被放大、步幅比左腿窄 12%（脚 z 行程 0.572m vs 0.650m）。
   const ref = rotX(0.4);

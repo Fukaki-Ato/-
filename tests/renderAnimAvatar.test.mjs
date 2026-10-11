@@ -1,5 +1,5 @@
 /**
- * animAvatar 胶水回归（真实 nailoong.glb 资产口径）：
+ * animAvatar 胶水回归（奶蛙真实 frog.glb 资产口径）：
  *   ① Idle 播完的「回卷」必须交叉淡化连贯——旧实现里 spare 与主 action 是同一实例（three 按
  *      clip+root 缓存 clipAction），fadeOut 被紧随的 reset() 取消，右手一帧瞬跳 0.69m。
  *   ② Run 步态放大必须覆盖所有键（含 4D 反号存储的长弧键）——旧实现的「近-π 轴病态」守卫写法
@@ -22,7 +22,7 @@ const { createAnimAvatar } = await import('../packages/game/dist/render/animAvat
 const { initialRunnerState } = await import('../packages/game/dist/core/sim/simTypes.js');
 const { meanQuaternion, amplifyClipSwing, RUN_BONE_AMPS } = await import('../packages/game/dist/render/animAmplify.js');
 
-const GLB = 'assets/characters/nailoong.glb';
+const GLB = 'assets/characters/frog.glb';
 const glbBuffer = () => {
   const b = readFileSync(GLB);
   return b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength);
