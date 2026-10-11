@@ -2,13 +2,13 @@
  * 落脚尘土 + 步频回归（render/animAvatar 的落脚探测 + render/footDust 池）。
  *
  * 为什么值得单独立门禁：
- *   奶龙 Run 的脚行程只有 0.65m/周期，而 12 m/s 下一个周期身体前进 6.7m——脚相对地面
+ *   奶蛙 frog.glb 的 Run 脚行程只有 0.65m/周期，而 12 m/s 下一个周期身体前进 6.7m——脚相对地面
  *   90% 在滑。用户四轮反馈的落点都是「看不出在跑步」，代码侧能做的只有两件：
  *   ① 把步频/摆腿从「风车档」调回可读档（本文件用真实 GLB 跑整条管线量化）；
  *   ② 给每次蹬地补一圈贴地尘土，把滑步读成蹬地（本文件验 cadence 与平流）。
  *   步幅本身受腿长锁死，无代码解，只能等建模侧重导 sprint cycle（见 animAmplify.ts 头）。
  *
- * 真实资产口径：直接走 createAnimAvatar（GLTFLoader 解析 nailoong.glb → 11 clip 装配 →
+ * 真实资产口径：直接走 createAnimAvatar（GLTFLoader 解析 frog.glb → 11 clip 装配 →
  * amplifyClipSwing → mixer），不拿合成 clip 近似，数值与局内逐帧一致。
  */
 import test from 'node:test';
@@ -28,7 +28,7 @@ const { createAnimAvatar } = await import('../packages/game/dist/render/animAvat
 const { createFootDust } = await import('../packages/game/dist/render/footDust.js');
 const { initialRunnerState } = await import('../packages/game/dist/core/sim/simTypes.js');
 
-const GLB = 'assets/characters/nailoong.glb';
+const GLB = 'assets/characters/frog.glb';
 /** GLTFLoader.parse 只认 ArrayBuffer（Node 的 Buffer 会被判成非 glTF 资产），这里转一手 */
 const adapter = { extras: { readBinary: async () => {
   const b = readFileSync(GLB);

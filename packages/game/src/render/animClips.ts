@@ -1,6 +1,6 @@
 /**
  * 动作 clip 选择（纯函数、零依赖，node --test 直接回归；three 的播放胶水在 animAvatar.ts）
- * 数据来源：char_nailong → assets/characters/nailoong.glb 的 11 个命名动画 clip（资产契约：
+ * 数据来源：char_frog → assets/characters/frog.glb 的 11 个命名动画 clip（资产契约：
  * Idle/Run/Laugh/Slide/Jump/TurnLeft/TurnRight/Fly/Land/Hit/Death，1 单位=1m、脚底在原点、面朝 -Z）。
  * 优先级（上层压下层，逐条对应「玩家此刻在干什么」）：
  *   ① QA 锁 ?anim=<ClipName>（仅 dev/QA，见 readAnimLock）→ 强制循环

@@ -3,7 +3,7 @@
  * docs/05 §1 画面支柱②「角色霓虹描边与拖尾」的描边部分在 runnerModel 里，本文件负责：
  *   位置/朝向、四档姿态选择、受击摇晃、以及喷气背包·头盔·护盾三个 buff 挂件。
  * 双路径（决策记录）：
- *   - look.prefab 存在且平台 extras.readBinary 可用 → animAvatar 的 GLB 驱动（char_nailong，11 clip）；
+ *   - look.prefab 存在且平台 extras.readBinary 可用 → animAvatar 的 GLB 驱动（当前为奶蛙，11 clip）；
  *     异步加载，加载完成前程序化模型照常可见，就绪即热替换，不阻塞开局；
  *   - 其余一切情况（无 prefab / 无 extras.readBinary / 资源或 clip 不合格）→ 程序化 runnerModel，行为不变。
  * 只读 sim 状态，不反写玩法数据（docs/02 §5 单向数据流）。
@@ -36,7 +36,7 @@ export function pickAvatarMode(s: RunnerState): 'run' | 'air' {
   return s.y > s.supportY + AIRBORNE_EPS ? 'air' : 'run';
 }
 
-/** buff 挂件在 GLB 骨骼上的锚点（骨骼名 + 骨内偏移；奶龙骨骼高度契约：Chest 1.05 / Head 1.45m） */
+/** buff 挂件在 GLB 骨骼上的锚点（骨骼名 + 骨内偏移；frog.glb 高度契约：Chest 1.05 / Head 1.45m） */
 const VFX_ANCHOR = {
   flame: { bone: 'Chest', offset: new THREE.Vector3(0, 0.35, 0.30) }, // 喷气火焰：背后背包位
   helmet: { bone: 'Head', offset: new THREE.Vector3(0, 0.22, 0) },
@@ -71,7 +71,7 @@ export function createAvatar(scene: THREE.Scene, laneWidth: number, look: Loadou
   helmet.position.set(0, model.headLocalY, 0);
   shieldOrb.position.set(0, model.chestLocalY, 0);
 
-  // ---------- GLB 驱动（char_nailong：look.prefab → animAvatar，11 个 clip） ----------
+  // ---------- GLB 驱动（奶蛙：look.prefab → animAvatar，11 个 clip） ----------
   // 落脚尘土（render 层）：GLB 路径专属。脚行程被腿长锁死在 0.65m/周期而 12 m/s 下身体前进
   // 6.7m/周期，没有落地反馈就读不出在跑；冲击环贴地随赛道平流，把滑步读成蹬地。
   const dust = createFootDust(scene);

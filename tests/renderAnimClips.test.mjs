@@ -1,5 +1,5 @@
 /**
- * 动作 clip 映射回归（char_nailong → nailoong.glb 的 11 个 clip，见 render/animClips.ts）。
+ * 动作 clip 映射回归（char_frog → frog.glb 的 11 个 clip，见 render/animClips.ts）。
  * 为什么锁得这么细：状态→clip 的优先级是「玩家此刻在干什么」的翻译表，任意一条被改动
  * （比如把 Hit 放 Death 前面、Land 忘了播一次）都不会编译报错，只会让局内动作莫名错乱，
  * 所以把完整映射表、Land 的一次性、Turn 的方向、Death 的重新起播、?anim= QA 锁全部固化。
