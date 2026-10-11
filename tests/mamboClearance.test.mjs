@@ -1,15 +1,15 @@
 /**
- * 马耳女仆 char_pony 接入 + 「矮」被动（角色净空 clearance）回归。
+ * 曼波 char_mambo 净空回归（原 char_pony 建模/净空数据并入曼波）。
  *
  * 背景：碰撞判定原本硬编码 playerH = sliding ? 0.7 : 1.7（collision.ts），角色身高不参与
- * 净空判定——接入 char_pony 后它并不会获得「不用滑铲就能过滑铲挡板」的优势。
+ * 净空判定——接入 pony.glb 建模后它并不会获得「不用滑铲就能过滑铲挡板」的优势。
  * 本批次把站立净空高改成 per-character 配置（characters.json clearance，缺省 STAND_H=1.7），
  * 高杆门 obs_gate_low 的判定改读它：
- *   - char_pony 净空 1.19 < 横杆下沿 BAR_BOTTOM 1.2 → 站立可直接钻过（tagline「矮个也能直接过挡板」）
+ *   - char_mambo 净空 1.19 < 横杆下沿 BAR_BOTTOM 1.2 → 站立可直接钻过（tagline「矮，是一种战术」）
  *   - 其余角色净空 ≥1.52 > 1.2 → 站立仍然被挡，必须滑铲（行为与改动前逐字节一致）
  *   - 滑铲净空 SLIDE_H 0.7 所有角色统一（滑铲是姿态不是身高）
  *
- * 为什么 pony 取 1.19 而非建模侧建议的 1.31：实测资产头 mesh 顶 1.18m、贝雷帽 1.301m、
+ * 为什么取 1.19 而非建模侧建议的 1.31：实测资产头 mesh 顶 1.18m、贝雷帽 1.301m、
  * 马耳 1.267m，而横杆下沿 1.2m——按 1.31 直接替换站立仍会被挡（1.31 > 1.2），验收不过。
  * 取「头部以下身体净空」1.18 + 0.01 余量；帽/耳超过横杆的部分视为装饰不参与碰撞
  * （站立钻杆时视觉插杆 6.7~10.1cm，属资产侧已知取舍）。
@@ -36,8 +36,8 @@ test('loadout.clearance：按配置读数，缺省回落 STAND_H', () => {
   assert.equal(STAND_H, 1.7);
   assert.equal(SLIDE_H, 0.7);
   assert.equal(BAR_BOTTOM, 1.2);
-  // 马耳女仆：头 mesh 顶实测 1.18 + 0.01 余量（< BAR_BOTTOM 才能站立钻杆）
-  assert.equal(buildLoadout(content, 'char_pony').clearance, 1.19);
+  // 曼波（沿用建模数据）：头 mesh 顶实测 1.18 + 0.01 余量（< BAR_BOTTOM 才能站立钻杆）
+  assert.equal(buildLoadout(content, 'char_mambo').clearance, 1.19);
   // 老角色：显式值均 > BAR_BOTTOM，站立行为与硬编码 1.7 时代一致
   assert.equal(buildLoadout(content, 'char_whale').clearance, 1.52);
   assert.equal(buildLoadout(content, 'char_bball').clearance, 1.70);
@@ -52,7 +52,7 @@ test('loadout.clearance：按配置读数，缺省回落 STAND_H', () => {
 
 test('高杆门判定矩阵：矮个站立可钻、其余站立被挡、全员滑铲可过、越顶可过', () => {
   // 站立：净空 ≤ 横杆下沿才过得去
-  assert.equal(hitsRunner(GATE, runner(0), 2.2, 1.19), false, 'char_pony（1.19<1.2）站立应直接钻过');
+  assert.equal(hitsRunner(GATE, runner(0), 2.2, 1.19), false, 'char_mambo（1.19<1.2）站立应直接钻过');
   assert.equal(hitsRunner(GATE, runner(0), 2.2, 1.2), false, '净空恰好等于横杆下沿也算过（不大于）');
   assert.equal(hitsRunner(GATE, runner(0), 2.2, 1.21), true, '净空高出杆沿 1cm 即判中');
   assert.equal(hitsRunner(GATE, runner(0), 2.2, 1.52), true, '鲸鱼女仆站立必须被挡');
@@ -91,9 +91,9 @@ function gateSim(charId) {
   return { sim, gate };
 }
 
-test('sim 差分：char_pony 零输入站立冲过滑铲门；对照角色同一时点被挡死', () => {
-  const pony = gateSim('char_pony');
-  assert.ok(pony.sim.state.alive, 'char_pony 应活着（站立钻过滑铲门）');
+test('sim 差分：char_mambo 零输入站立冲过滑铲门；对照角色同一时点被挡死', () => {
+  const pony = gateSim('char_mambo');
+  assert.ok(pony.sim.state.alive, '曼波应活着（站立钻过滑铲门）');
   assert.ok(pony.sim.state.distance > pony.gate.worldZ + 1,
     `应已越过门（dist=${pony.sim.state.distance.toFixed(1)} > ${pony.gate.worldZ + 1}）`);
   assert.equal(pony.sim.state.hits, 0, '全程不应受击');
@@ -106,8 +106,8 @@ test('sim 差分：char_pony 零输入站立冲过滑铲门；对照角色同一
   }
 });
 
-test('sim 差分：char_pony 滑铲同样能过（净空被动不破坏滑铲路径）', () => {
-  const sim = new RunnerSim(content, 4242, 'char_pony');
+test('sim 差分：char_mambo 滑铲同样能过（净空被动不破坏滑铲路径）', () => {
+  const sim = new RunnerSim(content, 4242, 'char_mambo');
   sim.state.t = 20;
   sim.obstacles.length = 0; sim.coinsArr.length = 0; sim.pickupsArr.length = 0; sim.cloudsArr.length = 0;
   const gate = { obsRef: 'obs_gate_low', cls: 'high', w: 2, h: 2.6, d: 0.6, lane: 0, worldZ: sim.state.distance + 40 };
@@ -121,5 +121,5 @@ test('sim 差分：char_pony 滑铲同样能过（净空被动不破坏滑铲路
     sim.step();
   }
   assert.ok(slid, '应触发过滑铲');
-  assert.ok(sim.state.alive, 'char_pony 滑铲也应能过');
+  assert.ok(sim.state.alive, '曼波滑铲也应能过');
 });

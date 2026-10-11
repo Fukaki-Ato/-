@@ -55,7 +55,7 @@ export interface Loadout {
   prefab?: string;
   /** 角色站立碰撞净空高（米，characters.json clearance，缺省 STAND_H=1.7）：
  *  高杆门 obs_gate_low 的碰撞判定读它——净空低于横杆下沿（BAR_BOTTOM=1.2）的角色
- *  （char_pony，头 mesh 顶实测 1.18m）可不滑铲直接钻过；其余角色仍必须滑铲。
+ *  （char_mambo，头 mesh 顶实测 1.18m）可不滑铲直接钻过；其余角色仍必须滑铲。
  *  贝雷帽/马耳等超过横杆的装饰件不参与碰撞（视觉插杆属已知取舍，资产侧不改）。 */
   clearance: number;
 }
