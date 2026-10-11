@@ -1,7 +1,7 @@
 /**
  * 篮球小子（char_bball → assets/characters/bball.glb）GLB 装配回归。
  *
- * 为什么单独立文件：它的 clip 集与奶龙不同源——没有 Laugh、多一个 Basketball（投篮）。
+ * 为什么单独立文件：它的 clip 集与奶蛙不同源——没有 Laugh、多一个 Basketball（投篮）。
  * 头号阻塞就是 animClips 旧契约「CLIP_NAMES 缺一即不合格」会让整条 GLB 路径静默回退
  * 程序化模型（控制台只有一行 warn，局内表现为「角色根本不换」）。CORE/PERF 拆分后，
  * 这里把装配口径、缺失表演 clip 回落 Run、Basketball 的 LoopOnce、脚部探针全部固化成门禁。
@@ -25,7 +25,7 @@ if (typeof URL.revokeObjectURL !== 'function') URL.revokeObjectURL = () => {};
 const { createAnimAvatar } = await import('../packages/game/dist/render/animAvatar.js');
 const { initialRunnerState } = await import('../packages/game/dist/core/sim/simTypes.js');
 
-const NAILONG = 'assets/characters/nailoong.glb';
+const FROG = 'assets/characters/frog.glb';
 const BBALL = 'assets/characters/bball.glb';
 
 /** GLTFLoader.parse 只认 ArrayBuffer（Node 的 Buffer 会被判成非 glTF 资产），这里转一手 */
@@ -100,13 +100,13 @@ test('篮球小子锁 ?anim=Laugh（资产没有该 clip）→ 回落 Run，不�
   assert.equal(feet.at(-1).act.clip, 'Run', '缺失的表演 clip 必须回落 Run');
 });
 
-test('奶龙回归：Laugh 仍能锁播且循环；锁 Basketball（奶龙没有）→ 回落 Run', async () => {
-  const laugh = await drive(NAILONG, 0.5, 12, 'debug&anim=Laugh');
-  assert.equal(laugh.feet.at(-1).act.clip, 'Laugh', '奶龙必须仍能播 Laugh');
+test('奶蛙回归：Laugh 仍能锁播且循环；锁 Basketball（奶蛙没有）→ 回落 Run', async () => {
+  const laugh = await drive(FROG, 0.5, 12, 'debug&anim=Laugh');
+  assert.equal(laugh.feet.at(-1).act.clip, 'Laugh', '奶蛙必须仍能播 Laugh');
   assert.equal(laugh.log.find(e => e.clip === 'Laugh').loop, true, 'Laugh 无缝故循环');
 
-  const miss = await drive(NAILONG, 0.5, 12, 'debug&anim=Basketball');
-  assert.equal(miss.feet.at(-1).act.clip, 'Run', '奶龙没有 Basketball，回落 Run');
+  const miss = await drive(FROG, 0.5, 12, 'debug&anim=Basketball');
+  assert.equal(miss.feet.at(-1).act.clip, 'Run', '奶蛙没有 Basketball，回落 Run');
 });
 
 test('无锁状态机：篮球小子贴地前进时 Idle→Run 一次切换后持续循环，不跳 clip', async () => {

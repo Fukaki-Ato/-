@@ -100,8 +100,7 @@ function build(
   isDead?: () => boolean,
 ): AnimAvatar | null {
   // 核心 clip（10 个）缺一即判资产不合格：半套动作比没有更糟（会静默少播受击/死亡等关键反馈）。
-  // 表演 clip（Laugh/Basketball）按存在性装配：奶龙带 Laugh、篮球小子带 Basketball，
-  // 两个资产的表演 clip 不同源，缺一个不判失败——pickClip 命中缺失的由 play() 回落 Run。
+  // 表演 clip（Laugh/Basketball）按存在性装配：奶蛙与篮球小子不同源，缺一个不判失败，缺失由 play() 回落 Run。
   const actions = {} as Record<ClipName, THREE.AnimationAction | null>;
   const mixer = new THREE.AnimationMixer(root);
   for (const name of CORE_CLIP_NAMES) {
@@ -125,8 +124,7 @@ function build(
   }
   // Run 步态放大（render 层解释，资产文件零改动）：v8 Run 是慢跑规格（脚行程 ~0.45m/周期），
   // baseSpeed 12 m/s 下一步覆盖 2.5m、timeScale 又被 TS_MAX 钳住，原样播就是「原地倒腾短腿+滑步」。
-  // 只放大 Run 的四肢摆动；Idle/Jump/Land/Death… 一律逐字节不动，循环口径不受影响。
-  // RUN_BONE_AMPS 的十个骨名（LegUpperL/R…ArmLowerL/R）奶龙与篮球小子都实测命中，放大同款生效。
+  // 只放大 Run 的四肢摆动，循环口径不受影响；RUN_BONE_AMPS 十骨（LegUpperL/R…ArmLowerL/R）奶蛙与篮球小子实测命中。
   const runAct = mixer.clipAction(amplifyClipSwing(clips.find(c => c.name === 'Run')!, RUN_BONE_AMPS));
   actions.Run = runAct;
 
@@ -164,7 +162,7 @@ function build(
    */
   const idleClip = clips.find(c => c.name === 'Idle');
   const idleAltClip = idleClip?.clone() ?? null;
-  let idleAct = actions.Idle;
+  let idleAct = actions.Idle as THREE.AnimationAction; // CORE 必存在（上面缺一即 return null）
   let idleSpare: THREE.AnimationAction | null = null;
   function idleCrossfadeToHead() {
     if (!idleClip || !idleAltClip) return;

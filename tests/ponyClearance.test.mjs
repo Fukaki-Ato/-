@@ -41,7 +41,7 @@ test('loadout.clearance：按配置读数，缺省回落 STAND_H', () => {
   // 老角色：显式值均 > BAR_BOTTOM，站立行为与硬编码 1.7 时代一致
   assert.equal(buildLoadout(content, 'char_whale').clearance, 1.52);
   assert.equal(buildLoadout(content, 'char_bball').clearance, 1.70);
-  assert.equal(buildLoadout(content, 'char_nailong').clearance, 1.70);
+  assert.equal(buildLoadout(content, 'char_frog').clearance, STAND_H);
   // 无 clearance 字段的角色（程序化模型/未交付 GLB 的 rina、bolt）回落标准身高
   for (const id of ['char_volt', 'char_ama', 'char_kaze', 'char_rina', 'char_bolt']) {
     assert.equal(buildLoadout(content, id).clearance, STAND_H, `${id} 应回落 ${STAND_H}`);

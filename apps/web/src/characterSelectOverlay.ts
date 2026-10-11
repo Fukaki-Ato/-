@@ -3,19 +3,11 @@ import { buildLoadout, playableCharacters } from '@tr/game/core/sim/character.js
 import type { CharacterSelectPageActions } from '@tr/game/flow/views.js';
 import { entryLabel, type EntryMethod } from '@tr/game/flow/session.js';
 import type { FontSet } from '@tr/framework/ui/text/metrics.js';
+import { applyCharacterArt, createCharacterPortrait, getCharacterArt } from './characterArt.js';
 import { createShopTextRenderer } from './shopText.js';
 import { installCharacterSelectKeyboard } from './characterSelectKeyboard.js';
 import backgroundArt from './assets/character-select/bg_select.webp';
-import runnerSheet from './assets/character-select/runners-sheet-centered.png';
 import './characterSelectOverlay.css';
-
-const ART_CELLS: Record<string, [string, string]> = {
-  char_volt: ['0%', '0%'],
-  char_ama: ['50%', '0%'],
-  char_kaze: ['100%', '0%'],
-  char_rina: ['0%', '100%'],
-  char_bolt: ['50%', '100%'],
-};
 
 interface RosterItem {
   entry: NamedEntry;
@@ -45,20 +37,10 @@ function unlockLabel(entry: NamedEntry): string {
 }
 
 function makePortrait(item: RosterItem, className: string): HTMLDivElement {
-  const portrait = document.createElement('div');
-  portrait.className = className;
-  portrait.setAttribute('aria-hidden', 'true');
-  portrait.style.setProperty('--char-tint', item.loadout.tint);
-  const position = ART_CELLS[item.loadout.charId];
-  if (position) {
-    portrait.classList.add('is-sheet-art');
-    portrait.style.backgroundImage = `url("${runnerSheet}")`;
-    portrait.style.backgroundPosition = `${position[0]} ${position[1]}`;
-  } else {
-    portrait.classList.add('is-generic-art');
-    portrait.append(sdf('span', [...item.loadout.name][0] ?? '跑', 'select-portrait-initial', '#fff8e5'));
-  }
-  return portrait;
+  return createCharacterPortrait(
+    { charId: item.loadout.charId, name: item.loadout.name, tint: item.loadout.tint },
+    className,
+  );
 }
 
 function makeButton(label: string, className: string, ariaLabel: string): HTMLButtonElement {
@@ -212,18 +194,7 @@ export function createCharacterSelectOverlay(
     selectedIndex = items.indexOf(item);
     const tint = item.loadout.tint;
     root.style.setProperty('--char-tint', tint);
-    heroPortrait.style.setProperty('--char-tint', tint);
-    const position = ART_CELLS[id];
-    heroPortrait.classList.toggle('is-sheet-art', Boolean(position));
-    heroPortrait.classList.toggle('is-generic-art', !position);
-    if (position) {
-      heroPortrait.style.backgroundImage = `url("${runnerSheet}")`;
-      heroPortrait.style.backgroundPosition = `${position[0]} ${position[1]}`;
-      heroPortrait.replaceChildren();
-    } else {
-      heroPortrait.style.backgroundImage = '';
-      heroPortrait.replaceChildren(sdf('span', [...item.loadout.name][0] ?? '跑', 'select-portrait-initial', '#fff8e5'));
-    }
+    applyCharacterArt(heroPortrait, getCharacterArt({ charId: id, name: item.loadout.name, tint }));
     rarity.textContent = `${item.loadout.rarity} · ${id.replace(/^char_/, '').toUpperCase()}`;
     rarity.style.setProperty('--rarity-color', item.loadout.rarity === 'SSR' ? '#ffc86e' : item.loadout.rarity === 'SR' ? '#7ee0d0' : '#d9e6e3');
     state.textContent = item.locked ? '锁定 · 仅查看' : '演示可选';
