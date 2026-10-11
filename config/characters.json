@@ -1,6 +1,6 @@
 {
   "$schema": "../schema/config.schema.json#/characters",
-  "configVersion": "1.1.3",
+  "configVersion": "1.2.0",
   "minEngineVersion": "1.0.0",
   "updatedAt": "2026-10-10",
   "items": [
@@ -132,6 +132,48 @@
         { "ver": "1.1.1", "date": "2026-10-05", "change": "issue #16 校正口径：蛮牛冲撞按 talent_niu_rush 1.1.1 改为「速度顶到地面 maxSpeed 26、冲过 45 米」，上面的「三倍速、20 米」是当时未核钳位的说法" }
       ]
     },
+    {
+      "id": "char_bball", "status": "live",
+      "name": { "zh-CN": "篮球小子", "en-US": "Bball Kid" },
+      "tagline": { "zh-CN": "运球、起跳、投篮，一路打进终点" },
+      "rarity": "SR", "unlock": { "type": "coin", "cost": 3200 },
+      "skins": ["skin_bball_default"],
+      "skillRef": "skill_thunder_dash", "talentRef": "talent_volt_coin",
+      "growth": { "maxLevel": 10, "costPerLevel": [], "effectPerLevel": { "target": "skillRef", "paramScalePerLevel": 0.05 } },
+      "model": { "prefab": "assets/characters/bball.glb", "scale": 1.0, "lod": [2, 6, 12] },
+      "audio": { "voDir": "assets/audio/vo/bball/", "footstep": "step_sneaker" },
+      "tint": "#FFD84D",
+      "clearance": 1.70,
+      "versions": [ { "ver": "1.0.0", "date": "2026-10-09", "change": "首发（GLB 驱动 11 动作 clip）" } ]
+    },
+    {
+      "id": "char_whale", "status": "live",
+      "name": { "zh-CN": "鲸鱼女仆", "en-US": "Whale Maid" },
+      "tagline": { "zh-CN": "尾巴一摆，冲进终点" },
+      "rarity": "SR", "unlock": { "type": "coin", "cost": 3200 },
+      "skins": ["skin_whale_default"],
+      "skillRef": "skill_thunder_dash", "talentRef": "talent_volt_coin",
+      "growth": { "maxLevel": 10, "costPerLevel": [], "effectPerLevel": { "target": "skillRef", "paramScalePerLevel": 0.05 } },
+      "model": { "prefab": "assets/characters/whale.glb", "scale": 1.0, "lod": [2, 6, 12] },
+      "audio": { "voDir": "assets/audio/vo/whale/", "footstep": "step_sneaker" },
+      "tint": "#4A6FD6",
+      "clearance": 1.52,
+      "versions": [ { "ver": "1.0.0", "date": "2026-10-10", "change": "首发（GLB 驱动 11 动作 clip）" } ]
+    },
+    {
+      "id": "char_pony", "status": "live",
+      "name": { "zh-CN": "马耳女仆", "en-US": "Pony Maid" },
+      "tagline": { "zh-CN": "捂嘴一笑，矮个也能直接过挡板" },
+      "rarity": "SR", "unlock": { "type": "coin", "cost": 3200 },
+      "skins": ["skin_pony_default"],
+      "skillRef": "skill_thunder_dash", "talentRef": "talent_volt_coin",
+      "growth": { "maxLevel": 10, "costPerLevel": [], "effectPerLevel": { "target": "skillRef", "paramScalePerLevel": 0.05 } },
+      "model": { "prefab": "assets/characters/pony.glb", "scale": 1.0, "lod": [2, 6, 12] },
+      "audio": { "voDir": "assets/audio/vo/pony/", "footstep": "step_sneaker" },
+      "tint": "#9A93C8",
+      "clearance": 1.19,
+      "versions": [ { "ver": "1.0.0", "date": "2026-10-10", "change": "首发（GLB 驱动 11 动作 clip + 矮净空被动：站立可钻滑铲门）" } ]
+    },
     { "id": "skin_volt_default", "kind": "skin", "status": "live", "baseRef": "char_volt",
       "name": { "zh-CN": "默认涂装" }, "rarity": "R",
       "materialOverrides": { "bodyTint": "#F2F4F8", "emissive": "#FFD84D" },
@@ -154,6 +196,9 @@
     { "id": "skin_bolt_storm", "kind": "skin", "status": "draft", "baseRef": "char_bolt", "name": { "zh-CN": "风暴行者" }, "rarity": "SSR", "materialOverrides": { "bodyTint": "#2A3350", "emissive": "#7FD1FF", "trailVfx": "vfx_trail_thunder" }, "model": { "prefab": "assets/skins/bolt_storm.glb" }, "unlock": { "type": "key", "cost": 12 }, "statMods": [], "versions": [ { "ver": "1.0.0", "date": "2026-09-22", "change": "围城活动商店（上线前 draft）" }, { "ver": "1.1.0", "date": "2026-10-04", "change": "随角色改名，皮肤名由「风暴警长」改为「风暴行者」" } ] },
     { "id": "skin_frog_default", "kind": "skin", "status": "live", "baseRef": "char_frog", "name": { "zh-CN": "默认涂装" }, "rarity": "SR", "materialOverrides": { "bodyTint": "#F4FBE8", "emissive": "#B6F24E" }, "model": { "prefab": "assets/characters/frog.glb" }, "unlock": { "type": "free" }, "statMods": [], "versions": [ { "ver": "1.1.0", "date": "2026-10-04", "change": "新增" }, { "ver": "1.2.0", "date": "2026-10-10", "change": "默认涂装改用 frog.glb 骨骼模型" } ] },
     { "id": "skin_mambo_default", "kind": "skin", "status": "live", "baseRef": "char_mambo", "name": { "zh-CN": "默认涂装" }, "rarity": "SR", "materialOverrides": { "bodyTint": "#FFF1E4", "emissive": "#FF9A3C" }, "model": { "prefab": "assets/characters/mambo.glb" }, "unlock": { "type": "free" }, "statMods": [], "versions": [ { "ver": "1.1.0", "date": "2026-10-04", "change": "新增" } ] },
-    { "id": "skin_niu_default", "kind": "skin", "status": "live", "baseRef": "char_niu", "name": { "zh-CN": "默认涂装" }, "rarity": "SSR", "materialOverrides": { "bodyTint": "#FBE9E7", "emissive": "#E45C5C" }, "model": { "prefab": "assets/characters/niu.glb" }, "unlock": { "type": "free" }, "statMods": [], "versions": [ { "ver": "1.1.0", "date": "2026-10-04", "change": "新增" } ] }
+    { "id": "skin_niu_default", "kind": "skin", "status": "live", "baseRef": "char_niu", "name": { "zh-CN": "默认涂装" }, "rarity": "SSR", "materialOverrides": { "bodyTint": "#FBE9E7", "emissive": "#E45C5C" }, "model": { "prefab": "assets/characters/niu.glb" }, "unlock": { "type": "free" }, "statMods": [], "versions": [ { "ver": "1.1.0", "date": "2026-10-04", "change": "新增" } ] },
+    { "id": "skin_bball_default", "kind": "skin", "status": "live", "baseRef": "char_bball", "name": { "zh-CN": "默认涂装" }, "rarity": "SR", "materialOverrides": { "bodyTint": "#FFD84D", "emissive": "#FFE9A8" }, "model": { "prefab": "assets/characters/bball.glb" }, "unlock": { "type": "free" }, "statMods": [], "versions": [ { "ver": "1.0.0", "date": "2026-10-09", "change": "首发" } ] },
+    { "id": "skin_whale_default", "kind": "skin", "status": "live", "baseRef": "char_whale", "name": { "zh-CN": "默认涂装" }, "rarity": "SR", "materialOverrides": { "bodyTint": "#FCF7FB", "emissive": "#7FD1FF" }, "model": { "prefab": "assets/characters/whale.glb" }, "unlock": { "type": "free" }, "statMods": [], "versions": [ { "ver": "1.0.0", "date": "2026-10-10", "change": "首发" } ] },
+    { "id": "skin_pony_default", "kind": "skin", "status": "live", "baseRef": "char_pony", "name": { "zh-CN": "默认涂装" }, "rarity": "SR", "materialOverrides": { "bodyTint": "#9A93C8", "emissive": "#D8CDF0" }, "model": { "prefab": "assets/characters/pony.glb" }, "unlock": { "type": "free" }, "statMods": [], "versions": [ { "ver": "1.0.0", "date": "2026-10-10", "change": "首发" } ] }
   ]
 }
