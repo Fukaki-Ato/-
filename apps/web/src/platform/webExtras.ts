@@ -44,7 +44,7 @@ export function createWebExtras(deps: {
     cloud,
     readJson: url => deps.fetchJson(url),
     async readBinary(path) {
-      const res = await fetch(path, { cache: 'no-store' });
+      const res = await fetch(path);
       if (!res.ok) throw new Error(`HTTP ${res.status} ${path}`);
       return res.arrayBuffer();
     },

@@ -16,12 +16,12 @@ import type { PlatformAdapter } from '@tr/framework/platform/platformAdapter.js'
 
 const resources: UiResources = {
   async loadJson(path: string) {
-    const res = await fetch(path, { cache: 'no-store' });
+    const res = await fetch(path, { cache: 'no-cache' });
     if (!res.ok) throw new Error(`HTTP ${res.status} ${path}`);
     return res.json();
   },
   async loadImage(path: string) {
-    const res = await fetch(path, { cache: 'no-store' });
+    const res = await fetch(path);
     if (!res.ok) throw new Error(`HTTP ${res.status} ${path}`);
     return createImageBitmap(await res.blob());
   },
@@ -100,7 +100,6 @@ async function loadVideoBackground(base: string): Promise<
 }
 
 async function loadBackdrop(base: string): Promise<{ set: BackdropSet; video?: { el: HTMLVideoElement; setVisible(visible: boolean): void } } | undefined> {
-  const still = await loadStill(`${base}assets/ui/menu-bg.png`);
   const vid = await loadVideoBackground(base);
   if (vid) {
     return {
@@ -113,6 +112,8 @@ async function loadBackdrop(base: string): Promise<{ set: BackdropSet; video?: {
       video: { el: vid.el, setVisible: vid.setVisible },
     };
   }
+  // 视频可用时不下载最终不会使用的 2MB 静态图。
+  const still = await loadStill(`${base}assets/ui/menu-bg.png`);
   return still ? { set: { main: still } } : undefined;
 }
 
@@ -142,15 +143,9 @@ export async function createUiShell(adapter: PlatformAdapter): Promise<UiShell> 
   renderer.setPixelRatio(s0.dpr);
   renderer.setSize(s0.width, s0.height, false);
 
-  const [fonts, gameJson] = await Promise.all([
-    loadFontSet(resources, `${import.meta.env.BASE_URL}assets/fonts`),
-    resources.loadJson(`${import.meta.env.BASE_URL}game.json`),
-  ]);
-  const config = resolveUiConfig((gameJson as { params?: unknown }).params);
-
   // 大厅徽标：normal + glow 两帧；零 insets 九宫格 = 整图拉伸；缺文件降级为空槽，不阻塞启动
   const badges: BadgeSet = { normal: {}, glow: {} };
-  await Promise.all(BADGE_NAMES.flatMap(n => (['normal', 'glow'] as const).map(async sub => {
+  const badgeLoad = Promise.all(BADGE_NAMES.flatMap(n => (['normal', 'glow'] as const).map(async sub => {
     try {
       const bmp = await resources.loadImage(`${import.meta.env.BASE_URL}assets/ui/badges/${sub}/${n}.png`);
       // ImageLike 是框架跨端抽象；web 侧实为 ImageBitmap（uiShell 允许 DOM 类型）
@@ -160,7 +155,14 @@ export async function createUiShell(adapter: PlatformAdapter): Promise<UiShell> 
     } catch { /* 单帧缺失不阻塞页面 */ }
   })));
 
-  const bg = await loadBackdrop(import.meta.env.BASE_URL);
+  // 字体、配置、徽标、背景彼此独立，不再把四段网络延迟串起来。
+  const [fonts, gameJson, , bg] = await Promise.all([
+    loadFontSet(resources, `${import.meta.env.BASE_URL}assets/fonts`),
+    adapter.fetchJson(`${import.meta.env.BASE_URL}game.json`),
+    badgeLoad,
+    loadBackdrop(import.meta.env.BASE_URL),
+  ]);
+  const config = resolveUiConfig((gameJson as { params?: unknown }).params);
   const backdrop = bg?.set;
   const bgVideo = bg?.video;
 

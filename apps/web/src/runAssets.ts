@@ -8,7 +8,7 @@ import { POSTER_DIR, POSTER_TABLES, setPosters, type PosterPool } from '@tr/game
 import { PICKUP_TILE_DIR, PICKUP_TILES, setPickupTiles } from '@tr/game/render/pickupTiles.js';
 
 async function loadTexture(url: string): Promise<THREE.Texture> {
-  const res = await fetch(url, { cache: 'no-store' });
+  const res = await fetch(url);
   if (!res.ok) throw new Error(`HTTP ${res.status} ${url}`);
   const bmp = await createImageBitmap(await res.blob());
   const tex = new THREE.Texture(bmp);

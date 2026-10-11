@@ -8,6 +8,7 @@ import { createCharacterSelectOverlay } from './characterSelectOverlay.js';
 import { createShopOverlay } from './shopOverlay.js';
 import { injectObstaclePosters, injectPickupTiles } from './runAssets.js';
 import { createTestPanel } from './testPanel.js';
+import { preloadStartupConfig } from './startupConfig.js';
 
 const mount = document.getElementById('screen')!;
 const debug = location.search.includes('debug');
@@ -15,7 +16,11 @@ const debug = location.search.includes('debug');
 const testMode = debug || location.search.includes('test');
 
 async function main(): Promise<void> {
-  const adapter = createWebPlatform({ mount });
+  const platform = createWebPlatform({ mount });
+  const configResolve = (name: string) => `${import.meta.env.BASE_URL}${name}.json`;
+  // UI 资源加载期间就取配置；UI 与 flow 共用 game.json，不发第二次请求。
+  const startupConfig = preloadStartupConfig(platform.fetchJson, configResolve);
+  const adapter = { ...platform, fetchJson: startupConfig.fetchJson };
   // QA 锁角色 ?char=<id>：覆盖本机记忆的出战角色（mainFlow 的初值就是读这个 storage 键，
   // 键名与 mainFlow.CHAR_KEY 一致，改它两边要同步）。不传则维持原有 UI 选角流程。
   const charParam = new URLSearchParams(location.search).get('char');
@@ -36,7 +41,7 @@ async function main(): Promise<void> {
     adapter,
     views,
     // config/*.json 由 Vite publicDir 挂载在部署 base 下（本地 dev 为 /，测试站为 /thunder-run/）
-    configResolve: name => `${import.meta.env.BASE_URL}${name}.json`,
+    configResolve,
     debug,
     test: testMode,
   });
@@ -53,7 +58,12 @@ async function main(): Promise<void> {
 
   // ---------------- 启动 ----------------
   // 局内贴图（障碍海报·道具箱方砖）与配置并行取：进局才读，boot 完到玩家点开始之间还有一段时间，够用
-  await Promise.all([flow.boot(), injectObstaclePosters(), injectPickupTiles()]);
+  try {
+    await Promise.all([flow.boot(), injectObstaclePosters(), injectPickupTiles()]);
+  } finally {
+    adapter.fetchJson = platform.fetchJson;
+    startupConfig.clear();
+  }
 }
 
 main().catch(err => {

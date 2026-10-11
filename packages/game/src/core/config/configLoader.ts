@@ -36,7 +36,8 @@ export async function loadAllConfig(host: ConfigHost, urlFor: (name: string) => 
   const sources: Record<string, FileSource> = {};
   const errors: string[] = [];
 
-  for (const name of CONTENT_NAMES) {
+  // 文件相互独立：先并发读取，仍按 CONTENT_NAMES 顺序校验/写缓存/汇总错误。
+  const files = await Promise.all(CONTENT_NAMES.map(async name => {
     let data: unknown = null;
     let source: FileSource = 'failed';
     // 1) 网络
@@ -50,6 +51,10 @@ export async function loadAllConfig(host: ConfigHost, urlFor: (name: string) => 
         try { data = JSON.parse(cached); source = 'cache'; } catch { data = null; }
       }
     }
+    return { name, data, source };
+  }));
+
+  for (const { name, data, source } of files) {
     if (data == null) {
       errors.push(`${name}: 网络与缓存均不可用`);
       sources[name] = 'failed';
