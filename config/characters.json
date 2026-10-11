@@ -96,11 +96,13 @@
       "skillRef": "skill_belly_laugh", "talentRef": "talent_frog_bounce",
       "growth": { "maxLevel": 10, "costPerLevel": [], "effectPerLevel": { "target": "skillRef", "paramScalePerLevel": 0.05 } },
       "model": { "prefab": "assets/characters/frog.glb", "scale": 1.0, "lod": [2, 6, 12] },
+      "intro": { "video": "assets/video/frog_intro.mp4", "durationS": 2.38, "widthM": 3.0, "heightM": 1.7, "distanceM": 4.0 },
       "audio": { "voDir": "assets/audio/vo/frog/", "footstep": "step_sneaker" },
       "tint": "#B6F24E",
       "versions": [
         { "ver": "1.1.0", "date": "2026-10-04", "change": "新增：捧腹大笑 10 秒无敌 + 每 10 秒一次强跳（沿用现有一套程序化建模，体量偏小）" },
-        { "ver": "1.2.0", "date": "2026-10-10", "change": "接入 frog.glb 与 11 个动作 clip；保留奶蛙的技能、天赋与音频配置" }
+        { "ver": "1.2.0", "date": "2026-10-10", "change": "接入 frog.glb 与 11 个动作 clip；保留奶蛙的技能、天赋与音频配置" },
+        { "ver": "1.3.0", "date": "2026-10-11", "change": "新增登场动画 intro：进局时在画面中央摆一块 3.0×1.7 米的视频面板（源片裁掉上下黑边后按 3 米宽等比换算），播放期间冻结跑酷，音效走 params.audio.characters.char_frog.sfx.intro" }
       ]
     },
     {

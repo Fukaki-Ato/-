@@ -19,7 +19,7 @@ import { createAudioDirector } from '@tr/game/core/audio/audioDirector.js';
 import type { AudioDirector } from '@tr/game/core/audio/audioDirector.js';
 import { hashSeed, mulberry32 } from '@tr/game/core/rng.js';
 import { installTestApi, uninstallTestApi } from './testApi.js';
-import { createSettingsScene, currentThemeId, pruneThemeSelection } from './settingsScene.js';
+import { createSettingsScene, currentThemeId, pruneThemeSelection, themeMusic } from './settingsScene.js';
 import { createRunnerScene } from '@tr/game/render/runnerScene.js';
 import type { PlatformAdapter } from '@tr/framework/platform/platformAdapter.js';
 import type { GameViews, RunSummary } from './views.js';
@@ -215,7 +215,7 @@ export function createGameFlow(deps: GameFlowDeps): GameFlow {
         if (!content) return;
         if (!availableCharacter(charId)) normalizeCharacter();
         if (!charId || !availableCharacter(charId)) { views.toast('暂无可用角色'); return; }
-        audio?.enterRun(charId);
+        audio?.enterRun(charId, themeMusic(adapter.storage, content)); // 主题 BGM 走 themes.json 的 music，缺省回退全局 run
         lastSeed = hashSeed('run-' + Date.now());
         const sim: RunnerSim = new RunnerSim(content, lastSeed, charId);
         // v2：主画布幂等单例 + 即时窗口尺寸（S10 §7.2；跨局复用同一画布，不新建）
@@ -225,9 +225,8 @@ export function createGameFlow(deps: GameFlowDeps): GameFlow {
         scene = (deps.createScene ?? createRunnerScene)(host, adapter, sim, content, {
           onHud: h => hud?.update(h),
           onEnd: summary => machine.go('result', summary),
-          onDeath: () => audio?.onDeath(),
-          onCast: () => audio?.onCast(),
-          onPickup: () => audio?.onPickup(),
+          onDeath: () => audio?.onDeath(), onCast: () => audio?.onCast(),
+          onPickup: () => audio?.onPickup(), onIntro: stage => audio?.onIntro(stage),
           debug: deps.debug,
         }, { themeId: currentThemeId(adapter.storage, content) ?? undefined });
         if (deps.test) installTestApi(sim, content); // 测试面板数据面：?debug/?test 才挂

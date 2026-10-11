@@ -403,3 +403,27 @@ test('同 seed 同角色同操作序列：整局摘要一致（含技能释放�
   assert.deepEqual(play('char_volt'), play('char_volt'));
   assert.notDeepEqual(play('char_volt'), play('char_rina'), '不同角色的整局结果应不同');
 });
+
+test('登场动画装配：奶蛙 intro 全量来自配置，没配的角色没有登场', () => {
+  assert.deepEqual(buildLoadout(content, 'char_frog').intro, {
+    video: 'assets/video/frog_intro.mp4', durationS: 2.38, widthM: 3, heightM: 1.7, distanceM: 4,
+  }, '奶蛙登场：3.0×1.7 米面板挂在相机前 4 米，播 2.38 秒（裁掉黑边后按比例换算）');
+  for (const c of playableCharacters(content)) {
+    if (c.id === 'char_frog') continue;
+    assert.equal(buildLoadout(content, c.id).intro, undefined, `${c.id} 不该带登场动画`);
+  }
+});
+
+test('登场动画脏配置：坏类型回默认、越界夹住、缺 video 视为无登场（不把 NaN 带进渲染层）', () => {
+  const withIntro = (intro) => {
+    const c = JSON.parse(JSON.stringify(content));
+    c.characters.items.find(x => x.id === 'char_frog').intro = intro;
+    return buildLoadout(c, 'char_frog').intro;
+  };
+  assert.equal(withIntro(undefined), undefined);
+  assert.equal(withIntro({ durationS: 3 }), undefined, '没有 video 就不算登场');
+  assert.deepEqual(withIntro({ video: 'a.mp4' }), { video: 'a.mp4', durationS: 3, widthM: 3, heightM: 1.7, distanceM: 4 });
+  assert.deepEqual(withIntro({ video: 'a.mp4', durationS: 'x', widthM: -5, heightM: null, distanceM: NaN }),
+    { video: 'a.mp4', durationS: 3, widthM: 0.1, heightM: 1.7, distanceM: 4 }, '坏类型回默认、负数夹到下限');
+  assert.deepEqual(withIntro({ video: 'a.mp4', durationS: -1 }).durationS, 0, '时长负数夹到 0（面板下一帧即交还）');
+});

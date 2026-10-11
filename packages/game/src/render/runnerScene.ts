@@ -14,6 +14,7 @@ import { createAvatar } from './avatarRig.js';
 import { camTargets } from './cameraRig.js';
 import { createCoinField } from './coinField.js';
 import { createCloudLayer, createObstacleLayer, createPickupLayer } from './entityLayers.js';
+import { createIntroPanel } from './introPanel.js';
 import { installRunProbe, uninstallRunProbe } from './runDebugProbe.js';
 import { createSpeedLines } from './speedLines.js';
 import { createTrackVisuals } from './trackVisuals.js';
@@ -34,6 +35,8 @@ export interface RunCallbacks {
   onCast?(): void;
   /** sim pickup 事件（道具箱，非金币）回调：角色拾取音效 */
   onPickup?(): void;
+  /** 登场动画时点回调：start＝音频让位给登场音效，end＝交还并续播 BGM */
+  onIntro?(stage: 'start' | 'end'): void;
   debug?: boolean;
 }
 
@@ -114,6 +117,8 @@ export function createRunnerScene(
   const cloudLayer = createCloudLayer(scene);
   const bursts = createBurstPool(scene);
   const speedLines = createSpeedLines(scene, tint);
+  /** 登场动画面板（characters.json intro 配了才有；无视频源＝只响音效不冻结） */
+  const intro = createIntroPanel(scene, camera, sim.loadout.intro, sim.loadout.charId, s => cb.onIntro?.(s));
   /** 胸口位置缓存：爆点与吸入动画对齐到身体，而不是脚底原点 */
   let chestX = 0, chestY = avatar.chestY;
   const fireAtPlayer = (color?: number) => bursts.fireAt(chestX, chestY, BURST_Z, color);
@@ -248,6 +253,7 @@ export function createRunnerScene(
     if (paused) { last = nowMs; raf = adapter.requestFrame(tick); return; } // 后台冻结：不推进 sim，仅对齐时钟
     const dt = Math.min((nowMs - last) / 1000, 0.05);
     last = nowMs;
+    if (intro?.active()) { intro.update(dt); renderer.render(scene, camera); raf = adapter.requestFrame(tick); return; } // 登场动画：整局冻结，只推进视频
     acc += dt;
     while (acc >= STEP_DT) {
       sim.step();
@@ -277,6 +283,7 @@ export function createRunnerScene(
     offInput(); offResize(); offVisibility();
     if (cb.debug) uninstallRunProbe(); // ?debug 探针随场景销毁卸载，避免 __trRun 指向已销毁的 sim
     avatar.dispose(); // GLB 混流器停摆（几何体/材质由下面的 traverse 统一销毁）
+    intro?.dispose(); // 只弃面板自身；视频元素与贴图归 apps 侧复用
     lightning.dispose();
     track.dispose();
     renderer.dispose();

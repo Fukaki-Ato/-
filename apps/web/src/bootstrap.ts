@@ -7,6 +7,7 @@ import '../style.css';
 import { createCharacterSelectOverlay } from './characterSelectOverlay.js';
 import { createShopOverlay } from './shopOverlay.js';
 import { injectObstaclePosters, injectPickupTiles } from './runAssets.js';
+import { injectIntroVideos } from './introVideo.js';
 import { createTestPanel } from './testPanel.js';
 import { preloadStartupConfig } from './startupConfig.js';
 
@@ -57,9 +58,12 @@ async function main(): Promise<void> {
   }
 
   // ---------------- 启动 ----------------
-  // 局内贴图（障碍海报·道具箱方砖）与配置并行取：进局才读，boot 完到玩家点开始之间还有一段时间，够用
+  // 局内贴图（障碍海报·道具箱方砖·登场视频）与配置并行取：进局才读，boot 完到玩家点开始之间还有一段时间，够用
   try {
-    await Promise.all([flow.boot(), injectObstaclePosters(), injectPickupTiles()]);
+    await Promise.all([
+      flow.boot(), injectObstaclePosters(), injectPickupTiles(),
+      injectIntroVideos(adapter.fetchJson, configResolve('characters'), import.meta.env.BASE_URL),
+    ]);
   } finally {
     adapter.fetchJson = platform.fetchJson;
     startupConfig.clear();
