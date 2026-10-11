@@ -45,6 +45,9 @@ Coverage as of 2026-10-05 (issue #17, first batch):
 | `char_niu` | ✅ | ⬜ | ⬜ |
 | `char_ama` / `char_kaze` / `char_rina` / `char_bolt` | ⬜ | ⬜ | ⬜ |
 
+> 2026-10-11：`char_pony` 已删除，其 `pony.glb` 建模与净空数据并入 `char_mambo`。
+> 音频路径按角色 id 不变，仍使用 `char_mambo` 的 cast/pickup；未新增或替换音频文件。
+
 ## License record
 
 - **2026-10-05 (issue #17)** — `sfx/char/char_frog/cast.mp3`, `sfx/char/char_mambo/{cast,pickup}.mp3`,

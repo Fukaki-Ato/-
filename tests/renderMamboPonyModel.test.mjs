@@ -1,8 +1,8 @@
 /**
- * 马耳女仆（char_pony → assets/characters/pony.glb）GLB 装配 + 姿态量化回归。
+ * 曼波（char_mambo → assets/characters/pony.glb，原马耳女仆建模）GLB 装配 + 姿态量化回归。
  *
  * 与鲸鱼女仆接入的差异：本资产 10 核心 clip + Laugh 与契约逐字一致（纯配置接入），
- * 这里守的是「马」特有的验收口径：
+ * 这里守的是这套建模特有的验收口径：
  *   - 朝向门禁：五官网格在 Head 的 -Z 侧（背对镜头，与篮球小子 +Z 历史回归防线同一条）
  *   - Q 版 3 头身 1.30m：Chest 0.62m / Head 0.74m，挂点按骨骼相对定位验证不漂移
  *   - 短腿抬脚低：放大后脚骨峰值必须高过 FOOT_ENTER_Y=0.24，否则落脚尘土一次不喷
@@ -28,7 +28,7 @@ if (typeof URL.revokeObjectURL !== 'function') URL.revokeObjectURL = () => {};
 const { createAnimAvatar } = await import('../packages/game/dist/render/animAvatar.js');
 const { initialRunnerState } = await import('../packages/game/dist/core/sim/simTypes.js');
 
-const PONY = 'assets/characters/pony.glb';
+const PONY_MODEL = 'assets/characters/pony.glb';
 const adapter = { extras: { readBinary: async (path) => {
   const b = readFileSync(path);
   return b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength);
@@ -69,8 +69,8 @@ async function drive(glb, sec, speed = 12, urlParams = 'debug', footfall = null)
   return { events, feet, log };
 }
 
-test('马耳女仆装配成功：10 个核心 clip + Laugh 齐全（纯配置接入，代码清单零改）', async () => {
-  const { log } = await drive(PONY, 0.2);
+test('曼波建模装配成功：10 个核心 clip + Laugh 齐全（纯配置接入，代码清单零改）', async () => {
+  const { log } = await drive(PONY_MODEL, 0.2);
   assert.ok(log.length >= 1, '应有 clip 切换记录');
 });
 
@@ -84,7 +84,7 @@ test('QA 锁表：Run/Slide/Fly/Hit/Death/Laugh 的时长与循环口径', async
     ['anim=Laugh', 'Laugh', 2.0, true],
   ];
   for (const [param, clip, dur, loop] of cases) {
-    const { feet, log } = await drive(PONY, 0.5, 12, `debug&${param}`);
+    const { feet, log } = await drive(PONY_MODEL, 0.5, 12, `debug&${param}`);
     assert.equal(feet.at(-1).act.clip, clip, `${param} 应锁到 ${clip}`);
     assert.ok(Math.abs(feet.at(-1).act.dur - dur) < 0.01, `${clip} 时长应为 ${dur}s`);
     assert.equal(log.find(e => e.clip === clip).loop, loop, `${clip} 的 loop 口径应为 ${loop}`);
@@ -92,19 +92,19 @@ test('QA 锁表：Run/Slide/Fly/Hit/Death/Laugh 的时长与循环口径', async
 });
 
 test('?anim=Laugh 播满 2s 一期后自动交还状态机（不永久接管、不会被定死）', async () => {
-  const { feet } = await drive(PONY, 4, 12, 'debug&anim=Laugh');
+  const { feet } = await drive(PONY_MODEL, 4, 12, 'debug&anim=Laugh');
   assert.equal(feet[30].clip, 'Laugh', '0.5s 时应锁播 Laugh');
   assert.equal(feet.at(-1).clip, 'Run', '4s 时应已交还状态机回 Run');
   assert.equal(feet.at(-1).lock, null, '探针 lock 应已清空');
 });
 
-test('马耳女仆锁 ?anim=Basketball（资产没有该 clip）→ 回落 Run，不静默不播', async () => {
-  const { feet } = await drive(PONY, 0.5, 12, 'debug&anim=Basketball');
+test('曼波建模锁 ?anim=Basketball（资产没有该 clip）→ 回落 Run，不静默不播', async () => {
+  const { feet } = await drive(PONY_MODEL, 0.5, 12, 'debug&anim=Basketball');
   assert.equal(feet.at(-1).clip, 'Run', '缺失的表演 clip 必须回落 Run');
 });
 
 test('朝向：五官网格在 Head 的 -Z 侧（背对镜头，防篮球小子 +Z 回归）', async () => {
-  const avatar = await createAnimAvatar(adapter, PONY, 1, null);
+  const avatar = await createAnimAvatar(adapter, PONY_MODEL, 1, null);
   assert.ok(avatar);
   const { s } = runningState(0);
   for (let i = 0; i < 30; i++) avatar.update(1 / 60, s, noFx); // 不动 → Idle 姿
@@ -122,7 +122,7 @@ test('朝向：五官网格在 Head 的 -Z 侧（背对镜头，防篮球小子 
 });
 
 test('无锁状态机：贴地前进时 Idle→Run 一次切换后持续循环，不跳 clip', async () => {
-  const { log, feet } = await drive(PONY, 3);
+  const { log, feet } = await drive(PONY_MODEL, 3);
   assert.deepEqual(log.map(e => e.clip), ['Idle', 'Run'],
     `只允许进场那一次 Idle→Run，实测 ${JSON.stringify(log.map(e => e.clip))}`);
   assert.equal(feet.at(-1).clip, 'Run');
@@ -131,7 +131,7 @@ test('无锁状态机：贴地前进时 Idle→Run 一次切换后持续循环�
 test('脚部探针 + 落脚尘土：Run 期间双脚坐标合法、持续摆动且喷尘土（Q 版短腿阈值专项）', async () => {
   // 未放大的 Run 脚骨只到 0.258m，逼近 FOOT_ENTER_Y=0.24——靠 RUN_BONE_AMPS 放大才稳过。
   // 这条门禁防以后改小放大系数把落脚探测打失效。
-  const { events, feet } = await drive(PONY, 4, 12, 'debug', true);
+  const { events, feet } = await drive(PONY_MODEL, 4, 12, 'debug', true);
   assert.ok(feet.length > 200, '采样不足');
   for (const f of feet) {
     for (const foot of [f.L, f.R]) {
@@ -146,7 +146,7 @@ test('脚部探针 + 落脚尘土：Run 期间双脚坐标合法、持续摆动�
 });
 
 test('buff 挂件锚点：Chest/Head 骨骼存在，chestY≈0.62m（Q 版 3 头身身高）', async () => {
-  const avatar = await createAnimAvatar(adapter, PONY, 1, null);
+  const avatar = await createAnimAvatar(adapter, PONY_MODEL, 1, null);
   assert.ok(avatar);
   assert.ok(avatar.getBone('Chest'), 'Chest 骨必须存在（喷火/护盾锚点）');
   assert.ok(avatar.getBone('Head'), 'Head 骨必须存在（头盔锚点）');
@@ -156,7 +156,7 @@ test('buff 挂件锚点：Chest/Head 骨骼存在，chestY≈0.62m（Q 版 3 头
 
 test('Slide 姿态量化：髋降 ≈0.20m、马尾 rx 增量 ≈-42°（相对静息姿）', async () => {
   // Idle 站立位髋高基线
-  const idleAvatar = await createAnimAvatar(adapter, PONY, 1, null);
+  const idleAvatar = await createAnimAvatar(adapter, PONY_MODEL, 1, null);
   const { s } = runningState(0);
   for (let i = 0; i < 60; i++) idleAvatar.update(1 / 60, s, noFx);
   const idleHipsY = idleAvatar.getBone('Hips').getWorldPosition(new THREE.Vector3()).y;
@@ -164,7 +164,7 @@ test('Slide 姿态量化：髋降 ≈0.20m、马尾 rx 增量 ≈-42°（相对�
   idleAvatar.dispose();
   delete globalThis.__trAnim;
 
-  const slideAvatar = await createAnimAvatar(adapter, PONY, 1, new URLSearchParams('debug&anim=Slide'));
+  const slideAvatar = await createAnimAvatar(adapter, PONY_MODEL, 1, new URLSearchParams('debug&anim=Slide'));
   const { s: s2 } = runningState(12);
   let minHipsY = Infinity, minTailRx = Infinity;
   const v = new THREE.Vector3();
@@ -186,7 +186,7 @@ test('Slide 姿态量化：髋降 ≈0.20m、马尾 rx 增量 ≈-42°（相对�
 
 test('Death 姿态量化：躯干前倒（世界俯仰 >40°）、头朝 -Z 前移 <-0.3m', async () => {
   // 1.05s：Death(1.1s) 播完前、自动解锁前的定格趴姿
-  const avatar = await createAnimAvatar(adapter, PONY, 1, new URLSearchParams('debug&anim=Death'));
+  const avatar = await createAnimAvatar(adapter, PONY_MODEL, 1, new URLSearchParams('debug&anim=Death'));
   const { s } = runningState(12);
   for (let i = 0; i < Math.round(1.05 * 60); i++) {
     s.t += 1 / 60; s.prevDistance = s.distance; s.distance += 12 / 60;

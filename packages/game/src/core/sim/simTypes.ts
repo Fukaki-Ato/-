@@ -14,7 +14,7 @@ export const FLY_SPEED_CAP = 34;
 export const BAR_BOTTOM = 1.2;
 
 /** 角色站立碰撞净空高（米）：无 characters.json clearance 字段时的默认值（老角色/程序化模型）。
- *  per-character 覆盖见 character.ts 的 Loadout.clearance——矮个角色（char_pony）净空低于
+ *  per-character 覆盖见 character.ts 的 Loadout.clearance——矮个角色（char_mambo）净空低于
  *  BAR_BOTTOM 时可不滑铲直接钻过高杆门，其余角色仍必须滑铲。 */
 export const STAND_H = 1.7;
 

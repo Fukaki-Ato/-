@@ -70,7 +70,7 @@ export const RAMP_TOP_FLAT_M = 0.8;
 
 /** 纵向判定：低障要跳够、高杆要钻或跃顶、电弧地面要跳起、满格与载具只能换道。
  *  @param clearance 角色站立净空高（米，sim 传 loadout.clearance）：高杆门按它判「头过不过杆」，
- *    矮个角色（char_pony 1.19 < BAR_BOTTOM 1.2）可不滑铲直接钻过；缺省 STAND_H=1.7 保持老角色行为。 */
+ *    矮个角色（char_mambo 1.19 < BAR_BOTTOM 1.2）可不滑铲直接钻过；缺省 STAND_H=1.7 保持老角色行为。 */
 export function hitsRunner(o: ObstacleEntity, s: RunnerState, laneWidth: number, clearance: number = STAND_H): boolean {
   if (lateralGap(o, s, laneWidth) > 0) return false;
   // 防呆：配置脏数据（NaN/非正）回落标准身高，绝不让碰撞判定因一个坏字段失效

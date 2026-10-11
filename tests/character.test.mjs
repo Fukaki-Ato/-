@@ -21,9 +21,9 @@ const SIM_SEED = () => hashSeed('char-test');
 /** 跑 n 秒（不注入任何操作，只让 sim 自己走） */
 function run(sim, seconds) { for (let i = 0; i < 60 * seconds; i++) { sim.step(); sim.drainEvents(); } }
 
-test('11 个角色都能装配出完整装备（主动技能 + 被动天赋）', () => {
+test('10 个角色都能装配出完整装备（主动技能 + 被动天赋）', () => {
   const chars = playableCharacters(content);
-  assert.equal(chars.length, 11, `应为 11 个可玩角色，实际 ${chars.length}`);
+  assert.equal(chars.length, 10, `应为 10 个可玩角色，实际 ${chars.length}`);
   for (const c of chars) {
     const l = buildLoadout(content, c.id);
     assert.equal(l.charId, c.id);
@@ -55,6 +55,27 @@ test('奶龙角色已移除，奶蛙承接 frog.glb 骨骼模型', () => {
   assert.equal(frog.skinId, 'skin_frog_default', '奶蛙默认涂装保持不变');
 });
 
+test('马耳女仆已删除，建模数据并入曼波且音效/技能不变', () => {
+  assert.equal(playableCharacters(content).some(c => c.id === 'char_pony'), false, '马耳女仆不再进入跑者名单');
+  assert.equal(content.characters.items.some(c => c.id === 'skin_pony_default'), false, '马耳女仆默认皮肤已清理');
+  const mambo = buildLoadout(content, 'char_mambo');
+  assert.equal(mambo.prefab, 'assets/characters/pony.glb', '曼波改用原马耳女仆模型');
+  assert.equal(mambo.modelScale, 1.0, '按 1.0 不缩放，VFX 锚点与资产契约一致');
+  assert.equal(mambo.clearance, 1.19, '曼波沿用 pony 净空 1.19：站立可钻滑铲门');
+  assert.equal(mambo.tint, '#9A93C8');
+  assert.equal(mambo.bodyTint, '#9A93C8');
+  assert.equal(mambo.emissive, '#D8CDF0');
+  assert.equal(mambo.skill.id, 'skill_mambo_power', '曼波主动技能保持不变');
+  assert.equal(mambo.skinId, 'skin_mambo_default', '曼波 id/默认涂装保持不变');
+
+  const sfx = content.game.params.audio.characters.char_mambo.sfx;
+  assert.equal(sfx.cast, 'assets/audio/sfx/char/char_mambo/cast.mp3');
+  assert.equal(sfx.pickup, 'assets/audio/sfx/char/char_mambo/pickup.mp3');
+  assert.ok(existsSync(join(root, sfx.cast)), '曼波 cast 音效应存在');
+  assert.ok(existsSync(join(root, sfx.pickup)), '曼波 pickup 音效应存在');
+  assert.equal(content.game.params.audio.characters.char_pony, undefined, '马耳女仆音效应清理');
+});
+
 test('被动天赋在开局即生效（run_start 触发）', () => {
   const cases = {
     char_volt: s => assert.equal(s.fx.coinPct, 5, '牢大：金币 +5%'),
@@ -66,10 +87,9 @@ test('被动天赋在开局即生效（run_start 触发）', () => {
     // 周期被动（奶蛙弹跳之力 / 阿牛蛮牛冲撞）第一步才真正挂上子效果，见各自用例
     char_frog: s => assert.ok(s.buffs.left('periodic') > 0, '奶蛙：周期被动应登记为永久槽位'),
     char_niu: s => assert.ok(s.buffs.left('periodic') > 0, '阿牛：周期被动应登记为永久槽位'),
-    // 篮球小子 / 鲸鱼女仆 / 马耳女仆复用小电的技能/天赋（GLB 外观角色，玩法不出圈）
+    // 篮球小子 / 鲸鱼女仆复用小电的技能/天赋（GLB 外观角色，玩法不出圈）
     char_bball: s => assert.equal(s.fx.coinPct, 5, '篮球小子：金币 +5%'),
     char_whale: s => assert.equal(s.fx.coinPct, 5, '鲸鱼女仆：金币 +5%'),
-    char_pony: s => assert.equal(s.fx.coinPct, 5, '马耳女仆：金币 +5%'),
   };
   for (const [id, check] of Object.entries(cases)) {
     const sim = new RunnerSim(content, SIM_SEED(), id);
@@ -322,9 +342,9 @@ test('渲染装配同样来自配置：体色/发光色/体量读皮肤 material
   assert.equal(buildLoadout(content, 'char_bball').modelScale, 1.0, '篮球小子 1 单位=1m，不缩放');
   assert.equal(buildLoadout(content, 'char_whale').prefab, 'assets/characters/whale.glb');
   assert.equal(buildLoadout(content, 'char_whale').modelScale, 1.0, '鲸鱼女仆 Q 版 1.52m，按 1.0 试玩不定档');
-  assert.equal(buildLoadout(content, 'char_pony').prefab, 'assets/characters/pony.glb');
-  assert.equal(buildLoadout(content, 'char_pony').modelScale, 1.0, '马耳女仆 Q 版 1.308m，按 1.0 不缩放（改 scale 会同时改变 VFX 锚点高度）');
-  assert.equal(buildLoadout(content, 'char_pony').clearance, 1.19, '马耳女仆净空 1.19 < 横杆下沿 1.2：站立可钻滑铲门');
+  assert.equal(buildLoadout(content, 'char_mambo').prefab, 'assets/characters/pony.glb');
+  assert.equal(buildLoadout(content, 'char_mambo').modelScale, 1.0, '曼波沿用 pony 建模的 1.0 缩放（改 scale 会同时改变 VFX 锚点高度）');
+  assert.equal(buildLoadout(content, 'char_mambo').clearance, 1.19, '曼波净空 1.19 < 横杆下沿 1.2：站立可钻滑铲门');
   assert.equal(buildLoadout(content, 'char_whale').clearance, 1.52, '鲸鱼女仆净空 1.52：站立仍必须滑铲');
   assert.equal(buildLoadout(content, 'char_volt').clearance, 1.7, '无 clearance 字段的老角色回落 STAND_H');
 
