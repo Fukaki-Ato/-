@@ -13,7 +13,7 @@ const deferred = () => {
 };
 const turn = () => new Promise(resolve => setImmediate(resolve));
 
-test('all config requests start before any completes; report/cache order stays deterministic', async () => {
+test('all config requests start before any completes; report order stays deterministic', async () => {
   const pending = new Map();
   const writes = [];
   const reportPromise = loadAllConfig({
@@ -32,7 +32,30 @@ test('all config requests start before any completes; report/cache order stays d
   assert.deepEqual(Object.keys(report.content), [...CONTENT_NAMES]);
   assert.deepEqual(Object.keys(report.sources), [...CONTENT_NAMES]);
   assert.ok(Object.values(report.sources).every(source => source === 'network'));
-  assert.deepEqual(writes, CONTENT_NAMES.map(name => `thunderrun:config:${name}`));
+  assert.deepEqual(writes, [...CONTENT_NAMES].reverse().map(name => `thunderrun:config:${name}`));
+});
+
+test('successful config is validated and cached while another request is still pending', async () => {
+  const slow = deferred();
+  const writes = new Map();
+  const lastName = CONTENT_NAMES.at(-1);
+  let finished = false;
+  const reportPromise = loadAllConfig({
+    fetchJson: name => name === lastName ? slow.promise : Promise.resolve(config(name)),
+    cacheGet: () => null,
+    cacheSet: (key, value) => writes.set(key, JSON.parse(value)),
+  }, name => name).then(report => { finished = true; return report; });
+  await turn();
+  assert.equal(finished, false);
+  assert.equal(writes.size, CONTENT_NAMES.length - 1, 'slow request must not delay successful cache writes');
+  for (const name of CONTENT_NAMES.slice(0, -1)) {
+    assert.deepEqual(writes.get(`thunderrun:config:${name}`), config(name));
+  }
+  slow.resolve(config(lastName));
+  const report = await reportPromise;
+  assert.equal(report.ok, true, report.errors.join('\n'));
+  assert.deepEqual(Object.keys(report.content), [...CONTENT_NAMES]);
+  assert.equal(writes.size, CONTENT_NAMES.length);
 });
 
 test('parallel loading retains per-file network/cache fallback and rejects malformed data', async () => {

@@ -36,7 +36,7 @@ export async function loadAllConfig(host: ConfigHost, urlFor: (name: string) => 
   const sources: Record<string, FileSource> = {};
   const errors: string[] = [];
 
-  // 文件相互独立：先并发读取，仍按 CONTENT_NAMES 顺序校验/写缓存/汇总错误。
+  // 文件独立读取、校验和落缓存，慢请求不阻止成功文件及时缓存；报告仍保持固定顺序。
   const files = await Promise.all(CONTENT_NAMES.map(async name => {
     let data: unknown = null;
     let source: FileSource = 'failed';
@@ -51,25 +51,22 @@ export async function loadAllConfig(host: ConfigHost, urlFor: (name: string) => 
         try { data = JSON.parse(cached); source = 'cache'; } catch { data = null; }
       }
     }
-    return { name, data, source };
-  }));
-
-  for (const { name, data, source } of files) {
     if (data == null) {
-      errors.push(`${name}: 网络与缓存均不可用`);
-      sources[name] = 'failed';
-      continue;
+      return { name, data: null, source: 'failed' as FileSource, errors: [`${name}: 网络与缓存均不可用`] };
     }
     // 3) 任何来源都要过校验（坏数据宁可不落地）
     const fileErrors = validateFile(name, data);
     if (fileErrors.length > 0) {
-      errors.push(...fileErrors);
-      sources[name] = 'failed';
-      continue;
+      return { name, data: null, source: 'failed' as FileSource, errors: fileErrors };
     }
-    content[name] = data;
-    sources[name] = source;
     if (source === 'network') host.cacheSet(CACHE_PREFIX + name, JSON.stringify(data));
+    return { name, data, source, errors: [] };
+  }));
+
+  for (const file of files) {
+    if (file.data != null) content[file.name] = file.data;
+    sources[file.name] = file.source;
+    errors.push(...file.errors);
   }
 
   const missing = CONTENT_NAMES.filter(n => content[n] == null);
