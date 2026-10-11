@@ -29,6 +29,8 @@ function clamp01(v: number | undefined): number {
 export function createWxAudio(wx: WxLike): AudioService {
   let music: WxInnerAudioContext | null = null;
   let musicUrl = '';
+  /** pauseMusic 过的标记：InnerAudioContext 没暴露 paused 状态，只能自己记，防止 resume 从头重播 */
+  let musicPaused = false;
   const sfx = new Set<WxInnerAudioContext>();
 
   return {
@@ -43,12 +45,24 @@ export function createWxAudio(wx: WxLike): AudioService {
         music.src = url;
         musicUrl = url;
       }
+      musicPaused = false;
       music.loop = options?.loop ?? false;
       music.volume = clamp01(options?.volume);
       music.play();
     },
     stopMusic() {
       if (music && musicUrl !== '') music.stop();
+      musicPaused = false;
+    },
+    pauseMusic() {
+      if (!music || musicUrl === '' || musicPaused) return;
+      music.pause(); // 保留播放位置，区别于 stopMusic 的归零
+      musicPaused = true;
+    },
+    resumeMusic() {
+      if (!music || !musicPaused) return;
+      musicPaused = false;
+      music.play();
     },
     playSfx(url, options?: AudioOptions) {
       const el = wx.createInnerAudioContext();
@@ -68,6 +82,7 @@ export function createWxAudio(wx: WxLike): AudioService {
       music?.destroy();
       music = null;
       musicUrl = '';
+      musicPaused = false;
       for (const el of sfx) el.destroy();
       sfx.clear();
     },

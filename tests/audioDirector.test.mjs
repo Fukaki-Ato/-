@@ -20,6 +20,8 @@ function makeAdapter() {
   const audio = {
     playMusic: (url, opts) => calls.push(['playMusic', url, opts]),
     stopMusic: () => calls.push(['stopMusic']),
+    pauseMusic: () => calls.push(['pauseMusic']),
+    resumeMusic: () => calls.push(['resumeMusic']),
     playSfx: (url, opts) => calls.push(['playSfx', url, opts]),
     dispose: () => calls.push(['dispose']),
   };
@@ -231,5 +233,72 @@ test('真实配置：未配置角色音效的角色只响全局音效；死亡�
     d.onDeath();
     const sfx = calls.filter(c => c[0] === 'playSfx').map(c => c[1]);
     assert.deepEqual(sfx, [cfg.startSfx, cfg.deathSfx[Math.floor(r * cfg.deathSfx.length)]]);
+  }
+});
+
+// ---------------- 主题专属 BGM 与登场动画音效（2026-10-11）----------------
+
+test('enterRun：主题 music 覆盖全局 run BGM；脏值与缺省都回退 run', () => {
+  const run = 'assets/audio/bgm/run.mp3';
+  const cases = [
+    ['assets/audio/bgm/run_rain.mp3', 'assets/audio/bgm/run_rain.mp3'],
+    ['', run], [null, run], [undefined, run],
+    ['..\\evil.mp3', run], // 含反斜杠 → 净化为空 → 回退
+    ['javascript:alert(1)', run], // 非 http(s) 协议 → 净化为空 → 回退
+  ];
+  for (const [themeBgm, expect] of cases) {
+    const { calls, adapter } = makeAdapter();
+    createAudioDirector(adapter, params).enterRun(undefined, themeBgm);
+    assert.deepEqual(calls, [['playMusic', expect, { loop: true, volume: 0.5 }]],
+      `themeBgm=${JSON.stringify(themeBgm)} 应落 ${expect}`);
+  }
+});
+
+test('onIntro：start 让位（暂停 BGM + 放登场音效），end 续播；重复 start 不叠播', () => {
+  const intro = 'assets/audio/sfx/char/char_frog/intro.mp3';
+  const p = { audio: { bgm: { run: 'assets/audio/bgm/run.mp3' }, characters: { char_frog: { sfx: { intro } } } } };
+  const { calls, adapter } = makeAdapter();
+  const d = createAudioDirector(adapter, p);
+  d.enterRun('char_frog');
+  d.onIntro('start');
+  d.onIntro('start'); // 已在登场中：不重复暂停、不重放音效
+  d.onIntro('end');
+  assert.deepEqual(calls.map(c => c[0]), ['playMusic', 'pauseMusic', 'playSfx', 'resumeMusic']);
+  assert.equal(calls[2][1], intro, '登场音效必须走 sfx 通道（音量面与技能音效一致）');
+});
+
+test('onIntro：没配 intro 的角色、以及未进局时点全部空操作（不会把 BGM 暂停掉）', () => {
+  const { calls, adapter } = makeAdapter();
+  const d = createAudioDirector(adapter, params);
+  d.onIntro('start'); // 未进局
+  d.enterRun('char_volt'); // 该角色无 intro cue
+  d.onIntro('start');
+  d.onIntro('end');
+  assert.deepEqual(calls.map(c => c[0]), ['playMusic'], '除进局 BGM 外不该有任何音频调用');
+});
+
+test('死亡与中途退出都收尾登场让位：不把暂停中的 BGM 带进死亡乐或下一局', () => {
+  const p = { audio: { bgm: { run: 'r.mp3', death: 'd.mp3' }, characters: { char_frog: { sfx: { intro: 'i.mp3' } } } } };
+  const { calls, adapter } = makeAdapter();
+  const d = createAudioDirector(adapter, p);
+  d.enterRun('char_frog'); d.onIntro('start'); d.onDeath();
+  assert.deepEqual(calls.map(c => c[0]), ['playMusic', 'pauseMusic', 'playSfx', 'stopMusic', 'playMusic'],
+    '死亡路径换死亡乐，不续播被让位的 run BGM');
+  const { calls: c2, adapter: a2 } = makeAdapter();
+  const d2 = createAudioDirector(a2, p);
+  d2.enterRun('char_frog'); d2.onIntro('start'); d2.exitRun();
+  assert.deepEqual(c2.map(c => c[0]), ['playMusic', 'pauseMusic', 'playSfx', 'resumeMusic', 'stopMusic']);
+});
+
+test('真实配置：奶蛙 intro cue 与每条主题的 music 都指向仓库里真实存在的文件', () => {
+  const cfg = parseAudioConfig(realParams);
+  const frog = cfg.characters.get('char_frog');
+  assert.ok(frog?.intro, 'char_frog 应登记 intro cue');
+  assert.equal(frog.intro, 'assets/audio/sfx/char/char_frog/intro.mp3', '路径必须与目录约定一字不差（大小写敏感）');
+  assert.ok(existsSync(join(root, frog.intro)), `配置引用的音频不存在：${frog.intro}`);
+  const themes = JSON.parse(readFileSync(join(root, 'config', 'themes.json'), 'utf8')).items;
+  for (const t of themes) {
+    assert.ok(typeof t.music === 'string' && t.music !== '', `${t.id} 必须配 music（该字段已被 enterRun 读取，不再是死配置）`);
+    assert.ok(existsSync(join(root, t.music)), `${t.id} 的 BGM 文件不存在：${t.music}`);
   }
 });

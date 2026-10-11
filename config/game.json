@@ -205,7 +205,8 @@
         },
         "char_frog": {
           "sfx": {
-            "cast": "assets/audio/sfx/char/char_frog/cast.mp3"
+            "cast": "assets/audio/sfx/char/char_frog/cast.mp3",
+            "intro": "assets/audio/sfx/char/char_frog/intro.mp3"
           }
         },
         "char_niu": {

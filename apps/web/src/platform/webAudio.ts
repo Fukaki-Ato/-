@@ -44,6 +44,12 @@ export function createWebAudio(): AudioService {
         /* 静默 */
       }
     },
+    pauseMusic() {
+      music?.pause(); // 不动 currentTime：resumeMusic 要从原处续播
+    },
+    resumeMusic() {
+      if (music && music.paused) fire(music);
+    },
     playSfx(url, options?: AudioOptions) {
       const el = new Audio(url);
       el.volume = clamp01(options?.volume);

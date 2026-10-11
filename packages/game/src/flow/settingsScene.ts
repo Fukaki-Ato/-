@@ -38,6 +38,16 @@ export function currentThemeId(storage: SyncStorage, content: GameContent | null
   return stored !== null && themeEntries(content).some(t => t['id'] === stored) ? stored : defaultThemeId(content);
 }
 
+/**
+ * 生效主题的专属 BGM（themes.json 的 music 字段）；缺字段或脏值返回 null，由音频层回退全局 run BGM。
+ * 路径净化在 audioDirector 侧做（core 唯一收口），这里只保证「取到的是非空字符串」。
+ */
+export function themeMusic(storage: SyncStorage, content: GameContent | null): string | null {
+  const id = currentThemeId(storage, content);
+  const music = id === null ? undefined : themeEntries(content).find(t => t['id'] === id)?.['music'];
+  return typeof music === 'string' && music !== '' ? music : null;
+}
+
 /** boot 清理：存档主题在配置里已不存在（删/改名）→ 移除，存储不长期留脏值 */
 export function pruneThemeSelection(storage: SyncStorage, content: GameContent | null): void {
   const stored = storage.get(THEME_KEY);

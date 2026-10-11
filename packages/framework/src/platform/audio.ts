@@ -21,6 +21,13 @@ export interface AudioService {
   playMusic(url: string, options?: AudioOptions): void;
   /** 停止背景音乐并复位（未在播放时为空操作）。 */
   stopMusic(): void;
+  /**
+   * 暂停背景音乐但**保留播放位置**（登场动画这类「短暂让位给一条音效」的场景用；
+   * stopMusic 会归零，不能拿来让位）。未在播放时为空操作。
+   */
+  pauseMusic(): void;
+  /** 续播被 pauseMusic 暂停的背景音乐（没暂停过则空操作，不得从头重播）。 */
+  resumeMusic(): void;
   /** 播放一次性音效（可与音乐、其它音效叠加）。 */
   playSfx(url: string, options?: AudioOptions): void;
   /** 释放底层资源；之后仍可继续调用播放方法（实现应惰性重建）。 */
