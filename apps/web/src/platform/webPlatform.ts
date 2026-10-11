@@ -109,7 +109,8 @@ export function createWebPlatform(options: WebPlatformOptions): PlatformAdapter 
   };
 
   const fetchJson = async (url: string): Promise<unknown> => {
-    const res = await fetch(url, { cache: 'no-store' });
+    // 未版本化配置每次向服务端校验，但允许 ETag/Last-Modified 的 304 响应。
+    const res = await fetch(url, { cache: 'no-cache' });
     if (!res.ok) throw new Error(`HTTP ${res.status} ${url}`);
     return res.json();
   };
