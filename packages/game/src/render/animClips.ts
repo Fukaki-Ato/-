@@ -1,7 +1,7 @@
 /**
  * 动作 clip 选择（纯函数、零依赖，node --test 直接回归；three 的播放胶水在 animAvatar.ts）
  * 数据来源：多个 GLB 资产的命名动画 clip（共同契约：1 单位=1m、脚底在原点、面朝 -Z）——
- * char_frog → frog.glb、char_bball → bball.glb、char_whale → whale.glb、
+ * char_frog → frog.glb、char_volt → bball.glb、char_whale → whale.glb、
  * char_mambo → pony.glb、char_niu → niu.glb（带 Laugh + Wave 两个表演 clip）。
  * 优先级（上层压下层，逐条对应「玩家此刻在干什么」）：
  *   ① QA 锁 ?anim=<ClipName>（仅 dev/QA，见 readAnimLock）→ 强制循环；
@@ -16,7 +16,7 @@
  *   ⑧ 默认：本帧有前行（distance 前进）→ Run；原地不动 → Idle（默认展示动作）
  * 「离地」用 supportY 而非绝对高度：站在 2.4m 车顶/坡道上仍是跑，不是跳（同 avatarRig.pickAvatarMode
  * 的口径，历史上把它当滞空是「火车上跑步动画不正常」的根因）。
- * 循环口径（建模侧资产契约，逐字对应交付要求）：只有 Run/Slide/Laugh/Fly 首末无缝，可 LoopRepeat；
+ * 循环口径（建模侧资产契约，逐字对应交付要求）：Run/Slide/Laugh/Fly/Wave 首末无缝，可 LoopRepeat；
  * Idle/Jump/Hit/Land/TurnLeft/TurnRight/Death/Basketball 一律 LoopOnce 播一次并保持末帧，
  * 由 animAvatar 在播完后收尾
  * （Idle 交回自身首帧做 0.12s 交叉淡化抹掉首末 110° 姿差；其余保持末帧，等状态切换自然淡出）。
