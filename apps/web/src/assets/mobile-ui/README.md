@@ -1,0 +1,13 @@
+# Mobile UI assets
+
+- `seaside.webp`: original 1024×1536 background generated with Codex CLI `$imagegen` on 2026-10-11, then encoded as WebP (quality 85). No text or interactive controls are baked into the image.
+- `nav-*.webp`: icon-only crops from the existing lobby badges, excluding their baked-in labels; the new navigation renders readable text separately.
+- `icon-{event,task,achieve,rank,settings}.webp`: reused old home illustrations. Activity/task/achievement crops exclude the old text, and silhouette alpha masks remove leftover scenery; new labels remain native. The trophy retains its painted decorative ribbon as part of the original illustration.
+- `panel-frame.webp`, `button-green.webp`, `button-gold.webp`, `title-plaque.webp`: clean, empty components extracted from `assets/ui/shop-popup-generated.png`, with antialiased alpha masks. Source crops are respectively `(296,480)-(495,555)`, `(300,630)-(495,718)`, `(299,555)-(494,626)`, `(202,71)-(824,305)`. The gold coin is removed by mirroring the empty right cap. Borders/buttons use CSS nine-slicing; the sculpted title plaque has independently rendered text. They are not flattened UI screens.
+- `thunder-sans.woff2`: variable Noto Sans SC (weight 100–900), subset from the open-source Google Fonts font to the repository charset and text in `apps/web/src`, `packages/game/src`, and `config`. Licensed under the bundled `OFL.txt`. Native text allows responsive layout, accessibility, and real scrolling without a canvas text overlay.
+
+`assets/fonts/NotoSansSC-OFL.txt` is the runtime license copy, included in the Web asset bundle by the existing asset-copy pipeline. WX currently copies only its legacy SDF atlas inputs and does not use the new native Web font. This license covers Noto Sans SC, not the provenance of those legacy atlases.
+
+When adding labels, run `python tools/fontgen/subset-web.py --font /path/to/NotoSansSC.ttf` with FontTools and Brotli installed in an isolated environment. The source font is available from [Google Fonts](https://github.com/google/fonts/tree/main/ofl/notosanssc). The script includes the repository charset, source/config text, and UI symbols, preserving the weight axis and license. Unsupported characters use the device's system font instead of a blank custom glyph. The normal game build does not need Python.
+
+In minimal cloud images without pip/ensurepip, isolated extracted FontTools and Brotli wheels on `PYTHONPATH` also work; no system package or lockfile change is required. This route was verified when generating the initial font, and should only be used with Python-version/platform-matching wheels from the official package index.
