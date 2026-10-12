@@ -4,6 +4,7 @@ import { isIP } from 'node:net';
 import { performance } from 'node:perf_hooks';
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
+import { existsSync, realpathSync } from 'node:fs';
 import { LeaderboardStore } from './store.mjs';
 import { ReplayPool } from './replay-pool.mjs';
 
@@ -482,7 +483,7 @@ async function main() {
   }
 }
 
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (process.argv[1] && existsSync(process.argv[1]) && realpathSync(process.argv[1]) === fileURLToPath(import.meta.url)) {
   main().catch(() => {
     console.error('Leaderboard API failed to start. Check configuration and built game files.');
     process.exitCode = 1;
