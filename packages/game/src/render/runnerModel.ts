@@ -30,7 +30,7 @@ export interface RunnerModelColors {
   body: string;
   /** 发光色（皮肤 materialOverrides.emissive）：描边、雷核、护目镜 */
   glow: string;
-  /** 整体缩放（characters.json model.scale） */
+  /** 占位整体缩放（characters.json model.fallbackScale，缺省 model.scale） */
   scale: number;
 }
 

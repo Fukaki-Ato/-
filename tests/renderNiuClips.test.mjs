@@ -5,7 +5,7 @@
  * 是第一个带 Wave 的角色——PERF_CLIP_NAMES/LOOPING_CLIPS 因它扩到 3 个/5 个。这里守的是：
  *   - 12 clip 装配与 QA 锁表（含 Wave 循环口径与锁播一期自动交还）
  *   - 朝向门禁：五官在 -Z 侧（牛无 Nose mesh，判据用 NostrilL——资产是鼻孔+口鼻）
- *   - Q 版 1.30m：Chest 0.56m；短腿抬脚低（放大后峰值仅 ~0.31m），尘土阈值专项
+ *   - 资产原始尺寸 1.30m：Chest 0.56m；局内放大到约 1.74m 的回归见 renderNiuScale.test.mjs
  *   - 【憨憨步态】摆臂主轴是 Z（X 轴恒 -90° 无摆动），同侧臂滞后腿 3~7 帧且相关>0.4——
  *     建模侧规格「摆臂滞后摆腿 4 帧」，×1.9 放大后必须仍然保持（防改放大系数抹平憨感）
  *   - 滑铲/倒地时大腹不陷地：Slide 整体 bbox 最低 > -0.06、Death 的 Body  mesh 不低于 -0.30
@@ -231,7 +231,7 @@ test('buff 挂件锚点：Chest/Head 骨骼存在，chestY≈0.56m（Q 版身高
   avatar.dispose();
 });
 
-test('回归：frog（原奶龙资产）Laugh 与篮球小子 Basketball 仍可锁播（PERF 扩到 3 个不破坏老角色）', async () => {
+test('回归：frog（原奶龙资产）Laugh 与牢大 Basketball 仍可锁播（PERF 扩到 3 个不破坏老角色）', async () => {
   // main 上奶龙已改名 char_frog（GLB 移到 frog.glb，与旧 nailoong.glb 同哈希）；
   //  frog Laugh 是 1.4s（whale/mambo/niu 才是 2.0s）——老资产时长原样断言，防回归改动
   for (const [glb, clip, dur, loop] of [

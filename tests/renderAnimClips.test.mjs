@@ -28,11 +28,11 @@ const fx = (over = {}) => ({
 /** 行进中的状态：每次调用 distance 前进 0.15m（≈9m/s@60fps），供「在跑」判定用 */
 const runner = (() => { let d = 0; return (over = {}) => { d += 0.15; return st({ distance: d, prevDistance: d - 0.15, ...over }); }; })();
 
-test('资产契约：CORE 10 + PERF 2 共 12 个 clip 名，与 glb 内 AnimationClip.name 逐字一致', () => {
+test('资产契约：CORE 10 + PERF 3 共 13 个合法 clip 名，各 GLB 按存在性装配', () => {
   assert.deepEqual([...CORE_CLIP_NAMES].sort(),
     ['Death', 'Fly', 'Hit', 'Idle', 'Jump', 'Land', 'Run', 'Slide', 'TurnLeft', 'TurnRight']);
   assert.deepEqual([...PERF_CLIP_NAMES].sort(), ['Basketball', 'Laugh', 'Wave'],
-    '阿牛（niu）带 Laugh + Wave（招手）；Basketball 保留——bball 角色的回归验收依赖它');
+    '阿牛（niu）带 Laugh + Wave（招手）；牢大承接 bball 模型，Basketball 保留');
   assert.deepEqual([...PERF_CLIP_NAMES].filter(isPerfClip).sort(), ['Basketball', 'Laugh', 'Wave']);
   assert.equal(isPerfClip('Run'), false, '核心 clip 不是表演 clip（锁播一期语义只对表演 clip 生效）');
   assert.equal(isPerfClip('Death'), false);

@@ -50,6 +50,8 @@ export interface Loadout {
   bodyTint: string;
   emissive: string;
   modelScale: number;
+  /** 程序化占位体量；缺省沿用 modelScale，独立于尺寸不同的 GLB 资产。 */
+  fallbackModelScale?: number;
   /** GLB 模型路径（characters.json model.prefab）：render/animAvatar 据此切 glb 驱动，
    *  缺失时回退程序化 runnerModel（平台 extras.readBinary 不可用时同理） */
   prefab?: string;
@@ -127,6 +129,9 @@ export function buildLoadout(content: GameContent, charId: string): Loadout {
   // 渲染装配：默认皮肤（skins[0]）的 materialOverrides 决定体色与发光色，model.scale 决定体量
   const model = (c['model'] ?? {}) as Record<string, unknown>;
   if (typeof model.scale === 'number' && model.scale > 0) base.modelScale = model.scale;
+  if (typeof model.fallbackScale === 'number' && Number.isFinite(model.fallbackScale) && model.fallbackScale > 0) {
+    base.fallbackModelScale = model.fallbackScale;
+  }
   const skinId = (((c.skins as string[] | undefined) ?? [])[0]) ?? '';
   const skin = (content.characters.items ?? []).find(x => x.id === skinId);
   const overrides = (skin?.materialOverrides ?? {}) as Record<string, unknown>;
