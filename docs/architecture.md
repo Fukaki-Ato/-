@@ -45,6 +45,14 @@ Each app owns its host integration.
 
 `npm run check` compiles all references, runs tests, validates all eight configuration files, checks architecture boundaries, and creates a disposable WX bundle. Golden replay fixtures make simulation and content changes explicit.
 
+### GLB display scale and effect heights
+
+- Asset units and rendered height are distinct: measure the GLB, then apply `characters.json → model.scale`. Do not assume the legacy scale fits a newly delivered model or normalize intentionally short characters globally.
+- If the GLB and procedural fallback have different native dimensions, configure `model.fallbackScale` independently; omitting it preserves the existing `model.scale` fallback. Cover loading, failure, and no-GLB platforms, not just successful hot-swap.
+- Before measuring animated/skinned meshes with `Box3.setFromObject(..., true)`, call `group.updateMatrixWorld(true)` for the complete hierarchy, as the renderer does. Per-node box updates can otherwise read stale child-bone transforms after changing the root scale.
+- `worldToLocal` removes scale as well as world translation/rotation. A chest height later added to the runner's world Y must include model scale again; bone-parented VFX inherit scale already and must not multiply their offsets twice.
+- Display scale does not automatically change collision `clearance`. Verify the configured loadout, visible height, raised support surfaces, footfall dust, and bone-parented VFX together (`tests/renderNiuScale.test.mjs`); raw 1.0-scale asset/clip tests alone do not cover the played character.
+
 ## Web-to-Cocos strategy
 
 Use the Web app as the rapid iteration surface for gameplay feel, pacing, camera, visuals, and UI. Keep simulation, gameplay state/flow, and configuration independent of rendering engines where practical, with engine- and platform-specific rendering, UI, input, assets, audio, and APIs isolated in their runtime layers.

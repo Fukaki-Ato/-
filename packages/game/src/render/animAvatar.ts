@@ -47,7 +47,7 @@ export interface AnimAvatar {
   group: THREE.Group;
   /** buff 挂件骨骼锚点（VFX 挂载用）；骨骼缺失返回 null */
   getBone(name: string): THREE.Object3D | null;
-  /** 胸口相对脚底的高度（米）：优先 Chest 骨骼（组内局部高度），缺骨骼按 1.05*scale 兜底 */
+  /** 胸口相对脚底的高度（米，含模型缩放）：优先 Chest 骨骼，缺骨骼按 1.05*scale 兜底 */
   get chestY(): number;
   /** @param dt 帧间隔（秒）；@param s @param fx 只读的 sim 状态与原语视图 */
   update(dt: number, s: RunnerState, fx: FxState): void;
@@ -100,7 +100,7 @@ function build(
   isDead?: () => boolean,
 ): AnimAvatar | null {
   // 核心 clip（10 个）缺一即判资产不合格：半套动作比没有更糟（会静默少播受击/死亡等关键反馈）。
-  // 表演 clip（Laugh/Basketball）按存在性装配：奶蛙与篮球小子不同源，缺一个不判失败，缺失由 play() 回落 Run。
+  // 表演 clip 按存在性装配：各模型不同源，缺一个不判失败，缺失由 play() 回落 Run。
   const actions = {} as Record<ClipName, THREE.AnimationAction | null>;
   const mixer = new THREE.AnimationMixer(root);
   for (const name of CORE_CLIP_NAMES) {
@@ -116,9 +116,9 @@ function build(
     const clip = clips.find(c => c.name === name);
     actions[name] = clip ? mixer.clipAction(clip) : null;
   }
-  // 两个表演 clip 全缺 = 契约外资产（既不是奶龙也不是篮球小子），判不合格
-  if (!actions.Laugh && !actions.Basketball) {
-    console.warn('[avatarRig] GLB 无表演 clip（Laugh/Basketball 均缺），判资产不合格');
+  // 三个表演 clip 全缺 = 契约外资产（现有角色至少带 Laugh/Basketball/Wave 之一），判不合格
+  if (PERF_CLIP_NAMES.every(n => !actions[n])) {
+    console.warn('[avatarRig] GLB 无表演 clip（Laugh/Basketball/Wave 均缺），判资产不合格');
     mixer.stopAllAction();
     return null;
   }
@@ -151,9 +151,9 @@ function build(
    *  Death 1.1s）LoopOnce + clampWhenFinished 播完就永久定在末帧——用户实测「一开始是好的，
    *  之后跑步没动作、下蹲也没动作」，就是验收地址 ?anim=Basketball 在 2s 后把角色定死。 */
   let lock = readAnimLock(urlParams);
+  if (lock && !actions[lock]) lock = null; // 本资产没有该 clip 时不能永久锁死状态机（如旧角色缺 Wave）。
   const chestV = new THREE.Vector3();
   const footV = new THREE.Vector3();
-
   /**
    * Idle 的双实例交替：Idle 首末姿差 110°（建模侧实测，不可直接循环），按契约 LoopOnce 播一次，
    * 播完后用第二个 action 做 0.12s 交叉淡化交回自身首帧，抹掉硬跳。
@@ -235,8 +235,8 @@ function build(
     getBone(name) { return bones.get(name) ?? null; },
     get chestY() {
       const chest = bones.get('Chest');
-      // 转成组内局部高度：avatarRig 还要再叠加 s.y，这里不能混进 group 的世界位移
-      return chest ? root.worldToLocal(chest.getWorldPosition(chestV)).y : CHEST_FALLBACK_Y * scale;
+      // 去掉组的世界位移/旋转，但补回 worldToLocal 消掉的缩放；调用方再叠加 s.y。
+      return chest ? root.worldToLocal(chest.getWorldPosition(chestV)).y * scale : CHEST_FALLBACK_Y * scale;
     },
     update(dt, s, fx) {
       ticks++;
