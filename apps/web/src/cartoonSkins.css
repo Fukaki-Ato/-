@@ -1,0 +1,90 @@
+/* Reusable nine-slice skins extracted from the old shop, not flattened pages. */
+.tr-mobile-page .ui-panel,
+.tr-character-select .select-power-card,
+.tr-character-select .select-roster-card,
+.tr-mobile-page .ui-secondary,
+.tr-mobile-page .ui-icon-button:not(.lobby-settings),
+.tr-character-select .select-back-button,
+.tr-character-select .select-shop-button,
+.mobile-settings .settings-theme,
+.tr-shop-overlay .shop-page-button {
+  position: relative;
+  isolation: isolate;
+  background: none;
+  border-color: transparent;
+  box-shadow: none;
+}
+.tr-mobile-page .ui-panel::before,
+.tr-character-select .select-power-card::before,
+.tr-character-select .select-roster-card::before,
+.tr-mobile-page .ui-secondary::before,
+.tr-mobile-page .ui-icon-button:not(.lobby-settings)::before,
+.tr-character-select .select-back-button::before,
+.tr-character-select .select-shop-button::before,
+.mobile-settings .settings-theme::before,
+.tr-shop-overlay .shop-page-button::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  width: auto;
+  background: none;
+  pointer-events: none;
+  border: 18px solid transparent;
+  border-image: url('./assets/mobile-ui/panel-frame.webp') 24 32 fill / 18px 22px;
+  filter: drop-shadow(0 3px 0 #9c673660) drop-shadow(0 5px 9px #684d2c12);
+}
+.tr-character-select .select-roster-card::before,
+.tr-mobile-page .ui-icon-button:not(.lobby-settings)::before,
+.tr-character-select .select-back-button::before { border-image-width: 13px 16px; }
+.tr-mobile-page .ui-primary,
+.tr-character-select .select-start-button {
+  position: relative;
+  isolation: isolate;
+  background: none;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  color: #fffdf1;
+  text-shadow: 0 2px 0 #21771a;
+}
+.tr-mobile-page .ui-primary::before,
+.tr-character-select .select-start-button::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  pointer-events: none;
+  border: 20px solid transparent;
+  border-image: url('./assets/mobile-ui/button-green.webp') 32 fill / 20px 28px;
+  filter: drop-shadow(0 4px 0 #85572a88) drop-shadow(0 5px 8px #527c5920);
+}
+.tr-mobile-page .ui-primary:disabled,
+.tr-character-select .select-start-button:disabled { background: none; color: #68766b; text-shadow: none; }
+.tr-mobile-page .ui-primary:disabled::before,
+.tr-character-select .select-start-button:disabled::before { filter: grayscale(.9) opacity(.7); }
+.mobile-settings .settings-theme.is-selected,
+.tr-character-select .select-roster-card.is-selected { outline: 2px solid var(--ui-teal); outline-offset: 2px; border-radius: 18px; }
+.tr-mobile-page .mobile-header { gap: 12px; }
+.tr-mobile-page .mobile-heading,
+.tr-character-select .select-heading {
+  display: grid;
+  place-items: center;
+  flex: 1;
+  min-width: 0;
+  min-height: 94px;
+  padding: 20px 12px 12px;
+  background: url('./assets/mobile-ui/title-plaque.webp') center / 100% 100% no-repeat;
+  filter: drop-shadow(0 2px 0 #99632c66);
+}
+.mobile-heading .ui-eyebrow, .tr-character-select .select-eyebrow { display: none; }
+.tr-mobile-page .mobile-heading h1,
+.tr-character-select .select-title { margin: 0; color: #69411e; font-size: 25px; text-align: center; text-shadow: 0 1px #fff1bf; }
+.tr-character-select .select-hero-portrait { border-color: #fff0be; box-shadow: 0 0 0 2px #cd984f, 0 4px 0 #98714655, 0 8px 20px #396c5718; border-radius: 25% 20% 24% 17%; }
+.tr-character-select .select-power-icon { border: 1px solid #5e9a7740; box-shadow: inset 0 2px #fff8, 0 2px #77a88e40; }
+.tr-character-select .select-power-icon.is-passive-icon { border-color: #c29a4a60; }
+.mobile-result .result-emblem { border: 2px solid #d5a445; background: radial-gradient(circle at 40% 25%, #fff5c2, #f7c753); box-shadow: inset 0 2px 0 #fff8, 0 3px 0 #bb7e3155; border-radius: 42% 38% 40% 35%; }
+@media (max-width: 350px) {
+  .tr-mobile-page .mobile-heading, .tr-character-select .select-heading { min-height: 82px; padding: 18px 10px 10px; }
+  .tr-mobile-page .mobile-heading h1, .tr-character-select .select-title { font-size: 22px; }
+}

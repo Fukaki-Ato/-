@@ -128,7 +128,7 @@ async function loadStill(url: string): Promise<NinePatchSource | undefined> {
   } catch { return undefined; }
 }
 
-export async function createUiShell(adapter: PlatformAdapter): Promise<UiShell> {
+export async function createUiShell(adapter: PlatformAdapter, options: { menuArt?: boolean } = {}): Promise<UiShell> {
   const canvas = document.createElement('canvas');
   canvas.className = 'tr-ui-canvas';
   canvas.tabIndex = -1;
@@ -145,7 +145,7 @@ export async function createUiShell(adapter: PlatformAdapter): Promise<UiShell> 
 
   // 大厅徽标：normal + glow 两帧；零 insets 九宫格 = 整图拉伸；缺文件降级为空槽，不阻塞启动
   const badges: BadgeSet = { normal: {}, glow: {} };
-  const badgeLoad = Promise.all(BADGE_NAMES.flatMap(n => (['normal', 'glow'] as const).map(async sub => {
+  const badgeLoad = options.menuArt === false ? Promise.resolve([]) : Promise.all(BADGE_NAMES.flatMap(n => (['normal', 'glow'] as const).map(async sub => {
     try {
       const bmp = await resources.loadImage(`${import.meta.env.BASE_URL}assets/ui/badges/${sub}/${n}.png`);
       // ImageLike 是框架跨端抽象；web 侧实为 ImageBitmap（uiShell 允许 DOM 类型）
@@ -160,7 +160,7 @@ export async function createUiShell(adapter: PlatformAdapter): Promise<UiShell> 
     loadFontSet(resources, `${import.meta.env.BASE_URL}assets/fonts`),
     adapter.fetchJson(`${import.meta.env.BASE_URL}game.json`),
     badgeLoad,
-    loadBackdrop(import.meta.env.BASE_URL),
+    options.menuArt === false ? Promise.resolve(undefined) : loadBackdrop(import.meta.env.BASE_URL),
   ]);
   const config = resolveUiConfig((gameJson as { params?: unknown }).params);
   const backdrop = bg?.set;

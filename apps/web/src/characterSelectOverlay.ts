@@ -1,257 +1,186 @@
-import type { NamedEntry, GameContent } from '@tr/game/core/config/configTypes.js';
-import { buildLoadout, playableCharacters } from '@tr/game/core/sim/character.js';
+import type { GameContent } from '@tr/game/core/config/configTypes.js';
+import { buildLoadout, isCharacterLocked, playableCharacters } from '@tr/game/core/sim/character.js';
 import type { CharacterSelectPageActions } from '@tr/game/flow/views.js';
-import { entryLabel, type EntryMethod } from '@tr/game/flow/session.js';
+import type { EntryMethod } from '@tr/game/flow/session.js';
 import type { FontSet } from '@tr/framework/ui/text/metrics.js';
-import { applyCharacterArt, createCharacterPortrait, getCharacterArt } from './characterArt.js';
-import { createShopTextRenderer } from './shopText.js';
+import { applySelectArt, createSelectPortrait } from './selectCharacterArt.js';
 import { installCharacterSelectKeyboard } from './characterSelectKeyboard.js';
-import backgroundArt from './assets/character-select/bg_select.webp';
+import { pageLifecycle, uiButton, uiText } from './mobileUi.js';
+import { unlockLabel, abilityRow } from './selectPageParts.js';
+import { createSelectDetails } from './selectDetails.js';
 import './characterSelectOverlay.css';
-
-interface RosterItem {
-  entry: NamedEntry;
-  loadout: ReturnType<typeof buildLoadout>;
-  locked: boolean;
-  unlockText: string;
-}
-
-function sdf(tag: keyof HTMLElementTagNameMap, text: string, className: string, color: string): HTMLElement {
-  const node = document.createElement(tag);
-  node.className = `select-sdf-text shop-sdf-text ${className}`;
-  node.textContent = text;
-  node.dataset.sdfColor = color;
-  return node;
-}
-
-function unlockLabel(entry: NamedEntry): string {
-  const unlock = entry['unlock'] as { type?: unknown; cost?: unknown } | undefined;
-  const cost = typeof unlock?.cost === 'number' ? new Intl.NumberFormat('zh-CN').format(unlock.cost) : '';
-  switch (String(unlock?.type ?? '')) {
-    case 'free': return '免费开放';
-    case 'coin': return cost ? `金币 · ${cost}` : '金币';
-    case 'loot': return '雷霆箱';
-    case 'event': return '限时活动';
-    default: return '暂未配置';
-  }
-}
-
-function makePortrait(item: RosterItem, className: string): HTMLDivElement {
-  return createCharacterPortrait(
-    { charId: item.loadout.charId, name: item.loadout.name, tint: item.loadout.tint },
-    className,
-  );
-}
-
-function makeButton(label: string, className: string, ariaLabel: string): HTMLButtonElement {
-  const button = document.createElement('button');
-  button.type = 'button';
-  button.className = className;
-  button.setAttribute('aria-label', ariaLabel);
-  button.append(sdf('span', label, 'select-button-label', className === 'select-start-button' ? '#63371c' : '#fff8e5'));
-  return button;
-}
 
 export function createCharacterSelectOverlay(
   content: GameContent,
   actions: CharacterSelectPageActions,
   currentCharId: string,
-  entry: EntryMethod | null,
-  fonts: FontSet,
+  _entry: EntryMethod | null,
+  _fonts: FontSet,
 ): () => void {
-  const items: RosterItem[] = playableCharacters(content).map(character => {
-    const locked = String(character.status ?? '') === 'locked' || character['locked'] === true;
-    return {
-      entry: character,
-      loadout: buildLoadout(content, character.id),
-      locked,
-      unlockText: unlockLabel(character),
-    };
-  });
-  let chosen = items.some(item => item.loadout.charId === currentCharId)
-    ? currentCharId : (items[0]?.loadout.charId ?? '');
+  const items = playableCharacters(content).map(character => ({
+    entry: character, loadout: buildLoadout(content, character.id),
+    locked: isCharacterLocked(character), unlockText: unlockLabel(character),
+  }));
+  let selectedIndex = Math.max(0, items.findIndex(item => item.loadout.charId === currentCharId));
+  let chosen = items[selectedIndex]?.loadout.charId ?? '';
 
-  const root = document.createElement('section');
-  root.className = 'tr-character-select';
+  const root = uiText('section', '', 'tr-character-select island-select');
   root.setAttribute('role', 'dialog');
   root.setAttribute('aria-modal', 'true');
   root.setAttribute('aria-label', '选择跑者');
-  root.tabIndex = -1;
-  root.style.backgroundImage = `linear-gradient(125deg, rgba(5, 52, 61, .72), rgba(35, 52, 46, .62)), url("${backgroundArt}")`;
-
-  const frame = document.createElement('div');
-  frame.className = 'character-select-frame';
-  const header = document.createElement('header');
-  header.className = 'select-header';
-  const backButton = makeButton('返回', 'select-back-button', '返回主菜单');
-  backButton.addEventListener('click', returnToMainMenu);
-  const heading = document.createElement('div');
-  heading.className = 'select-heading';
-  heading.append(
-    sdf('span', `SEA BREEZE · ${entryLabel(entry)}`, 'select-eyebrow', '#ffe7a8'),
-    sdf('h1', '选择角色', 'select-title', '#fff7e4'),
-  );
-  const counter = sdf('div', '', 'select-counter', '#fff7e4');
+  const frame = uiText('div', '', 'character-select-frame');
+  const details = createSelectDetails(frame);
+  const header = uiText('header', '', 'select-header');
+  const backButton = uiButton('‹', 'select-back-button', returnToMainMenu);
+  backButton.setAttribute('aria-label', '返回主菜单');
+  const heading = uiText('div', '', 'select-page-heading');
+  heading.append(uiText('h1', '选择角色', 'select-title'));
+  const counter = uiText('span', '', 'select-counter');
   header.append(backButton, heading, counter);
 
-  const showcase = document.createElement('main');
-  showcase.className = 'select-showcase';
-  const portraitPanel = document.createElement('div');
-  portraitPanel.className = 'select-portrait-panel';
-  const heroPortrait = document.createElement('div');
-  heroPortrait.className = 'select-hero-portrait';
+  const showcase = uiText('main', '', 'select-showcase');
+  const display = uiText('div', '', 'select-display');
+  const portraitPanel = uiText('div', '', 'select-portrait-panel');
+  const halo = uiText('div', '', 'select-stage-halo');
+  halo.setAttribute('aria-hidden', 'true');
+  const heroPortrait = uiText('div', '', 'select-hero-portrait');
   heroPortrait.setAttribute('aria-hidden', 'true');
-  portraitPanel.append(heroPortrait);
-  const identity = document.createElement('div');
-  identity.className = 'select-identity';
-  const identityMeta = document.createElement('div');
-  identityMeta.className = 'select-identity-meta';
-  const rarity = sdf('span', '', 'select-rarity', '#65401f');
-  const state = sdf('span', '', 'select-state', '#276354');
-  identityMeta.append(rarity, state);
-  const name = sdf('h2', '', 'select-name', '#50331e');
-  const tagline = sdf('p', '', 'select-tagline', '#725332');
-  const unlock = sdf('span', '', 'select-unlock', '#79552e');
-  identity.append(identityMeta, name, tagline, unlock);
+  const pedestal = uiText('div', '', 'select-pedestal');
+  pedestal.setAttribute('aria-hidden', 'true');
+  portraitPanel.append(halo, pedestal, heroPortrait);
+  const previous = uiButton('‹', 'select-cycle-button select-previous', () => step(-1));
+  previous.setAttribute('aria-label', '上一个角色');
+  const next = uiButton('›', 'select-cycle-button select-next', () => step(1));
+  next.setAttribute('aria-label', '下一个角色');
+  const rarity = uiText('span', '', 'select-rarity');
+  display.append(portraitPanel, previous, next, rarity);
 
-  const powers = document.createElement('div');
-  powers.className = 'select-powers';
-  const activeCard = document.createElement('article');
-  activeCard.className = 'select-power-card is-active-power';
-  const activeIcon = document.createElement('span');
-  activeIcon.className = 'select-power-icon is-active-icon';
-  activeIcon.setAttribute('aria-hidden', 'true');
-  const activeTitle = sdf('span', '主动技能', 'select-power-type', '#8b652f');
-  const activeName = sdf('strong', '', 'select-power-name', '#53381f');
-  const activeDesc = sdf('p', '', 'select-power-desc', '#74583a');
-  activeCard.append(activeIcon, activeTitle, activeName, activeDesc);
-  const passiveCard = document.createElement('article');
-  passiveCard.className = 'select-power-card is-passive-power';
-  const passiveIcon = document.createElement('span');
-  passiveIcon.className = 'select-power-icon is-passive-icon';
-  passiveIcon.setAttribute('aria-hidden', 'true');
-  const passiveTitle = sdf('span', '被动特性', 'select-power-type', '#8b652f');
-  const passiveName = sdf('strong', '', 'select-power-name', '#53381f');
-  const passiveDesc = sdf('p', '', 'select-power-desc', '#74583a');
-  passiveCard.append(passiveIcon, passiveTitle, passiveName, passiveDesc);
-  powers.append(activeCard, passiveCard);
-  showcase.append(portraitPanel, identity, powers);
+  const identity = uiText('div', '', 'select-identity');
+  const nameRow = uiText('div', '', 'select-name-row');
+  const name = uiText('h2', '', 'select-name');
+  const state = uiText('span', '', 'select-state');
+  nameRow.append(name, state);
+  const tagline = uiText('p', '', 'select-tagline');
+  identity.append(nameRow, tagline);
 
-  const roster = document.createElement('section');
-  roster.className = 'select-roster';
+  const powers = uiText('section', '', 'select-power-card select-ability-board');
+  powers.setAttribute('aria-label', '角色能力');
+  const active = abilityRow('主动技能', 'active', () => { if (chosen) details.open(); });
+  const passive = abilityRow('被动特性', 'passive', () => { if (chosen) details.open(); });
+  powers.append(active.root, passive.root);
+  showcase.append(display, identity);
+
+  const roster = uiText('section', '', 'select-roster');
   roster.setAttribute('aria-label', '角色名单');
-  const rosterHead = document.createElement('div');
-  rosterHead.className = 'select-roster-head';
-  rosterHead.append(
-    sdf('h3', '伙伴', 'select-roster-title', '#fff5d9'),
-    sdf('span', '点选角色 · 左右选择', 'select-roster-hint', '#ffe9bd'),
-  );
-  const rosterList = document.createElement('div');
-  rosterList.className = 'select-roster-list';
-  rosterList.setAttribute('role', 'list');
+  const rosterHead = uiText('div', '', 'select-roster-head');
+  rosterHead.append(uiText('h3', '跑者小队', 'select-roster-title'), uiText('span', '左右滑动 · 点选伙伴', 'select-roster-hint'));
+  const rosterList = uiText('div', '', 'select-roster-list');
   const cards = new Map<string, HTMLButtonElement>();
   for (const item of items) {
     const id = item.loadout.charId;
-    const card = document.createElement('button');
-    card.type = 'button';
-    card.className = 'select-roster-card';
+    const card = uiButton('', 'select-roster-card', () => select(id, true));
     card.dataset.charId = id;
     card.dataset.locked = String(item.locked);
     card.style.setProperty('--char-tint', item.loadout.tint);
-    card.setAttribute('aria-label', `${item.loadout.name}，${item.locked ? '锁定角色，仅查看' : '演示可选'}`);
-    card.append(makePortrait(item, 'select-card-art'));
-    const cardName = sdf('span', item.loadout.name, 'select-card-name', '#fff7e4');
-    const cardStatus = sdf('span', item.locked ? '锁定' : item.loadout.rarity, 'select-card-status', '#ffe7ae');
-    card.append(cardName, cardStatus);
-    card.addEventListener('click', () => select(id));
+    card.append(createSelectPortrait(item.loadout, 'select-card-art'), uiText('span', item.loadout.name, 'select-card-name'));
+    const tier = uiText('span', item.locked ? '锁定' : item.loadout.rarity, 'select-card-tier');
+    card.append(tier);
     cards.set(id, card);
     rosterList.append(card);
   }
   roster.append(rosterHead, rosterList);
+  const controls = uiText('div', '', 'select-controls');
+  controls.append(powers, roster);
 
-  const footer = document.createElement('footer');
-  footer.className = 'select-actions';
-  const shopButton = makeButton('打开商店', 'select-shop-button', '打开商店');
-  const actionNote = sdf('span', '选好伙伴，出发看海', 'select-action-note', '#fff0ce');
-  const startButton = makeButton('开始酷跑', 'select-start-button', '开始酷跑');
+  const footer = uiText('footer', '', 'select-actions');
+  const unlock = uiText('span', '', 'select-unlock');
+  const footerMeta = uiText('div', '', 'select-footer-meta');
+  const actionNote = uiText('span', '', 'select-action-note');
+  actionNote.setAttribute('role', 'status');
+  footerMeta.append(unlock, actionNote);
+  const actionRow = uiText('div', '', 'select-action-row');
+  const shopButton = uiButton('商店', 'select-shop-button');
+  shopButton.setAttribute('aria-label', '打开商店');
+  const startButton = uiButton('', 'select-start-button');
+  startButton.append(uiText('span', '开始酷跑', 'select-button-label'), uiText('span', '→', 'select-start-arrow'));
   shopButton.addEventListener('click', () => { if (chosen) actions.onShop(chosen); });
   startButton.addEventListener('click', () => { if (chosen && !startButton.disabled) actions.onStartRun(chosen); });
-  footer.append(shopButton, actionNote, startButton);
-  frame.append(header, showcase, roster, footer);
-  const textCanvas = document.createElement('canvas');
-  textCanvas.className = 'select-text-layer';
-  textCanvas.setAttribute('aria-hidden', 'true');
-  root.append(frame, textCanvas);
+  actionRow.append(shopButton, startButton);
+  identity.append(footerMeta);
+  footer.append(actionRow);
+  frame.append(header, showcase, controls, footer);
+  root.append(frame, details.root);
   document.body.append(root);
+  const disposePage = pageLifecycle(root);
+  const disposeKeyboard = installCharacterSelectKeyboard(root, returnToMainMenu, delta => {
+    if (!details.isOpen) step(delta);
+  }, () => details.isOpen ? details.panel : frame);
 
-  const paintText = createShopTextRenderer(root, textCanvas, fonts);
-  let selectedIndex = 0;
+  function step(delta: number): void {
+    if (!items.length) return;
+    select(items[(selectedIndex + delta + items.length) % items.length]!.loadout.charId, true);
+  }
 
-  function select(id: string): void {
+  function select(id: string, reveal = false): void {
     const item = items.find(candidate => candidate.loadout.charId === id);
     if (!item) return;
     chosen = id;
     selectedIndex = items.indexOf(item);
-    const tint = item.loadout.tint;
-    root.style.setProperty('--char-tint', tint);
-    applyCharacterArt(heroPortrait, getCharacterArt({ charId: id, name: item.loadout.name, tint }));
-    rarity.textContent = `${item.loadout.rarity} · ${id.replace(/^char_/, '').toUpperCase()}`;
-    rarity.style.setProperty('--rarity-color', item.loadout.rarity === 'SSR' ? '#ffc86e' : item.loadout.rarity === 'SR' ? '#7ee0d0' : '#d9e6e3');
+    root.style.setProperty('--char-tint', item.loadout.tint);
+    root.dataset.rarity = item.loadout.rarity;
+    applySelectArt(heroPortrait, item.loadout);
+    rarity.textContent = item.loadout.rarity;
+    name.textContent = item.loadout.name;
     state.textContent = item.locked ? '锁定 · 仅查看' : '演示可选';
     state.classList.toggle('is-locked', item.locked);
-    state.dataset.sdfColor = item.locked ? '#853e2c' : '#276354';
-    name.textContent = item.loadout.name;
     tagline.textContent = item.loadout.tagline || '海风正好，准备出发';
     unlock.textContent = `入手方式 · ${item.unlockText}`;
-    activeName.textContent = item.loadout.skill?.label || '暂无主动技能';
-    activeDesc.textContent = item.loadout.skill?.desc || '这位跑者暂未配置主动技能。';
-    passiveName.textContent = item.loadout.talentLabel || '暂无被动特性';
-    passiveDesc.textContent = item.loadout.talentDesc || '这位跑者暂未配置被动特性。';
+    active.name.textContent = item.loadout.skill?.label || '暂无主动技能';
+    active.desc.textContent = item.loadout.skill?.desc || '这位跑者暂未配置主动技能。';
+    passive.name.textContent = item.loadout.talentLabel || '暂无被动特性';
+    passive.desc.textContent = item.loadout.talentDesc || '这位跑者暂未配置被动特性。';
+    active.root.setAttribute('aria-label', `查看主动技能 · ${active.name.textContent}`);
+    passive.root.setAttribute('aria-label', `查看被动特性 · ${passive.name.textContent}`);
+    details.update(item.loadout.name, active.name.textContent, active.desc.textContent,
+      passive.name.textContent, passive.desc.textContent);
     counter.textContent = `${String(selectedIndex + 1).padStart(2, '0')} / ${String(items.length).padStart(2, '0')}`;
-    actionNote.textContent = item.locked ? '锁定角色仅供查看' : `${item.loadout.name} · 演示可选`;
+    actionNote.textContent = item.locked ? `${item.loadout.name} · 锁定，仅供查看` : `出战 · ${item.loadout.name}`;
     startButton.disabled = item.locked || !chosen;
     startButton.setAttribute('aria-label', item.locked ? `${item.loadout.name}尚未解锁` : `以${item.loadout.name}身份开始酷跑`);
     for (const [cardId, card] of cards) {
       const selected = cardId === id;
+      const cardItem = items.find(candidate => candidate.loadout.charId === cardId)!;
       card.classList.toggle('is-selected', selected);
       card.setAttribute('aria-pressed', String(selected));
-      const cardItem = items.find(candidate => candidate.loadout.charId === cardId);
-      card.setAttribute('aria-label', `${cardItem?.loadout.name ?? cardId}，${selected ? '已选' : '选择'}${cardItem?.locked ? '，锁定角色，仅查看' : '，演示可选'}`);
+      card.setAttribute('aria-label', `${cardItem.loadout.name}，${selected ? '已选' : '选择'}${cardItem.locked ? '，锁定角色，仅查看' : '，演示可选'}`);
+    }
+    if (reveal) {
+      const card = cards.get(id)!;
+      const left = card.offsetLeft - (rosterList.clientWidth - card.offsetWidth) / 2;
+      // Selection must be visible immediately on a phone, including last-to-first cycling.
+      rosterList.scrollTo({ left, behavior: 'auto' });
     }
     actions.onSelect(id);
-    paintText(1);
   }
 
   function returnToMainMenu(): void {
+    if (details.isOpen) { details.close(); return; }
     actions.onBack();
-    const menuEntry = document.querySelector<HTMLButtonElement>('.tr-main-menu .main-menu-nav-hotspot[aria-label="角色"]');
-    (menuEntry ?? document.querySelector<HTMLCanvasElement>('.tr-ui-canvas'))?.focus({ preventScroll: true });
+    document.querySelector<HTMLButtonElement>('.mobile-lobby button[aria-label^="选择角色"]')?.focus({ preventScroll: true });
   }
 
-  const disposeKeyboard = installCharacterSelectKeyboard(root, returnToMainMenu, step => {
-    if (!items.length) return;
-    const next = (selectedIndex + step + items.length) % items.length;
-    select(items[next]!.loadout.charId);
-  });
-
-  function repaintText(): void { paintText(1); }
-  window.addEventListener('resize', repaintText);
-  window.visualViewport?.addEventListener('resize', repaintText);
-  root.addEventListener('scroll', repaintText, { capture: true, passive: true });
-  if (chosen) select(chosen);
-  else {
+  if (chosen) {
+    select(chosen);
+    const card = cards.get(chosen)!;
+    rosterList.scrollLeft = Math.max(0, card.offsetLeft - (rosterList.clientWidth - card.offsetWidth) / 2);
+  } else {
     name.textContent = '暂无可选角色';
     state.textContent = '等待角色配置';
     startButton.disabled = true;
     counter.textContent = '00 / 00';
   }
-  root.focus({ preventScroll: true });
-
-  return () => {
-    window.removeEventListener('resize', repaintText);
-    window.visualViewport?.removeEventListener('resize', repaintText);
-    root.removeEventListener('scroll', repaintText, true);
-    disposeKeyboard();
-    root.remove();
-  };
+  previous.disabled = next.disabled = items.length < 2;
+  (active.root as HTMLButtonElement).disabled = !items.length;
+  (passive.root as HTMLButtonElement).disabled = !items.length;
+  return () => { disposeKeyboard(); details.dispose(); disposePage(); };
 }

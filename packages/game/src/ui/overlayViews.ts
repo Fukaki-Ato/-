@@ -34,6 +34,10 @@ export interface OverlayViewsDeps {
    */
   onLobbyVisible?(visible: boolean): void;
   shopRenderer?: (content: GameContent, actions: ShopActions) => () => void;
+  lobbyRenderer?: (content: GameContent, actions: SelectActions, currentCharId: string, extras?: SelectExtras) => () => void;
+  settingsRenderer?: (content: GameContent, actions: SettingsActions, currentThemeId: string | null) => () => void;
+  resultRenderer?: (summary: RunSummary, best: number, actions: ResultActions) => () => void;
+  hudRenderer?: () => HudHandle;
   selectRenderer?: (
     content: GameContent,
     actions: CharacterSelectPageActions,
@@ -49,6 +53,7 @@ export function createOverlayViews(deps: OverlayViewsDeps): OverlayViews {
   let backdrop: MenuBackdrop | null = null;
   let disposeCharacterSelect: (() => void) | null = null;
   let disposeShopRenderer: (() => void) | null = null;
+  let disposePanelRenderer: (() => void) | null = null;
   const clearShopRenderer = (): void => {
     const dispose = disposeShopRenderer;
     disposeShopRenderer = null;
@@ -59,7 +64,12 @@ export function createOverlayViews(deps: OverlayViewsDeps): OverlayViews {
     disposeCharacterSelect = null;
     dispose?.();
   };
-  const clearTransient = (): void => { clearCharacterSelect(); clearShopRenderer(); };
+  const clearTransient = (): void => {
+    clearCharacterSelect(); clearShopRenderer();
+    const dispose = disposePanelRenderer;
+    disposePanelRenderer = null;
+    dispose?.();
+  };
   const lobby = (visible: boolean): void => deps.onLobbyVisible?.(visible);
   const stopBackdrop = (): void => { backdrop?.dispose(); backdrop = null; lobby(false); };
 
@@ -88,6 +98,12 @@ export function createOverlayViews(deps: OverlayViewsDeps): OverlayViews {
       extras?: SelectExtras,
     ): void {
       clearTransient();
+      if (deps.lobbyRenderer) {
+        stopBackdrop();
+        host.mount(host.makeView(), { transparent: true });
+        disposePanelRenderer = deps.lobbyRenderer(content, actions, currentCharId, extras);
+        return;
+      }
       const page = buildLobbyPage(host, {
         content,
         actions,
@@ -135,12 +151,23 @@ export function createOverlayViews(deps: OverlayViewsDeps): OverlayViews {
     renderSettings(content: GameContent, actions: SettingsActions, currentThemeId: string | null): void {
       clearTransient();
       stopBackdrop();
+      if (deps.settingsRenderer) {
+        host.mount(host.makeView(), { transparent: true });
+        disposePanelRenderer = deps.settingsRenderer(content, actions, currentThemeId);
+        return;
+      }
       host.mount(buildSettingsPage(host, { content, actions, currentThemeId }).view);
     },
 
     mountHud(): HudHandle {
       clearTransient();
       stopBackdrop();
+      if (deps.hudRenderer) {
+        host.mount(host.makeView(), { transparent: true });
+        const handle = deps.hudRenderer();
+        disposePanelRenderer = () => handle.dispose();
+        return handle;
+      }
       const page = buildHudPage(host);
       host.mount(page.view, { transparent: true });
       return page.handle;
@@ -149,6 +176,11 @@ export function createOverlayViews(deps: OverlayViewsDeps): OverlayViews {
     renderResult(summary: RunSummary, best: number, actions: ResultActions): void {
       clearTransient();
       stopBackdrop();
+      if (deps.resultRenderer) {
+        host.mount(host.makeView(), { transparent: true });
+        disposePanelRenderer = deps.resultRenderer(summary, best, actions);
+        return;
+      }
       host.mount(buildResultPage(host, { summary, best, actions }).view);
     },
 

@@ -4,6 +4,7 @@ export function installCharacterSelectKeyboard(
   root: HTMLElement,
   onBack: () => void,
   onArrow: (step: number) => void,
+  focusScope: () => HTMLElement = () => root,
 ): () => void {
   function onKeyDown(event: KeyboardEvent): void {
     if (event.key === 'Escape') {
@@ -12,7 +13,7 @@ export function installCharacterSelectKeyboard(
       return;
     }
     if (event.key === 'Tab') {
-      const focusable = Array.from(root.querySelectorAll<HTMLElement>(FOCUSABLE))
+      const focusable = Array.from(focusScope().querySelectorAll<HTMLElement>(FOCUSABLE))
         .filter(element => element.getClientRects().length > 0);
       const activeIndex = focusable.indexOf(document.activeElement as HTMLElement);
       if (!focusable.length) {
@@ -33,6 +34,8 @@ export function installCharacterSelectKeyboard(
     onArrow(event.key === 'ArrowRight' ? 1 : -1);
   }
 
-  document.addEventListener('keydown', onKeyDown);
-  return () => document.removeEventListener('keydown', onKeyDown);
+  // Page-scoped ownership also prevents the Escape returning from a shop from
+  // reaching a freshly installed selection handler during the same bubbling event.
+  root.addEventListener('keydown', onKeyDown);
+  return () => root.removeEventListener('keydown', onKeyDown);
 }

@@ -9,6 +9,9 @@ import { createShopOverlay } from './shopOverlay.js';
 import { injectObstaclePosters, injectPickupTiles } from './runAssets.js';
 import { createTestPanel } from './testPanel.js';
 import { preloadStartupConfig } from './startupConfig.js';
+import { createMobileLobby } from './mobileLobby.js';
+import { createMobileSettings, createMobileResult } from './mobilePanels.js';
+import { createMobileHud } from './mobileHud.js';
 
 const mount = document.getElementById('screen')!;
 const debug = location.search.includes('debug');
@@ -25,13 +28,17 @@ async function main(): Promise<void> {
   // 键名与 mainFlow.CHAR_KEY 一致，改它两边要同步）。不传则维持原有 UI 选角流程。
   const charParam = new URLSearchParams(location.search).get('char');
   if (charParam) adapter.storage.set('thunderrun:character', charParam);
-  const shell = await createUiShell(adapter);
+  const shell = await createUiShell(adapter, { menuArt: false });
   const views = createOverlayViews({
     host: shell.host, badges: shell.badges, backdrop: shell.backdrop,
     onLobbyVisible: v => shell.setBackgroundVisible(v), // 背景视频只在大厅解码
     selectRenderer: (content, actions, currentCharId, entry) =>
       createCharacterSelectOverlay(content, actions, currentCharId, entry, shell.fonts),
     shopRenderer: (content, actions) => createShopOverlay(content, actions, shell.fonts),
+    lobbyRenderer: createMobileLobby,
+    settingsRenderer: createMobileSettings,
+    resultRenderer: createMobileResult,
+    hudRenderer: createMobileHud,
   });
   shell.host.start();
   // UI 就绪：撤掉 index.html 的静态占位文案；角色选择页与商店按需挂载 Web DOM overlay

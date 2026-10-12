@@ -51,9 +51,9 @@ export function getCharacterArt(input: CharacterArtInput): CharacterArt {
 
 function sdf(tag: keyof HTMLElementTagNameMap, text: string, className: string, color: string): HTMLElement {
   const node = document.createElement(tag);
-  node.className = `select-sdf-text shop-sdf-text ${className}`;
+  node.className = className;
   node.textContent = text;
-  node.dataset.sdfColor = color;
+  node.style.color = color;
   return node;
 }
 

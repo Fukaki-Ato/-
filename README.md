@@ -37,6 +37,8 @@ Useful commands:
 - `TR_WEB_BASE=/thunder-run/ npm run build:web`: create a bundle with URLs rooted at the isolated test-site path.
 - `npm run build:wx -- --minify`: create a WX Developer Tools package in `apps/wx/dist`.
 
+The mobile UI design and verification rules are in [docs/mobile-ui.md](docs/mobile-ui.md). Test-site and post-merge delivery instructions are in [docs/ui-delivery.md](docs/ui-delivery.md).
+
 ## Current Scope
 
 - Web runs the complete menu, runner, HUD, and result flow.
