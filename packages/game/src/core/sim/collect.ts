@@ -9,6 +9,8 @@ import { VACUUM_RANGE_M, type RunnerState, type SimEvent } from './simTypes.js';
 
 /** 金币高度匹配窗口：角色重心（y+0.9）与金币圆心（默认 0.65）的允许差 */
 const COIN_Y_TOL = 1.3;
+/** Ground-coin exclusion height; generation uses the exact same pickup boundary. */
+export const GROUND_COIN_CLEAR_Y = COIN_Y_TOL - 0.9 + 0.65;
 /** 金币横向判定：车道中心 ±0.9 米 */
 const COIN_X_TOL = 0.9;
 /** 道具箱横向判定（箱子比金币大，容差略宽） */

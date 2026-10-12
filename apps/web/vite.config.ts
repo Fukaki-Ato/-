@@ -59,6 +59,11 @@ export default defineConfig({
     host: '127.0.0.1',
     port: 8767,
     strictPort: true,
+    proxy: {
+      '/api/': { target: 'http://127.0.0.1:8788', changeOrigin: false,
+        rewrite: path => `/thunder-run${path}`, cookiePathRewrite: { '/thunder-run/api': '/api' } },
+      '/thunder-run/api/': { target: 'http://127.0.0.1:8788', changeOrigin: false },
+    },
     // TR_NO_OPEN=1：CI/自动化冒烟时不弹浏览器（人双击 .bat 时照旧自动打开）
     open: !process.env.TR_NO_OPEN,
   },

@@ -12,6 +12,8 @@ import { preloadStartupConfig } from './startupConfig.js';
 import { createMobileLobby } from './mobileLobby.js';
 import { createMobileSettings, createMobileResult } from './mobilePanels.js';
 import { createMobileHud } from './mobileHud.js';
+import { createMobileLeaderboard } from './mobileLeaderboard.js';
+import { createLeaderboardClient } from './leaderboardClient.js';
 
 const mount = document.getElementById('screen')!;
 const debug = location.search.includes('debug');
@@ -39,6 +41,7 @@ async function main(): Promise<void> {
     settingsRenderer: createMobileSettings,
     resultRenderer: createMobileResult,
     hudRenderer: createMobileHud,
+    leaderboardRenderer: createMobileLeaderboard,
   });
   shell.host.start();
   // UI 就绪：撤掉 index.html 的静态占位文案；角色选择页与商店按需挂载 Web DOM overlay
@@ -51,6 +54,7 @@ async function main(): Promise<void> {
     configResolve,
     debug,
     test: testMode,
+    leaderboard: createLeaderboardClient(import.meta.env.BASE_URL),
   });
 
   // 测试模式面板（?debug/?test）：左侧技能开关，数据面为 __trTest（mainFlow 在 run 局挂载）

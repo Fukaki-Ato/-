@@ -1,8 +1,8 @@
 /**
  * 地面金币链铺设（模板窗口内）——trackGen 专用纯函数，独立成文件守 300 行上限。
  * 规则（docs/01：金币即教学）：主链优先铺在模板安全线，再按 laneGroupWeights 抽本组
- * 车道数（单道 70% > 双道 25% > 三道 5%）；链必须完整落在本模板窗口内（不跨窗），
- * 且与窗口内任何障碍同车道深度不重叠；放不下就整链放弃（宁缺毋残，保证 5~16 完整）。
+ * 车道数由配置抽取；同组多道金币齐头齐尾。链不跨窗、不与障碍重叠，
+ * 总长度受普通跳跃的金币净空窗口限制，避免三道金币成为必吃墙。
  */
 import type { RunRng } from '../rng.js';
 import type { CoinEntity, ObstacleEntity } from './trackGen.js';
@@ -18,6 +18,7 @@ export interface CoinLayDeps {
   laneWeights: Record<number, number>;
   chainBuckets: { min: number; max: number; weight: number }[];
   spacing: number;
+  maxSpanM?: number;
   /** 单车道金币最长断档（超过则强制补链） */
   laneGapM: number;
   /** 各车道最近一次投币的 z（读写共享：调用方持有） */
@@ -54,21 +55,29 @@ export function layCoinChains(d: CoinLayDeps): void {
     if (cur < to - 0.01) segs.push([cur, to]);
     return segs;
   };
+  const bucket = d.rng.weighted(d.chainBuckets, b => b.weight);
+  const wantLen = d.rng.int(bucket.min, bucket.max);
+  const minLen = Math.min(...d.chainBuckets.map(b => b.min));
+  let segs: Array<[number, number]> = [[d.winStart + 3, d.winEnd - 14]];
+  const accepted: number[] = [];
   for (const lane of lanes) {
-    const bucket = d.rng.weighted(d.chainBuckets, b => b.weight);
-    const wantLen = d.rng.int(bucket.min, bucket.max);
-    const segs = freeSegments(lane, d.winStart + 3, d.winEnd - 14); // 后缘让出 14m：24m 长列车的尾部会向后探约 13m
-    // 选能容纳最长链的空段；长度按空段容量截断，仍不足 5 枚则放弃本车道
-    let best: [number, number] | null = null;
-    for (const s of segs) if (!best || (s[1] - s[0]) > (best[1] - best[0])) best = s;
-    if (!best) continue;
-    const capacity = Math.floor((best[1] - best[0]) / d.spacing) + 1;
-    const len = Math.min(wantLen, capacity, bucket.max);
-    if (len < 5) continue;
-    const maxStart = best[1] - (len - 1) * d.spacing;
-    const chainStart = d.rng.range(best[0], Math.max(best[0], maxStart));
-    const id = d.seq();
-    for (let i = 0; i < len; i++) d.coins.push({ lane, worldZ: chainStart + i * d.spacing, chain: id });
-    d.lastCoinZ[lane] = chainStart + (len - 1) * d.spacing; // 记录本车道最近投币位置
+    const free = freeSegments(lane, d.winStart + 3, d.winEnd - 14);
+    const common: Array<[number, number]> = [];
+    for (const [a, b] of segs) for (const [c, e] of free) {
+      const from = Math.max(a, c), to = Math.min(b, e);
+      if (to - from >= (minLen - 1) * d.spacing) common.push([from, to]);
+    }
+    if (common.length) { segs = common; accepted.push(lane); }
+  }
+  if (!accepted.length) return;
+  const best = segs.reduce((a, b) => b[1] - b[0] > a[1] - a[0] ? b : a);
+  const span = Math.min(best[1] - best[0], d.maxSpanM ?? Infinity);
+  const len = Math.min(wantLen, Math.floor(span / d.spacing) + 1);
+  if (len < minLen) return;
+  const start = d.rng.range(best[0], best[1] - (len - 1) * d.spacing);
+  const id = d.seq();
+  for (const lane of accepted) {
+    for (let i = 0; i < len; i++) d.coins.push({ lane, worldZ: start + i * d.spacing, chain: id });
+    d.lastCoinZ[lane] = start + (len - 1) * d.spacing;
   }
 }

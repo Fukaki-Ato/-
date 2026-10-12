@@ -1,7 +1,7 @@
 /**
  * 空中内容铺设（飞行段金币带与云团）——trackGen 专用纯函数，独立成文件守 300 行上限。
  * 用户反馈修正：空中金币不再「每条链都铺满三条道」，改为与地面同款 laneGroupWeights
- * （1 道 70% / 2 道 25% / 3 道 5%）抽本组车道数；同组同链、组间留空档。
+ * 抽本组车道数；同组同链、组间留空档。
  */
 import type { RunRng } from '../rng.js';
 import type { CloudEntity, CoinEntity } from './trackGen.js';

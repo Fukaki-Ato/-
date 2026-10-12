@@ -9,9 +9,10 @@ import type { GameContent } from '@tr/game/core/config/configTypes.js';
 import type { RunnerSim } from '@tr/game/core/sim/runnerSim.js';
 import type { RunCallbacks } from '@tr/game/render/runnerScene.js';
 import type { EntryMethod } from './session.js';
+import type { LeaderboardService, RankingFeedback } from './leaderboard.js';
 
 /** 结算摘要（与 core RunnerSim.summary() 同源）；charName 由 mainFlow 查 characters 配置补入，供结果页显示 */
-export type RunSummary = ReturnType<RunnerSim['summary']> & { charName?: string };
+export type RunSummary = ReturnType<RunnerSim['summary']> & { charName?: string; ranking?: RankingFeedback };
 /** HUD 快照（与 render RunCallbacks.onHud 参数同源，避免双份定义漂移） */
 export type HudData = Parameters<RunCallbacks['onHud']>[0];
 
@@ -48,6 +49,7 @@ export interface SelectActions {
   onShop?(): void;
   /** 打开设置页（右上「设置」徽标）；缺省＝该入口只有按压反馈 */
   onSettings?(): void;
+  onLeaderboard?(): void;
 }
 
 export interface CharacterSelectPageActions {
@@ -74,6 +76,7 @@ export interface SelectExtras {
 export interface ResultActions {
   onRetry(): void;
   onSelect(): void;
+  onLeaderboard?(): void;
 }
 
 /** 局内 HUD：挂载即创建（DOM 层 append 由实现方自理），dispose 即移除 */
@@ -101,6 +104,7 @@ export interface GameViews {
   renderShop(content: GameContent, actions: ShopActions): void;
   /** 设置页（每个游戏都必须有）：当前首项＝切换跑酷场景；currentThemeId 为流程解析出的生效主题 */
   renderSettings(content: GameContent, actions: SettingsActions, currentThemeId: string | null): void;
+  renderLeaderboard?(service: LeaderboardService, actions: { onBack(): void }): void;
   mountHud(): HudHandle;
   renderResult(summary: RunSummary, best: number, actions: ResultActions): void;
   toast(msg: string): void;

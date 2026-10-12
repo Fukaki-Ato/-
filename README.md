@@ -21,10 +21,10 @@ tools/          Build, replay, config, and architecture checks
 
 ## Quick Start
 
-Requires Node `>=20.19.0`.
+Requires Node `>=22.23.0` (Node 24 recommended). The leaderboard backend and its tests use built-in `node:sqlite`.
 
 ```bash
-npm install
+npm ci
 npm run check
 npm run dev
 ```
@@ -50,3 +50,5 @@ The mobile UI design and verification rules are in [docs/mobile-ui.md](docs/mobi
 Gameplay fixes, content, and balance changes belong in `packages/game`, `config`, and their tests. Framework API changes belong in `packages/framework` and require maintainer review. All changes arrive through pull requests; maintainers own final merge order.
 
 See [docs/architecture.md](docs/architecture.md), [CONTRIBUTING.md](CONTRIBUTING.md), and [docs/replay.md](docs/replay.md).
+
+零金币全服排行榜的玩家规则、金币生成调整与验证方式见 [docs/coinless-leaderboard.md](docs/coinless-leaderboard.md)；后端与部署见 [docs/leaderboard-server.md](docs/leaderboard-server.md)。

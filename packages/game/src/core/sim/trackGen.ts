@@ -13,6 +13,7 @@ import type { GameContent, NamedEntry } from '../config/configTypes.js';
 import { BLOCKING_CLASSES, buildObstacleEntity, type SwingSpec } from './trackDefs.js';
 import { layCoinChains } from './trackCoins.js';
 import { spawnSkyContent } from './trackSky.js';
+import { coinJumpSpan } from './coinJumpSpan.js';
 
 export interface ObstacleEntity {
   obsRef: string;
@@ -52,6 +53,8 @@ export class TrackGen {
   private readonly curve: { by: number; poolWeights: Record<string, number> }[];
   private readonly chainBuckets: { min: number; max: number; weight: number }[];
   private readonly coinSpacing: number;
+  private readonly runner: Record<string, number>;
+  private readonly jumpSpanRatio: number;
   private readonly laneWeights: Record<number, number>;
   private readonly laneGapM: number; // 单车道金币最长断档（超过则强制补链）
   private readonly lastCoinZ: Record<number, number> = { [-1]: 0, 0: 0, 1: 0 }; // 各车道最近一次投币的 z
@@ -81,6 +84,8 @@ export class TrackGen {
     this.patterns = ob.patterns as unknown as Pattern[];
     this.curve = ob.difficultyCurve;
     const coins = (content.game.params.coins ?? {}) as Record<string, unknown>;
+    this.runner = (content.game.params.runner ?? {}) as Record<string, number>;
+    this.jumpSpanRatio = (coins.jumpSpanRatio as number) ?? 0.9;
     const buckets = (coins.chainBuckets ?? [{ min: 5, max: 10, weight: 75 }]) as typeof this.chainBuckets;
     // 防御：配置给出空数组时回落到默认桶，避免向空池 weighted 取到 undefined 后读 min 崩溃
     this.chainBuckets = buckets.length ? buckets : [{ min: 5, max: 10, weight: 75 }];
@@ -142,6 +147,8 @@ export class TrackGen {
         winStart: this.genZ, winEnd: this.genZ + pat.lengthSegments * this.segLen,
         safeLane, laneWeights: this.laneWeights, chainBuckets: this.chainBuckets,
         spacing: this.coinSpacing, laneGapM: this.laneGapM, lastCoinZ: this.lastCoinZ,
+        maxSpanM: coinJumpSpan(this.runner, Math.min(this.runner.maxSpeed ?? 26,
+          (this.runner.baseSpeed ?? 12) + (this.runner.speedRampPer100M ?? 0.18) * this.genZ / 100), this.jumpSpanRatio),
         seq: () => ++this.chainSeq,
       });
       // 兜底反向清理（理论上不触发：链不跨窗；防御未来模板长度参数改小）

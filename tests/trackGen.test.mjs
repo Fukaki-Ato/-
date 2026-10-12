@@ -3,7 +3,7 @@
  * 断言：
  *   1. 任意同一 z 窗口内，"不可跳不可铲"的墙(full/vehicle)最多占 2 条车道（必有活路）；
  *   2. 金币链长度全部落在 chainBuckets 范围内；
- *   3. 大样本下每组车道数分布贴近配置权重（70/25/5，容差 ±10 个百分点）。
+ *   3. 多道金币齐头齐尾，长度受跳跃净空限制；三道抽取权重升为 30%。
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -12,6 +12,8 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { TrackGen } from '../packages/game/dist/core/sim/trackGen.js';
 import { RunRng } from '../packages/game/dist/core/rng.js';
+import { coinJumpSpan } from '../packages/game/dist/core/sim/coinJumpSpan.js';
+import { layCoinChains } from '../packages/game/dist/core/sim/trackCoins.js';
 
 const root = join(fileURLToPath(import.meta.url), '..', '..');
 const NAMES = ['game', 'characters', 'skills', 'items', 'obstacles', 'themes', 'events', 'economy'];
@@ -48,29 +50,27 @@ test('生成 20000m：墙类障碍从不同时封死三条道', () => {
   }
 });
 
-test('金币链长度全部在 5~16 且成组连续', () => {
+test('金币链长度全部在配置范围且不超过该段普通跳跃净空距离', () => {
   const gen = new TrackGen(content, new RunRng(7));
   const obstacles = [], coins = [];
   for (let d = 0; d <= 5000; d += 200) gen.ensure(d, 400, obstacles, coins);
   assert.ok(coins.length > 500);
   for (const c of coins) assert.ok(c.lane >= -1 && c.lane <= 1);
-  // 按 (lane, 连续段) 分组统计链长（与上一枚同车道的链尾比较间隔）
   const chains = new Map();
-  for (const c of [...coins].sort((a, b) => a.worldZ - b.worldZ)) {
-    const k = c.lane;
-    const arr = chains.get(k) ?? [];
-    chains.set(k, arr);
-    const last = arr[arr.length - 1];
-    if (last && c.worldZ - last.end < 2) last.end = c.worldZ;
-    else arr.push({ start: c.worldZ, end: c.worldZ });
+  for (const c of coins) {
+    const key = `${c.chain}:${c.lane}`;
+    if (!chains.has(key)) chains.set(key, []);
+    chains.get(key).push(c.worldZ);
   }
-  let total = 0, ok = 0;
-  for (const arr of chains.values()) for (const ch of arr) {
-    const len = Math.round((ch.end - ch.start) / 1.5) + 1;
-    total++;
-    if (len >= 5 && len <= 16) ok++;
+  const p = content.game.params, r = p.runner;
+  const min = Math.min(...p.coins.chainBuckets.map(b => b.min));
+  const max = Math.max(...p.coins.chainBuckets.map(b => b.max));
+  for (const zs of chains.values()) {
+    assert.ok(zs.length >= min && zs.length <= max);
+    const speed = Math.min(r.maxSpeed, r.baseSpeed + r.speedRampPer100M * zs[0] / 100);
+    assert.ok(zs.at(-1) - zs[0] <= coinJumpSpan(r, speed, p.coins.jumpSpanRatio) + 1e-8);
+    for (let i = 1; i < zs.length; i++) assert.ok(Math.abs(zs[i] - zs[i - 1] - p.coins.spacingM) < 1e-8);
   }
-  assert.equal(ok, total, `有链长越界的分组：${ok}/${total}`);
 });
 
 test('金币不与障碍重叠：同车道深度范围内不存在金币', () => {
@@ -87,31 +87,20 @@ test('金币不与障碍重叠：同车道深度范围内不存在金币', () =>
   }
 });
 
-test('每组车道数分布贴近权重 70/25/5（整链投放允许少量削减）', () => {
-  const gen = new TrackGen(content, new RunRng(99));
-  const obstacles = [], coins = [];
-  for (let d = 0; d <= 40000; d += 200) gen.ensure(d, 400, obstacles, coins);
-  // 按生成器打的 chain id 聚合：同一轮投放的多条链起点相差 <10m，归为一个「组」
-  const byChain = new Map();
-  for (const c of coins) {
-    if (c.chain == null) continue;
-    let e = byChain.get(c.chain);
-    if (!e) { e = { start: c.worldZ, lanes: new Set() }; byChain.set(c.chain, e); }
-    e.lanes.add(c.lane);
-    e.start = Math.min(e.start, c.worldZ);
+test('无遮挡窗口按 50/20/30 生成同步金币组（不被强制补链混淆）', () => {
+  const rng = new RunRng(99), p = content.game.params.coins;
+  const counts = { 1: 0, 2: 0, 3: 0 };
+  for (let i = 0; i < 5000; i++) {
+    const coins = [];
+    layCoinChains({ rng, coins, obstacles: [], winStart: 0, winEnd: 48, safeLane: 0,
+      laneWeights: p.laneGroupWeights, chainBuckets: p.chainBuckets, spacing: p.spacingM,
+      laneGapM: Infinity, lastCoinZ: { '-1': 0, 0: 0, 1: 0 }, seq: () => 1, maxSpanM: 10 });
+    const lanes = [...new Set(coins.map(c => c.lane))];
+    counts[lanes.length]++;
+    const first = coins.filter(c => c.lane === lanes[0]).map(c => c.worldZ);
+    for (const lane of lanes) assert.deepEqual(coins.filter(c => c.lane === lane).map(c => c.worldZ), first);
   }
-  const chainList = [...byChain.values()].sort((a, b) => a.start - b.start);
-  const groups = [];
-  for (const ch of chainList) {
-    const cur = groups[groups.length - 1];
-    if (!cur || ch.start - cur.start > 10) groups.push({ start: ch.start, lanes: new Set(ch.lanes) });
-    else for (const l of ch.lanes) cur.lanes.add(l);
-  }
-  const pct = n => groups.filter(g => g.lanes.size === n).length / groups.length * 100;
-  assert.ok(groups.length > 400, '样本不足');
-  // 权重按 70/25/5 抽取；列车封道等不可投放情况会让单道实现率上浮，属预期
-  assert.ok(pct(1) >= 55 && pct(1) <= 90, `单道占比 ${pct(1).toFixed(1)}% 超出合理区间`);
-  assert.ok(pct(1) > pct(2) && pct(2) > pct(3), `应满足 单道>双道>三道，实际 ${pct(1).toFixed(0)}/${pct(2).toFixed(0)}/${pct(3).toFixed(0)}`);
+  for (const n of [1, 2, 3]) assert.ok(Math.abs(counts[n] / 50 - p.laneGroupWeights[n]) < 3, JSON.stringify(counts));
 });
 
 test('车道金币覆盖：任意车道断档不超过 laneGapM+一个模板窗（左右道不是金币荒漠）', () => {
