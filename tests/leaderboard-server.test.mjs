@@ -51,13 +51,16 @@ async function openService(t, { content = rankedFixture(), dbPath, ...options } 
   const service = await createLeaderboardServer({
     content, dbPath: path, origins: [ORIGIN], workerCount: 1, maxQueue: 8, replayTimeoutMs: 18_000, secureCookie: false, ...options,
   });
+  const ownedServices = [service];
   await service.listen(0, '127.0.0.1');
   const address = service.server.address();
   t.after(async () => {
-    await service.close();
+    // One fixture owns all reopened handles: close them BEFORE deleting SQLite on Windows.
+    for (const owned of [...ownedServices].reverse()) await owned.close();
     if (dir) await rm(dir, { recursive: true, force: true });
   });
-  return { service, dbPath: path, base: 'http://127.0.0.1:' + address.port };
+  return { service, dbPath: path, base: 'http://127.0.0.1:' + address.port,
+    trackService: reopened => { ownedServices.push(reopened); return reopened; } };
 }
 
 class Client {
@@ -117,7 +120,7 @@ async function waitUntilUploadable(startedAt, frames) {
 
 test('HTTP clients share a persistent global best; tickets are bound and single-use', async t => {
   const content = rankedFixture();
-  const { service, dbPath, base } = await openService(t, { content });
+  const { service, dbPath, base, trackService } = await openService(t, { content });
   const alice = new Client(base, '203.0.113.11');
   const bob = new Client(base, '203.0.113.12');
 
@@ -183,9 +186,8 @@ test('HTTP clients share a persistent global best; tickets are bound and single-
   assert.equal(hashes.includes(aliceHash), true);
   assert.equal(hashes.includes(alice.cookie), false);
 
-  const reopened = await createLeaderboardServer({ content, dbPath, origins: [ORIGIN], workerCount: 1, maxQueue: 8, replayTimeoutMs: 18_000, secureCookie: false });
+  const reopened = trackService(await createLeaderboardServer({ content, dbPath, origins: [ORIGIN], workerCount: 1, maxQueue: 8, replayTimeoutMs: 18_000, secureCookie: false }));
   await reopened.listen(0, '127.0.0.1');
-  t.after(() => reopened.close());
   alice.base = 'http://127.0.0.1:' + reopened.server.address().port;
   bob.base = alice.base;
   const alicePersisted = await alice.request(API_PATH + '/leaderboard');
