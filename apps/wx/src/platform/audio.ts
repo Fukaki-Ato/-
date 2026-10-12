@@ -32,6 +32,10 @@ export function createWxAudio(wx: WxLike): AudioService {
   /** pauseMusic 过的标记：InnerAudioContext 没暴露 paused 状态，只能自己记，防止 resume 从头重播 */
   let musicPaused = false;
   const sfx = new Set<WxInnerAudioContext>();
+  const dropAllSfx = (): void => {
+    for (const el of [...sfx]) { el.stop(); el.destroy(); } // 快照再清：销毁路径会往同一个集合里删
+    sfx.clear();
+  };
 
   return {
     playMusic(rawUrl, options?: AudioOptions) {
@@ -78,13 +82,15 @@ export function createWxAudio(wx: WxLike): AudioService {
       el.src = resolveWxAudioPath(url);
       el.play();
     },
+    stopSfx() {
+      dropAllSfx();
+    },
     dispose() {
       music?.destroy();
       music = null;
       musicUrl = '';
       musicPaused = false;
-      for (const el of sfx) el.destroy();
-      sfx.clear();
+      dropAllSfx();
     },
   };
 }

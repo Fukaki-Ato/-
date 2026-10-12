@@ -23,6 +23,7 @@ function makeAdapter() {
     pauseMusic: () => calls.push(['pauseMusic']),
     resumeMusic: () => calls.push(['resumeMusic']),
     playSfx: (url, opts) => calls.push(['playSfx', url, opts]),
+    stopSfx: () => calls.push(['stopSfx']),
     dispose: () => calls.push(['dispose']),
   };
   return { calls, adapter: { audio } };
@@ -254,17 +255,35 @@ test('enterRun：主题 music 覆盖全局 run BGM；脏值与缺省都回退 ru
   }
 });
 
-test('onIntro：start 让位（暂停 BGM + 放登场音效），end 续播；重复 start 不叠播', () => {
+test('onIntro：start 切掉开局语音 + 让位 BGM + 放登场音效，end 原地续播；重复 start 不叠播', () => {
   const intro = 'assets/audio/sfx/char/char_frog/intro.mp3';
-  const p = { audio: { bgm: { run: 'assets/audio/bgm/run.mp3' }, characters: { char_frog: { sfx: { intro } } } } };
+  const start = 'assets/audio/sfx/start.mp3';
+  const p = { audio: {
+    bgm: { run: 'assets/audio/bgm/run.mp3' },
+    sfx: { start },
+    characters: { char_frog: { sfx: { intro } } },
+  } };
   const { calls, adapter } = makeAdapter();
   const d = createAudioDirector(adapter, p);
   d.enterRun('char_frog');
   d.onIntro('start');
   d.onIntro('start'); // 已在登场中：不重复暂停、不重放音效
   d.onIntro('end');
-  assert.deepEqual(calls.map(c => c[0]), ['playMusic', 'pauseMusic', 'playSfx', 'resumeMusic']);
-  assert.equal(calls[2][1], intro, '登场音效必须走 sfx 通道（音量面与技能音效一致）');
+  assert.deepEqual(calls.map(c => c[0]),
+    ['playMusic', 'playSfx', 'stopSfx', 'pauseMusic', 'playSfx', 'resumeMusic']);
+  assert.equal(calls[1][1], start, '进局先响开局语音');
+  assert.ok(calls.findIndex(c => c[0] === 'stopSfx') > 1, 'stopSfx 必须排在开局语音之后＝真的把它切掉');
+  assert.equal(calls[4][1], intro, '登场音效走 sfx 通道（音量面与技能音效一致）');
+});
+
+test('没有登场音效的角色：开局语音不被切掉', () => {
+  const start = 'assets/audio/sfx/start.mp3';
+  const p = { audio: { bgm: { run: 'r.mp3' }, sfx: { start }, characters: { char_volt: { sfx: { cast: 'c.mp3' } } } } };
+  const { calls, adapter } = makeAdapter();
+  const d = createAudioDirector(adapter, p);
+  d.enterRun('char_volt');
+  d.onIntro('start'); // 该角色没配 intro＝不接管，开局语音继续响
+  assert.deepEqual(calls.map(c => c[0]), ['playMusic', 'playSfx']);
 });
 
 test('onIntro：没配 intro 的角色、以及未进局时点全部空操作（不会把 BGM 暂停掉）', () => {
@@ -282,12 +301,14 @@ test('死亡与中途退出都收尾登场让位：不把暂停中的 BGM 带进
   const { calls, adapter } = makeAdapter();
   const d = createAudioDirector(adapter, p);
   d.enterRun('char_frog'); d.onIntro('start'); d.onDeath();
-  assert.deepEqual(calls.map(c => c[0]), ['playMusic', 'pauseMusic', 'playSfx', 'stopMusic', 'playMusic'],
+  assert.deepEqual(calls.map(c => c[0]),
+    ['playMusic', 'stopSfx', 'pauseMusic', 'playSfx', 'stopMusic', 'playMusic'],
     '死亡路径换死亡乐，不续播被让位的 run BGM');
   const { calls: c2, adapter: a2 } = makeAdapter();
   const d2 = createAudioDirector(a2, p);
   d2.enterRun('char_frog'); d2.onIntro('start'); d2.exitRun();
-  assert.deepEqual(c2.map(c => c[0]), ['playMusic', 'pauseMusic', 'playSfx', 'resumeMusic', 'stopMusic']);
+  assert.deepEqual(c2.map(c => c[0]),
+    ['playMusic', 'stopSfx', 'pauseMusic', 'playSfx', 'resumeMusic', 'stopMusic']);
 });
 
 test('真实配置：奶蛙 intro cue 与每条主题的 music 都指向仓库里真实存在的文件', () => {

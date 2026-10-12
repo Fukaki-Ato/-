@@ -30,6 +30,11 @@ export interface AudioService {
   resumeMusic(): void;
   /** 播放一次性音效（可与音乐、其它音效叠加）。 */
   playSfx(url: string, options?: AudioOptions): void;
+  /**
+   * 立刻切掉所有还在响的一次性音效（登场动画这类要独占听感的场景用：
+   * 它必须盖过开局语音，而音乐只用 pauseMusic 让位、播完原地续播）。空操作安全。
+   */
+  stopSfx(): void;
   /** 释放底层资源；之后仍可继续调用播放方法（实现应惰性重建）。 */
   dispose(): void;
 }

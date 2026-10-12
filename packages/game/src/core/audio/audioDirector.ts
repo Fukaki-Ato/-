@@ -35,7 +35,7 @@ export interface AudioDirector {
   onPickup(): void;
   /**
    * 登场动画生命周期（渲染层在面板起/止时各调一次）：
-   * start＝暂停 run BGM 并放登场音效（音效走 sfx 音量、且此刻 BGM 让位，故听感压过音乐）；
+   * start＝切掉在响的一次性音效（开局语音）+ 暂停 run BGM + 放登场音效，让登场声独占听感；
    * end＝续播 run BGM（宿主未暂停过则空操作）。
    */
   onIntro(stage: 'start' | 'end'): void;
@@ -195,6 +195,7 @@ export function createAudioDirector(
       if (!audio) return;
       if (stage === 'start') {
         if (phase !== 'run' || !cues.intro || introHeld) return;
+        audio.stopSfx(); // 登场音效要盖过开局语音（「你跑不过我你信吗」）：先切掉在响的一次性音效
         audio.pauseMusic();
         introHeld = true;
         playSfx(cues.intro);

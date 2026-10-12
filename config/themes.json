@@ -35,7 +35,8 @@
       "vfxTint": "#9FD8FF",
       "versions": [
         { "ver": "1.0.0", "date": "2026-10-06", "change": "第二个跑酷场景：雨夜日式便利店街角。三条跑道沿用，两侧改为「便利店（每 100m 两侧交替）+ 有围栏小花园（中间段）+ 远景楼群」，纯程序化几何零素材，含降雨/滴水/涟漪/雨痕/自动门/招牌闪烁/信号灯七组手写动效" },
-        { "ver": "1.1.0", "date": "2026-10-11", "change": "music 改指 run_rain.mp3（雨声空灵版，11 秒循环，响度对齐全局 run.mp3 到 -16.5 LUFS）：本字段自这次起真正被运行时读取——audioDirector.enterRun 收主题 BGM 路径，缺省仍回退 params.audio.bgm.run" }
+        { "ver": "1.1.0", "date": "2026-10-11", "change": "music 改指 run_rain.mp3（雨声空灵版，响度对齐全局 run.mp3 到 -16.5 LUFS）：本字段自这次起真正被运行时读取——audioDirector.enterRun 收主题 BGM 路径，缺省仍回退 params.audio.bgm.run" },
+        { "ver": "1.2.0", "date": "2026-10-12", "change": "run_rain.mp3 换成用户补给的循环母带（雨声空灵版_循环.mp3，8.33 秒无缝版），路径不变、只换字节；仍按 -16.5 LUFS 对齐" }
       ]
     }
   ]

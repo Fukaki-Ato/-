@@ -13,6 +13,8 @@ authors supply assets and the `game.json` entries.
   position (used by the character intro); `stopMusic` can't be used for that because it rewinds.
   Both are idempotent, and `resumeMusic` is a no-op unless a `pauseMusic` is outstanding.
 - `playSfx(url, { loop, volume })`
+- `stopSfx()` — cut every one-shot cue that is still sounding (the intro sting needs to dominate
+  the start voice line). It never touches the BGM, and the implementations release their handles.
 - `dispose()`
 
 Implementations: Web `apps/web/src/platform/webAudio.ts` (HTMLAudioElement), WX
@@ -68,7 +70,7 @@ reach the director through `RunCallbacks.onCast` / `onPickup` / `onDeath` in
 | Trigger | Sound |
 | --- | --- |
 | Enter `run` (selected character) | `<theme>.music` loops (falls back to `bgm.run`); `sfx.start` once |
-| Character intro starts (`characters.json → <id>.intro`) | BGM ducks via `pauseMusic`; that character's `sfx.intro` plays once |
+| Character intro starts (`characters.json → <id>.intro`) | still-sounding one-shots (the start voice line) are cut via `stopSfx`; BGM ducks via `pauseMusic`; that character's `sfx.intro` plays once |
 | Character intro ends (video finished, or `durationS` + 1.5s safety cap) | BGM resumes in place; the frozen run starts |
 | Sim `cast` event | selected character's `sfx.cast` |
 | Sim `pickup` event (item box, not coins) | selected character's `sfx.pickup` |

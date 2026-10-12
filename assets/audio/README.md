@@ -60,11 +60,14 @@ Coverage as of 2026-10-05 (issue #17, first batch):
   `sfx/char/char_niu/cast.mp3`: supplied by the project owner as a local asset pack
   (`D:\音频素材`), transcode-only (no editing, no trimming). The owner confirmed redistribution
   rights for this repository. Original filenames recorded in the commit message.
-- **2026-10-11 (登场动画 + 场景 BGM)** — `bgm/run_rain.mp3`、`sfx/char/char_frog/intro.mp3`、
-  替换后的 `sfx/char/char_niu/cast.mp3`，以及仓库外的 `assets/video/frog_intro.mp4`：均由项目本人
+- **2026-10-11 (登场动画 + 场景 BGM)** — `sfx/char/char_frog/intro.mp3`、替换后的
+  `sfx/char/char_niu/cast.mp3`，以及仓库外的 `assets/video/frog_intro.mp4`：均由项目本人
   从本地素材包（`D:\音频素材`）提供并确认可随本 public 仓再分发；处理仅限转码/裁边/响度对齐，
-  未做二次创作。源文件名：`游戏背景音乐/雨声空灵版_前11秒.wav`、
-  `奶娃的音效/奶娃的登场动画/video_261011_220428.mp4`（音轨同源）、
+  未做二次创作。源文件名：`奶娃的音效/奶娃的登场动画/video_261011_220428.mp4`（登场音效即其音轨）、
   `阿牛的音效/阿牛技能释放音效/阿牛技能音效_拼接v4.mp3`。
+- **2026-10-12** — `bgm/run_rain.mp3`（「雨夜便利店」主题 BGM）换成用户补给的循环版母带
+  `游戏背景音乐/雨声空灵版_循环.mp3`（8.33 秒，替换同目录早先那版只截了前 11 秒的
+  `雨声空灵版_前11秒.wav`）；转码 + 响度对齐到 `bgm/run.mp3` 的 -16.5 LUFS，保持立体声
+  （雨声是去相关宽声场，下混单声道会掉约 7 LU）。权利同上，本人确认可再分发。
 - Earlier batches (run BGM, death BGM, global death pool, start cue, `char_volt` cues): rights
   asserted in their pull-request descriptions, per the rule above.
