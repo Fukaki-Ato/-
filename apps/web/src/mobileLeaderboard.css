@@ -1,0 +1,11 @@
+.mobile-leaderboard .mobile-frame { display: flex; flex-direction: column; gap: 16px; padding-bottom: max(24px, env(safe-area-inset-bottom)); }
+.rank-rules, .rank-personal { padding: 18px; }
+.rank-rules h2, .rank-personal h2 { margin: 0 0 8px; font-size: 20px; }
+.rank-rules p, .rank-personal p { margin: 0; line-height: 1.6; }
+.rank-status { margin: 0; min-height: 1.5em; }
+.rank-list { display: grid; gap: 10px; padding: 0; margin: 0; list-style: none; }
+.rank-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px; border: 2px solid #d8c7a5; border-radius: 18px; background: #fffdf3; }
+.rank-who { min-width: 0; overflow-wrap: anywhere; }
+.rank-stats { display: grid; gap: 5px; flex-shrink: 0; text-align: right; }
+.rank-stats span { color: #685843; font-size: 14px; }
+.rank-refresh { align-self: stretch; min-height: 48px; }

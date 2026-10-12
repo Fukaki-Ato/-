@@ -11,6 +11,7 @@ import type {
   SelectActions, SelectExtras, SettingsActions, ShopActions, StartActions, StartHandle,
 } from '../flow/views.js';
 import type { EntryMethod } from '../flow/session.js';
+import type { LeaderboardService } from '../flow/leaderboard.js';
 import type { UiHost } from '@tr/framework/ui/host.js';
 import { buildBootPage } from './bootView.js';
 import { buildStartPage } from './startView.js';
@@ -38,6 +39,7 @@ export interface OverlayViewsDeps {
   settingsRenderer?: (content: GameContent, actions: SettingsActions, currentThemeId: string | null) => () => void;
   resultRenderer?: (summary: RunSummary, best: number, actions: ResultActions) => () => void;
   hudRenderer?: () => HudHandle;
+  leaderboardRenderer?: (service: LeaderboardService, actions: { onBack(): void }) => () => void;
   selectRenderer?: (
     content: GameContent,
     actions: CharacterSelectPageActions,
@@ -109,7 +111,7 @@ export function createOverlayViews(deps: OverlayViewsDeps): OverlayViews {
         actions,
         currentCharId,
         extras: { coins: extras?.coins ?? 0, diamonds: extras?.diamonds ?? 0, badges: deps.badges },
-        slots: { onShop: actions.onShop, onSettings: actions.onSettings },
+        slots: { onShop: actions.onShop, onSettings: actions.onSettings, onRank: actions.onLeaderboard },
       });
       stopBackdrop();
       let frame: ((t: number) => void) | undefined;
@@ -158,6 +160,14 @@ export function createOverlayViews(deps: OverlayViewsDeps): OverlayViews {
       }
       host.mount(buildSettingsPage(host, { content, actions, currentThemeId }).view);
     },
+
+    ...(deps.leaderboardRenderer ? {
+      renderLeaderboard(service: LeaderboardService, actions: { onBack(): void }): void {
+        clearTransient(); stopBackdrop();
+        host.mount(host.makeView(), { transparent: true });
+        disposePanelRenderer = deps.leaderboardRenderer!(service, actions);
+      },
+    } : {}),
 
     mountHud(): HudHandle {
       clearTransient();

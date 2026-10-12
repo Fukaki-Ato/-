@@ -199,10 +199,10 @@ test('闪电圈：先把头盔/护盾电掉（护具挡一次），此后无护�
 
 // ---------------- 6. 空中金币车道分布 ----------------
 
-test('空中金币：按 laneGroupWeights 抽 1/2/3 道（单道为主），不再条条铺满三条路', () => {
+test('空中金币：按新的 laneGroupWeights 抽 1/2/3 道，不再条条铺满三条路', () => {
   const gen = new TrackGen(content, new RunRng(555));
   const coins = [], clouds = [];
-  gen.spawnSky(0, 900, 4.6, coins, clouds);
+  gen.spawnSky(0, 9000, 4.6, coins, clouds);
   assert.ok(coins.length > 100, `样本不足: ${coins.length}`);
   assert.ok(coins.every(c => c.y === 4.6), '空中金币应悬浮在飞行高度');
   assert.ok(clouds.length > 10, `云团样本不足: ${clouds.length}`);
@@ -218,8 +218,7 @@ test('空中金币：按 laneGroupWeights 抽 1/2/3 道（单道为主），不�
     return chains.filter(ch => ch.lanes.size === n).length / chains.length * 100;
   };
   assert.ok(byChain.size > 10, `链样本不足: ${byChain.size}`);
-  assert.ok(pct(1) > 50, `单道链应占多数（70% 权重），实际 ${pct(1).toFixed(0)}%`);
-  assert.ok(pct(1) > pct(2) && pct(2) >= pct(3), `应满足单道>双道>=三道，实际 ${pct(1).toFixed(0)}/${pct(2).toFixed(0)}/${pct(3).toFixed(0)}`);
+  for (const n of [1, 2, 3]) assert.ok(Math.abs(pct(n) - content.game.params.coins.laneGroupWeights[n]) < 8, `${n} 道占比 ${pct(n).toFixed(0)}%`);
 });
 
 // ---------------- 7. 滑翔期不清障 + 落地只清一小段 ----------------

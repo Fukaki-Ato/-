@@ -64,8 +64,14 @@ export function createMobileResult(summary: RunSummary, best: number, actions: R
   const runner = uiText('div', '', 'result-runner');
   runner.append(uiText('strong', summary.charName || summary.charId), uiText('span', `技能释放 ${summary.casts ?? 0} 次`));
   ticket.append(stats, runner);
+  const ranking = uiText('p', summary.ranking?.message ?? '整局零金币可挑战全服榜', 'result-ranking');
+  ranking.setAttribute('role', 'status');
+  ticket.append(ranking);
+  const offRanking = summary.ranking?.subscribe(message => { ranking.textContent = message; });
   const buttons = uiText('div', '', 'ui-footer-actions');
   buttons.append(uiButton('再跑一次  →', 'ui-primary', actions.onRetry), uiButton('返回大厅', 'ui-secondary', actions.onSelect));
+  if (actions.onLeaderboard) buttons.append(uiButton('查看零金币榜', 'ui-secondary', actions.onLeaderboard));
   frame.append(header, ticket, buttons, uiText('p', '下一次海风，等你来追。', 'mobile-page-note'));
-  return pageLifecycle(root, actions.onSelect);
+  const dispose = pageLifecycle(root, actions.onSelect);
+  return () => { offRanking?.(); dispose(); };
 }

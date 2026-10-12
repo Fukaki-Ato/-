@@ -7,6 +7,7 @@
  *       所以 step 外产生的施放事件不会丢；全部数值来自 config/*.json（调手感不改代码）。
  */
 import { RunRng } from '../rng.js';
+import { MAX_RANKED_INPUTS, type ReplayInput } from '../leaderboard.js';
 import type { GameContent } from '../config/configTypes.js';
 import { BuffEngine, type BuffView, type CastContext, type FxState } from '../effects/buffEngine.js';
 import { buildLoadout, itemEffects, type EffectSpec, type Loadout } from './character.js';
@@ -66,8 +67,13 @@ export class RunnerSim {
   private readonly buffCtx: CastContext = { distance: 0, lane: 0 };
   /** scoreAdd 原语与技能释放奖励的额外分 */
   private bonusScore = 0;
+  /** Actual pickups (before currency multipliers), used by zero-coin eligibility. */
+  collectedCoins = 0;
+  replayFrames = 0;
+  readonly replayInputs: ReplayInput[] = [];
+  replayOverflow = false;
 
-  constructor(private readonly content: GameContent, seed: number, charId?: string) {
+  constructor(private readonly content: GameContent, seed: number, charId?: string, private readonly recordReplay = false) {
     const p = content.game.params;
     this.R = (p.runner ?? {}) as Record<string, number>;
     this.SC = (p.score ?? {}) as Record<string, number>;
@@ -130,6 +136,10 @@ export class RunnerSim {
   applyAction(a: SimAction) {
     const s = this.state;
     if (!s.alive) return;
+    if (this.recordReplay) {
+      if (this.replayInputs.length < MAX_RANKED_INPUTS) this.replayInputs.push({ frame: this.replayFrames, action: a });
+      else this.replayOverflow = true;
+    }
     if (a === 'laneL') s.lane = Math.max(-1, s.lane - 1); // 换道（含空中与滑翔，滑翔时可变向）
     else if (a === 'laneR') s.lane = Math.min(1, s.lane + 1);
     else if (a === 'skill') this.castSkill();
@@ -180,6 +190,7 @@ export class RunnerSim {
 
   /** 金币入账：coinValueAdd 的百分比加成走小数累计，避免每枚金币四舍五入丢分 */
   private creditCoin() {
+    this.collectedCoins++;
     this.coinCarry += 1 * (1 + this.fx.coinPct / 100);
     const whole = Math.floor(this.coinCarry);
     this.state.coins += whole;
@@ -197,6 +208,7 @@ export class RunnerSim {
     const s = this.state;
     s.prevDistance = s.distance;
     if (!s.alive) { s.topple = Math.min(s.topple + STEP_DT * TOPPLE_RATE, TOPPLE_MAX); return; }
+    this.replayFrames++;
 
     s.t += STEP_DT;
     this.buffCtx.distance = s.distance;

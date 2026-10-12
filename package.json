@@ -21,7 +21,7 @@
     "preview:web": "npm run preview --workspace @tr/web"
   },
   "engines": {
-    "node": ">=20.19.0"
+    "node": ">=22.23.0"
   },
   "devDependencies": {
     "esbuild": "^0.28.2",

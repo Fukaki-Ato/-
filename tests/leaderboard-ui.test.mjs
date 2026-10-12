@@ -1,0 +1,59 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { importWebModule, fakeDom } from './dom-fixture.mjs';
+const { createMobileLeaderboard } = await importWebModule('../apps/web/src/mobileLeaderboard.ts');
+const { createLeaderboardClient } = await importWebModule('../apps/web/src/leaderboardClient.ts');
+const { createMobileResult } = await importWebModule('../apps/web/src/mobilePanels.ts');
+const tick = () => new Promise(r => setImmediate(r));
+
+test('排行榜展示全服/个人纪录，失败可刷新；晚到响应不更新已卸载页面', async t => {
+  const { body, byClass } = fakeDom(t);
+  let calls = 0, resolve;
+  const data = { entries: [{ rank: 1, playerName: '<b>游客</b>', distance: 42.25, score: 420, charId: 'char_volt' }], personal: null, playerName: '游客小电' };
+  const service = { list: () => {
+    calls++;
+    if (calls === 1) return Promise.reject(Error('offline'));
+    if (calls === 3) return new Promise(r => { resolve = r; });
+    return Promise.resolve(data);
+  } };
+  const dispose = createMobileLeaderboard(service, { onBack() {} });
+  await tick(); assert.match(body.textContent, /加载失败/);
+  byClass(body, 'rank-refresh')[0].click(); await tick();
+  assert.match(body.textContent, /42.25 m/); assert.match(body.textContent, /420 分/);
+  assert.equal(byClass(body, 'rank-row')[0].children[0].children[0].textContent, '1. <b>游客</b>');
+  assert.match(body.textContent, /暂无零金币纪录/);
+  const root = byClass(body, 'mobile-leaderboard')[0];
+  byClass(body, 'rank-refresh')[0].click(); dispose();
+  const text = root.textContent; resolve(data); await tick();
+  assert.equal(root.textContent, text); assert.equal(body.children.length, 0);
+});
+
+test('空榜、个人排名、返回按钮与 Escape', async t => {
+  const { body, all, key } = fakeDom(t); let backs = 0;
+  const dispose = createMobileLeaderboard({ list: async () => ({ entries: [], playerName: '游客', personal: { rank: 51, distance: 25.5, score: 250 } }) }, { onBack: () => backs++ });
+  await tick(); assert.match(body.textContent, /全服榜暂时为空/); assert.match(body.textContent, /第 51 名/);
+  all(body).find(n => n.getAttribute('aria-label') === '返回上一页').click();
+  body.children[0].dispatchEvent(key('Escape')); assert.equal(backs, 2); dispose();
+});
+
+test('结果页实时更新上传状态且卸载取消订阅', t => {
+  const { body } = fakeDom(t); let listener, removed = false;
+  const summary = { score: 42, distance: 4.2, coins: 0, hits: 1, nearMiss: 0, charId: 'char_volt',
+    ranking: { message: '校验中', subscribe: cb => { listener = cb; return () => { removed = true; }; } } };
+  const dispose = createMobileResult(summary, 0, { onRetry() {}, onSelect() {}, onLeaderboard() {} });
+  listener('已入全服榜'); assert.match(body.textContent, /已入全服榜/); assert.match(body.textContent, /查看零金币榜/);
+  dispose(); assert.equal(removed, true);
+});
+
+test('客户端采用同源 Cookie、JSON 和子路径，不携带可伪造的客户端成绩', async t => {
+  fakeDom(t); const calls = [];
+  const client = createLeaderboardClient('/thunder-run/', async (url, options) => { calls.push({ url, options }); return { ok: true, json: async () => ({ accepted: true }) }; });
+  await client.list(); await client.begin('char_volt', 'rules');
+  await client.submit({ runId: 'r', frames: 10, inputs: [] });
+  assert.deepEqual(calls.map(c => c.url), ['/thunder-run/api/leaderboard', '/thunder-run/api/runs', '/thunder-run/api/runs/submit']);
+  assert.ok(calls.every(c => c.options.credentials === 'same-origin' && c.options.signal));
+  assert.equal(calls[1].options.headers['Content-Type'], 'application/json');
+  assert.equal('score' in JSON.parse(calls[2].options.body), false);
+  const bad = createLeaderboardClient('/', async () => ({ ok: false, status: 503 }));
+  await assert.rejects(bad.list(), /503/);
+});
