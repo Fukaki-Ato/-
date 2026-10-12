@@ -19,9 +19,11 @@ test('selection showcase uses portrait cutouts and page-scoped keyboard/cycle co
   assert.equal(root.getAttribute('role'), 'dialog');
   assert.equal(root.getAttribute('aria-modal'), 'true');
   assert.equal(find('select-name').textContent, '牢大');
-  assert.equal(find('select-counter').textContent, '01 / 10');
+  assert.equal(find('select-counter').textContent, '01 / 09');
   assert.equal(find('select-hero-portrait').children[0].tagName, 'img');
-  assert.match(find('select-hero-portrait').children[0].src, /volt\.webp$/);
+  assert.match(find('select-hero-portrait').children[0].src, /bball\.webp$/);
+  assert.equal(all(root).filter(node => node.classList.contains('select-roster-card')).length, 9);
+  assert.equal(all(root).some(node => node.dataset.charId === 'char_bball'), false);
   assert.equal(all(root).filter(node => node.tagName === 'canvas').length, 0, 'selection does not start another mobile renderer');
   find('select-next').click();
   assert.equal(find('select-name').textContent, '阿玛拉');
@@ -43,6 +45,15 @@ test('selection showcase uses portrait cutouts and page-scoped keyboard/cycle co
   const count = calls.length; root.dispatchEvent(key('Escape'));
   assert.equal(calls.length, count, 'navigation removes selection keyboard handlers');
   assert.equal(body.children.length, 0);
+});
+
+test('removed basketball role falls back to 牢大 and starts with its audio identity', t => {
+  const { find, calls, dispose } = setup(t, 'char_bball');
+  assert.equal(find('select-name').textContent, '牢大');
+  assert.match(find('select-hero-portrait').children[0].src, /bball\.webp$/);
+  find('select-start-button').click();
+  assert.deepEqual(calls.at(-1), ['start', 'char_volt']);
+  dispose();
 });
 
 test('locked-role preview shows correct data, keeps start disabled, and forwards the preview to shop', t => {
