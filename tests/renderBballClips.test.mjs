@@ -1,5 +1,5 @@
 /**
- * 篮球小子（char_bball → assets/characters/bball.glb）GLB 装配回归。
+ * 牢大（char_volt → 原篮球小子 assets/characters/bball.glb）GLB 装配回归。
  *
  * 为什么单独立文件：它的 clip 集与奶蛙不同源——没有 Laugh、多一个 Basketball（投篮）。
  * 头号阻塞就是 animClips 旧契约「CLIP_NAMES 缺一即不合格」会让整条 GLB 路径静默回退
@@ -24,9 +24,13 @@ if (typeof URL.revokeObjectURL !== 'function') URL.revokeObjectURL = () => {};
 
 const { createAnimAvatar } = await import('../packages/game/dist/render/animAvatar.js');
 const { initialRunnerState } = await import('../packages/game/dist/core/sim/simTypes.js');
+const { buildLoadout } = await import('../packages/game/dist/core/sim/character.js');
 
 const FROG = 'assets/characters/frog.glb';
-const BBALL = 'assets/characters/bball.glb';
+const content = Object.fromEntries(['characters', 'skills'].map(name =>
+  [name, JSON.parse(readFileSync(`config/${name}.json`, 'utf8'))]));
+const volt = buildLoadout(content, 'char_volt');
+const BBALL = volt.prefab;
 
 /** GLTFLoader.parse 只认 ArrayBuffer（Node 的 Buffer 会被判成非 glTF 资产），这里转一手 */
 const adapter = { extras: { readBinary: async (path) => {
@@ -48,7 +52,7 @@ function runningState(speed, supportY = 0) {
 
 /** 装配 + 驱动 sec 秒；urlParams 支持 'debug'（挂 __trAnim 探针）与 'anim=<Clip>'（QA 锁） */
 async function drive(glb, sec, speed = 12, urlParams = 'debug', footfall = null) {
-  const avatar = await createAnimAvatar(adapter, glb, 1, new URLSearchParams(urlParams));
+  const avatar = await createAnimAvatar(adapter, glb, volt.modelScale, new URLSearchParams(urlParams));
   assert.ok(avatar, `GLB 装配失败（${glb}）：核心 clip 缺失或资产不合格`);
   const events = [];
   if (footfall) avatar.setFootfallHandler((x, y, z) => events.push({ x, y, z }));
@@ -71,7 +75,9 @@ async function drive(glb, sec, speed = 12, urlParams = 'debug', footfall = null)
   return { events, feet, log };
 }
 
-test('篮球小子装配成功：10 个核心 clip 齐全（缺一即回退程序化模型，这里必须非 null）', async () => {
+test('牢大装配成功：配置接入 bball.glb，10 个核心 clip 齐全', async () => {
+  assert.equal(volt.charId, 'char_volt');
+  assert.equal(BBALL, 'assets/characters/bball.glb');
   const { log } = await drive(BBALL, 0.2);
   assert.ok(log.length >= 1, '应有 clip 切换记录');
 });
@@ -95,7 +101,7 @@ test('QA 锁表：Run/Slide/Death/Basketball 的时长与循环口径（?anim= �
   }
 });
 
-test('篮球小子锁 ?anim=Laugh（资产没有该 clip）→ 回落 Run，不静默不播', async () => {
+test('牢大锁 ?anim=Laugh（资产没有该 clip）→ 回落 Run，不静默不播', async () => {
   const { feet } = await drive(BBALL, 0.5, 12, 'debug&anim=Laugh');
   assert.equal(feet.at(-1).act.clip, 'Run', '缺失的表演 clip 必须回落 Run');
 });
@@ -109,7 +115,7 @@ test('奶蛙回归：Laugh 仍能锁播且循环；锁 Basketball（奶蛙没有
   assert.equal(miss.feet.at(-1).act.clip, 'Run', '奶蛙没有 Basketball，回落 Run');
 });
 
-test('无锁状态机：篮球小子贴地前进时 Idle→Run 一次切换后持续循环，不跳 clip', async () => {
+test('无锁状态机：牢大贴地前进时 Idle→Run 一次切换后持续循环，不跳 clip', async () => {
   const { log, feet } = await drive(BBALL, 3);
   assert.deepEqual(log.map(e => e.clip), ['Idle', 'Run'],
     `只允许进场那一次 Idle→Run，实测 ${JSON.stringify(log.map(e => e.clip))}`);

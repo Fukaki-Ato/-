@@ -1,5 +1,4 @@
 import { applyCharacterArt, getCharacterArt, type CharacterArtInput } from './characterArt.js';
-import volt from './assets/character-select/portraits/volt.webp';
 import ama from './assets/character-select/portraits/ama.webp';
 import kaze from './assets/character-select/portraits/kaze.webp';
 import rina from './assets/character-select/portraits/rina.webp';
@@ -11,8 +10,8 @@ import whale from './assets/character-select/portraits/whale.webp';
 import niu from './assets/character-select/portraits/niu.webp';
 
 const PORTRAITS: Record<string, string> = {
-  char_volt: volt, char_ama: ama, char_kaze: kaze, char_rina: rina, char_bolt: bolt,
-  char_frog: frog, char_mambo: mambo, char_bball: bball, char_whale: whale, char_niu: niu,
+  char_volt: bball, char_ama: ama, char_kaze: kaze, char_rina: rina, char_bolt: bolt,
+  char_frog: frog, char_mambo: mambo, char_whale: whale, char_niu: niu,
 };
 
 /** Selection-only presentation; the approved lobby artwork remains unchanged. */

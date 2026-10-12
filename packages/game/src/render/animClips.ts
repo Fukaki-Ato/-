@@ -1,7 +1,7 @@
 /**
  * 动作 clip 选择（纯函数、零依赖，node --test 直接回归；three 的播放胶水在 animAvatar.ts）
  * 数据来源：多个 GLB 资产的命名动画 clip（共同契约：1 单位=1m、脚底在原点、面朝 -Z）——
- * char_frog → assets/characters/frog.glb、char_bball → assets/characters/bball.glb、
+ * char_frog → assets/characters/frog.glb、char_volt → assets/characters/bball.glb、
  * char_whale → assets/characters/whale.glb、char_mambo → assets/characters/pony.glb。
  * 优先级（上层压下层，逐条对应「玩家此刻在干什么」）：
  *   ① QA 锁 ?anim=<ClipName>（仅 dev/QA，见 readAnimLock）→ 强制循环；
