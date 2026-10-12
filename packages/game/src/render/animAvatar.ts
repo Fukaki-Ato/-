@@ -116,9 +116,9 @@ function build(
     const clip = clips.find(c => c.name === name);
     actions[name] = clip ? mixer.clipAction(clip) : null;
   }
-  // 两个表演 clip 全缺 = 契约外资产（既不是奶龙也不是篮球小子），判不合格
-  if (!actions.Laugh && !actions.Basketball) {
-    console.warn('[avatarRig] GLB 无表演 clip（Laugh/Basketball 均缺），判资产不合格');
+  // 三个表演 clip 全缺 = 契约外资产（现有角色至少带 Laugh/Basketball/Wave 之一），判不合格
+  if (PERF_CLIP_NAMES.every(n => !actions[n])) {
+    console.warn('[avatarRig] GLB 无表演 clip（Laugh/Basketball/Wave 均缺），判资产不合格');
     mixer.stopAllAction();
     return null;
   }

@@ -1,5 +1,5 @@
 /**
- * 动作 clip 映射回归（多个 GLB 资产共用 CORE 10 + PERF 2，见 render/animClips.ts）。
+ * 动作 clip 映射回归（多个 GLB 资产共用 CORE 10 + PERF 3，见 render/animClips.ts）。
  * 为什么锁得这么细：状态→clip 的优先级是「玩家此刻在干什么」的翻译表，任意一条被改动
  * （比如把 Hit 放 Death 前面、Land 忘了播一次）都不会编译报错，只会让局内动作莫名错乱，
  * 所以把完整映射表、Land 的一次性、Turn 的方向、Death 的重新起播、?anim= QA 锁全部固化。
@@ -31,23 +31,24 @@ const runner = (() => { let d = 0; return (over = {}) => { d += 0.15; return st(
 test('资产契约：CORE 10 + PERF 2 共 12 个 clip 名，与 glb 内 AnimationClip.name 逐字一致', () => {
   assert.deepEqual([...CORE_CLIP_NAMES].sort(),
     ['Death', 'Fly', 'Hit', 'Idle', 'Jump', 'Land', 'Run', 'Slide', 'TurnLeft', 'TurnRight']);
-  assert.deepEqual([...PERF_CLIP_NAMES].sort(), ['Basketball', 'Laugh'],
-    '奶龙带 Laugh、篮球小子带 Basketball，两个资产的表演 clip 不同源');
-  assert.deepEqual([...PERF_CLIP_NAMES].filter(isPerfClip).sort(), ['Basketball', 'Laugh']);
+  assert.deepEqual([...PERF_CLIP_NAMES].sort(), ['Basketball', 'Laugh', 'Wave'],
+    '阿牛（niu）带 Laugh + Wave（招手）；Basketball 保留——bball 角色的回归验收依赖它');
+  assert.deepEqual([...PERF_CLIP_NAMES].filter(isPerfClip).sort(), ['Basketball', 'Laugh', 'Wave']);
   assert.equal(isPerfClip('Run'), false, '核心 clip 不是表演 clip（锁播一期语义只对表演 clip 生效）');
   assert.equal(isPerfClip('Death'), false);
-  assert.equal(CLIP_NAMES.length, 12, 'CORE 10 + PERF 2');
+  assert.equal(isPerfClip('Wave'), true, 'Wave 是表演 clip：锁播满一期自动交还');
+  assert.equal(CLIP_NAMES.length, 13, 'CORE 10 + PERF 3');
   assert.deepEqual([...CLIP_NAMES].sort(),
-    ['Basketball', 'Death', 'Fly', 'Hit', 'Idle', 'Jump', 'Land', 'Laugh', 'Run', 'Slide', 'TurnLeft', 'TurnRight']);
+    ['Basketball', 'Death', 'Fly', 'Hit', 'Idle', 'Jump', 'Land', 'Laugh', 'Run', 'Slide', 'TurnLeft', 'TurnRight', 'Wave']);
   assert.equal(asClipName('Run'), 'Run');
   assert.equal(asClipName('run'), null, '大小写敏感：小写不是合法 clip 名');
   assert.equal(asClipName('Nope'), null);
 });
 
-test('循环契约：只有 Run/Slide/Laugh/Fly 可循环，其余一律播一次', () => {
-  assert.deepEqual([...LOOPING_CLIPS].sort(), ['Fly', 'Laugh', 'Run', 'Slide']);
+test('循环契约：只有 Run/Slide/Laugh/Fly/Wave 可循环，其余一律播一次', () => {
+  assert.deepEqual([...LOOPING_CLIPS].sort(), ['Fly', 'Laugh', 'Run', 'Slide', 'Wave']);
   for (const n of CLIP_NAMES) {
-    assert.equal(loopsForever(n), ['Run', 'Slide', 'Laugh', 'Fly'].includes(n), `${n} 的循环口径`);
+    assert.equal(loopsForever(n), ['Run', 'Slide', 'Laugh', 'Fly', 'Wave'].includes(n), `${n} 的循环口径`);
   }
   // 一次性 clip 被 ?anim= 锁定时也播放一次并保持末帧（Death 倒地定格的验收点）
   const ctx = createClipContext();
@@ -56,6 +57,7 @@ test('循环契约：只有 Run/Slide/Laugh/Fly 可循环，其余一律播一�
   assert.deepEqual(pickClip(st(), fx(), ctx, 1 / 60, 'Run'), { clip: 'Run', loop: true });
   assert.equal(loopsForever('Basketball'), false,
     'Basketball 首末姿差 117.16°，只能 LoopOnce（当成 Laugh 循环会每圈硬跳）');
+  assert.equal(loopsForever('Wave'), true, 'Wave 首末缝 0.0010m 无缝，可 LoopRepeat');
 });
 
 test('完整映射表：待机/跑/跳/滑/飞/滑翔/受击/死亡各就位', () => {
@@ -183,6 +185,8 @@ test('?anim= QA 锁：合法 clip 名按其循环口径播放，非法名字忽�
     { clip: 'Laugh', loop: true }, 'QA 锁压过死亡/受击/飞行；Laugh 无缝故循环');
   assert.deepEqual(pickClip(st({ y: 1 }), fx(), ctx, 1 / 60, 'Basketball'),
     { clip: 'Basketball', loop: false }, 'Basketball 锁了也播一次（首末差 117° 不能循环）');
+  assert.deepEqual(pickClip(st({ y: 1 }), fx(), ctx, 1 / 60, 'Wave'),
+    { clip: 'Wave', loop: true }, 'Wave 无缝循环，锁播按循环口径（放完一期由 animAvatar 交还）');
   assert.equal(pickClip(st({ y: 1 }), fx(), ctx, 1 / 60, 'Bogus').clip, 'Jump', '非法锁名按正常映射');
   assert.equal(pickClip(st({ y: 1 }), fx(), ctx, 1 / 60, null).clip, 'Jump', '无锁按正常映射');
 });
