@@ -18,6 +18,7 @@ import { Movement } from './movement.js';
 import { resolveHit, type HitCtx } from './resolveHit.js';
 import { TrackGen, type CloudEntity, type CoinEntity, type ObstacleEntity, type PickupEntity } from './trackGen.js';
 import { createSimWorld } from './simWorld.js';
+import { FirstCoinRecord, scoreForState } from './firstCoinRecord.js';
 import { cullByWorldZ, cullObstacles, smashAhead } from './entitySweep.js';
 import {
   EMPTY_LOADOUT, FLY_SPEED_CAP, STEP_DT, initialRunnerState,
@@ -67,8 +68,9 @@ export class RunnerSim {
   private readonly buffCtx: CastContext = { distance: 0, lane: 0 };
   /** scoreAdd 原语与技能释放奖励的额外分 */
   private bonusScore = 0;
-  /** Actual pickups (before currency multipliers), used by zero-coin eligibility. */
+  /** Actual pickups (before currency multipliers). */
   collectedCoins = 0;
+  readonly firstCoinRecord = new FirstCoinRecord();
   replayFrames = 0;
   readonly replayInputs: ReplayInput[] = [];
   replayOverflow = false;
@@ -190,6 +192,7 @@ export class RunnerSim {
 
   /** 金币入账：coinValueAdd 的百分比加成走小数累计，避免每枚金币四舍五入丢分 */
   private creditCoin() {
+    this.firstCoinRecord.capture(this.state.distance, scoreForState(this.state, this.SC, this.bonusScore));
     this.collectedCoins++;
     this.coinCarry += 1 * (1 + this.fx.coinPct / 100);
     const whole = Math.floor(this.coinCarry);
@@ -253,10 +256,7 @@ export class RunnerSim {
     this.cull();
     if (!s.alive) return; // 死亡帧不结算拾取与计分（cull 仍执行，保持实体回收）
 
-    s.score = Math.floor(s.distance) * (this.SC.perMeter ?? 10)
-      + s.coins * (this.SC.perCoin ?? 5)
-      + s.nearMiss * (this.SC.perNearMiss ?? 25)
-      + this.bonusScore;
+    s.score = scoreForState(s, this.SC, this.bonusScore);
   }
 
   private collide() {

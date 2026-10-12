@@ -30,22 +30,28 @@ test('比赛取服务器 seed；完整零金币局上传操作且结算订阅结
   seen.sim.applyAction('jump'); seen.sim.step();
   seen.sim.state.alive = false;
   seen.callbacks.onEnd(seen.sim.summary());
-  assert.equal(seen.summary.ranking.message, '零金币成绩校验中…');
+  assert.equal(seen.summary.ranking.message, '金币前距离成绩校验中…');
   const updates = [], off = seen.summary.ranking.subscribe(text => updates.push(text));
   await tick();
   assert.equal(seen.submits[0].runId, ticket.runId);
   assert.equal(seen.submits[0].frames, 1);
   assert.deepEqual(seen.submits[0].inputs, [{ frame: 0, action: 'jump' }]);
-  assert.equal(updates.at(-1), '零金币成绩已入全服榜');
+  assert.equal(updates.at(-1), '金币前距离成绩已入全服榜');
+  assert.deepEqual(seen.summary.beforeFirstCoin, { distance: seen.summary.distance, score: seen.summary.score, stoppedByCoin: false });
   off(); session.dispose();
 });
 
-test('吃币局不上传；取消等待不创建场景；服务故障回落普通局', async () => {
+test('吃币局照常上传第一次吃金币前纪录；取消等待不创建场景；服务故障回落普通局', async () => {
   const first = fixture(); await tick();
-  first.seen.sim.collectedCoins = 1;
+  first.seen.sim.step(); first.seen.sim.coinsArr.length = 0;
+  first.seen.sim.coinsArr.push({ lane: 0, worldZ: first.seen.sim.state.distance + 1 });
+  first.seen.sim.step();
+  const record = first.seen.sim.firstCoinRecord.snapshot(first.seen.sim.summary());
+  for(let i=0;i<60;i++) first.seen.sim.step();
   first.seen.callbacks.onEnd(first.seen.sim.summary());
-  await tick(); assert.equal(first.seen.submits.length, 0);
-  assert.match(first.seen.summary.ranking.message, /收集了金币/); first.session.dispose();
+  await tick(); assert.equal(first.seen.submits.length, 1);
+  assert.deepEqual(first.seen.summary.beforeFirstCoin, record);
+  assert.match(first.seen.summary.ranking.message, /已入全服榜/); first.session.dispose();
   let resolve;
   const waiting = fixture({ service: { begin: () => new Promise(r => { resolve = r; }) } });
   waiting.session.dispose(); resolve(ticket); await tick();
@@ -56,20 +62,20 @@ test('吃币局不上传；取消等待不创建场景；服务故障回落普�
   assert.match(unavailable.seen.summary.ranking.message, /服务不可用/); unavailable.session.dispose();
 });
 
-test('吃币/中途退出/晚到比赛票释放占用；已提交结算不误取消', async () => {
+test('中途退出/晚到比赛票释放占用；吃币后结算上传不误取消', async () => {
   const released = [];
   const service = { begin: async () => ticket, cancel: async id => released.push(id), submit: async () => ({ accepted: true }) };
   const coin = fixture({ service }); await tick();
   coin.seen.sim.collectedCoins = 1; coin.seen.callbacks.onEnd(coin.seen.sim.summary()); coin.session.dispose();
-  assert.equal(released.length, 1);
+  assert.equal(released.length, 0);
   const abandoned = fixture({ service }); await tick(); abandoned.session.dispose();
-  assert.equal(released.length, 2);
+  assert.equal(released.length, 1);
   let resolve;
   const waiting = fixture({ service: { ...service, begin: () => new Promise(r => { resolve = r; }) } });
-  waiting.session.dispose(); resolve(ticket); await tick(); assert.equal(released.length, 3);
+  waiting.session.dispose(); resolve(ticket); await tick(); assert.equal(released.length, 2);
   const ranked = fixture({ service }); await tick();
   ranked.seen.callbacks.onEnd(ranked.seen.sim.summary()); ranked.session.dispose(); await tick();
-  assert.equal(released.length, 3);
+  assert.equal(released.length, 2);
 });
 
 test('debug/test 不向排行榜取票或提交，配置不匹配不入榜', async () => {

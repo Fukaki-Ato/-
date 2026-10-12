@@ -50,18 +50,17 @@ export function createRunSession(d: RunSessionDeps): { dispose(): void } {
         if (cancelled) return;
         completed = true;
         if (ticket) {
-          if (sim.collectedCoins > 0) { ranking.set('本局收集了金币，不参与零金币榜'); release(ticket); }
-          else if (sim.replayOverflow || sim.replayFrames > MAX_RANKED_FRAMES) { ranking.set('本局超出比赛上限，不参与排行榜'); release(ticket); }
+          if (sim.replayOverflow || sim.replayFrames > MAX_RANKED_FRAMES) { ranking.set('本局超出比赛上限，不参与排行榜'); release(ticket); }
           else {
-            ranking.set('零金币成绩校验中…');
+            ranking.set('金币前距离成绩校验中…');
             const replay = { runId: ticket.runId, frames: sim.replayFrames, inputs: sim.replayInputs.slice() };
             void d.service!.submit(replay).then(
-              result => ranking.set(result.accepted ? '零金币成绩已入全服榜' : '成绩未通过排行榜校验'),
+              result => ranking.set(result.accepted ? '金币前距离成绩已入全服榜' : '成绩未通过排行榜校验'),
               () => ranking.set('成绩上传失败，请检查网络'),
             );
           }
         }
-        d.onEnd({ ...summary, ranking });
+        d.onEnd({ ...summary, ranking, beforeFirstCoin: sim.firstCoinRecord.snapshot(summary) });
       },
       onDeath: d.onDeath, onCast: d.onCast, onPickup: d.onPickup, debug: d.debug,
     }, { themeId: d.themeId });
