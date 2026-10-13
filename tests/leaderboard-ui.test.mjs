@@ -52,13 +52,15 @@ test('结果页实时更新上传状态且卸载取消订阅', t => {
 
 test('客户端采用同源 Cookie、JSON 和子路径，不携带可伪造的客户端成绩', async t => {
   fakeDom(t); const calls = [];
-  const client = createLeaderboardClient('/thunder-run/', async (url, options) => { calls.push({ url, options }); return { ok: true, json: async () => ({ accepted: true }) }; });
+  const client = createLeaderboardClient('/thunder-run/', async (url, options) => { calls.push({ url, options }); return { ok: true, json: async () => ({ accepted: true }) }; }, 'page-credential');
   await client.list(); await client.begin('char_volt', 'rules');
   await client.submit({ runId: 'r', frames: 10, inputs: [] });
   assert.deepEqual(calls.map(c => c.url), ['/thunder-run/api/leaderboard', '/thunder-run/api/runs', '/thunder-run/api/runs/submit']);
   assert.ok(calls.every(c => c.options.credentials === 'same-origin' && c.options.signal));
   assert.equal(calls[1].options.headers['Content-Type'], 'application/json');
   assert.equal('score' in JSON.parse(calls[2].options.body), false);
+  assert.equal(JSON.parse(calls[1].options.body).pageId, 'page-credential');
+  assert.equal(JSON.parse(calls[2].options.body).pageId, 'page-credential');
   const bad = createLeaderboardClient('/', async () => ({ ok: false, status: 503 }));
   await assert.rejects(bad.list(), /503/);
 });

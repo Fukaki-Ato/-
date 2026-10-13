@@ -16,6 +16,8 @@ Optional environment settings:
 - TR_LEADERBOARD_PORT (default 8788)
 - TR_LEADERBOARD_DB (default ./data/leaderboard.sqlite)
 - TR_LEADERBOARD_ORIGINS (default local Vite origins above; comma-separated exact HTTP(S) origins, no paths)
+- TR_LEADERBOARD_WEB_ROOT (default repository `apps/web/dist`; production `/usr/local/nginx/html/thunder-run`): exact entry HTML to serve through the page gateway.
+- TR_LEADERBOARD_ALLOW_DEBUG_PAGES (default false): private/local QA only; even when enabled, QA receives no ranking document credential.
 - TR_LEADERBOARD_COOKIE_SECURE=true to add Secure when the public site is HTTPS. It defaults off because the current official route is HTTP.
 - TR_LEADERBOARD_WORKERS (default 2, bounded to 1–4), TR_LEADERBOARD_QUEUE (default 8, bounded to 0–64), and TR_LEADERBOARD_REPLAY_TIMEOUT_MS (default 15000, bounded to 250–18000)
 
@@ -31,15 +33,17 @@ All responses are JSON with Cache-Control: no-store. Errors have the form {"erro
 
   Entries are ordered by distance descending, then score descending, then the earliest successfully submitted best. Each identity has at most one stored best; an equal distance/score replay does not replace the earlier record. personal has the same entry shape and includes its rank even when below the top 50.
 
-- POST /thunder-run/api/runs, body {"charId":"char_volt","rulesId":"first-coin-v1-..."}, validates the current shared rules ID and a live, unlocked playable character. It returns {"runId":"...","seed":123,"rulesId":"..."}. The opaque run ticket is bound to the anonymous cookie identity and expires after 30 minutes plus a 60-second upload grace period. Pending tickets are memory-only and are invalidated by a server restart.
+- GET/HEAD `/thunder-run/` and `/thunder-run/index.html` issue eligible normal HTML/document credentials; production QA entry requests return 403 and revoke the presented ranking session. HTML must use the server gateway rather than a static bypass. See [debug-ranking-guard.md](debug-ranking-guard.md).
 
-- POST /thunder-run/api/runs/submit, body {"runId":"...","frames":123,"inputs":[{"frame":0,"action":"jump"}]}, submits the exact ordered action stream. It returns {"accepted":true|false} for a well-formed, bound, one-use ticket. accepted:false means the deterministic run did not meet ranked rules; malformed requests and unavailable tickets use generic error statuses/codes.
+- POST /thunder-run/api/runs, body {"charId":"char_volt","rulesId":"first-coin-v2-...","pageId":"..."}, validates the current shared rules ID, a live unlocked playable character, and server-held normal-page eligibility. It returns {"runId":"...","seed":123,"rulesId":"..."}. The opaque ticket binds the anonymous identity plus browser session/document credential, and expires after 30 minutes plus a 60-second upload grace period. Server restart invalidates page eligibility and pending tickets.
+
+- POST /thunder-run/api/runs/submit, body {"runId":"...","frames":123,"inputs":[{"frame":0,"action":"jump"}],"pageId":"..."}, submits the exact ordered action stream with the original document credential. It returns {"accepted":true|false} for an eligible bound one-use ticket. Revoked/expired/mismatched eligibility is rejected before replay and checked again before any database write.
 
 - POST /thunder-run/api/runs/cancel, body {"runId":"..."}, releases a ticket owned by the current cookie. The client uses this for abandoned or over-limit runs (no replay upload) and ignores cancellation network failures. Runs that collect coins now upload normally on death. Missing tickets are idempotent; another identity cannot cancel a live ticket. At most 60 cancellations/minute/IP. Equal distance/score records are ordered by their successful server submission time, then row ID.
 
 The service accepts no client score or distance fields. It replays every submitted frame in a bounded worker thread using the challenge seed, character and canonical RunnerSim; acceptance requires exactly the supplied number of alive steps, death on the final step, and no earlier death. RunnerSim.replayFrames is checked against the submitted count. The run may collect any number of coins: the distance and score freeze immediately before the first actual pickup is credited, and later gameplay/rewards cannot inflate that checkpoint. Ordinary pickup, magnets and bulk skill collection all use the same credit hook; currency multipliers do not affect whether the checkpoint stops. If no coin was ever collected, use the unchanged final run summary.
 
-The new rules ID rejects an old `coinless-v1-*` client even with identical config files. Deploy both front end and server from the new revision together. No database migration/reset is required: every stored old whole-run zero-coin result is also a valid pre-first-coin result; identities, bests and ordering remain intact. Previously rejected coin-collecting runs were not stored and cannot be reconstructed retrospectively.
+The page-bound `first-coin-v2-*` protocol rejects old `first-coin-v1-*` and `coinless-v1-*` clients. Deploy frontend, Node and HTML gateway together. The metric and database stay unchanged: old whole-run zero-coin results remain valid pre-first-coin results; identities, bests and ordering survive. Previously rejected coin-collecting runs were not stored and cannot be reconstructed retrospectively.
 
 Replay limits follow the shared protocol: at most 108,000 frames and 20,000 inputs; input actions are jump, slide, laneL, laneR, or skill, with nondecreasing in-range frame numbers. Upload cannot arrive more than two seconds faster than the claimed 60 Hz elapsed time. JSON bodies are capped at 2 MiB. The worker pool has fixed concurrency, a bounded waiting queue, end-to-end queue/worker timeout and memory limits; replay CPU work does not run on the HTTP event loop.
 
@@ -60,7 +64,7 @@ node --test tests/leaderboard-server.test.mjs exercises two independent HTTP coo
 - Use a supervised unprivileged service. With systemd, `DynamicUser=yes`, `StateDirectory=thunder-run-leaderboard`, `ProtectHome=yes`, `ProtectSystem=strict`, `NoNewPrivileges=yes`, and `Restart=on-failure` keep the writable surface confined to durable state. Start `/usr/local/bin/node /opt/thunder-run-leaderboard/current/server/index.mjs`.
 - Configure `TR_LEADERBOARD_ORIGINS` to the exact official origin, `TR_LEADERBOARD_DB` to durable state, and `TR_LEADERBOARD_PORT=8788`. The current official site is HTTP, so the Secure cookie flag is off until HTTPS is enabled.
 
-In the **existing official vhost only**, add the narrow route (preserve all other locations):
+In the **existing official vhost only**, install `server/nginx-leaderboard.conf` (exact HTML-entry proxies plus the following API route; remove previous entry/API locations, preserve all others):
 
 ```nginx
 location ^~ /thunder-run/api/ {

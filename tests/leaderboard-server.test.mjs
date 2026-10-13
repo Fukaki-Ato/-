@@ -68,24 +68,40 @@ class Client {
     this.base = base;
     this.ip = ip;
     this.cookie = null;
+    this.pageCookie = null;
+    this.pageId = null;
+  }
+
+  async enter() {
+    const result = await this.request('/thunder-run/', { method: 'HEAD' });
+    assert.equal(result.response.status, 200);
+    this.pageId = result.response.headers.get('x-tr-rank-page');
+    assert.ok(this.pageId);
   }
 
   async request(path, { method = 'GET', body, rawBody, origin = ORIGIN, contentType = 'application/json', headers = {} } = {}) {
     const requestHeaders = { 'x-real-ip': this.ip, ...headers };
     if (origin !== undefined) requestHeaders.origin = origin;
-    if (this.cookie) requestHeaders.cookie = 'tr_lb=' + this.cookie;
+    requestHeaders.cookie = [this.cookie && 'tr_lb=' + this.cookie,
+      this.pageCookie && 'tr_rank_session=' + this.pageCookie].filter(Boolean).join('; ');
     let payload;
     if (rawBody !== undefined) {
       requestHeaders['content-type'] = contentType;
       payload = rawBody;
     } else if (body !== undefined) {
       requestHeaders['content-type'] = contentType;
-      payload = JSON.stringify(body);
+      const ranked = [API_PATH + '/runs', API_PATH + '/runs/submit'].includes(path);
+      payload = JSON.stringify(ranked ? { ...body, pageId: this.pageId } : body);
     }
     const response = await fetch(this.base + path, { method, headers: requestHeaders, body: payload });
-    const setCookie = response.headers.get('set-cookie');
-    const cookieMatch = setCookie?.match(/(?:^|,\s*)tr_lb=([A-Za-z0-9_-]{43})/);
-    if (cookieMatch) this.cookie = cookieMatch[1];
+    const setCookies = response.headers.getSetCookie();
+    const setCookie = setCookies.join(', ');
+    for (const value of setCookies) {
+      const cookieMatch = value.match(/^tr_lb=([A-Za-z0-9_-]{43})/);
+      const pageMatch = value.match(/^tr_rank_session=([A-Za-z0-9_-]{43})/);
+      if (cookieMatch) this.cookie = cookieMatch[1];
+      if (pageMatch) this.pageCookie = pageMatch[1];
+    }
     let data = null;
     try { data = await response.json(); } catch { /* status-only assertions */ }
     return { response, data, setCookie };
@@ -93,6 +109,7 @@ class Client {
 }
 
 async function begin(client, rulesId, charId = CHAR_ID) {
+  if (!client.pageId) await client.enter();
   return client.request(API_PATH + '/runs', {
     method: 'POST', body: { charId, rulesId },
   });
@@ -249,8 +266,10 @@ test('POSTs require exact Origin and JSON, rules/inputs/body are bounded, and li
   const wrongRules = await begin(client, 'coinless-v1-wrong');
   assert.equal(wrongRules.response.status, 409);
   assert.equal(wrongRules.data.error.code, 'rules_mismatch');
-  const oldMetric = await begin(client, service.expectedRulesId.replace('first-coin-v1-', 'coinless-v1-'));
+  const oldMetric = await begin(client, 'coinless-v1-' + service.expectedRulesId.split('-').at(-1));
   assert.equal(oldMetric.response.status, 409, 'an old whole-run client is rejected with identical configuration');
+  const oldAuth = await begin(client, 'first-coin-v1-' + service.expectedRulesId.split('-').at(-1));
+  assert.equal(oldAuth.response.status, 409, 'old unbound page protocol is rejected');
   const invalidCharacter = await begin(client, service.expectedRulesId, 'skin_volt_default');
   assert.equal(invalidCharacter.response.status, 400);
   assert.equal(invalidCharacter.data.error.code, 'invalid_character');

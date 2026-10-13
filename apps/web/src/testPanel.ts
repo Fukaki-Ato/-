@@ -47,8 +47,7 @@ const CSS = `
 
 export interface TestPanel { dispose(): void }
 
-export function createTestPanel(): TestPanel {
-  const enabled = /[?&](debug|test)\b/.test(location.search);
+export function createTestPanel(enabled = false): TestPanel {
   if (!enabled) return { dispose() {} };
 
   const style = document.createElement('style');

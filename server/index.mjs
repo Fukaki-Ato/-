@@ -7,6 +7,8 @@ import { resolve } from 'node:path';
 import { existsSync, realpathSync } from 'node:fs';
 import { LeaderboardStore } from './store.mjs';
 import { ReplayPool } from './replay-pool.mjs';
+import { PageSessions } from './pageSessions.mjs';
+import { debugReferral, isGameEntry, servePage } from './pageGateway.mjs';
 
 export const API_PATH = '/thunder-run/api';
 const COOKIE_NAME = 'tr_lb';
@@ -195,7 +197,7 @@ function exactKeys(value, keys) {
 }
 
 function validateSubmitBody(body, maxFrames, maxInputs) {
-  if (!isObject(body) || !exactKeys(body, ['runId', 'frames', 'inputs'])) {
+  if (!isObject(body) || !exactKeys(body, ['runId', 'frames', 'inputs', 'pageId'])) {
     throw httpError(400, 'invalid_request');
   }
   if (!Number.isInteger(body.frames) || body.frames < 1 || body.frames > maxFrames
@@ -227,10 +229,11 @@ function cookieHeader(token, secure) {
 }
 
 export async function createLeaderboardServer(options = {}) {
-  const [{ loadContent }, { playableCharacters, isCharacterLocked }, rules] = await Promise.all([
+  const [{ loadContent, repoRoot }, { playableCharacters, isCharacterLocked }, rules, { debugQueryFlags }] = await Promise.all([
     import('../tools/replay/runner.mjs'),
     import('../packages/game/dist/core/sim/character.js'),
     import('../packages/game/dist/flow/leaderboard.js'),
+    import('../packages/game/dist/core/debugMode.js'),
   ]);
   const content = options.content ?? loadContent();
   const allowedOrigins = normalizeOrigins(options.origins
@@ -245,7 +248,7 @@ export async function createLeaderboardServer(options = {}) {
   const store = new LeaderboardStore(options.dbPath
     ?? process.env.TR_LEADERBOARD_DB
     ?? resolve(process.cwd(), 'data/leaderboard.sqlite'));
-  const workerPool = new ReplayPool({
+  const workerPool = options.replayPool ?? new ReplayPool({
     size: options.workerCount ?? parseBoundedInteger(process.env.TR_LEADERBOARD_WORKERS, 2, 1, 4),
     maxQueue: options.maxQueue ?? parseBoundedInteger(process.env.TR_LEADERBOARD_QUEUE, 8, 0, 64),
     timeoutMs: options.replayTimeoutMs ?? parseBoundedInteger(process.env.TR_LEADERBOARD_REPLAY_TIMEOUT_MS, 15_000, 250, 18_000),
@@ -255,6 +258,9 @@ export async function createLeaderboardServer(options = {}) {
   const limiter = new BoundedRateLimiter();
   const secureCookie = options.secureCookie
     ?? /^(1|true|yes)$/i.test(process.env.TR_LEADERBOARD_COOKIE_SECURE ?? '');
+  const pageSessions = new PageSessions({ secure: secureCookie, ...options.pageSessionOptions });
+  const allowDebug = options.allowDebugPages ?? /^(1|true|yes)$/i.test(process.env.TR_LEADERBOARD_ALLOW_DEBUG_PAGES ?? '');
+  const webRoot = options.webRoot ?? process.env.TR_LEADERBOARD_WEB_ROOT ?? resolve(repoRoot, 'apps/web/dist');
 
   function cleanupChallenges(now = performance.now()) {
     for (const [runId, challenge] of challenges) {
@@ -292,6 +298,14 @@ export async function createLeaderboardServer(options = {}) {
     }
     const url = new URL(req.url ?? '/', 'http://localhost');
     const pathname = url.pathname;
+    const ip = requestIp(req);
+    const debugSignal = debugQueryFlags(url.search).qa || debugReferral(req.headers.referer, debugQueryFlags, allowedOrigins);
+    if (debugSignal) pageSessions.revoke(req.headers.cookie);
+    if (isGameEntry(url)) {
+      if (!limiter.allow(ip, 'page', 60, 60_000)) throw httpError(429, 'rate_limited');
+      if (await servePage(req, res, url, { sessions: pageSessions, debugFlags: debugQueryFlags, allowDebug, webRoot, allowedOrigins })) return;
+    }
+    if (debugSignal) throw httpError(403, 'debug_disabled');
     if (pathname === API_PATH + '/health' && req.method === 'GET') {
       try {
         store.db.prepare('SELECT 1 AS ok').get();
@@ -302,7 +316,6 @@ export async function createLeaderboardServer(options = {}) {
       return;
     }
 
-    const ip = requestIp(req);
     if (pathname === API_PATH + '/leaderboard' && req.method === 'GET') {
       if (!limiter.allow(ip, 'list', 60, 60_000)) throw httpError(429, 'rate_limited');
       const identity = ensureIdentity(req, res, ip);
@@ -314,13 +327,15 @@ export async function createLeaderboardServer(options = {}) {
       if (!allowedOrigins.has(req.headers.origin)) throw httpError(403, 'origin_denied');
       if (!limiter.allow(ip, 'begin', 15, 60_000)) throw httpError(429, 'rate_limited');
       const body = await readJson(req);
-      if (!isObject(body) || !exactKeys(body, ['charId', 'rulesId'])
+      if (!isObject(body) || !exactKeys(body, ['charId', 'rulesId', 'pageId'])
         || typeof body.charId !== 'string' || body.charId.length > 64
         || typeof body.rulesId !== 'string') {
         throw httpError(400, 'invalid_request');
       }
       if (body.rulesId !== expectedRulesId) throw httpError(409, 'rules_mismatch');
       if (!liveCharacters.has(body.charId)) throw httpError(400, 'invalid_character');
+      const pageAuth = pageSessions.authorize(req.headers.cookie, body.pageId);
+      if (!pageAuth) throw httpError(403, 'rank_page_required');
       cleanupChallenges();
       if (challenges.size >= MAX_ACTIVE_CHALLENGES) throw httpError(503, 'challenge_capacity');
       const identity = ensureIdentity(req, res, ip);
@@ -329,6 +344,8 @@ export async function createLeaderboardServer(options = {}) {
         if (challenge.tokenHash === identity.tokenHash) pending++;
       }
       if (pending >= MAX_CHALLENGES_PER_PLAYER) throw httpError(429, 'rate_limited');
+      const pageCookie = pageSessions.renew(pageAuth);
+      if (!pageCookie) throw httpError(403, 'rank_page_required');
       const runId = randomBytes(32).toString('base64url');
       const seed = randomBytes(4).readUInt32BE(0);
       const issuedAt = performance.now();
@@ -337,10 +354,12 @@ export async function createLeaderboardServer(options = {}) {
         charId: body.charId,
         seed,
         rulesId: expectedRulesId,
+        pageAuth: { sessionHash: pageAuth.sessionHash, pageHash: pageAuth.pageHash },
         issuedAt,
         expiresAt: issuedAt + RUN_TTL_MS,
       });
-      sendJson(res, 201, { runId, seed, rulesId: expectedRulesId }, identity.setCookie);
+      sendJson(res, 201, { runId, seed, rulesId: expectedRulesId },
+        [identity.setCookie, pageCookie].filter(Boolean));
       return;
     }
 
@@ -357,6 +376,7 @@ export async function createLeaderboardServer(options = {}) {
       const challenge = challenges.get(body.runId);
       if (!challenge || challenge.tokenHash !== identity.tokenHash) throw httpError(404, 'challenge_unavailable');
       challenges.delete(body.runId); // A bound ticket is consumed on its first JSON submission attempt.
+      if (!pageSessions.matches(req.headers.cookie, body.pageId, challenge.pageAuth)) throw httpError(403, 'rank_page_required');
 
       const replay = validateSubmitBody(body, maxFrames, maxInputs);
       const requiredMs = replay.frames * (1000 / 60) - UPLOAD_CLOCK_SLOP_MS;
@@ -377,6 +397,9 @@ export async function createLeaderboardServer(options = {}) {
           ? error.code : 'replay_unavailable';
         throw httpError(503, code);
       }
+      // The mode can be revoked while replay is off-thread; recheck before any synchronous DB write.
+      if (challenge.expiresAt <= performance.now()
+        || !pageSessions.matches(req.headers.cookie, body.pageId, challenge.pageAuth)) throw httpError(403, 'rank_page_required');
       if (result.accepted) {
         store.recordBest({
           tokenHash: identity.tokenHash,

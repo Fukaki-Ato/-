@@ -1,7 +1,8 @@
 import type { LeaderboardData, LeaderboardService, RankedReplay, RankedTicket } from '@tr/game/flow/leaderboard.js';
 
 /** Same-origin anonymous identity is held in an HttpOnly cookie, never in game storage. */
-export function createLeaderboardClient(base: string, request: typeof fetch = fetch): LeaderboardService {
+export function createLeaderboardClient(base: string, request: typeof fetch = fetch,
+  pageId = document.querySelector<HTMLMetaElement>('meta[name="tr-rank-page"]')?.content ?? ''): LeaderboardService {
   const call = async <T>(path: string, body?: unknown): Promise<T> => {
     const controller = new AbortController();
     const timer = window.setTimeout(() => controller.abort(), body && path.endsWith('submit') ? 20000 : 5000);
@@ -17,8 +18,8 @@ export function createLeaderboardClient(base: string, request: typeof fetch = fe
   };
   return {
     list: () => call<LeaderboardData>('leaderboard'),
-    begin: (charId, rulesId) => call<RankedTicket>('runs', { charId, rulesId }),
-    submit: (replay: RankedReplay) => call<{ accepted: boolean }>('runs/submit', replay),
+    begin: (charId, rulesId) => call<RankedTicket>('runs', { charId, rulesId, pageId }),
+    submit: (replay: RankedReplay) => call<{ accepted: boolean }>('runs/submit', { ...replay, pageId }),
     cancel: async runId => { await call('runs/cancel', { runId }); },
   };
 }

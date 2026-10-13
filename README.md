@@ -52,3 +52,5 @@ Gameplay fixes, content, and balance changes belong in `packages/game`, `config`
 See [docs/architecture.md](docs/architecture.md), [CONTRIBUTING.md](CONTRIBUTING.md), and [docs/replay.md](docs/replay.md).
 
 第一次吃金币前距离全服排行榜的玩家规则、金币生成调整与验证方式见 [docs/coinless-leaderboard.md](docs/coinless-leaderboard.md)；后端与部署见 [docs/leaderboard-server.md](docs/leaderboard-server.md)。
+
+正式站的调试入口关闭、服务器页面凭据与排名票据隔离见 [docs/debug-ranking-guard.md](docs/debug-ranking-guard.md)。

@@ -33,5 +33,5 @@ export function leaderboardRulesId(content: GameContent): string {
     return `{${Object.keys(object).sort().map(k => `${JSON.stringify(k)}:${canonical(object[k])}`).join(',')}}`;
   };
   const { game, characters, skills, items, obstacles } = content;
-  return `first-coin-v1-${hashSeed(canonical({ game, characters, skills, items, obstacles })).toString(16)}`;
+  return `first-coin-v2-${hashSeed(canonical({ game, characters, skills, items, obstacles })).toString(16)}`;
 }
