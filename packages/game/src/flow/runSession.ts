@@ -11,6 +11,7 @@ export interface RunSessionDeps {
   adapter: PlatformAdapter; views: GameViews; content: GameContent; charId: string;
   service?: LeaderboardService; debug?: boolean; test?: boolean; themeId?: string;
   createScene?: typeof createRunnerScene;
+  trackRun?: (sim: RunnerSim, seed: number) => () => void;
   onSeed(seed: number): void; onEnd(summary: RunSummary): void;
   onDeath(): void; onCast(): void; onPickup(): void;
 }
@@ -30,6 +31,7 @@ export function createRunSession(d: RunSessionDeps): { dispose(): void } {
   let scene: { dispose(): void } | null = null;
   let hud: ReturnType<GameViews['mountHud']> | null = null;
   let activeTicket: RankedTicket | undefined, completed = false;
+  let finishTracking: (() => void) | undefined;
   const release = (ticket?: RankedTicket): void => {
     if (ticket && d.service?.cancel) void d.service.cancel(ticket.runId).catch(() => {});
   };
@@ -41,6 +43,7 @@ export function createRunSession(d: RunSessionDeps): { dispose(): void } {
     const seed = ticket?.seed ?? hashSeed('run-' + Date.now());
     d.onSeed(seed);
     const sim = new RunnerSim(d.content, seed, d.charId, !!ticket);
+    finishTracking = d.trackRun?.(sim, seed);
     const host = { canvas: d.adapter.canvas.mainCanvas(), size: d.adapter.canvas.windowSize() };
     hud = d.views.mountHud();
     hud.update({ score: 0, coins: 0, distance: 0, hits: 0, lives: sim.lives, buffs: [], skill: null });
@@ -79,6 +82,7 @@ export function createRunSession(d: RunSessionDeps): { dispose(): void } {
   } else start();
   return { dispose() {
     cancelled = true;
+    finishTracking?.(); finishTracking = undefined;
     if (!completed) release(activeTicket);
     scene?.dispose(); hud?.dispose();
     if (d.test) uninstallTestApi();

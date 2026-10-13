@@ -173,7 +173,7 @@ test('导航：局内 Esc 与结算「返回选角」都回 select', () => {
 const audioCfg = parseAudioConfig(JSON.parse(readFileSync(join(root, 'config', 'game.json'), 'utf8')).params);
 
 /** 真实配置启动的流程：假场景工厂捕获 RunCallbacks（cast/pickup/death 即 sim 事件回调），假音频记录调用。 */
-async function bootRealFlow({ withAudio = true, pageSupport = false, storedCharId, lockedCharId } = {}) {
+async function bootRealFlow({ withAudio = true, pageSupport = false, storedCharId, lockedCharId, trackRun } = {}) {
   const calls = [];
   const scenes = [];
   const inputs = [];
@@ -216,7 +216,7 @@ async function bootRealFlow({ withAudio = true, pageSupport = false, storedCharI
     scenes.push(s);
     return s;
   };
-  const flow = createGameFlow({ adapter, views, configResolve: n => n, audioRandom: () => 0, createScene });
+  const flow = createGameFlow({ adapter, views, configResolve: n => n, audioRandom: () => 0, createScene, trackRun });
   await flow.boot();
   // 游客态直入主界面：boot 后落在 select、入口记 guest、全程零 login 调用
   assert.equal(flow.machine.current(), 'select');
@@ -224,6 +224,26 @@ async function bootRealFlow({ withAudio = true, pageSupport = false, storedCharI
   const key = code => inputs.forEach(cb => cb({ type: 'key', code, phase: 'down' }));
   return { flow, calls, scenes, seen, key, logins, store };
 }
+
+test('任务录制生命周期：死亡和主动退出各提交一次，切换大厅不重复', async () => {
+  const starts = [], finishes = [];
+  const { flow, scenes, seen, key } = await bootRealFlow({ trackRun: (sim, seed) => {
+    starts.push({ sim, seed }); return () => finishes.push(sim);
+  } });
+  seen.select.onStartRun('char_volt');
+  assert.equal(starts.length, 1);
+  assert.equal(starts[0].sim, scenes[0].sim);
+  assert.equal(starts[0].seed, flow.currentSeed());
+  scenes[0].cb.onEnd(scenes[0].sim.summary());
+  assert.equal(finishes.length, 1);
+  seen.result.onSelect();
+  assert.equal(finishes.length, 1);
+  seen.select.onStartRun('char_volt');
+  key('Escape');
+  assert.equal(starts.length, 2);
+  assert.equal(finishes.length, 2);
+  assert.equal(flow.machine.current(), 'select');
+});
 
 test('角色入口打开独立选角页；选角记忆、返回和开跑沿用有效角色', async () => {
   const { flow, scenes, seen, store } = await bootRealFlow({ pageSupport: true });
