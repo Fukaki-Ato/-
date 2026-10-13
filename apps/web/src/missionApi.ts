@@ -40,6 +40,7 @@ export class MissionApi {
     });
   }
   async start(seed: number, charId: string): Promise<string> {
+    if (this.queue.length >= 10) throw new Error('待同步记录已满，请先在任务页同步；本局不计入任务进度');
     await this.connect();
     return (await this.request<{ runId: string }>('/runs', { seed: seed >>> 0, charId })).runId;
   }

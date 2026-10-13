@@ -12,8 +12,9 @@ import {
   type UiInput, type UiResources,
 } from '@tr/framework/ui/index.js';
 import { buildDemoView } from './uiDemoView.js';
+import { DEBUG_TOOLS_ENABLED, runtimeDebugParams } from './debugPolicy.js';
 
-if (new URLSearchParams(location.search).get('ui') === 'demo') {
+if (DEBUG_TOOLS_ENABLED && runtimeDebugParams(location.search)?.get('ui')?.toLowerCase() === 'demo') {
   start().catch(showFatal);
 }
 

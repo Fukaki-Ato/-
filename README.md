@@ -55,4 +55,6 @@ See [docs/architecture.md](docs/architecture.md), [CONTRIBUTING.md](CONTRIBUTING
 
 第一次吃金币前距离全服排行榜的玩家规则、金币生成调整与验证方式见 [docs/coinless-leaderboard.md](docs/coinless-leaderboard.md)；后端与部署见 [docs/leaderboard-server.md](docs/leaderboard-server.md)。
 
+正式站的调试入口关闭、服务器页面凭据与排名票据隔离见 [docs/debug-ranking-guard.md](docs/debug-ranking-guard.md)。
+
 每日/每周任务支持进度、奖励领取和服务端持久化。玩法与 Web 接入见 [docs/missions.md](docs/missions.md)，独立任务 API 的启动与部署见 [docs/missions-backend.md](docs/missions-backend.md)。

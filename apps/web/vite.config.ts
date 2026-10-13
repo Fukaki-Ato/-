@@ -2,6 +2,7 @@ import { defineConfig, type Plugin } from 'vite';
 import { readFile, cp, mkdir } from 'node:fs/promises';
 import { join, normalize, extname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { rankPageGateway } from './rankPageGateway.js';
 
 /** Vite setup for the Web app: config is public and runtime assets are copied to dist. */
 const assetsDir = fileURLToPath(new URL('../../assets', import.meta.url));
@@ -54,7 +55,7 @@ function trAssets(): Plugin {
 export default defineConfig({
   base: process.env.TR_WEB_BASE ?? '/',
   publicDir: '../../config',
-  plugins: [trAssets()],
+  plugins: [rankPageGateway(), trAssets()],
   server: {
     host: '127.0.0.1',
     port: 8767,

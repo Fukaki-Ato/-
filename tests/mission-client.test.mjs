@@ -8,6 +8,7 @@ import { leaderboardRulesId } from '@tr/game/flow/leaderboard.js';
 
 const { createMissionPanel } = await importWebModule('../apps/web/src/missionPanel.ts');
 const { MissionApi } = await importWebModule('../apps/web/src/missionApi.ts');
+const { createMissionIntegration } = await importWebModule('../apps/web/src/missionIntegration.ts');
 const tick = () => new Promise(resolve => setImmediate(resolve));
 const makeSnapshot = () => ({
   serverTime: Date.UTC(2026, 9, 12), wallet: { coin: 400, shard_volt: 5, key: 1 },
@@ -18,6 +19,32 @@ const makeSnapshot = () => ({
   weekly: { periodId: '2026-10-12', resetsAt: Date.UTC(2026, 9, 18, 16), missions: [
     { id: 'wchars', title: '使用3位角色', metric: 'charactersPlayed', progress: 1, target: 3, reward: { key: 2 }, claimed: false },
   ] },
+});
+
+test('QA mission integration stays untracked; normal runs keep their mission start/finish path', async t => {
+  const { content } = fakeDom(t);
+  const originalFetch = globalThis.fetch, originalStorage = globalThis.localStorage;
+  t.after(() => { globalThis.fetch = originalFetch; globalThis.localStorage = originalStorage; });
+  const calls = [];
+  globalThis.localStorage = { getItem: () => null, setItem() {} };
+  globalThis.fetch = async (url, options) => {
+    calls.push({ url, options });
+    return Response.json(url.endsWith('/runs') ? { runId: 'mission-run' } : makeSnapshot());
+  };
+  const qaSim = new RunnerSim(content, 1234, 'char_volt');
+  const oldStep = qaSim.step, oldAction = qaSim.applyAction;
+  const qa = createMissionIntegration(true);
+  const stopQa = qa.trackRun(qaSim, 1234); qaSim.step(); stopQa(); await tick();
+  assert.equal(qaSim.step, oldStep); assert.equal(qaSim.applyAction, oldAction);
+  assert.equal(calls.length, 0, 'known QA mode must not call the task API or record reward progress');
+  const normalSim = new RunnerSim(content, 1234, 'char_volt');
+  const normal = createMissionIntegration(false);
+  const stopNormal = normal.trackRun(normalSim, 1234); normalSim.applyAction('slide'); normalSim.step(); stopNormal();
+  for (let i = 0; i < 5; i++) await tick();
+  assert.ok(calls.some(call => call.url.endsWith('/runs')));
+  const finish = calls.find(call => call.url.endsWith('/finish')); assert.ok(finish);
+  assert.equal(JSON.parse(finish.options.body).frames, 1);
+  assert.deepEqual(JSON.parse(finish.options.body).actions, [{ frame: 0, action: 'slide' }]);
 });
 
 test('recorder replays exact fixed steps, ignores death animation and counts successful slides', t => {
@@ -159,4 +186,17 @@ test('client persists retries and sends no client-authored scores', async t => {
   assert.equal(JSON.parse([...store.values()][0]).length, 0);
   assert.equal(calls.find(call => call.url.endsWith('/runs')).options.credentials, 'same-origin');
   assert.equal(JSON.parse(calls.find(call => call.url.endsWith('/runs')).options.body).seed, 4294967295);
+});
+
+test('a full pending queue refuses another mission ticket without discarding prior replays', async t => {
+  const originalFetch = globalThis.fetch, originalStorage = globalThis.localStorage;
+  t.after(() => { globalThis.fetch = originalFetch; globalThis.localStorage = originalStorage; });
+  const pending = Array.from({length:10},(_,i)=>({runId:`run-${i}`,frames:10,actions:[]}));
+  let network = 0, saved = JSON.stringify(pending);
+  globalThis.localStorage = {getItem:()=>saved,setItem:(_key,value)=>{saved=value;}};
+  globalThis.fetch = async()=>{network++;return Response.json({runId:'extra-run'});};
+  const api = new MissionApi();
+  await assert.rejects(api.start(1234,'char_volt'),/本局不计入任务进度/);
+  assert.equal(network,0,'do not create an unqueueable mission ticket');
+  assert.deepEqual(JSON.parse(saved),pending);
 });
