@@ -13,7 +13,9 @@ import type { GLCanvas, PlatformAdapter, WindowSize } from '@tr/framework/platfo
 import { createAvatar } from './avatarRig.js';
 import { camTargets } from './cameraRig.js';
 import { createCoinField } from './coinField.js';
-import { createCloudLayer, createObstacleLayer, createPickupLayer } from './entityLayers.js';
+import { createCloudLayer, createObstacleLayer } from './entityLayers.js';
+import { createPickupLayer } from './pickupLayer.js';
+import { createPickupModelLoader } from './pickupModels.js';
 import { installRunProbe, uninstallRunProbe } from './runDebugProbe.js';
 import { createSpeedLines } from './speedLines.js';
 import { createTrackVisuals } from './trackVisuals.js';
@@ -110,7 +112,9 @@ export function createRunnerScene(
   const avatar = createAvatar(scene, laneWidth, sim.loadout, adapter);
   const coinField = createCoinField(scene, laneWidth);
   const obstacleLayer = createObstacleLayer(scene, laneWidth);
-  const pickupLayer = createPickupLayer(scene, laneWidth);
+  // 道具 3D 模型（items.json model.prefab/spin）：磁铁有文件→近距换 3D，其余预留路径
+  // 文件缺失→加载器返回 null，保持贴图箱（wx 无 extras.readBinary 同理），捞取判定不受影响
+  const pickupLayer = createPickupLayer(scene, laneWidth, createPickupModelLoader(content, adapter));
   const cloudLayer = createCloudLayer(scene);
   const bursts = createBurstPool(scene);
   const speedLines = createSpeedLines(scene, tint);
