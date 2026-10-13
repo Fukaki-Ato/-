@@ -2,6 +2,11 @@ import type { LeaderboardService, LeaderboardEntry } from '@tr/game/flow/leaderb
 import { mountMobilePage, pageHeader, pageLifecycle, uiButton, uiText } from './mobileUi.js';
 import './mobileLeaderboard.css';
 
+const MAX_ENTRIES = 50;
+const DEFAULT_ENTRIES = 4;
+const LIST_ID = 'global-leaderboard-list';
+const LOAD_ERROR = '排行榜加载失败，请检查网络后重试';
+
 export function createMobileLeaderboard(service: LeaderboardService, actions: { onBack(): void }): () => void {
   const { root, frame } = mountMobilePage('第一次吃金币前距离全服排行榜', 'mobile-leaderboard');
   frame.append(pageHeader('金币前距离榜', 'GLOBAL / 全服挑战', actions.onBack));
@@ -14,7 +19,8 @@ export function createMobileLeaderboard(service: LeaderboardService, actions: { 
   personal.hidden = true;
   personal.setAttribute('aria-label', '我的纪录');
   const list = uiText('ol', '', 'rank-list');
-  list.setAttribute('aria-label', '全服前 50 名');
+  list.id = LIST_ID;
+  list.setAttribute('aria-label', '全服前 4 名');
   const row = (entry: LeaderboardEntry): HTMLLIElement => {
     const item = uiText('li', '', 'rank-row');
     const who = uiText('div', '', 'rank-who');
@@ -24,28 +30,79 @@ export function createMobileLeaderboard(service: LeaderboardService, actions: { 
     item.append(who, stats);
     return item;
   };
-  let disposed = false, requestId = 0;
+  let disposed = false, requestId = 0, loading = true, loadFailed = false;
+  let hasData = false, expanded = false;
+  let entries: LeaderboardEntry[] = [];
   const refresh = uiButton('刷新排行榜', 'ui-secondary rank-refresh', () => { void load(); });
+  const expand = uiButton('查看完整50名排行', 'ui-secondary rank-expand');
+  expand.setAttribute('aria-controls', LIST_ID);
+  expand.setAttribute('aria-expanded', 'false');
+  expand.addEventListener('click', () => {
+    if (!hasData || entries.length <= DEFAULT_ENTRIES) return;
+    expanded = !expanded;
+    renderEntries();
+    updateControls();
+    updateStatus();
+  });
+  function updateControls(): void {
+    const label = expanded ? '收起为前4名' : '查看完整50名排行';
+    expand.textContent = label;
+    expand.setAttribute('aria-label', label);
+    expand.setAttribute('aria-expanded', String(expanded));
+    expand.setAttribute('aria-controls', LIST_ID);
+    expand.disabled = !hasData || entries.length <= DEFAULT_ENTRIES;
+  }
+  function renderEntries(): void {
+    const visible = expanded ? entries : entries.slice(0, DEFAULT_ENTRIES);
+    list.replaceChildren(...visible.map(row));
+    list.setAttribute('aria-label', expanded ? '全服完整排行，最多 50 名' : '全服前 4 名');
+  }
+  function updateStatus(): void {
+    if (!hasData) {
+      status.textContent = loading ? '正在加载全服成绩…' : LOAD_ERROR;
+      return;
+    }
+    if (entries.length === 0) {
+      status.textContent = loadFailed ? LOAD_ERROR + '；全服榜暂时为空' : '全服榜暂时为空，等你来创下第一条纪录';
+      return;
+    }
+    const mode = expanded
+      ? `已展开完整排行（当前显示 ${entries.length} 名，最多 50 名）`
+      : `当前展示前 ${Math.min(DEFAULT_ENTRIES, entries.length)} 名（${entries.length > DEFAULT_ENTRIES ? `可查看前 ${entries.length} 名` : '已显示全部纪录'}）`;
+    status.textContent = (loading ? '正在刷新全服成绩…；' : loadFailed ? LOAD_ERROR + '；' : '') + mode + ' · 服务端校验成绩';
+  }
   async function load(): Promise<void> {
     const id = ++requestId;
+    loading = true;
+    loadFailed = false;
     refresh.disabled = true;
-    status.textContent = '正在加载全服成绩…';
+    updateStatus();
     try {
       const data = await service.list();
       if (disposed || id !== requestId) return;
+      entries = data.entries.slice(0, MAX_ENTRIES);
+      hasData = true;
+      expanded = expanded && entries.length > DEFAULT_ENTRIES;
       identity.textContent = `你是 ${data.playerName} · 游客身份保存在浏览器，清除站点数据会重置`;
       personal.hidden = false;
       personal.replaceChildren(uiText('h2', '我的最佳纪录'));
       if (data.personal) {
         personal.append(uiText('p', `第 ${data.personal.rank} 名 · ${data.personal.distance.toFixed(2)} m · ${data.personal.score.toLocaleString()} 分`));
       } else personal.append(uiText('p', '暂无金币前距离纪录，开始一局挑战吧！', 'ui-muted'));
-      list.replaceChildren(...data.entries.map(row));
-      status.textContent = data.entries.length ? '全服前 50 名 · 服务端校验成绩' : '全服榜暂时为空，等你来创下第一条纪录';
+      renderEntries();
+      updateControls();
+      loading = false;
+      updateStatus();
     } catch {
-      if (!disposed && id === requestId) status.textContent = '排行榜加载失败，请检查网络后重试';
+      if (!disposed && id === requestId) {
+        loading = false;
+        loadFailed = true;
+        updateStatus();
+      }
     } finally { if (!disposed && id === requestId) refresh.disabled = false; }
   }
-  frame.append(rules, identity, personal, status, list, refresh);
+  updateControls();
+  frame.append(rules, identity, personal, status, expand, list, refresh);
   const dispose = pageLifecycle(root, actions.onBack);
   void load();
   return () => { disposed = true; requestId++; dispose(); };
