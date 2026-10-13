@@ -16,6 +16,7 @@
     "check-imports": "node tools/check-import-rules.mjs",
     "check": "node tools/check.mjs",
     "dev": "npm run build && npm run dev --workspace @tr/web",
+    "dev:server": "npm run build && npm run start --workspace @tr/server",
     "build:web": "npm run build && npm run build --workspace @tr/web",
     "build:wx": "npm run build && node tools/build-wx.mjs",
     "preview:web": "npm run preview --workspace @tr/web"

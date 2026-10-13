@@ -1,10 +1,7 @@
 /**
  * 跑酷玩法模拟（core/sim 层，纯逻辑、固定步长、确定性）——docs/01 §2-§9、docs/02 §5、docs/08 §2。
- * 分工：运动学 movement.ts / 几何判定 collision.ts / 拾取 collect.ts /
- *       buff 计时合并 effects/buffEngine.ts / 引擎→世界作用面 simWorld.ts / 实体回收 entitySweep.ts。
- *       本文件只做输入路由、逐帧推进与结算。
- * 原则：只暴露 step()/applyAction()（渲染层读状态不写）；事件由调用方 drainEvents() 取走，
- *       所以 step 外产生的施放事件不会丢；全部数值来自 config/*.json（调手感不改代码）。
+ * 运动/碰撞/拾取/buff/世界/回收各自独立；这里做输入路由、推进与结算。
+ * 渲染层只读状态、消费 drainEvents；玩法数值来自 config/*.json。
  */
 import { RunRng } from '../rng.js';
 import { MAX_RANKED_INPUTS, type ReplayInput } from '../leaderboard.js';
@@ -68,6 +65,9 @@ export class RunnerSim {
   private readonly buffCtx: CastContext = { distance: 0, lane: 0 };
   /** scoreAdd 原语与技能释放奖励的额外分 */
   private bonusScore = 0;
+  private itemPickups = 0;
+  /** 任务遥测不改变历史 summary / golden 回放结构。 */
+  get missionStats() { return { slides: this.mv.totalSlides, itemPickups: this.itemPickups }; }
   /** Actual pickups (before currency multipliers). */
   collectedCoins = 0;
   readonly firstCoinRecord = new FirstCoinRecord();
@@ -150,10 +150,7 @@ export class RunnerSim {
     else if (a === 'slide') this.mv.slideInput(s, this.fx);
   }
 
-  /**
-   * 主动技能可释放：冷却结束 + 活着 + 积攒门槛达标（docs/01 §6.2）。
-   * 无积攒门槛的技能开局第 0 秒即亮（充能制已移除，纯冷却）。
-   */
+  /** 主动技能：冷却结束、活着、积攒门槛达标；无门槛时开局即可释放。 */
   canCastSkill(): boolean {
     const sk = this.loadout.skill;
     const s = this.state;
@@ -187,6 +184,7 @@ export class RunnerSim {
   }
 
   private grantItem(itemRef: string) {
+    this.itemPickups++;
     this.applyEffects(itemEffects(this.content, itemRef), itemRef);
   }
 

@@ -55,7 +55,8 @@ export function createMobileLobby(content: GameContent, actions: SelectActions, 
   const shortcuts = uiText('nav', '', 'lobby-shortcuts');
   shortcuts.setAttribute('aria-label', '更多玩法');
   for (const [label, icon] of [['活动', eventIcon], ['任务', taskIcon], ['成就', achievementIcon], ['排行榜', rankIcon]]) {
-    const button = uiButton('', 'lobby-shortcut', label === '排行榜' ? actions.onLeaderboard ?? comingSoon : comingSoon);
+    const action = label === '排行榜' ? actions.onLeaderboard : label === '任务' ? actions.onTasks : undefined;
+    const button = uiButton('', 'lobby-shortcut', action ?? comingSoon);
     const image = document.createElement('img');
     image.src = icon!;
     image.alt = '';

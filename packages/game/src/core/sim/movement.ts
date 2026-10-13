@@ -28,6 +28,8 @@ const AIRBORNE_Y = 0.2;
 export class Movement {
   /** 起身后的滑铲冷却（禁止连续下滑） */
   slideCd = 0;
+  /** 单调统计，独立于技能充能的 slideCount。 */
+  totalSlides = 0;
   /** 输入缓冲：落地后仍接受该步数内的跳/铲指令 */
   pendingJump = 0;
   pendingSlide = 0;
@@ -67,6 +69,7 @@ export class Movement {
     s.slideT = this.P.slideS + fx.slideAddS;   // 被动「贴地飞行」加长
     s.sliding = true;
     s.slideCount++; // 下滑积攒型技能的计数：每次真正进入滑行算一次
+    this.totalSlides++;
   }
 
   /** 结束滑行并进入冷却（飞行进入地面、起身跳时都会调用） */

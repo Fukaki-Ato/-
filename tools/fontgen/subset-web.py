@@ -9,9 +9,15 @@ parser.add_argument("--font", required=True, help="Redistributable Noto Sans SC 
 args = parser.parse_args()
 root = Path(__file__).resolve().parents[2]
 characters = set((root / "assets/fonts/charset.txt").read_text(encoding="utf-8"))
-for directory in ("apps/web/src", "packages/game/src", "config"):
+source_types = {
+    "apps/web/src": (".ts", ".css", ".json"),
+    "packages/game/src": (".ts", ".css", ".json"),
+    "config": (".ts", ".css", ".json"),
+    "apps/server/src": (".mjs",),
+}
+for directory, suffixes in source_types.items():
     for path in (root / directory).rglob("*"):
-        if path.suffix in (".ts", ".css", ".json"):
+        if path.suffix in suffixes:
             characters.update(path.read_text(encoding="utf-8"))
 characters.update("‹›→⚙♥♡◇✦≋⚑ϟ✓")
 font = TTFont(args.font)

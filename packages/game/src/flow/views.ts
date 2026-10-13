@@ -50,6 +50,7 @@ export interface SelectActions {
   onBack(): void;
   onCharacterSelect?(): void;
   onShop?(): void;
+  onTasks?(): void;
   /** 打开设置页（右上「设置」徽标）；缺省＝该入口只有按压反馈 */
   onSettings?(): void;
   onLeaderboard?(): void;
