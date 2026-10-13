@@ -8,4 +8,4 @@
 .rank-who { min-width: 0; overflow-wrap: anywhere; }
 .rank-stats { display: grid; gap: 5px; flex-shrink: 0; text-align: right; }
 .rank-stats span { color: #685843; font-size: 14px; }
-.rank-refresh { align-self: stretch; min-height: 48px; }
+.rank-expand, .rank-refresh { align-self: stretch; min-height: 48px; }
