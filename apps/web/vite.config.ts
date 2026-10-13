@@ -61,6 +61,7 @@ export default defineConfig({
     port: 8767,
     strictPort: true,
     proxy: {
+      '/api/missions': { target: process.env.TR_MISSION_API ?? 'http://127.0.0.1:8768', changeOrigin: false },
       '/api/': { target: 'http://127.0.0.1:8788', changeOrigin: false,
         rewrite: path => `/thunder-run${path}`, cookiePathRewrite: { '/thunder-run/api': '/api' } },
       '/thunder-run/api/': { target: 'http://127.0.0.1:8788', changeOrigin: false },

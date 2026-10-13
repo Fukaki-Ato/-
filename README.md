@@ -7,6 +7,7 @@
 ```text
 apps/
   web/          Web entry and browser platform adapter
+  server/       Daily/weekly mission API (Node.js + SQLite)
   wx/           WX entry and WX platform adapter
 packages/
   framework/    Platform contracts and custom UI runtime
@@ -34,6 +35,7 @@ Useful commands:
 - `npm run build`: compile all project references.
 - `npm test`: run deterministic simulation, UI, replay, and platform tests.
 - `npm run build:web`: create the Web bundle in `apps/web/dist`.
+- `npm run dev:server`: build shared code and start the mission API on port 8768 (separate terminal from Web).
 - `TR_WEB_BASE=/thunder-run/ npm run build:web`: create a bundle with URLs rooted at the isolated test-site path.
 - `npm run build:wx -- --minify`: create a WX Developer Tools package in `apps/wx/dist`.
 
@@ -54,3 +56,5 @@ See [docs/architecture.md](docs/architecture.md), [CONTRIBUTING.md](CONTRIBUTING
 第一次吃金币前距离全服排行榜的玩家规则、金币生成调整与验证方式见 [docs/coinless-leaderboard.md](docs/coinless-leaderboard.md)；后端与部署见 [docs/leaderboard-server.md](docs/leaderboard-server.md)。
 
 正式站的调试入口关闭、服务器页面凭据与排名票据隔离见 [docs/debug-ranking-guard.md](docs/debug-ranking-guard.md)。
+
+每日/每周任务支持进度、奖励领取和服务端持久化。玩法与 Web 接入见 [docs/missions.md](docs/missions.md)，独立任务 API 的启动与部署见 [docs/missions-backend.md](docs/missions-backend.md)。

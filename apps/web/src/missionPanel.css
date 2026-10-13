@@ -1,0 +1,22 @@
+.mobile-missions { background: radial-gradient(ellipse at top right, #d4eee6, transparent 60%), #eff4ec; }
+.mission-tabs { display: flex; gap: 8px; padding: 5px; border-radius: 18px; background: #dbe9e2; }
+.mission-tab { flex: 1; min-height: 46px; border: 0; border-radius: 13px; background: transparent; color: var(--ui-muted); font-weight: 800 !important; }
+.mission-tab[aria-selected="true"] { color: var(--ui-ink); background: var(--ui-paper); box-shadow: 0 3px 9px #174f6510; }
+.mission-reset { margin: 16px 0 8px; font-size: 12px; }
+.mission-status { min-height: 34px; margin: 8px 0 16px; font-size: 12px; line-height: 1.6; color: var(--ui-teal); }
+.mission-list { display: grid; gap: 14px; }
+.mission-card { padding: 20px; border-radius: 22px; }
+.mission-card-heading, .mission-card-bottom { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.mission-card h2 { margin: 0; font-size: 17px; line-height: 1.5; }
+.mission-state { flex-shrink: 0; font-size: 11px; color: var(--ui-teal); }
+.mission-card progress { display: block; width: 100%; height: 8px; margin-top: 18px; appearance: none; border: 0; border-radius: 10px; overflow: hidden; background: #e1ece7; }
+.mission-card progress::-webkit-progress-bar { background: #e1ece7; border-radius: 10px; }
+.mission-card progress::-webkit-progress-value { background: #188b88; border-radius: 10px; }
+.mission-card progress::-moz-progress-bar { background: #188b88; border-radius: 10px; }
+.mission-count { margin: 6px 0 16px; text-align: right; color: var(--ui-muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+.mission-reward { font-size: 13px; font-weight: 700; }
+.mission-claim { flex-shrink: 0; min-height: 42px; padding: 8px 14px; font-size: 13px !important; border-radius: 13px; }
+.mission-refresh { width: 100%; margin: 22px 0 16px; }
+.mission-wallet { padding: 20px; border-radius: 20px; }
+.mission-wallet p { margin-bottom: 0; overflow-wrap: anywhere; }
+@media (max-width: 350px) { .mission-card { padding: 16px; } .mission-card h2 { font-size: 15px; } }

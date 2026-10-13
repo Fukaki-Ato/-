@@ -103,6 +103,7 @@ function bootstrapMocks() {
     './shopOverlay.js': ['createShopOverlay'],
     './runAssets.js': ['injectObstaclePosters', 'injectPickupTiles'],
     './startupConfig.js': ['preloadStartupConfig'],
+    './missionIntegration.js': ['createMissionIntegration'],
     './mobileLobby.js': ['createMobileLobby'],
     './mobilePanels.js': ['createMobileSettings', 'createMobileResult'],
     './mobileHud.js': ['createMobileHud'],
@@ -146,6 +147,11 @@ test('production bootstrap strips URL QA extras and does not construct the test 
       };
     },
     preloadStartupConfig(fetchJson) { return { fetchJson, clear() {} }; },
+    createMissionIntegration(qa) {
+      this.missionQa = qa;
+      this.trackMissions = () => () => undefined;
+      return { lobbyRenderer: this.createMobileLobby, trackRun: this.trackMissions };
+    },
     async createUiShell(adapter) {
       this.adapter = adapter;
       return { host: { start() {} }, badges: {}, backdrop: {}, setBackgroundVisible() {}, fonts: {} };
@@ -183,6 +189,8 @@ test('production bootstrap strips URL QA extras and does not construct the test 
     assert.deepEqual(capture.flowOptions.debug, false);
     assert.deepEqual(capture.flowOptions.test, false);
     assert.equal(Boolean(capture.flowOptions.leaderboard), true, 'QA query keys do not disable production leaderboard wiring');
+    assert.equal(capture.missionQa, false);
+    assert.equal(capture.flowOptions.trackRun, capture.trackMissions, 'normal mission tracking survives the merge');
     assert.equal(capture.panelCreations, 0);
     assert.equal(capture.storageWrites.length, 0, 'production ignores the QA character preset');
     assert.equal(Object.hasOwn(globalThis, '__trTestPanel'), false);

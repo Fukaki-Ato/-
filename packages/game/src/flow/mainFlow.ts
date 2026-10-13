@@ -15,7 +15,7 @@ import type { SceneName } from '@tr/game/core/scene/sceneMachine.js';
 import { createAudioDirector } from '@tr/game/core/audio/audioDirector.js';
 import type { AudioDirector } from '@tr/game/core/audio/audioDirector.js';
 import { hashSeed, mulberry32 } from '@tr/game/core/rng.js';
-import { createRunSession } from './runSession.js';
+import { createRunSession, type RunSessionDeps } from './runSession.js';
 import type { LeaderboardService } from './leaderboard.js';
 import { createSettingsScene, currentThemeId, pruneThemeSelection } from './settingsScene.js';
 import { createRunnerScene } from '@tr/game/render/runnerScene.js';
@@ -48,6 +48,8 @@ export interface GameFlowDeps {
   /** 测试模式（?debug/?test）：run 局内挂载 __trTest 技能开关 API，供左侧测试面板消费 */
   test?: boolean;
   leaderboard?: LeaderboardService;
+  /** 宿主可录制任务回放，结束函数由 RunSession 在死亡或退出时调用。 */
+  trackRun?: RunSessionDeps['trackRun'];
 }
 
 export interface GameFlow {
@@ -66,12 +68,7 @@ export function createGameFlow(deps: GameFlowDeps): GameFlow {
   /** 音频导演：配置加载成功后创建；game.params.audio 缺省时为空操作（不阻塞玩法） */
   let audio: AudioDirector | null = null;
 
-  /**
-   * 历史最佳分（v2 修正）：
-   * - 修正键存在 → 解析；脏值（非有限数/非正数）按 0，不把 NaN 带进分数比较；
-   * - 修正键缺失且旧笔误键存在 → 一次性迁移：旧值校验通过才写入修正键，随后删旧键；
-   * - 两边都没有 / 旧值脏 → 0。写入路径见 result.onEnter（严格 > 才落盘，平纪录不覆盖好值）。
-   */
+  /** 历史最佳分：兼容旧键；脏值按 0，result 仅在破纪录时落盘。 */
   const bestScore = (): number => {
     const raw = adapter.storage.get(BEST_KEY);
     if (raw !== null) {
@@ -224,6 +221,7 @@ export function createGameFlow(deps: GameFlowDeps): GameFlow {
         scene = createRunSession({
           adapter, views, content, charId, service: deps.leaderboard,
           createScene: deps.createScene, debug: deps.debug, test: deps.test,
+          trackRun: deps.trackRun,
           themeId: currentThemeId(adapter.storage, content) ?? undefined,
           onSeed: seed => { lastSeed = seed; }, onEnd: summary => machine.go('result', summary),
           onDeath: () => audio?.onDeath(),

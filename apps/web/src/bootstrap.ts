@@ -8,7 +8,7 @@ import { createCharacterSelectOverlay } from './characterSelectOverlay.js';
 import { createShopOverlay } from './shopOverlay.js';
 import { injectObstaclePosters, injectPickupTiles } from './runAssets.js';
 import { preloadStartupConfig } from './startupConfig.js';
-import { createMobileLobby } from './mobileLobby.js';
+import { createMissionIntegration } from './missionIntegration.js';
 import { createMobileSettings, createMobileResult } from './mobilePanels.js';
 import { createMobileHud } from './mobileHud.js';
 import { createMobileLeaderboard } from './mobileLeaderboard.js';
@@ -31,13 +31,14 @@ async function main(): Promise<void> {
   const charParam = DEBUG_TOOLS_ENABLED ? new URLSearchParams(location.search).get('char') : null;
   if (charParam) adapter.storage.set('thunderrun:character', charParam);
   const shell = await createUiShell(adapter, { menuArt: false });
+  const missions = createMissionIntegration(qa);
   const views = createOverlayViews({
     host: shell.host, badges: shell.badges, backdrop: shell.backdrop,
     onLobbyVisible: v => shell.setBackgroundVisible(v), // 背景视频只在大厅解码
     selectRenderer: (content, actions, currentCharId, entry) =>
       createCharacterSelectOverlay(content, actions, currentCharId, entry, shell.fonts),
     shopRenderer: (content, actions) => createShopOverlay(content, actions, shell.fonts),
-    lobbyRenderer: createMobileLobby,
+    lobbyRenderer: missions.lobbyRenderer,
     settingsRenderer: createMobileSettings,
     resultRenderer: createMobileResult,
     hudRenderer: createMobileHud,
@@ -54,6 +55,7 @@ async function main(): Promise<void> {
     configResolve,
     debug,
     test: testMode,
+    trackRun: missions.trackRun,
     leaderboard: qa ? undefined : createLeaderboardClient(import.meta.env.BASE_URL),
   });
 
