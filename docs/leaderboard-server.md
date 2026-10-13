@@ -1,4 +1,4 @@
-# Ranked coinless leaderboard server
+# Pre-first-coin distance leaderboard server
 
 This Node HTTP service backs the same-origin API at /thunder-run/api. It is deliberately separate from the web workspace: it uses only Node built-ins, including Node 22.23+'s node:sqlite, and loads canonical game data and replay simulation from this repository. Build the game distribution before starting it.
 
@@ -31,13 +31,15 @@ All responses are JSON with Cache-Control: no-store. Errors have the form {"erro
 
   Entries are ordered by distance descending, then score descending, then the earliest successfully submitted best. Each identity has at most one stored best; an equal distance/score replay does not replace the earlier record. personal has the same entry shape and includes its rank even when below the top 50.
 
-- POST /thunder-run/api/runs, body {"charId":"char_volt","rulesId":"coinless-v1-..."}, validates the current shared rules ID and a live, unlocked playable character. It returns {"runId":"...","seed":123,"rulesId":"..."}. The opaque run ticket is bound to the anonymous cookie identity and expires after 30 minutes plus a 60-second upload grace period. Pending tickets are memory-only and are invalidated by a server restart.
+- POST /thunder-run/api/runs, body {"charId":"char_volt","rulesId":"first-coin-v1-..."}, validates the current shared rules ID and a live, unlocked playable character. It returns {"runId":"...","seed":123,"rulesId":"..."}. The opaque run ticket is bound to the anonymous cookie identity and expires after 30 minutes plus a 60-second upload grace period. Pending tickets are memory-only and are invalidated by a server restart.
 
 - POST /thunder-run/api/runs/submit, body {"runId":"...","frames":123,"inputs":[{"frame":0,"action":"jump"}]}, submits the exact ordered action stream. It returns {"accepted":true|false} for a well-formed, bound, one-use ticket. accepted:false means the deterministic run did not meet ranked rules; malformed requests and unavailable tickets use generic error statuses/codes.
 
-- POST /thunder-run/api/runs/cancel, body {"runId":"..."}, releases a ticket owned by the current cookie. The client uses this for abandoned/coin-collecting runs (no replay upload) and ignores cancellation network failures. Missing tickets are idempotent; another identity cannot cancel a live ticket. At most 60 cancellations/minute/IP. Equal distance/score records are ordered by their successful server submission time, then row ID.
+- POST /thunder-run/api/runs/cancel, body {"runId":"..."}, releases a ticket owned by the current cookie. The client uses this for abandoned or over-limit runs (no replay upload) and ignores cancellation network failures. Runs that collect coins now upload normally on death. Missing tickets are idempotent; another identity cannot cancel a live ticket. At most 60 cancellations/minute/IP. Equal distance/score records are ordered by their successful server submission time, then row ID.
 
-The service accepts no client score or distance fields. It replays every submitted frame in a bounded worker thread using the challenge seed, character and canonical RunnerSim; acceptance requires exactly the supplied number of alive steps, death on the final step, no earlier death, and RunnerSim.collectedCoins === 0. Distance and score are taken from the server's simulation summary. RunnerSim.replayFrames is checked against the submitted count.
+The service accepts no client score or distance fields. It replays every submitted frame in a bounded worker thread using the challenge seed, character and canonical RunnerSim; acceptance requires exactly the supplied number of alive steps, death on the final step, and no earlier death. RunnerSim.replayFrames is checked against the submitted count. The run may collect any number of coins: the distance and score freeze immediately before the first actual pickup is credited, and later gameplay/rewards cannot inflate that checkpoint. Ordinary pickup, magnets and bulk skill collection all use the same credit hook; currency multipliers do not affect whether the checkpoint stops. If no coin was ever collected, use the unchanged final run summary.
+
+The new rules ID rejects an old `coinless-v1-*` client even with identical config files. Deploy both front end and server from the new revision together. No database migration/reset is required: every stored old whole-run zero-coin result is also a valid pre-first-coin result; identities, bests and ordering remain intact. Previously rejected coin-collecting runs were not stored and cannot be reconstructed retrospectively.
 
 Replay limits follow the shared protocol: at most 108,000 frames and 20,000 inputs; input actions are jump, slide, laneL, laneR, or skill, with nondecreasing in-range frame numbers. Upload cannot arrive more than two seconds faster than the claimed 60 Hz elapsed time. JSON bodies are capped at 2 MiB. The worker pool has fixed concurrency, a bounded waiting queue, end-to-end queue/worker timeout and memory limits; replay CPU work does not run on the HTTP event loop.
 
@@ -49,7 +51,7 @@ SQLite stores player names and one best result per token hash; a conditional SQL
 
 ## Checks
 
-node --test tests/leaderboard-server.test.mjs exercises two independent HTTP cookie clients, shared/personal leaderboard data, persistence across server restart, token hashing, sorting/upsert behavior, exact-Origin and JSON enforcement, bounded bodies and input ordering, single-use/bound tickets, real-content death validation, and rejection of a replay that actually collects coins.
+node --test tests/leaderboard-server.test.mjs exercises two independent HTTP cookie clients, shared/personal leaderboard data, persistence across server restart, token hashing, sorting/upsert behavior, exact-Origin and JSON enforcement, bounded bodies and input ordering, single-use/bound tickets, real-content death validation, coin-collecting runs ranked by their frozen prefix rather than final distance/score, and rejection of forged client metric fields. `tests/first-coin-record.test.mjs` covers ordinary/magnet/bulk pickups, zero-value currency, exact score timing, immutable checkpoints, no-coin fallback and deterministic replay.
 
 ## Production layout and upgrade
 

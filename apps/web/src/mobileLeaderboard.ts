@@ -3,10 +3,10 @@ import { mountMobilePage, pageHeader, pageLifecycle, uiButton, uiText } from './
 import './mobileLeaderboard.css';
 
 export function createMobileLeaderboard(service: LeaderboardService, actions: { onBack(): void }): () => void {
-  const { root, frame } = mountMobilePage('零金币全服排行榜', 'mobile-leaderboard');
-  frame.append(pageHeader('零金币排行榜', 'GLOBAL / 全服挑战', actions.onBack));
+  const { root, frame } = mountMobilePage('第一次吃金币前距离全服排行榜', 'mobile-leaderboard');
+  frame.append(pageHeader('金币前距离榜', 'GLOBAL / 全服挑战', actions.onBack));
   const rules = uiText('section', '', 'rank-rules ui-panel');
-  rules.append(uiText('h2', '不吃金币，能跑多远？'), uiText('p', '整局零金币且跑至结算才可入榜，技能吸取也算吃金币。按距离排名，同距离按分数；每位游客保留最佳纪录。'));
+  rules.append(uiText('h2', '第一次吃金币前，能跑多远？'), uiText('p', '记录开局到第一次吃金币前的距离和分数，后来吃金币不影响纪录，磁铁和技能吸取也算吃金币。没吃金币则取整局成绩。跑至结算后上传，按距离排名，同距离按分数；每位游客保留最佳纪录。'));
   const identity = uiText('p', '', 'ui-muted');
   const status = uiText('p', '正在加载全服成绩…', 'rank-status');
   status.setAttribute('role', 'status');
@@ -38,7 +38,7 @@ export function createMobileLeaderboard(service: LeaderboardService, actions: { 
       personal.replaceChildren(uiText('h2', '我的最佳纪录'));
       if (data.personal) {
         personal.append(uiText('p', `第 ${data.personal.rank} 名 · ${data.personal.distance.toFixed(2)} m · ${data.personal.score.toLocaleString()} 分`));
-      } else personal.append(uiText('p', '暂无零金币纪录，开始一局挑战吧！', 'ui-muted'));
+      } else personal.append(uiText('p', '暂无金币前距离纪录，开始一局挑战吧！', 'ui-muted'));
       list.replaceChildren(...data.entries.map(row));
       status.textContent = data.entries.length ? '全服前 50 名 · 服务端校验成绩' : '全服榜暂时为空，等你来创下第一条纪录';
     } catch {

@@ -21,7 +21,9 @@ test('排行榜展示全服/个人纪录，失败可刷新；晚到响应不更�
   byClass(body, 'rank-refresh')[0].click(); await tick();
   assert.match(body.textContent, /42.25 m/); assert.match(body.textContent, /420 分/);
   assert.equal(byClass(body, 'rank-row')[0].children[0].children[0].textContent, '1. <b>游客</b>');
-  assert.match(body.textContent, /暂无零金币纪录/);
+  assert.match(body.textContent, /暂无金币前距离纪录/);
+  assert.match(body.textContent, /第一次吃金币前/);
+  assert.match(body.textContent, /后来吃金币不影响纪录/);
   const root = byClass(body, 'mobile-leaderboard')[0];
   byClass(body, 'rank-refresh')[0].click(); dispose();
   const text = root.textContent; resolve(data); await tick();
@@ -38,10 +40,13 @@ test('空榜、个人排名、返回按钮与 Escape', async t => {
 
 test('结果页实时更新上传状态且卸载取消订阅', t => {
   const { body } = fakeDom(t); let listener, removed = false;
-  const summary = { score: 42, distance: 4.2, coins: 0, hits: 1, nearMiss: 0, charId: 'char_volt',
+  const summary = { score: 420, distance: 42, coins: 20, hits: 1, nearMiss: 0, charId: 'char_volt',
+    beforeFirstCoin: { distance: 4.2, score: 40, stoppedByCoin: true },
     ranking: { message: '校验中', subscribe: cb => { listener = cb; return () => { removed = true; }; } } };
   const dispose = createMobileResult(summary, 0, { onRetry() {}, onSelect() {}, onLeaderboard() {} });
-  listener('已入全服榜'); assert.match(body.textContent, /已入全服榜/); assert.match(body.textContent, /查看零金币榜/);
+  listener('已入全服榜'); assert.match(body.textContent, /已入全服榜/); assert.match(body.textContent, /查看金币前距离榜/);
+  assert.match(body.textContent, /第一次吃金币前  4.20 m · 40 分/);
+  assert.match(body.textContent, /42 m/);
   dispose(); assert.equal(removed, true);
 });
 

@@ -109,7 +109,7 @@ function simulateToDeath(content, ticket, inputs = []) {
     sim.step();
     frames++;
   }
-  return { frames, inputs, collectedCoins: sim.collectedCoins, summary: sim.summary() };
+  return { frames, inputs, collectedCoins: sim.collectedCoins, summary: sim.summary(), record: sim.firstCoinRecord.snapshot(sim.summary()) };
 }
 
 async function waitUntilUploadable(startedAt, frames) {
@@ -249,6 +249,8 @@ test('POSTs require exact Origin and JSON, rules/inputs/body are bounded, and li
   const wrongRules = await begin(client, 'coinless-v1-wrong');
   assert.equal(wrongRules.response.status, 409);
   assert.equal(wrongRules.data.error.code, 'rules_mismatch');
+  const oldMetric = await begin(client, service.expectedRulesId.replace('first-coin-v1-', 'coinless-v1-'));
+  assert.equal(oldMetric.response.status, 409, 'an old whole-run client is rejected with identical configuration');
   const invalidCharacter = await begin(client, service.expectedRulesId, 'skin_volt_default');
   assert.equal(invalidCharacter.response.status, 400);
   assert.equal(invalidCharacter.data.error.code, 'invalid_character');
@@ -355,7 +357,7 @@ test('real game content rejects a replay that is still alive at its claimed last
   assert.deepEqual(result.data, { accepted: false });
 });
 
-test('actual collected coins reject a replay even when no client score summary is supplied', async t => {
+test('collecting coins accepts only the first-coin prefix, never the later full-run distance or score', async t => {
   const content = rankedFixture({ coinRun: true });
   const { service, base } = await openService(t, { content });
   const client = new Client(base, '203.0.113.41');
@@ -365,14 +367,32 @@ test('actual collected coins reject a replay even when no client score summary i
   const replay = simulateToDeath(content, ticket.data);
   assert.equal(replay.summary.alive, false);
   assert.ok(replay.collectedCoins > 0, 'fixture must collect at least one actual coin');
+  assert.equal(replay.record.stoppedByCoin, true);
+  assert.ok(replay.record.distance < replay.summary.distance);
+  assert.ok(replay.record.score < replay.summary.score);
   await waitUntilUploadable(startedAt, replay.frames);
   const result = await client.request(API_PATH + '/runs/submit', {
     method: 'POST', body: { runId: ticket.data.runId, frames: replay.frames, inputs: replay.inputs },
   });
   assert.equal(result.response.status, 200);
-  assert.deepEqual(result.data, { accepted: false });
+  assert.deepEqual(result.data, { accepted: true });
   const board = await client.request(API_PATH + '/leaderboard');
-  assert.deepEqual(board.data.entries, []);
+  assert.equal(board.data.entries.length, 1);
+  assert.equal(board.data.personal.distance, replay.record.distance);
+  assert.equal(board.data.personal.score, replay.record.score);
+  assert.notEqual(board.data.personal.distance, replay.summary.distance);
+});
+
+test('client-provided prefix distance or score cannot override authoritative replay', async t => {
+  const { service, base } = await openService(t);
+  const client = new Client(base, '203.0.113.42');
+  await client.request(API_PATH + '/leaderboard');
+  const ticket = await begin(client, service.expectedRulesId);
+  const result = await client.request(API_PATH + '/runs/submit', { method: 'POST', body: {
+    runId: ticket.data.runId, frames: 1, inputs: [], distance: 999999, score: 999999,
+  } });
+  assert.equal(result.response.status, 400);
+  assert.deepEqual((await client.request(API_PATH + '/leaderboard')).data.entries, []);
 });
 
 test('replay worker queue is bounded and CPU replay leaves the HTTP event loop responsive', async t => {

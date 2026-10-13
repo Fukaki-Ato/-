@@ -16,7 +16,6 @@ function replay({ seed, charId, frames, inputs }) {
     sim.step();
 
     // Acceptance is tied to the actual simulation, including its final death step.
-    if (sim.collectedCoins !== 0) return { accepted: false };
     if (frame < frames - 1 && !sim.state.alive) return { accepted: false };
     if (frame === frames - 1 && sim.state.alive) return { accepted: false };
   }
@@ -25,11 +24,12 @@ function replay({ seed, charId, frames, inputs }) {
   if (sim.state.alive || sim.replayFrames !== frames || summary.alive !== false) {
     return { accepted: false };
   }
-  if (!Number.isFinite(summary.distance) || summary.distance < 0
-    || !Number.isSafeInteger(summary.score) || summary.score < 0) {
+  const record = sim.firstCoinRecord.snapshot(summary);
+  if (!Number.isFinite(record.distance) || record.distance < 0
+    || !Number.isSafeInteger(record.score) || record.score < 0) {
     return { accepted: false };
   }
-  return { accepted: true, distance: summary.distance, score: summary.score };
+  return { accepted: true, distance: record.distance, score: record.score };
 }
 
 parentPort.on('message', message => {

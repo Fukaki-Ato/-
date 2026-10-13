@@ -10,9 +10,12 @@ import type { RunnerSim } from '@tr/game/core/sim/runnerSim.js';
 import type { RunCallbacks } from '@tr/game/render/runnerScene.js';
 import type { EntryMethod } from './session.js';
 import type { LeaderboardService, RankingFeedback } from './leaderboard.js';
+import type { FirstCoinStats } from '../core/sim/firstCoinRecord.js';
 
 /** 结算摘要（与 core RunnerSim.summary() 同源）；charName 由 mainFlow 查 characters 配置补入，供结果页显示 */
-export type RunSummary = ReturnType<RunnerSim['summary']> & { charName?: string; ranking?: RankingFeedback };
+export type RunSummary = ReturnType<RunnerSim['summary']> & {
+  charName?: string; ranking?: RankingFeedback; beforeFirstCoin?: FirstCoinStats;
+};
 /** HUD 快照（与 render RunCallbacks.onHud 参数同源，避免双份定义漂移） */
 export type HudData = Parameters<RunCallbacks['onHud']>[0];
 
