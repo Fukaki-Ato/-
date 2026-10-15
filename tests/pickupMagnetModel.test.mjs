@@ -1,12 +1,13 @@
 /**
- * 磁铁道具 3D 化回归（item_magnet → assets/pickups/magnet.glb）。
+ * 道具 3D 化回归（item_magnet → assets/pickups/magnet.glb；item_jetpack → assets/pickups/jetpack.glb）。
  *
- * 背景：items.json 里 10 个道具都预留了 model.prefab，但仓库里只有磁铁一个文件，且渲染层
+ * 背景：items.json 里 10 个道具都预留了 model.prefab，但仓库里起初只有磁铁一个文件，且渲染层
  * 从未消费过 model.prefab/spin——道具视觉一直是 entityLayers 的贴图箱。本批次：
  *   1. pickupModels.ts：照 animAvatar 模式按 itemRef 异步加载 GLB，任何失败返回 null
- *      （8 个预留路径里 7 个没文件，绝不能集体报错或空白——回退铁律）
+ *      （预留路径里没文件的道具绝不能集体报错或空白——回退铁律）
  *   2. entityLayers.createPickupLayer：近距换模（进 35m / 出 40m 滞回）+ spin 消费，
  *      箱槽与模型槽分离，每帧零分配；捞取判定/数值/音效零改动
+ *   3. jetpack.glb 落盘后 item_jetpack 从「文件缺失回退」列表移到正向用例
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -66,10 +67,38 @@ test('加载器：磁铁 GLB 加载成功（尺寸/原点/双网格/自转口径
   assert.equal(loader.model('item_magnet'), m, '重复取应返回同一实例（不重复加载）');
 });
 
+test('加载器：飞行包 GLB 加载成功（尺寸/原点/5 材质/自转口径）', async () => {
+  const loader = createPickupModelLoader(content, realAdapter);
+  assert.equal(loader.hasPrefab('item_jetpack'), true);
+  assert.equal(loader.spins('item_jetpack'), true, 'items.json model.spin=true 应被消费');
+  assert.equal(loader.model('item_jetpack'), null, '首帧同步未就绪（异步加载不阻塞开局）');
+  await flush();
+  const m = loader.model('item_jetpack');
+  assert.ok(m, 'flush 后应加载完成');
+  const box = new THREE.Box3().setFromObject(m);
+  const size = box.getSize(new THREE.Vector3());
+  assert.ok(Math.abs(size.x - 0.70) < 0.01 && Math.abs(size.y - 0.1592) < 0.01 && Math.abs(size.z - 0.6183) < 0.01,
+    `尺寸应 0.70×0.1592×0.6183，实测 ${size.toArray().map(v => v.toFixed(3)).join('×')}`);
+  assert.ok(box.getCenter(new THREE.Vector3()).length() < 0.01, '几何中心应在原点（与道具箱同锚点）');
+  let meshes = 0; const mats = new Set();
+  m.traverse(o => {
+    if (!o.isMesh) return;
+    meshes++;
+    (Array.isArray(o.material) ? o.material : [o.material]).forEach(mat => {
+      mats.add(mat.name);
+      assert.ok(mat.emissive.getHexString() !== '000000', '加载后应补了 emissive');
+      assert.ok(Math.abs(mat.emissiveIntensity - 0.18) < 1e-6, 'emissive 强度 0.18');
+    });
+  });
+  assert.equal(meshes, 5, 'ship_hull/glass/wing/greeble/engine 五个 primitive');
+  assert.deepEqual([...mats].sort(), ['ship_engine', 'ship_glass', 'ship_greeble', 'ship_hull', 'ship_wing']);
+  assert.equal(loader.model('item_jetpack'), m, '重复取应返回同一实例（不重复加载）');
+});
+
 test('加载器回退铁律：预留路径文件缺失/垃圾字节/无适配器/未配置道具全部返回 null', async () => {
   const ok = createPickupModelLoader(content, realAdapter);
   await flush();
-  for (const id of ['item_shield', 'item_jetpack', 'item_coin', 'item_key', 'item_boots', 'item_helmet', 'item_board', 'item_multiplier']) {
+  for (const id of ['item_shield', 'item_coin', 'item_key', 'item_boots', 'item_helmet', 'item_board', 'item_multiplier']) {
     assert.equal(ok.hasPrefab(id), true, `${id} 配了 prefab（预留路径）`);
     assert.equal(ok.model(id), null, `${id} 文件不存在 → null（保持贴图箱）`);
   }
