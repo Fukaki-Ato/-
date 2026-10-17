@@ -65,9 +65,10 @@ Coverage as of 2026-10-05 (issue #17, first batch):
   从本地素材包（`D:\音频素材`）提供并确认可随本 public 仓再分发；处理仅限转码/裁边/响度对齐，
   未做二次创作。源文件名：`奶娃的音效/奶娃的登场动画/video_261011_220428.mp4`（登场音效即其音轨）、
   `阿牛的音效/阿牛技能释放音效/阿牛技能音效_拼接v4.mp3`。
-- **2026-10-12** — `bgm/run_rain.mp3`（「雨夜便利店」主题 BGM）换成用户补给的循环版母带
-  `游戏背景音乐/雨声空灵版_循环.mp3`（8.33 秒，替换同目录早先那版只截了前 11 秒的
-  `雨声空灵版_前11秒.wav`）；转码 + 响度对齐到 `bgm/run.mp3` 的 -16.5 LUFS，保持立体声
-  （雨声是去相关宽声场，下混单声道会掉约 7 LU）。权利同上，本人确认可再分发。
+- **2026-10-12 / 2026-10-17** — `bgm/run_rain.mp3`（「雨夜便利店」主题 BGM）使用用户补给的
+  循环版母带 `游戏背景音乐/雨声空灵版_循环.mp3`（原长 8.33 秒，替换同目录早先只截前 11 秒的
+  `雨声空灵版_前11秒.wav`）。10-17 为消除循环接缝，把尾/首各 150ms 做等功率交叉淡化后重编；
+  当前时长约 8.18 秒（解码 8.15 秒）、44.1 kHz / 立体声 / 128 kbps、-16.5 LUFS / -2.0 dBFS
+  true peak。路径不变，权利同上，本人确认可再分发。
 - Earlier batches (run BGM, death BGM, global death pool, start cue, `char_volt` cues): rights
   asserted in their pull-request descriptions, per the rule above.
