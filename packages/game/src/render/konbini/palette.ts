@@ -20,9 +20,27 @@ export const C = {
   shelf: '#dfe6ee', prod1: '#e8654f', prod2: '#f2b134', prod3: '#5aa9e6', prod4: '#7bc96f',
   prod5: '#c86fd0', fridge: '#cfe3f0', boxBlue: '#3f7fbf', oden: '#ffb45e',
 
-  /** 花园与远景 */
+  /** 花园与远景：高层居民楼三套型各一档深蓝灰（比 10-12 那版再往蓝推一点），窗光统一压暗 */
   green: '#4f7a52', greenDark: '#3a5c40', leaf: '#63a05f', flower: '#e87f9b', flower2: '#f2c14e',
-  farA: '#2b3348', farB: '#232a3c', farWin: '#ffd9a0', farNeon: '#6fd0ff',
+  farA: '#3a4859', farB: '#33404f', farC: '#425163', farCap: '#232b36', farLit: '#9c8f76', farCool: '#63737f', farDark: '#252d38',
+
+  /** 临街商铺排：深蓝灰低饱和墙体 + 深灰平顶 + 淡蓝/暖白发光字 + 柔和暖黄橱窗
+   *  墙比远景楼亮一档（楼在 26m 外要压住地平线，铺面在 45~65m 要读得出体块） */
+  shopA: '#556375', shopB: '#4e5c6f', shopC: '#5d6b7d', shopRoof: '#333a45', shopTrim: '#282f3a',
+  shopSill: '#66737f', shopPipe: '#68757f',
+  walkBlue: '#5b6577', walkBlueSeam: '#4a5364', curbStone: '#727d8d', shoulder: '#475163',
+  /** 小道与「湿地上那摊光」：小道比人行道亮一档（同族蓝灰，读得出是另一种铺法）；
+   *  光摊走 glow 桶（自发光、不乘曝光），所以这里写的就是夜里最终看到的颜色，必须比路面亮才像灯。 */
+  path: '#6d7787', pathSeam: '#556072', wetWarm: '#6f6046', wetCool: '#4f6076', wetNeon: '#46586e',
+  winWarm: '#f0c285', winSoft: '#d4a76c', winDark: '#2a3340', adGlow: '#cfe3ef',
+  signFace: '#2f4a63', signBlue: '#8fd8fb', signWarm: '#fff0d2',
+  canopy: '#bfe2f7', lampGrey: '#6a7482', lampDark: '#454d59', warmPool: '#ffd9a8',
+  shelterMetal: '#9aa4b2', binDark: '#262d36', bollA: '#e8873c', bollB: '#f2efe6',
+  /** 商铺排后方的餐厅与广场：浅米 + 暖木 + 四坡顶；广场浅灰/浅棕拼花 + 石材 + 水面
+   *  （body 桶会统一乘夜景曝光，这里写的是白天色，夜里自动压成暖米/浅灰） */
+  restWall: '#d8cbb2', restWall2: '#cbbda2', restWood: '#a8794f', restRoof: '#6d5744',
+  plazaA: '#aab1bc', plazaB: '#bda887', plazaSeam: '#8f959f', stone: '#9aa2ad',
+  water: '#4e8fa8', jet: '#bfe6f2',
 } as const;
 
 /** 常用姿态：躺平（把圆柱变成轮子/横管）、竖直转向 */

@@ -70,9 +70,10 @@ export function buildStoreShell(d: Diorama): void {
       d.box('body', 0.07, 0.16, BD + 0.2, B.x1 + 1.06, 2.7, CZ, C.frame);
     }
   }
-  // 招牌带压在雨棚上方：暗框 + 底光面（闪烁由动画层叠加）+ 三色圆（店招记忆点）
+  // 招牌带压在雨棚上方：暗框 + 常亮底光面 + 三色圆（店招记忆点）
+  // 10-13：原来这条带子由动画层每 0.2s 抖一次亮度（用户：饭店右侧那盏灯在闪，不要闪）⇒ 改成常亮，动画层已删。
   d.box('body', BW + 0.1, 0.68, 0.2, CX, 3.3, B.z1 + 0.02, C.frame);
-  d.quad('glow', BW - 0.15, 0.5, CX, 3.3, B.z1 + 0.14, '#6a5c44');            // 底光压暗，闪烁由动画层加上去
+  d.quad('glow', BW - 0.15, 0.5, CX, 3.3, B.z1 + 0.14, '#fff2cf');
   for (let i = 0; i < 3; i++) {
     d.cyl('glow', 0.17, 0.17, 0.06, 12, -1.0 + i * 0.62, 3.3, B.z1 + 0.16, [C.neonA, C.neonB, C.neonC][i], { rx: R90 });
   }
@@ -101,7 +102,7 @@ export function buildStoreShell(d: Diorama): void {
   // ---------- 后巷：邻居楼 + 巷子地面 + 壁灯 + 纸箱 ----------
   d.box('body', 6.2, 4.3, 1.1, -1.9, 2.15, -4.55, C.farB);
   d.slab('body', 6.2, 0.9, -1.9, 4.34, -4.55, C.roof);
-  for (let i = 0; i < 4; i++) d.quad('glow', 0.6, 0.55, -3.9 + i * 1.5, 2.2 + (i % 2) * 1.2, -3.99, i % 3 ? C.farWin : '#8fd4ff');
+  for (let i = 0; i < 4; i++) d.quad('glow', 0.6, 0.55, -3.9 + i * 1.5, 2.2 + (i % 2) * 1.2, -3.99, i % 3 ? C.farLit : C.farCool);
   d.slab('body', 2.6, 1.5, B.x0 + 1.3, 0.02, -3.5, C.roadDark);                  // 巷子里的地面
   d.box('body', 0.55, 0.5, 0.55, B.x0 + 0.7, 0.25, -3.6, C.wood);                // 纸箱两只
   d.box('body', 0.45, 0.4, 0.45, B.x0 + 1.4, 0.2, -3.3, C.wood);

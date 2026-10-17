@@ -54,8 +54,11 @@ test('konbini 侧景：全部实例化、无散 mesh，画面上万三角也只�
   const props = createSceneryProps(scene, 'konbini');
   const s = survey(scene);
   assert.equal(s.loose, 0, `侧景不许有未实例化的散 mesh，实得 ${s.loose} 个`);
-  assert.ok(s.inst >= 10 && s.inst <= 24, `实例组数应在 10~24（3 桶店 + 2 花园 + 2 远景 + 2 路灯 + 光池/雨/门/涟漪/雨痕/招牌/信号/溅射 各一），实得 ${s.inst}`);
-  assert.ok(s.verts < 60_000, `合并后顶点总量应远小于逐个建 mesh 的方案，实得 ${s.verts}`);
+  assert.ok(s.inst >= 10 && s.inst <= 44, `实例组数应在 10~44（3 桶店 + 2 花园 + 6 远景三套型 + 2 路灯 + 3 桶商铺排 + 2 桶空地路面 + 3 桶餐厅 + 2 桶广场 + 光池/光晕/雨/门/涟漪/雨痕/招牌/信号/棚沿水滴/灯下雨丝/溅射 各一），实得 ${s.inst}`);
+  // 60k 是「便利店 + 花园 + 远景」那三套的预算；10-13 先加了商铺排/小巷路面/三套型远景（→58.1k），
+  // 又加了餐厅与城市广场（+5.2k；植被已从 plants 的多面叶团换成扁椭圆，一棵树 1.1k → 120 顶点）。
+  // 再往上加东西请先想合并与换基元，别顺手抬这条线。
+  assert.ok(s.verts < 66_000, `合并后顶点总量应远小于逐个建 mesh 的方案，实得 ${s.verts}`);
   assert.ok(s.tris > 20_000, `画面里确实铺开了上万个三角（说明模型有内容），实得 ${s.tris}`);
   disposeScene(scene, props);
 });
@@ -76,6 +79,31 @@ test('konbini 侧景：update 逐帧推着道具后退，绕回后仍在 LOOP �
       const z = zOf(o, i);
       assert.ok(z > -260 && z < 60, `绕回后第 ${i} 个实例的 z 应在周期内，实得 ${z.toFixed(1)}`);
     }
+  }
+  disposeScene(scene, props);
+});
+
+test('商铺排与餐厅：整组四个角都不许压到跑道（|x|<4.75 是硬规则）', () => {
+  const scene = new THREE.Scene();
+  const props = createSceneryProps(scene, 'konbini');
+  const m = new THREE.Matrix4(), v = new THREE.Vector3();
+  // 靠 konbiniProps 打的 name 认组（广场长轴也有 39m，尺寸不再是唯一指纹），取长轴最大的那桶＝含底座的 body
+  for (const name of ['shopRow', 'restaurant']) {
+    const named = scene.children.filter(o => o.isInstancedMesh && o.name === name);
+    assert.equal(named.length, 3, `${name} 应有 body/glow/glass 三组，实得 ${named.length}`);
+    named.forEach(o => o.geometry.computeBoundingBox());
+    const g = named.reduce((a, b) => (a.geometry.boundingBox.max.z - a.geometry.boundingBox.min.z
+      >= b.geometry.boundingBox.max.z - b.geometry.boundingBox.min.z ? a : b));
+    let near = Infinity;
+    for (let i = 0; i < g.count; i++) {
+      g.getMatrixAt(i, m);
+      const b = g.geometry.boundingBox;
+      for (const cx of [b.min.x, b.max.x]) for (const cz of [b.min.z, b.max.z]) {
+        v.set(cx, 0, cz).applyMatrix4(m);
+        near = Math.min(near, Math.abs(v.x));
+      }
+    }
+    assert.ok(near >= 4.75, `${name} 离跑道中线最近 ${near.toFixed(2)}m，护栏区之内不能摆景观`);
   }
   disposeScene(scene, props);
 });

@@ -205,6 +205,22 @@ export class Diorama {
   }
 }
 
+/**
+ * 局部坐标 → 世界坐标（绕 y 转 ry、按实例缩放、再平移到该实例）。
+ * 动件（门扇、水滴、灯下雨丝）要贴在模型表面，必须先算它在模型里的位置，再跟着底座一起转和放大。
+ */
+export function toWorld(p: Spot, lx: number, ly: number, lz: number): [number, number, number] {
+  const c = Math.cos(p.ry), s = Math.sin(p.ry);
+  return [p.x + (lx * c + lz * s) * p.s, p.y + ly * p.s, p.z + (-lx * s + lz * c) * p.s];
+}
+
+/** 半透明加色材质：动件统一用它，靠 instanceColor 从亮压到黑来表达淡入淡出（灯光类一律不吃雾） */
+export function addMat(color: THREE.ColorRepresentation, opacity: number): THREE.MeshBasicMaterial {
+  return new THREE.MeshBasicMaterial({
+    color, transparent: true, opacity, fog: false, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide,
+  });
+}
+
 const M4 = new THREE.Matrix4();
 const QQ = new THREE.Quaternion();
 const VV = new THREE.Vector3();
