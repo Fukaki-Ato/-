@@ -8,10 +8,11 @@ import mambo from './assets/character-select/portraits/mambo.webp';
 import bball from './assets/character-select/portraits/bball.webp';
 import whale from './assets/character-select/portraits/whale.webp';
 import niu from './assets/character-select/portraits/niu.webp';
+import penguin from './assets/character-select/portraits/penguin.webp';
 
 const PORTRAITS: Record<string, string> = {
   char_volt: bball, char_ama: ama, char_kaze: kaze, char_rina: rina, char_bolt: bolt,
-  char_frog: frog, char_mambo: mambo, char_whale: whale, char_niu: niu,
+  char_frog: frog, char_mambo: mambo, char_whale: whale, char_niu: niu, char_penguin: penguin,
 };
 
 /** Selection-only presentation; the approved lobby artwork remains unchanged. */

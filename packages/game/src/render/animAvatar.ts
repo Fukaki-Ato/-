@@ -15,6 +15,7 @@ import {
   type ClipContext, type ClipName,
 } from './animClips.js';
 import { RUN_BONE_AMPS, amplifyClipSwing } from './animAmplify.js';
+import { createFootfallProbe } from './animFootfall.js';
 
 /** 换动作的交叉淡化时长（秒）：clip 间切换统一用它，turn→run 的回淡也是它。
  *  0.12→0.08：玩家高频换道时 Run 被 Turn 反复顶掉，更短的淡化让回切更利落，
@@ -33,14 +34,6 @@ const STRIDE_M = 2.25;
 const TS_MIN = 0.6, TS_MAX = 1.4;
 /** 胸口估算高度（米）：Chest 骨骼缺失时的兜底（骨骼契约里 Chest 距脚底 1.05m） */
 const CHEST_FALLBACK_Y = 1.05;
-/** 落脚探测：脚世界高度低于「支撑面 + 该值」算进入触地区（资产实测脚最低点在支撑面上方
- *  0.137m、抬起 0.29~0.43m，0.24 落在区间中段，两谷之间）。
- *  注意单靠高度分不开「真触地」与「摆腿掠过」——该 clip 每周期有两个低谷（0.14m / 0.19m），
- *  阈值法会把浅谷也数成一次落地（尘土密一倍、步频假快）。真正的区分特征是触地期间脚的
- *  水平位移方向：向前迈=落点，向后收=蹬地后收腿。见 tests/renderFootDust.test.mjs。 */
-const FOOT_ENTER_Y = 0.24;
-/** 尘土生成高度相对支撑面的抬升（米）：贴地但不穿进地面 */
-const DUST_LIFT_Y = 0.03;
 
 export interface AnimAvatar {
   /** gltf.scene（脚底在原点、面朝 -Z；外层按帧写 position 与 rotation.z） */
@@ -137,10 +130,10 @@ function build(
   let current: ClipName | null = null;
   let tsSmooth = 1;                  // timeScale 平滑值，防帧位移抖动让跑步抽风
   let ticks = 0;                     // update() 累计次数（探针 __trAnim.ticks：死实例停止增长）
-  /** 落脚探测状态：两只脚各自「是否正踩在触地区里」与进入触地时的水平位置（判迈步方向） */
-  let footfall: ((x: number, y: number, z: number) => void) | null = null;
-  const inContact = { L: false, R: false };
-  const entryZ = { L: 0, R: 0 };
+  /** 落脚探测（阈值自适应 + 进入/离开判定，见 animFootfall.ts）：短腿角色（企鹅）按本资产
+   *  Run 脚程取阈值中点兜底，长腿角色保持默认 0.24——只有设了 handler 才逐帧判定 */
+  const footfall = createFootfallProbe(mixer, runAct, root, bones);
+  let footfallHandler: ((x: number, y: number, z: number) => void) | null = null;
   /** 表演 clip 锁播累计秒与当前 clip：满一期交还状态机（LoopRepeat 的 time 会归零，不能靠 time 判） */
   let perfLockT = 0;
   let perfLockClip: ClipName | null = null;
@@ -154,6 +147,7 @@ function build(
   if (lock && !actions[lock]) lock = null; // 本资产没有该 clip 时不能永久锁死状态机（如旧角色缺 Wave）。
   const chestV = new THREE.Vector3();
   const footV = new THREE.Vector3();
+  const footV2 = new THREE.Vector3();
   /**
    * Idle 的双实例交替：Idle 首末姿差 110°（建模侧实测，不可直接循环），按契约 LoopOnce 播一次，
    * 播完后用第二个 action 做 0.12s 交叉淡化交回自身首帧，抹掉硬跳。
@@ -216,6 +210,8 @@ function build(
       get current() { return current; },
       /** update() 累计调用次数：>0 且持续增长=探针所属实例活着（死实例的 ticks 停止增长） */
       get ticks() { return ticks; },
+      /** 本资产实际生效的落脚触地区阈值（默认 0.24；短腿角色自适应兜底，QA 取证用） */
+      get footEnterY() { return +footfall.enterY.toFixed(3); },
       /** 当前生效的 QA 锁（自动解锁后为 null；测试面板据此显示提示） */
       get lock() { return lock; },
       get act() {
@@ -268,26 +264,19 @@ function build(
       const target = Math.min(TS_MAX, Math.max(TS_MIN, speed / STRIDE_M));
       tsSmooth += (target - tsSmooth) * Math.min(1, dt * 8);
       runAct.setEffectiveTimeScale(tsSmooth);
-      // 落脚探测：只在 Run（贴地且前进）时做。脚世界高度低于 ENTER 记一次触地并记住进入时的
-      // 水平位置，向上穿出时若触地期间脚向前迈才算落点（向后=蹬地后收腿，跳过）。
-      // y 用支撑面高度（s.y，车顶/坡道也正确），不等同于脚骨高度；x/z 取本帧脚世界坐标。
-      if (footfall && pick.clip === 'Run') {
-        for (const [bone, key] of [['FootL', 'L'], ['FootR', 'R']] as const) {
-          const b = bones.get(bone);
-          if (!b) continue;
-          const p = b.getWorldPosition(footV);
-          if (p.y < s.y + FOOT_ENTER_Y) {
-            if (!inContact[key]) { inContact[key] = true; entryZ[key] = p.z; }
-          } else if (inContact[key]) {
-            inContact[key] = false;
-            if (p.z - entryZ[key] > 0) footfall(p.x, s.y + DUST_LIFT_Y, p.z);
-          }
-        }
+      // 落脚探测：只在 Run（贴地且前进）时做；判定与阈值自适应都在 animFootfall.ts。
+      // y 用支撑面高度（s.y，车顶/坡道也正确），x/z 取本帧脚世界坐标。
+      if (footfallHandler && pick.clip === 'Run') {
+        const feet = { L: footV, R: footV2 };
+        const l = bones.get('FootL'), r = bones.get('FootR');
+        if (l) feet.L = l.getWorldPosition(footV);
+        if (r) feet.R = r.getWorldPosition(footV2);
+        footfall.update(dt, s.y, feet, footfallHandler);
       } else {
-        inContact.L = false; inContact.R = false; // 非 Run 帧清记忆，回来时不补发过期蹬地
+        footfall.reset(); // 非 Run 帧清记忆，回来时不补发过期蹬地
       }
     },
-    setFootfallHandler(fn) { footfall = fn; },
+    setFootfallHandler(fn) { footfallHandler = fn; },
     dispose() {
       mixer.stopAllAction();
       root.traverse(o => {
