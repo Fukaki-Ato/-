@@ -31,15 +31,17 @@ const runner = (() => { let d = 0; return (over = {}) => { d += 0.15; return st(
 test('资产契约：CORE 10 + PERF 3 共 13 个合法 clip 名，各 GLB 按存在性装配', () => {
   assert.deepEqual([...CORE_CLIP_NAMES].sort(),
     ['Death', 'Fly', 'Hit', 'Idle', 'Jump', 'Land', 'Run', 'Slide', 'TurnLeft', 'TurnRight']);
-  assert.deepEqual([...PERF_CLIP_NAMES].sort(), ['Basketball', 'Laugh', 'Wave'],
-    '阿牛（niu）带 Laugh + Wave（招手）；牢大承接 bball 模型，Basketball 保留');
-  assert.deepEqual([...PERF_CLIP_NAMES].filter(isPerfClip).sort(), ['Basketball', 'Laugh', 'Wave']);
+  assert.deepEqual([...PERF_CLIP_NAMES].sort(), ['Basketball', 'Hop', 'Laugh', 'RaiseHand', 'Wave'],
+    '企鹅（penguin）新增 RaiseHand/Hop；niu 的 Wave、牢大（bball 模型）的 Basketball 均保留');
+  assert.deepEqual([...PERF_CLIP_NAMES].filter(isPerfClip).sort(), ['Basketball', 'Hop', 'Laugh', 'RaiseHand', 'Wave']);
   assert.equal(isPerfClip('Run'), false, '核心 clip 不是表演 clip（锁播一期语义只对表演 clip 生效）');
   assert.equal(isPerfClip('Death'), false);
   assert.equal(isPerfClip('Wave'), true, 'Wave 是表演 clip：锁播满一期自动交还');
-  assert.equal(CLIP_NAMES.length, 13, 'CORE 10 + PERF 3');
+  assert.equal(isPerfClip('RaiseHand'), true, 'RaiseHand 是表演 clip');
+  assert.equal(isPerfClip('Hop'), true, 'Hop 是表演 clip');
+  assert.equal(CLIP_NAMES.length, 15, 'CORE 10 + PERF 5');
   assert.deepEqual([...CLIP_NAMES].sort(),
-    ['Basketball', 'Death', 'Fly', 'Hit', 'Idle', 'Jump', 'Land', 'Laugh', 'Run', 'Slide', 'TurnLeft', 'TurnRight', 'Wave']);
+    ['Basketball', 'Death', 'Fly', 'Hit', 'Hop', 'Idle', 'Jump', 'Land', 'Laugh', 'RaiseHand', 'Run', 'Slide', 'TurnLeft', 'TurnRight', 'Wave']);
   assert.equal(asClipName('Run'), 'Run');
   assert.equal(asClipName('run'), null, '大小写敏感：小写不是合法 clip 名');
   assert.equal(asClipName('Nope'), null);
@@ -187,6 +189,10 @@ test('?anim= QA 锁：合法 clip 名按其循环口径播放，非法名字忽�
     { clip: 'Basketball', loop: false }, 'Basketball 锁了也播一次（首末差 117° 不能循环）');
   assert.deepEqual(pickClip(st({ y: 1 }), fx(), ctx, 1 / 60, 'Wave'),
     { clip: 'Wave', loop: true }, 'Wave 无缝循环，锁播按循环口径（放完一期由 animAvatar 交还）');
+  assert.deepEqual(pickClip(st({ y: 1 }), fx(), ctx, 1 / 60, 'RaiseHand'),
+    { clip: 'RaiseHand', loop: false }, 'RaiseHand 首末=静止姿：LoopOnce 定末帧不怪');
+  assert.deepEqual(pickClip(st({ y: 1 }), fx(), ctx, 1 / 60, 'Hop'),
+    { clip: 'Hop', loop: false }, 'Hop 首末=静止姿：LoopOnce 定末帧不怪');
   assert.equal(pickClip(st({ y: 1 }), fx(), ctx, 1 / 60, 'Bogus').clip, 'Jump', '非法锁名按正常映射');
   assert.equal(pickClip(st({ y: 1 }), fx(), ctx, 1 / 60, null).clip, 'Jump', '无锁按正常映射');
 });

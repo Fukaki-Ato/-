@@ -2,10 +2,11 @@
  * 动作 clip 选择（纯函数、零依赖，node --test 直接回归；three 的播放胶水在 animAvatar.ts）
  * 数据来源：多个 GLB 资产的命名动画 clip（共同契约：1 单位=1m、脚底在原点、面朝 -Z）——
  * char_frog → frog.glb、char_volt → bball.glb、char_whale → whale.glb、
- * char_mambo → pony.glb、char_niu → niu.glb（带 Laugh + Wave 两个表演 clip）。
+ * char_mambo → pony.glb、char_niu → niu.glb（Laugh + Wave）、
+ * char_penguin → penguin.glb（Laugh + Wave + RaiseHand + Hop 四个表演 clip）。
  * 优先级（上层压下层，逐条对应「玩家此刻在干什么」）：
  *   ① QA 锁 ?anim=<ClipName>（仅 dev/QA，见 readAnimLock）→ 强制循环；
- *     表演 clip（Laugh/Basketball/Wave）锁播满一期自动交还状态机（演示用，不永久接管），
+ *     表演 clip（Laugh/Basketball/Wave/RaiseHand/Hop）锁播满一期自动交还状态机（演示用，不永久接管），
  *     核心循环锁持续锁播、核心一次性锁播完即解锁（解锁实现都在 animAvatar）
  *   ② !alive → Death 播一次保持末帧；进死亡那一下从 0 重起（restart）
  *   ③ stunT>0 → Hit 循环
@@ -31,14 +32,15 @@ import type { RunnerState } from '@tr/game/core/sim/simTypes.js';
 export const CORE_CLIP_NAMES = [
   'Idle', 'Run', 'Slide', 'Jump', 'TurnLeft', 'TurnRight', 'Fly', 'Land', 'Hit', 'Death',
 ] as const;
-/** 表演 clip（3 个）：不进状态机，只服务 ?anim= QA 锁（以及将来的道具触发演出）。
+/** 表演 clip（5 个）：不进状态机，只服务 ?anim= QA 锁（以及将来的道具触发演出）。
  *  各资产的表演 clip 不同源：frog/whale/mambo 带 Laugh（无缝循环的笑），bball 带 Basketball
- *  （投篮，首末姿差 117.16° 只能 LoopOnce），niu 带 Laugh + Wave（招手，无缝循环）——
- *  所以按存在性装配：缺失不判资产不合格，pickClip 命中缺失的由 animAvatar.play() 回落 Run，
- *  三个全缺才是契约外资产。
+ *  （投篮，首末姿差 117.16° 只能 LoopOnce），niu 带 Laugh + Wave（招手，无缝循环），
+ *  penguin 带 Laugh + Wave + RaiseHand（抬手）+ Hop（跳一下）——后两者首末都是静止姿
+ *  （LoopOnce 定末帧不怪，故不进 LOOPING_CLIPS）——所以按存在性装配：缺失不判资产不合格，
+ *  pickClip 命中缺失的由 animAvatar.play() 回落 Run，五个全缺才是契约外资产。
  *  Basketball 不能改名成 Laugh 硬上：首末姿差 117.16°，而 Laugh 在 LOOPING_CLIPS 里是
  *  LoopRepeat，直接改名会让它每圈硬跳一次。 */
-export const PERF_CLIP_NAMES = ['Laugh', 'Basketball', 'Wave'] as const;
+export const PERF_CLIP_NAMES = ['Laugh', 'Basketball', 'Wave', 'RaiseHand', 'Hop'] as const;
 /** 全部合法 clip 名（CORE + PERF）：asClipName / readAnimLock 的合法集 */
 export const CLIP_NAMES = [...CORE_CLIP_NAMES, ...PERF_CLIP_NAMES] as const;
 export type ClipName = typeof CLIP_NAMES[number];

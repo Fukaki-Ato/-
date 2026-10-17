@@ -23,7 +23,7 @@ function run(sim, seconds) { for (let i = 0; i < 60 * seconds; i++) { sim.step()
 
 test('9 个角色都能装配出完整装备（主动技能 + 被动天赋）', () => {
   const chars = playableCharacters(content);
-  assert.equal(chars.length, 9, `应为 9 个可玩角色，实际 ${chars.length}`);
+  assert.equal(chars.length, 10, `应为 10 个可玩角色，实际 ${chars.length}`);
   for (const c of chars) {
     const l = buildLoadout(content, c.id);
     assert.equal(l.charId, c.id);
@@ -117,6 +117,8 @@ test('被动天赋在开局即生效（run_start 触发）', () => {
     char_niu: s => assert.ok(s.buffs.left('periodic') > 0, '阿牛：周期被动应登记为永久槽位'),
     // 鲸鱼女仆复用牢大的技能/天赋（GLB 外观角色，玩法不出圈）
     char_whale: s => assert.equal(s.fx.coinPct, 5, '鲸鱼女仆：金币 +5%'),
+    // 企鹅娘同样复用冲刺技能 + 金币天赋（GLB 外观角色，玩法不出圈）
+    char_penguin: s => assert.equal(s.fx.coinPct, 5, '企鹅娘：金币 +5%'),
   };
   for (const [id, check] of Object.entries(cases)) {
     const sim = new RunnerSim(content, SIM_SEED(), id);
