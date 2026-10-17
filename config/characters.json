@@ -1,8 +1,8 @@
 {
   "$schema": "../schema/config.schema.json#/characters",
-  "configVersion": "1.2.3",
+  "configVersion": "1.2.4",
   "minEngineVersion": "1.0.0",
-  "updatedAt": "2026-10-12",
+  "updatedAt": "2026-10-17",
   "items": [
     {
       "id": "char_volt", "status": "live",
