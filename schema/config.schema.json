@@ -142,7 +142,8 @@
                       "properties": {
                         "cast": { "type": "string" },
                         "pickup": { "type": "string" },
-                        "death": { "type": "string" }
+                        "death": { "type": "string" },
+                        "intro": { "type": "string", "description": "登场动画音效：局内渲染层播完/跳过登场时经 AudioDirector.onIntro 播放，不参与 cast/pickup/death 三事件契约" }
                       },
                       "additionalProperties": true
                     }

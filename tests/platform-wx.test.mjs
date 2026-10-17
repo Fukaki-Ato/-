@@ -335,3 +335,64 @@ test('createWxAudio：真实配置路径经解析写入 InnerAudioContext.src；
   audio.playMusic(`pkg-assets/${bgm.run}`, { loop: true });
   assert.equal(made[0].src, `pkg-assets/${bgm.run}`, '已带分包前缀的路径不重复加前缀');
 });
+
+test('createWxAudio：pauseMusic 保留播放位置、resumeMusic 才续播；幂等且 stopMusic 后不复活', () => {
+  const made = [];
+  const wx = {
+    ...makeWxMock().wx,
+    createInnerAudioContext() {
+      const ctx = {
+        src: '', loop: false, volume: 1, played: 0, paused: 0, stopped: 0,
+        play() { this.played++; }, pause() { this.paused++; }, stop() { this.stopped++; },
+        destroy() {}, onEnded() {}, onError() {},
+      };
+      made.push(ctx);
+      return ctx;
+    },
+  };
+  const audio = createWxAudio(wx);
+  audio.pauseMusic();
+  audio.resumeMusic();
+  assert.equal(made.length, 0, '还没建过实例时两个方法都不该凭空建实例');
+  audio.playMusic('assets/audio/bgm/run.mp3', { loop: true, volume: 0.7 });
+  const stoppedAtStart = made[0].stopped; // 换曲路径自带一次 stop（归零旧曲），与让位无关
+  audio.pauseMusic();
+  audio.pauseMusic(); // 幂等：重复暂停不再多调一次
+  audio.resumeMusic();
+  audio.resumeMusic(); // 已续播：不重复 play
+  assert.equal(made[0].paused, 1, 'pause 只调一次，且绝不走 stop（stop 会归零）');
+  assert.equal(made[0].stopped, stoppedAtStart, '让位期间不得归零播放位置');
+  assert.equal(made[0].played, 2, '进局一次 + 续播一次');
+  audio.stopMusic();
+  audio.resumeMusic();
+  assert.equal(made[0].played, 2, 'stopMusic 之后 resume 不该把已归零的曲目拉回来');
+});
+
+test('createWxAudio：stopSfx 切掉在响的音效并销毁实例，且不碰背景音乐', () => {
+  const made = [];
+  const wx = {
+    ...makeWxMock().wx,
+    createInnerAudioContext() {
+      const ctx = {
+        src: '', loop: false, volume: 1, stopped: 0, destroyed: false,
+        play() {}, pause() {}, stop() { this.stopped++; }, destroy() { this.destroyed = true; },
+        onEnded() {}, onError() {},
+      };
+      made.push(ctx);
+      return ctx;
+    },
+  };
+  const audio = createWxAudio(wx);
+  audio.playMusic('assets/audio/bgm/run.mp3', { loop: true });
+  const musicStopped = made[0].stopped; // 换曲自带一次 stop，基线从这里算
+  audio.playSfx('assets/audio/sfx/start.mp3');
+  audio.playSfx('assets/audio/sfx/death-1.mp3');
+  audio.stopSfx();
+  assert.equal(made[1].stopped, 1, '开局语音被真的切掉');
+  assert.equal(made[1].destroyed, true);
+  assert.equal(made[2].destroyed, true, '两条都要销毁，不能泄漏实例');
+  assert.equal(made[0].stopped, musicStopped, 'stopSfx 不得影响背景音乐');
+  audio.playSfx('assets/audio/sfx/start.mp3');
+  assert.equal(made.length, 4, '清空后还能继续放新音效');
+  audio.dispose();
+});

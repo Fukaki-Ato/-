@@ -16,6 +16,7 @@ import { createCoinField } from './coinField.js';
 import { createCloudLayer, createObstacleLayer } from './entityLayers.js';
 import { createPickupLayer } from './pickupLayer.js';
 import { createPickupModelLoader } from './pickupModels.js';
+import { createIntroPanel } from './introPanel.js';
 import { installRunProbe, uninstallRunProbe } from './runDebugProbe.js';
 import { createSpeedLines } from './speedLines.js';
 import { createTrackVisuals } from './trackVisuals.js';
@@ -36,12 +37,12 @@ export interface RunCallbacks {
   onCast?(): void;
   /** sim pickup 事件（道具箱，非金币）回调：角色拾取音效 */
   onPickup?(): void;
+  /** 登场动画时点回调：start＝音频让位给登场音效，end＝交还并续播 BGM */
+  onIntro?(stage: 'start' | 'end'): void;
   debug?: boolean;
 }
 
-/** 相机参数（docs/02 §8：跟随人物但不 1:1 抬高，否则近处地面会翻出画面下沿）。
- *  机位/注视点/FOV 目标统一由 cameraRig.ts 纯函数派生（地面/空中两套，可回归测试），
- *  这里只保留平滑系数与注视点纵深；审计 T1/T2 的历史口径见 cameraRig.ts 注释。 */
+/** 相机目标/FOV 在 cameraRig.ts 派生，本文件只保留平滑系数与注视点纵深。 */
 /** 注视点纵深（米）：四轮反馈「视角有点远」后由 -11 收到 -9.5（构图更紧、人物不上移出画） */
 const CAM_FOLLOW = 0.25, FOV_LERP = 0.06, LOOK_AHEAD_Z = -9.5;
 /** 加速（speedMul>1）的视野扩张：按 (speedMul-1) 线性加宽并封顶（雷霆冲刺一类技能要看得见加速） */
@@ -118,6 +119,8 @@ export function createRunnerScene(
   const cloudLayer = createCloudLayer(scene);
   const bursts = createBurstPool(scene);
   const speedLines = createSpeedLines(scene, tint);
+  /** 登场动画面板（characters.json intro 配了才有；无视频源＝只响音效不冻结） */
+  const intro = createIntroPanel(scene, camera, sim.loadout.intro, sim.loadout.charId, s => cb.onIntro?.(s));
   /** 胸口位置缓存：爆点与吸入动画对齐到身体，而不是脚底原点 */
   let chestX = 0, chestY = avatar.chestY;
   const fireAtPlayer = (color?: number) => bursts.fireAt(chestX, chestY, BURST_Z, color);
@@ -252,6 +255,8 @@ export function createRunnerScene(
     if (paused) { last = nowMs; raf = adapter.requestFrame(tick); return; } // 后台冻结：不推进 sim，仅对齐时钟
     const dt = Math.min((nowMs - last) / 1000, 0.05);
     last = nowMs;
+    intro?.update(dt); // 无视频源时只计时恢复 BGM；active 仅表示需要冻结 sim 的视频面板
+    if (intro?.active()) { renderer.render(scene, camera); raf = adapter.requestFrame(tick); return; } // 登场视频：整局冻结
     acc += dt;
     while (acc >= STEP_DT) {
       sim.step();
@@ -281,6 +286,7 @@ export function createRunnerScene(
     offInput(); offResize(); offVisibility();
     if (cb.debug) uninstallRunProbe(); // ?debug 探针随场景销毁卸载，避免 __trRun 指向已销毁的 sim
     avatar.dispose(); // GLB 混流器停摆（几何体/材质由下面的 traverse 统一销毁）
+    intro?.dispose(); // 只弃面板自身；视频元素与贴图归 apps 侧复用
     lightning.dispose();
     track.dispose();
     renderer.dispose();

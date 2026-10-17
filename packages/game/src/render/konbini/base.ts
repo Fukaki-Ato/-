@@ -10,6 +10,8 @@ import type { Diorama } from './kit.js';
 export const PLATE = 10;
 /** 路缘石内缘：+X 与 +Z 两条边各留一条 1.85m 宽的马路，转角自然成形 */
 export const ROAD = 3.15;
+/** 商铺排与空地路面共用的「人行道内缘 x」（局部坐标，临街朝 −x）：两处必须同一个数，路面才接得上 */
+export const WALK = -4.0;
 
 /** 正方形底座：顶面即人行道，深色裙边让「可收藏模型」的厚度看得见 */
 export function buildBasePlate(d: Diorama): void {

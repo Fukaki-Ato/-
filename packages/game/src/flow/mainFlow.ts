@@ -17,7 +17,7 @@ import type { AudioDirector } from '@tr/game/core/audio/audioDirector.js';
 import { hashSeed, mulberry32 } from '@tr/game/core/rng.js';
 import { createRunSession, type RunSessionDeps } from './runSession.js';
 import type { LeaderboardService } from './leaderboard.js';
-import { createSettingsScene, currentThemeId, pruneThemeSelection } from './settingsScene.js';
+import { createSettingsScene, currentThemeId, pruneThemeSelection, themeMusic } from './settingsScene.js';
 import { createRunnerScene } from '@tr/game/render/runnerScene.js';
 import type { PlatformAdapter } from '@tr/framework/platform/platformAdapter.js';
 import type { GameViews, RunSummary } from './views.js';
@@ -217,7 +217,7 @@ export function createGameFlow(deps: GameFlowDeps): GameFlow {
         if (!content) return;
         if (!availableCharacter(charId)) normalizeCharacter();
         if (!charId || !availableCharacter(charId)) { views.toast('暂无可用角色'); return; }
-        audio?.enterRun(charId);
+        audio?.enterRun(charId, themeMusic(adapter.storage, content)); // 按当前主题选 BGM，缺省回退全局 run
         scene = createRunSession({
           adapter, views, content, charId, service: deps.leaderboard,
           createScene: deps.createScene, debug: deps.debug, test: deps.test,
@@ -227,6 +227,7 @@ export function createGameFlow(deps: GameFlowDeps): GameFlow {
           onDeath: () => audio?.onDeath(),
           onCast: () => audio?.onCast(),
           onPickup: () => audio?.onPickup(),
+          onIntro: stage => audio?.onIntro(stage),
         });
       },
       onExit: () => {

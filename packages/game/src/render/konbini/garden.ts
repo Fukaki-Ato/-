@@ -122,22 +122,46 @@ export function buildGarden(d: Diorama): void {
   }
 }
 
-/** 远景楼群：三栋一组，两侧都开灯（左右两侧共用同一份几何，只是摆的位置不同） */
-export function buildFarBlocks(d: Diorama): void {
-  const H = [9.5, 14.0, 7.2], W = [3.4, 2.6, 3.0];
-  for (let i = 0; i < 3; i++) {
-    const x = -4.2 + i * 4.0, h = H[i];
-    d.box('body', W[i], h, 3.2, x, h / 2, 0, i === 1 ? C.farA : C.farB);
-    d.box('body', W[i] + 0.16, 0.2, 3.36, x, h + 0.1, 0, '#1a2030');
-    d.box('body', 0.5, 1.1, 0.5, x - W[i] / 2 + 0.4, h + 0.6, 0.6, '#242c3c');
-    for (let k = 0; k < 4; k++) for (let j = 0; j < 3; j++) {
-      const c = j === 1 && k === 2 ? C.farNeon : C.farWin;
-      d.quad('glow', 0.42, 0.5, x - W[i] / 2 - 0.02, 1.5 + k * 1.9, -0.9 + j * 0.9, (k + j) % 3 ? c : '#2b3444', { ry: -R90 });
-      d.quad('glow', 0.42, 0.5, x + W[i] / 2 + 0.02, 1.5 + k * 1.9, -0.9 + j * 0.9, (k + j + i) % 3 ? c : '#2b3444', { ry: R90 });
+/**
+ * 远景高层居民楼：三套型（v=0 三栋标准组 / v=1 两栋高瘦 / v=2 四栋矮密），调用方按楼位轮流取套型、
+ * 每栋再抖一次尺度 ⇒ 同一侧相邻两组也不撞形（用户 2026-10-13：不要全部一样的）。
+ * 口径：统一深蓝灰低饱和、深灰平顶压边、无霓虹；亮窗比例每套型不同但色温都压暗，
+ * 远处只留安静的剪影，把戏让给中景那排商铺。
+ */
+const FAR_H = [[9.5, 14.0, 7.2], [16.5, 11.5], [8.2, 10.6, 12.4, 9.2]];
+const FAR_W = [[3.4, 2.6, 3.0], [2.8, 3.4], [2.6, 3.0, 2.4, 3.2]];
+const FAR_TONE = [[C.farA, C.farB], [C.farB, C.farC], [C.farC, C.farA]];
+const FAR_LIT = [0.5, 0.34, 0.62];
+const FGAP = 0.9;
+
+export function buildFarBlocks(d: Diorama, v: number): void {
+  const H = FAR_H[v], W = FAR_W[v], tone = FAR_TONE[v];
+  let x = -(W.reduce((a, b) => a + b, 0) + FGAP * (W.length - 1)) / 2;
+
+  for (let i = 0; i < W.length; i++) {
+    const h = H[i], cx = x + W[i] / 2, rows = Math.max(3, Math.floor((h - 2.6) / 2)), cols = W[i] > 3 ? 3 : 2;
+    d.box('body', W[i], h, 3.2, cx, h / 2, 0, i % 2 ? tone[1] : tone[0]);
+    d.box('body', W[i] + 0.16, 0.2, 3.36, cx, h + 0.1, 0, C.farCap);                     // 深灰平顶压边
+    if (v === 1 && i === 0) d.box('body', W[i] - 1.1, 2.2, 2.1, cx, h + 1.2, 0, tone[1]); // 高瘦那栋收一段退台
+    for (let k = 0; k < rows; k++) for (let j = 0; j < cols; j++) {
+      for (const s of [-1, 1]) {
+        const on = rnd(k * cols + j + (s > 0 ? 17 : 0), i * 7 + v) > 1 - FAR_LIT[v];      // 每套型亮灯比例不同
+        const c = on ? (j === cols - 1 && k % 4 === 3 ? C.farCool : C.farLit) : C.farDark;
+        d.quad('glow', 0.42, 0.5, cx + s * (W[i] / 2 + 0.02), 1.5 + k * 2, -0.9 + j * 0.9, c, { ry: s * R90 });
+      }
     }
-    if (i === 1) {                                                           // 中间那栋挂一条竖霓虹
-      d.box('body', 0.16, 4.2, 0.16, x + W[i] / 2 + 0.1, 6.4, -1.0, '#242c3c');
-      d.quad('glow', 0.3, 3.6, x + W[i] / 2 + 0.2, 6.4, -1.0, C.neonB, { ry: R90 });
-    }
+    x += W[i] + FGAP;
+  }
+  // 屋顶小件就是套型之间的差别所在：楼梯间 + 桅杆 / 水箱 + 桅杆 / 一排通风管 + 一盏顶灯
+  if (v === 0) {
+    d.box('body', 0.5, 1.1, 0.5, -4.2, 9.9, 0.6, C.farCap);
+    d.box('body', 0.5, 0.8, 0.5, 3.8, 7.8, 0.6, C.farCap);
+    d.strut('body', -0.2, 14.2, -0.6, -0.2, 16.8, -0.6, 0.06, C.farCap, 5);
+  } else if (v === 1) {
+    d.cyl('body', 0.42, 0.42, 0.9, 8, -1.2, 17.1, 0.4, C.farB);
+    d.strut('body', 1.5, 12.0, -0.8, 1.5, 14.2, -0.8, 0.055, C.farCap, 5);
+  } else {
+    for (let i = 0; i < 3; i++) d.box('body', 1.5, 0.22, 0.22, -2.8 + i * 2.5, 12.7, -0.7, C.farCap);
+    d.quad('glow', 0.5, 0.16, 3.1, 9.5, 1.62, C.farCool);                                 // 矮那栋顶上一盏冷灯
   }
 }

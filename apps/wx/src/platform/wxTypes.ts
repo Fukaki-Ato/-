@@ -76,6 +76,7 @@ export interface WxInnerAudioContext {
   loop: boolean;
   volume: number;
   play(): void;
+  pause(): void;
   stop(): void;
   destroy(): void;
   onEnded(cb: () => void): void;

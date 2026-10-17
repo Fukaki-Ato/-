@@ -14,6 +14,7 @@ export interface RunSessionDeps {
   trackRun?: (sim: RunnerSim, seed: number) => () => void;
   onSeed(seed: number): void; onEnd(summary: RunSummary): void;
   onDeath(): void; onCast(): void; onPickup(): void;
+  onIntro?(stage: 'start' | 'end'): void;
 }
 
 function feedback(message: string): RankingFeedback & { set(message: string): void } {
@@ -65,7 +66,8 @@ export function createRunSession(d: RunSessionDeps): { dispose(): void } {
         }
         d.onEnd({ ...summary, ranking, beforeFirstCoin: sim.firstCoinRecord.snapshot(summary) });
       },
-      onDeath: d.onDeath, onCast: d.onCast, onPickup: d.onPickup, debug: d.debug,
+      onDeath: d.onDeath, onCast: d.onCast, onPickup: d.onPickup,
+      onIntro: stage => d.onIntro?.(stage), debug: d.debug,
     }, { themeId: d.themeId });
     if (d.test) installTestApi(sim, d.content);
   };

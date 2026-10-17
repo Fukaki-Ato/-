@@ -15,8 +15,14 @@ function clamp01(v: number | undefined): number {
 export function createWebAudio(): AudioService {
   let music: HTMLAudioElement | null = null;
   let musicUrl = '';
+  /** 在响的一次性音效（即发即忘，但留引用才能被 stopSfx 切掉；播完/出错自行出集） */
+  const sfxEls = new Set<HTMLAudioElement>();
 
   const fire = (el: HTMLAudioElement) => { void el.play().catch(() => { /* 策略/解码失败：静默降级 */ }); };
+  const dropAllSfx = (): void => {
+    for (const el of [...sfxEls]) { el.pause(); el.src = ''; } // 置空 src 才真放下这条解码流
+    sfxEls.clear(); // 先快照再清：置空 src 会触发 error 回调往同一个集合里删
+  };
 
   return {
     playMusic(url, options?: AudioOptions) {
@@ -44,16 +50,30 @@ export function createWebAudio(): AudioService {
         /* 静默 */
       }
     },
+    pauseMusic() {
+      music?.pause(); // 不动 currentTime：resumeMusic 要从原处续播
+    },
+    resumeMusic() {
+      if (music && music.paused) fire(music);
+    },
     playSfx(url, options?: AudioOptions) {
       const el = new Audio(url);
       el.volume = clamp01(options?.volume);
       el.loop = options?.loop ?? false;
+      const drop = () => { sfxEls.delete(el); };
+      el.addEventListener('ended', drop);
+      el.addEventListener('error', drop);
+      sfxEls.add(el);
       fire(el);
+    },
+    stopSfx() {
+      dropAllSfx();
     },
     dispose() {
       music?.pause();
       music = null;
       musicUrl = '';
+      dropAllSfx();
     },
   };
 }

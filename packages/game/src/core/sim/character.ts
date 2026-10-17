@@ -33,6 +33,20 @@ export interface ActiveSkill {
   effects: EffectSpec[];
 }
 
+/** 登场动画（characters.json 的 intro）：几何与时长，视频面本身由 apps 侧注入 render 层 */
+export interface IntroSpec {
+  /** 仓库相对视频路径（assets/video/...），web 拼 BASE_URL、微信端无解码能力故只响音效 */
+  video: string;
+  /** 视频时长（秒）：冻结时长的兜底上限来源，实际以播放结束事件为准 */
+  durationS: number;
+  /** 面板宽（米）：换算口径「视频里的东西在世界里多大」 */
+  widthM: number;
+  /** 面板高（米）：按裁掉黑边后的画面比例给出，避免拉变形 */
+  heightM: number;
+  /** 面板到相机的距离（米）：决定它盖住多大一块画面 */
+  distanceM: number;
+}
+
 /** 一个角色的完整装配结果 */
 export interface Loadout {
   charId: string;
@@ -60,6 +74,8 @@ export interface Loadout {
  *  （char_mambo，头 mesh 顶实测 1.18m）可不滑铲直接钻过；其余角色仍必须滑铲。
  *  贝雷帽/马耳等超过横杆的装饰件不参与碰撞（视觉插杆属已知取舍，资产侧不改）。 */
   clearance: number;
+  /** 登场动画配置（characters.json intro，缺省＝没有登场） */
+  intro?: IntroSpec;
 }
 
 /** 可出战角色 = char_ 前缀且 status=live */
@@ -144,6 +160,18 @@ export function buildLoadout(content: GameContent, charId: string): Loadout {
   const skinModel = ((skin?.['model'] ?? {}) as Record<string, unknown>).prefab;
   const prefab = [model.prefab, skinModel].find(p => typeof p === 'string' && p.length > 0);
   if (typeof prefab === 'string') base.prefab = prefab;
+
+  // 登场动画：没写 video 就是没登场；数值脏值回默认（配置只调手感，不该把渲染层带崩）
+  const intro = (c['intro'] ?? {}) as Record<string, unknown>;
+  if (typeof intro.video === 'string' && intro.video !== '') {
+    base.intro = {
+      video: intro.video,
+      durationS: Math.max(0, number(intro.durationS, 3)),
+      widthM: Math.max(0.1, number(intro.widthM, 3)),
+      heightM: Math.max(0.1, number(intro.heightM, 1.7)),
+      distanceM: Math.max(0.5, number(intro.distanceM, 4)),
+    };
+  }
 
   const skillEntry = findEntry(content, c.skillRef);
   if (skillEntry && skillEntry['kind'] === 'active') {

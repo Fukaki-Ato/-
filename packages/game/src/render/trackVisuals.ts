@@ -40,7 +40,13 @@ function addSkyDome(scene: THREE.Scene, zenith: string, horizon: string): THREE.
   return mat;
 }
 
-/** 程序化沙地纹理（值噪声+稀疏草斑）：免素材、可平铺，消掉纯色地面的塑料感 */
+/**
+ * 程序化地面纹理（细砂粒 + 大小块干湿不匀）：免素材、可平铺，消掉纯色地面的塑料感。
+ * ⚠️ 这张图**只管明暗、不管色调**（三通道近等值，冷暖各偏 ≤7%）：它要和主题的 groundColor 相乘。
+ * 早先它自带沙色（b×0.66），于是雨夜便利店配的深蓝灰被乘成一地 muddy 色斑（用户 2026-10-13 截图点名）；
+ * 色调交回主题配置，这里只留明度起伏（均值仍取 0.86，免得两个主题的亮度一起跳档）。
+ * 斑块用整数周期正弦 ⇒ 60×240m 平铺出去不会在接缝处露出格纹。
+ */
 function makeGroundTexture(): THREE.DataTexture {
   const N = 128;
   const data = new Uint8Array(N * N * 4);
@@ -48,14 +54,19 @@ function makeGroundTexture(): THREE.DataTexture {
     const s = Math.sin(x * 127.1 + y * 311.7) * 43758.5453;
     return s - Math.floor(s);
   };
+  const blob = (x: number, y: number, fx: number, fy: number) =>
+    Math.sin(((x / N) * fx + hash(fx, fy)) * 6.2832) * Math.cos(((y / N) * fy + hash(fy, fx)) * 6.2832);
+
   for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
     const grain = 0.62 * hash(x, y) + 0.38 * hash(x >> 2, y >> 2);
-    const patch = hash(x / 6 | 0, y / 6 | 0) > 0.9;
-    const base = 202 + grain * 36;
-    let r = base, g = base * 0.89, b = base * 0.66;
-    if (patch) { r *= 0.84; g *= 0.97; b *= 0.74; }
+    const mottle = blob(x, y, 1, 2) * 0.5 + blob(x, y, 3, 5) * 0.3 + blob(x, y, 7, 11) * 0.2;
+    const lum = 0.8 + grain * 0.09 + mottle * 0.07;                          // 均值 0.86，同旧版
+    const warm = Math.max(0, mottle), cool = Math.max(0, -mottle);
     const i = (y * N + x) * 4;
-    data[i] = r; data[i + 1] = g; data[i + 2] = b; data[i + 3] = 255;
+    data[i] = Math.min(255, 255 * lum * (1 + warm * 0.05 - cool * 0.02));
+    data[i + 1] = Math.min(255, 255 * lum * (1 - (warm + cool) * 0.012));
+    data[i + 2] = Math.min(255, 255 * lum * (1 + cool * 0.07 - warm * 0.04));
+    data[i + 3] = 255;
   }
   const tex = new THREE.DataTexture(data, N, N, THREE.RGBAFormat);
   tex.wrapS = tex.wrapT = THREE.RepeatWrapping;

@@ -104,4 +104,8 @@ export function buildStreetProps(d: Diorama): void {
   d.box('body', 0.5, 0.08, 0.08, ANCHOR.lamp.x - 0.2, 3.3, ANCHOR.lamp.z, '#5a6068');
   d.box('body', 0.2, 0.66, 0.16, ANCHOR.lamp.x, ANCHOR.lamp.y, ANCHOR.lamp.z, C.frame);
   d.box('body', 0.24, 0.1, 0.2, ANCHOR.lamp.x, ANCHOR.lamp.y + 0.4, ANCHOR.lamp.z, '#4c535e');
+  // 信号灯三盏：10-13 用户「不要闪」⇒ 不再逐秒轮绿黄红，固定绿灯亮、红黄压成灭灯色（动画层已删）
+  for (let k = 0; k < 3; k++) {
+    d.quad('glow', 0.13, 0.13, ANCHOR.lamp.x, ANCHOR.lamp.y + 0.2 - k * 0.2, ANCHOR.lamp.z + 0.09, k === 2 ? '#5fe08a' : '#3a2f33');
+  }
 }

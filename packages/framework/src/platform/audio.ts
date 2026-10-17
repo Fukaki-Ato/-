@@ -21,8 +21,20 @@ export interface AudioService {
   playMusic(url: string, options?: AudioOptions): void;
   /** 停止背景音乐并复位（未在播放时为空操作）。 */
   stopMusic(): void;
+  /**
+   * 暂停背景音乐但**保留播放位置**（登场动画这类「短暂让位给一条音效」的场景用；
+   * stopMusic 会归零，不能拿来让位）。未在播放时为空操作。
+   */
+  pauseMusic(): void;
+  /** 续播被 pauseMusic 暂停的背景音乐（没暂停过则空操作，不得从头重播）。 */
+  resumeMusic(): void;
   /** 播放一次性音效（可与音乐、其它音效叠加）。 */
   playSfx(url: string, options?: AudioOptions): void;
+  /**
+   * 立刻切掉所有还在响的一次性音效（登场动画这类要独占听感的场景用：
+   * 它必须盖过开局语音，而音乐只用 pauseMusic 让位、播完原地续播）。空操作安全。
+   */
+  stopSfx(): void;
   /** 释放底层资源；之后仍可继续调用播放方法（实现应惰性重建）。 */
   dispose(): void;
 }

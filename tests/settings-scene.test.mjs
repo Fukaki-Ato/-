@@ -14,6 +14,7 @@ import { UiHost } from '../packages/framework/dist/ui/host.js';
 import { createOverlayViews } from '../packages/game/dist/ui/overlayViews.js';
 import { createGameFlow, DEFAULT_CHAR, THEME_KEY } from '../packages/game/dist/flow/mainFlow.js';
 import { themeOptions } from '../packages/game/dist/ui/settingsView.js';
+import { themeMusic } from '../packages/game/dist/flow/settingsScene.js';
 import { loadTestFontSet } from './ui-helpers.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
@@ -255,4 +256,18 @@ test('流程：设置页 Esc 回大厅', async () => {
   assert.equal(flow.machine.current(), 'settings');
   key('Escape');
   assert.equal(flow.machine.current(), 'select');
+});
+
+test('themeMusic：进局 BGM 跟着设置页所选主题走（脏存档与缺省都回首个 live 主题）', () => {
+  const content = { themes: JSON.parse(readFileSync(join(root, 'config/themes.json'), 'utf8')) };
+  const storage = (theme) => {
+    const store = new Map(theme ? [[THEME_KEY, theme]] : []);
+    return { get: k => store.get(k) ?? null, set: (k, v) => store.set(k, v), remove: k => store.delete(k) };
+  };
+  assert.equal(themeMusic(storage(null), content), 'assets/audio/bgm/run.mp3', '未选过＝默认主题（白日海景）的 BGM');
+  assert.equal(themeMusic(storage('theme_rain_konbini'), content), 'assets/audio/bgm/run_rain.mp3',
+    '选「雨夜便利店」＝换成本主题专属雨声 BGM');
+  assert.equal(themeMusic(storage('theme_已删除'), content), 'assets/audio/bgm/run.mp3', '存档指向不存在的主题要回退，不能不响');
+  const noMusic = { themes: { items: [{ id: 't', status: 'live' }] } };
+  assert.equal(themeMusic(storage(null), noMusic), null, '主题没配 music 就交回音频层回退全局 run');
 });
