@@ -173,7 +173,7 @@ test('导航：局内 Esc 与结算「返回选角」都回 select', () => {
 const audioCfg = parseAudioConfig(JSON.parse(readFileSync(join(root, 'config', 'game.json'), 'utf8')).params);
 
 /** 真实配置启动的流程：假场景工厂捕获 RunCallbacks（cast/pickup/death 即 sim 事件回调），假音频记录调用。 */
-async function bootRealFlow({ withAudio = true, pageSupport = false, storedCharId, lockedCharId } = {}) {
+async function bootRealFlow({ withAudio = true, pageSupport = false, storedCharId, storedThemeId, lockedCharId, trackRun } = {}) {
   const calls = [];
   const scenes = [];
   const inputs = [];
@@ -181,6 +181,7 @@ async function bootRealFlow({ withAudio = true, pageSupport = false, storedCharI
   const seen = { select: null, selectPage: null, result: null };
   const store = new Map();
   if (storedCharId !== undefined) store.set(CHAR_KEY, storedCharId);
+  if (storedThemeId !== undefined) store.set('thunderrun:theme', storedThemeId);
   const adapter = {
     storage: { get: k => store.get(k) ?? null, set: (k, v) => store.set(k, v), remove: k => store.delete(k) },
     fetchJson: async url => {
@@ -198,7 +199,10 @@ async function bootRealFlow({ withAudio = true, pageSupport = false, storedCharI
     audio: withAudio ? {
       playMusic: (url, o) => calls.push(['playMusic', url, o]),
       stopMusic: () => calls.push(['stopMusic']),
+      pauseMusic: () => calls.push(['pauseMusic']),
+      resumeMusic: () => calls.push(['resumeMusic']),
       playSfx: (url, o) => calls.push(['playSfx', url, o]),
+      stopSfx: () => calls.push(['stopSfx']),
       dispose: () => calls.push(['dispose']),
     } : undefined,
   };
@@ -216,7 +220,7 @@ async function bootRealFlow({ withAudio = true, pageSupport = false, storedCharI
     scenes.push(s);
     return s;
   };
-  const flow = createGameFlow({ adapter, views, configResolve: n => n, audioRandom: () => 0, createScene });
+  const flow = createGameFlow({ adapter, views, configResolve: n => n, audioRandom: () => 0, createScene, trackRun });
   await flow.boot();
   // 游客态直入主界面：boot 后落在 select、入口记 guest、全程零 login 调用
   assert.equal(flow.machine.current(), 'select');
@@ -224,6 +228,26 @@ async function bootRealFlow({ withAudio = true, pageSupport = false, storedCharI
   const key = code => inputs.forEach(cb => cb({ type: 'key', code, phase: 'down' }));
   return { flow, calls, scenes, seen, key, logins, store };
 }
+
+test('任务录制生命周期：死亡和主动退出各提交一次，切换大厅不重复', async () => {
+  const starts = [], finishes = [];
+  const { flow, scenes, seen, key } = await bootRealFlow({ trackRun: (sim, seed) => {
+    starts.push({ sim, seed }); return () => finishes.push(sim);
+  } });
+  seen.select.onStartRun('char_volt');
+  assert.equal(starts.length, 1);
+  assert.equal(starts[0].sim, scenes[0].sim);
+  assert.equal(starts[0].seed, flow.currentSeed());
+  scenes[0].cb.onEnd(scenes[0].sim.summary());
+  assert.equal(finishes.length, 1);
+  seen.result.onSelect();
+  assert.equal(finishes.length, 1);
+  seen.select.onStartRun('char_volt');
+  key('Escape');
+  assert.equal(starts.length, 2);
+  assert.equal(finishes.length, 2);
+  assert.equal(flow.machine.current(), 'select');
+});
 
 test('角色入口打开独立选角页；选角记忆、返回和开跑沿用有效角色', async () => {
   const { flow, scenes, seen, store } = await bootRealFlow({ pageSupport: true });
@@ -299,6 +323,19 @@ test('音频 handoff：选角开局 → run BGM+开局音效；cast/pickup 回�
   assert.equal(flow.machine.current(), 'result');
   assert.equal(scenes[0].disposed, true);
   assert.deepEqual(calls, [], '进入结算不应停掉死亡 BGM');
+});
+
+test('主题 BGM 与登场音频回调穿过排行榜 run-session 接线', async () => {
+  const { calls, scenes, seen } = await bootRealFlow({ storedThemeId: 'theme_rain_konbini' });
+  seen.select.onStartRun('char_frog');
+  assert.equal(calls[0][1], 'assets/audio/bgm/run_rain.mp3', '所选主题的 BGM 必须传到音频导演');
+  calls.length = 0;
+  scenes[0].cb.onIntro('start');
+  scenes[0].cb.onIntro('end');
+  const intro = audioCfg.characters.get('char_frog').intro;
+  assert.deepEqual(calls, [
+    ['stopSfx'], ['pauseMusic'], ['playSfx', intro, sfxOpt], ['resumeMusic'],
+  ], 'RunSession 不得丢掉视频/音频-only登场的音频交接回调');
 });
 
 test('音频 handoff：结算「再来一局」先停死亡 BGM 再开新局；「返回选角」停死亡 BGM', async () => {

@@ -1,8 +1,8 @@
 {
   "$schema": "../schema/config.schema.json#/game",
-  "configVersion": "1.0.1",
+  "configVersion": "1.0.2",
   "minEngineVersion": "1.0.0",
-  "updatedAt": "2026-10-05",
+  "updatedAt": "2026-10-12",
   "params": {
     "runner": {
       "baseSpeed": 12,
@@ -72,27 +72,28 @@
     "coins": {
       "chainBuckets": [
         {
-          "min": 5,
-          "max": 10,
+          "min": 3,
+          "max": 4,
           "weight": 75
         },
         {
-          "min": 11,
-          "max": 13,
+          "min": 5,
+          "max": 6,
           "weight": 20
         },
         {
-          "min": 14,
-          "max": 16,
+          "min": 7,
+          "max": 8,
           "weight": 5
         }
       ],
       "spacingM": 1.5,
+      "jumpSpanRatio": 0.9,
       "spawnEveryM": 26,
       "laneGroupWeights": {
-        "1": 70,
-        "2": 25,
-        "3": 5
+        "1": 50,
+        "2": 20,
+        "3": 30
       },
       "laneGapM": 90
     },

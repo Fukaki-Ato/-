@@ -1,0 +1,27 @@
+[Unit]
+Description=Thunder Run coinless global leaderboard
+After=network.target
+
+[Service]
+Type=simple
+DynamicUser=yes
+StateDirectory=thunder-run-leaderboard
+StateDirectoryMode=0700
+WorkingDirectory=/opt/thunder-run-leaderboard/current
+EnvironmentFile=/etc/default/thunder-run-leaderboard
+ExecStart=/usr/local/bin/node /opt/thunder-run-leaderboard/current/server/index.mjs
+Restart=on-failure
+RestartSec=3
+TimeoutStopSec=30
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+CapabilityBoundingSet=
+MemoryMax=512M
+TasksMax=32
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

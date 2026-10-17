@@ -51,6 +51,7 @@
       ]
     },
     "missions": {
+      "minRunSeconds": 10,
       "daily": { "pick": 3,
         "pool": [
           { "id": "mdist", "tier": "easy", "type": "accumulate", "metric": "distanceM", "target": 3000, "reward": { "coin": 400 } },

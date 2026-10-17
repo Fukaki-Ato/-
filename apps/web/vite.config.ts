@@ -2,6 +2,7 @@ import { defineConfig, type Plugin } from 'vite';
 import { readFile, cp, mkdir } from 'node:fs/promises';
 import { join, normalize, extname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { rankPageGateway } from './rankPageGateway.js';
 
 /** Vite setup for the Web app: config is public and runtime assets are copied to dist. */
 const assetsDir = fileURLToPath(new URL('../../assets', import.meta.url));
@@ -54,11 +55,17 @@ function trAssets(): Plugin {
 export default defineConfig({
   base: process.env.TR_WEB_BASE ?? '/',
   publicDir: '../../config',
-  plugins: [trAssets()],
+  plugins: [rankPageGateway(), trAssets()],
   server: {
     host: '127.0.0.1',
     port: 8767,
     strictPort: true,
+    proxy: {
+      '/api/missions': { target: process.env.TR_MISSION_API ?? 'http://127.0.0.1:8768', changeOrigin: false },
+      '/api/': { target: 'http://127.0.0.1:8788', changeOrigin: false,
+        rewrite: path => `/thunder-run${path}`, cookiePathRewrite: { '/thunder-run/api': '/api' } },
+      '/thunder-run/api/': { target: 'http://127.0.0.1:8788', changeOrigin: false },
+    },
     // TR_NO_OPEN=1：CI/自动化冒烟时不弹浏览器（人双击 .bat 时照旧自动打开）
     open: !process.env.TR_NO_OPEN,
   },

@@ -97,3 +97,19 @@ test('Run 放大：真实资产所有键都按 amp 放大（4D 反号长弧键�
   }
   assert.ok(checked > 200, `参与统计的键太少：${checked}（资产被换？）`);
 });
+
+test('旧模型没有 Wave：忽略不存在的 QA 锁，Run 后仍可正常滑铲而非永久锁跑', async () => {
+  const avatar = await createAnimAvatar(adapter, GLB, 1, new URLSearchParams('debug&anim=Wave'));
+  assert.ok(avatar);
+  const s = initialRunnerState();
+  const noFx = { flyT: 0, invincible: false, magnetT: 0, helmetT: 0, shieldLayers: 0 };
+  try {
+    for (let i = 0; i < 30; i++) {
+      s.prevDistance = s.distance; s.distance += 0.2; avatar.update(1 / 60, s, noFx);
+    }
+    assert.equal(globalThis.__trAnim.current, 'Run');
+    assert.equal(globalThis.__trAnim.lock, null, '不可用的 Wave 锁必须被清除');
+    s.sliding = true; avatar.update(1 / 60, s, noFx);
+    assert.equal(globalThis.__trAnim.current, 'Slide', '缺失 QA 动画不能接管正常输入');
+  } finally { avatar.dispose(); delete globalThis.__trAnim; }
+});

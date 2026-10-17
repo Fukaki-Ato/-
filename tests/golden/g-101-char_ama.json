@@ -878,27 +878,27 @@
     ]
   },
   "expected": {
-    "frames": 1185,
+    "frames": 1558,
     "summary": {
-      "t": 19.75,
-      "distance": 241.26,
-      "coins": 37,
+      "t": 25.97,
+      "distance": 318.99,
+      "coins": 50,
       "nearMiss": 0,
       "hits": 1,
-      "score": 2745,
+      "score": 3730,
       "alive": false,
-      "casts": 1,
+      "casts": 2,
       "charId": "char_ama"
     },
     "eventCounts": {
-      "cast": 1,
-      "coin": 37,
+      "cast": 2,
+      "coin": 50,
       "death": 1,
       "hit": 1,
       "pickup": 1,
       "protected": 1
     },
-    "eventsSha256": "2b0ad3cb8d48b0b9edc649edeb72b0eb3d48666374d63046f9164a9df37184fc",
+    "eventsSha256": "2a29b1280e03e1001ea5ccc91de3e2cb4995a0f6e38597bd29f94aee13f659ac",
     "inputsSha256": "d17b07eff0b4d858ed03b2683c2992a9459316b5b548f9ecc6cf5f4c218b5409"
   }
 }

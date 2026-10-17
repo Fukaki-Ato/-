@@ -161,6 +161,9 @@ test('真实配置：解析出 run/death BGM、开局音效、7 条死亡池与 
   assert.equal(cfg.deathSfx.length, 7);
   const volt = cfg.characters.get('char_volt');
   assert.ok(volt && volt.cast && volt.pickup && volt.death);
+  for (const event of ['cast', 'pickup', 'death']) {
+    assert.equal(volt[event], `assets/audio/sfx/char/char_volt/${event}.mp3`, '换建模不换牢大音效');
+  }
   for (const p of [cfg.bgmRun, cfg.bgmDeath, cfg.startSfx, ...cfg.deathSfx, volt.cast, volt.pickup, volt.death]) {
     assert.ok(existsSync(join(root, p)), `配置引用的音频不存在：${p}`);
   }

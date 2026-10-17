@@ -4,21 +4,19 @@
  *       boot（配置加载）→ select（游客主界面）↔ characterSelect（Web 角色页）↔ shop ↔ settings → run → result → select；
  *       start（微信/游客登录页）保留在场景机里但 boot 后不再可达——默认游客进入，
  *       全程不调 adapter.extras.login()、不弹授权（issue：重构主界面并默认游客进入）；
- *       跑酷局内：每次进入 run 场景创建全新 RunnerSim（seed 记录在案，可复现），
- *       渲染场景消费 sim 事件；死亡 1.2s 后自动进结算页。
  * 微信登录只调注入的 adapter.extras.login()（wx 侧现为游客占位，服务端鉴权未接），见 session.ts。
  * 铁律：本包零 DOM/wx——挂载点与页面全部经 GameViews 由 apps/* 注入。
  */
 import { loadAllConfig } from '@tr/game/core/config/configLoader.js';
 import type { GameContent, NamedEntry } from '@tr/game/core/config/configTypes.js';
 import { buildLoadout, isCharacterLocked, playableCharacters } from '@tr/game/core/sim/character.js';
-import { RunnerSim } from '@tr/game/core/sim/runnerSim.js';
 import { createSceneMachine } from '@tr/game/core/scene/sceneMachine.js';
 import type { SceneName } from '@tr/game/core/scene/sceneMachine.js';
 import { createAudioDirector } from '@tr/game/core/audio/audioDirector.js';
 import type { AudioDirector } from '@tr/game/core/audio/audioDirector.js';
 import { hashSeed, mulberry32 } from '@tr/game/core/rng.js';
-import { installTestApi, uninstallTestApi } from './testApi.js';
+import { createRunSession, type RunSessionDeps } from './runSession.js';
+import type { LeaderboardService } from './leaderboard.js';
 import { createSettingsScene, currentThemeId, pruneThemeSelection, themeMusic } from './settingsScene.js';
 import { createRunnerScene } from '@tr/game/render/runnerScene.js';
 import type { PlatformAdapter } from '@tr/framework/platform/platformAdapter.js';
@@ -49,6 +47,9 @@ export interface GameFlowDeps {
   createScene?: typeof createRunnerScene;
   /** 测试模式（?debug/?test）：run 局内挂载 __trTest 技能开关 API，供左侧测试面板消费 */
   test?: boolean;
+  leaderboard?: LeaderboardService;
+  /** 宿主可录制任务回放，结束函数由 RunSession 在死亡或退出时调用。 */
+  trackRun?: RunSessionDeps['trackRun'];
 }
 
 export interface GameFlow {
@@ -63,17 +64,11 @@ export function createGameFlow(deps: GameFlowDeps): GameFlow {
   const { adapter, views } = deps;
   let content: GameContent | null = null;
   let scene: { dispose(): void } | null = null;
-  let hud: ReturnType<GameViews['mountHud']> | null = null;
   let lastSeed = 0;
   /** 音频导演：配置加载成功后创建；game.params.audio 缺省时为空操作（不阻塞玩法） */
   let audio: AudioDirector | null = null;
 
-  /**
-   * 历史最佳分（v2 修正）：
-   * - 修正键存在 → 解析；脏值（非有限数/非正数）按 0，不把 NaN 带进分数比较；
-   * - 修正键缺失且旧笔误键存在 → 一次性迁移：旧值校验通过才写入修正键，随后删旧键；
-   * - 两边都没有 / 旧值脏 → 0。写入路径见 result.onEnter（严格 > 才落盘，平纪录不覆盖好值）。
-   */
+  /** 历史最佳分：兼容旧键；脏值按 0，result 仅在破纪录时落盘。 */
   const bestScore = (): number => {
     const raw = adapter.storage.get(BEST_KEY);
     if (raw !== null) {
@@ -173,6 +168,7 @@ export function createGameFlow(deps: GameFlowDeps): GameFlow {
           onCharacterSelect: views.renderCharacterSelectPage ? () => machine.go('characterSelect') : undefined,
           onShop: () => machine.go('shop', { returnTo: 'select' }),
           onSettings: () => machine.go('settings'),
+          onLeaderboard: deps.leaderboard && views.renderLeaderboard ? () => machine.go('leaderboard') : undefined,
         }, charId, entry, { coins: readCount(COINS_KEY), diamonds: readCount(DIAMOND_KEY) });
       },
     },
@@ -210,30 +206,32 @@ export function createGameFlow(deps: GameFlowDeps): GameFlow {
       storage: adapter.storage, views, content: () => content,
       goSelect: () => machine.go('select'), stopDeathMusic: () => audio?.stopDeathMusic(),
     }),
+    leaderboard: {
+      onEnter: () => {
+        if (!deps.leaderboard || !views.renderLeaderboard) { machine.go('select'); return; }
+        views.renderLeaderboard(deps.leaderboard, { onBack: () => machine.go('select') });
+      },
+    },
     run: {
       onEnter: () => {
         if (!content) return;
         if (!availableCharacter(charId)) normalizeCharacter();
         if (!charId || !availableCharacter(charId)) { views.toast('暂无可用角色'); return; }
-        audio?.enterRun(charId, themeMusic(adapter.storage, content)); // 主题 BGM 走 themes.json 的 music，缺省回退全局 run
-        lastSeed = hashSeed('run-' + Date.now());
-        const sim: RunnerSim = new RunnerSim(content, lastSeed, charId);
-        // v2：主画布幂等单例 + 即时窗口尺寸（S10 §7.2；跨局复用同一画布，不新建）
-        const host = { canvas: adapter.canvas.mainCanvas(), size: adapter.canvas.windowSize() };
-        hud = views.mountHud();
-        hud.update({ score: 0, coins: 0, distance: 0, hits: 0, lives: sim.lives, buffs: [], skill: null });
-        scene = (deps.createScene ?? createRunnerScene)(host, adapter, sim, content, {
-          onHud: h => hud?.update(h),
-          onEnd: summary => machine.go('result', summary),
-          onDeath: () => audio?.onDeath(), onCast: () => audio?.onCast(),
-          onPickup: () => audio?.onPickup(), onIntro: stage => audio?.onIntro(stage),
-          debug: deps.debug,
-        }, { themeId: currentThemeId(adapter.storage, content) ?? undefined });
-        if (deps.test) installTestApi(sim, content); // 测试面板数据面：?debug/?test 才挂
+        audio?.enterRun(charId, themeMusic(adapter.storage, content)); // 按当前主题选 BGM，缺省回退全局 run
+        scene = createRunSession({
+          adapter, views, content, charId, service: deps.leaderboard,
+          createScene: deps.createScene, debug: deps.debug, test: deps.test,
+          trackRun: deps.trackRun,
+          themeId: currentThemeId(adapter.storage, content) ?? undefined,
+          onSeed: seed => { lastSeed = seed; }, onEnd: summary => machine.go('result', summary),
+          onDeath: () => audio?.onDeath(),
+          onCast: () => audio?.onCast(),
+          onPickup: () => audio?.onPickup(),
+          onIntro: stage => audio?.onIntro(stage),
+        });
       },
       onExit: () => {
-        scene?.dispose(); scene = null; hud?.dispose(); hud = null;
-        if (deps.test) uninstallTestApi(); // 局结束即卸载，避免 __trTest 指向已销毁的 sim
+        scene?.dispose(); scene = null;
         // 已死亡时 exitRun 保留死亡 BGM 到结算页；中途退出则停 run BGM
         audio?.exitRun();
       },
@@ -250,6 +248,7 @@ export function createGameFlow(deps: GameFlowDeps): GameFlow {
         views.renderResult(summary, best, {
           onRetry: () => { if (rememberCharacter(charId)) machine.go('run'); },
           onSelect: () => machine.go('select'),
+          onLeaderboard: deps.leaderboard && views.renderLeaderboard ? () => machine.go('leaderboard') : undefined,
         });
       },
       // 离开结算（重开/回选角）：停死亡 BGM，避免与下一局 run BGM 重叠
@@ -262,6 +261,7 @@ export function createGameFlow(deps: GameFlowDeps): GameFlow {
     if (e.type === 'key' && e.phase === 'down' && e.code === 'Escape' && machine.current() === 'run') machine.go('select');
     else if (e.type === 'key' && e.phase === 'down' && e.code === 'Escape' && machine.current() === 'shop') shopBack?.();
     else if (e.type === 'key' && e.phase === 'down' && e.code === 'Escape' && machine.current() === 'settings') machine.go('select');
+    else if (e.type === 'key' && e.phase === 'down' && e.code === 'Escape' && machine.current() === 'leaderboard') machine.go('select');
   });
 
   async function boot(): Promise<void> {

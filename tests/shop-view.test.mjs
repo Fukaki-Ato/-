@@ -136,11 +136,11 @@ test('Web shop offers are disabled and renderer cleanup runs on navigation and t
   assert.match(shopSource, /action\.disabled = true/);
   assert.match(shopSource, /仅展示配置，不执行购买或兑换/);
   assert.doesNotMatch(shopSource, /action\.addEventListener\(/);
-  assert.match(shopSource, /document\.removeEventListener\('keydown', onKeyDown\)/);
-  assert.match(shopSource, /window\.removeEventListener\('resize', resize\)/);
-  assert.match(shopSource, /visualViewport\?\.removeEventListener\('resize', resize\)/);
-  assert.match(shopSource, /shop-close-button', '返回上一页'/);
-  assert.match(shopSource, /event\.key === 'Escape'\) actions\.onBack\(\)/);
+  // The responsive DOM page delegates Escape/focus/cleanup to the shared lifecycle.
+  // Its actual listener behavior is covered in mobile-ui.test.mjs.
+  assert.match(shopSource, /return pageLifecycle\(root, actions\.onBack\)/);
+  assert.match(shopSource, /classList\.add\('shop-close-button'\)/);
+  assert.match(shopSource, /setAttribute\('aria-label', '返回上一页'\)/);
 
   const host = makeHost();
   let disposals = 0;

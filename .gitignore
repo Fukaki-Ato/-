@@ -18,3 +18,9 @@ Thumbs.db
 Desktop.ini
 .DS_Store
 *.log
+
+# Local mission backend database (contains player/session data)
+/apps/server/data/
+
+# Local leaderboard state (production state lives outside the checkout)
+/data/

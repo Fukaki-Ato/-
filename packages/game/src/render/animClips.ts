@@ -1,11 +1,12 @@
 /**
  * 动作 clip 选择（纯函数、零依赖，node --test 直接回归；three 的播放胶水在 animAvatar.ts）
  * 数据来源：多个 GLB 资产的命名动画 clip（共同契约：1 单位=1m、脚底在原点、面朝 -Z）——
- * char_frog → assets/characters/frog.glb、char_bball → assets/characters/bball.glb、
- * char_whale → assets/characters/whale.glb、char_mambo → assets/characters/pony.glb。
+ * char_frog → frog.glb、char_volt → bball.glb、char_whale → whale.glb、
+ * char_mambo → pony.glb、char_niu → niu.glb（Laugh + Wave）、
+ * char_penguin → penguin.glb（Laugh + Wave + RaiseHand + Hop 四个表演 clip）。
  * 优先级（上层压下层，逐条对应「玩家此刻在干什么」）：
  *   ① QA 锁 ?anim=<ClipName>（仅 dev/QA，见 readAnimLock）→ 强制循环；
- *     表演 clip（Laugh/Basketball）锁播满一期自动交还状态机（演示用，不永久接管），
+ *     表演 clip（Laugh/Basketball/Wave/RaiseHand/Hop）锁播满一期自动交还状态机（演示用，不永久接管），
  *     核心循环锁持续锁播、核心一次性锁播完即解锁（解锁实现都在 animAvatar）
  *   ② !alive → Death 播一次保持末帧；进死亡那一下从 0 重起（restart）
  *   ③ stunT>0 → Hit 循环
@@ -16,7 +17,7 @@
  *   ⑧ 默认：本帧有前行（distance 前进）→ Run；原地不动 → Idle（默认展示动作）
  * 「离地」用 supportY 而非绝对高度：站在 2.4m 车顶/坡道上仍是跑，不是跳（同 avatarRig.pickAvatarMode
  * 的口径，历史上把它当滞空是「火车上跑步动画不正常」的根因）。
- * 循环口径（建模侧资产契约，逐字对应交付要求）：只有 Run/Slide/Laugh/Fly 首末无缝，可 LoopRepeat；
+ * 循环口径（建模侧资产契约，逐字对应交付要求）：Run/Slide/Laugh/Fly/Wave 首末无缝，可 LoopRepeat；
  * Idle/Jump/Hit/Land/TurnLeft/TurnRight/Death/Basketball 一律 LoopOnce 播一次并保持末帧，
  * 由 animAvatar 在播完后收尾
  * （Idle 交回自身首帧做 0.12s 交叉淡化抹掉首末 110° 姿差；其余保持末帧，等状态切换自然淡出）。
@@ -31,12 +32,15 @@ import type { RunnerState } from '@tr/game/core/sim/simTypes.js';
 export const CORE_CLIP_NAMES = [
   'Idle', 'Run', 'Slide', 'Jump', 'TurnLeft', 'TurnRight', 'Fly', 'Land', 'Hit', 'Death',
 ] as const;
-/** 表演 clip（2 个）：不进状态机，只服务 ?anim= QA 锁（以及将来的道具触发演出）。
- *  奶龙带 Laugh（无缝循环的笑），篮球小子带 Basketball（投篮）——两个资产的表演 clip 不同源，
- *  所以按存在性装配：缺失不判资产不合格，pickClip 命中缺失的由 animAvatar.play() 回落 Run。
+/** 表演 clip（5 个）：不进状态机，只服务 ?anim= QA 锁（以及将来的道具触发演出）。
+ *  各资产的表演 clip 不同源：frog/whale/mambo 带 Laugh（无缝循环的笑），bball 带 Basketball
+ *  （投篮，首末姿差 117.16° 只能 LoopOnce），niu 带 Laugh + Wave（招手，无缝循环），
+ *  penguin 带 Laugh + Wave + RaiseHand（抬手）+ Hop（跳一下）——后两者首末都是静止姿
+ *  （LoopOnce 定末帧不怪，故不进 LOOPING_CLIPS）——所以按存在性装配：缺失不判资产不合格，
+ *  pickClip 命中缺失的由 animAvatar.play() 回落 Run，五个全缺才是契约外资产。
  *  Basketball 不能改名成 Laugh 硬上：首末姿差 117.16°，而 Laugh 在 LOOPING_CLIPS 里是
  *  LoopRepeat，直接改名会让它每圈硬跳一次。 */
-export const PERF_CLIP_NAMES = ['Laugh', 'Basketball'] as const;
+export const PERF_CLIP_NAMES = ['Laugh', 'Basketball', 'Wave', 'RaiseHand', 'Hop'] as const;
 /** 全部合法 clip 名（CORE + PERF）：asClipName / readAnimLock 的合法集 */
 export const CLIP_NAMES = [...CORE_CLIP_NAMES, ...PERF_CLIP_NAMES] as const;
 export type ClipName = typeof CLIP_NAMES[number];
@@ -44,8 +48,9 @@ export type CoreClipName = typeof CORE_CLIP_NAMES[number];
 export type PerfClipName = typeof PERF_CLIP_NAMES[number];
 
 /** 可无缝循环的 clip（建模侧实测首末姿一致）：其余一律只播一次。
- *  Basketball 故意不在内：首末姿差 117.16°，LoopRepeat 会每圈硬跳（见 PERF_CLIP_NAMES 注释）。 */
-export const LOOPING_CLIPS = ['Run', 'Slide', 'Laugh', 'Fly'] as const;
+ *  Basketball 故意不在内：首末姿差 117.16°，LoopRepeat 会每圈硬跳（见 PERF_CLIP_NAMES 注释）。
+ *  Wave（niu 招手）实测首末缝 0.0010m 无缝，入循环清单——QA 锁播时按表演 clip 语义放完一期交还。 */
+export const LOOPING_CLIPS = ['Run', 'Slide', 'Laugh', 'Fly', 'Wave'] as const;
 
 /** 是否表演 clip（QA 锁的「演示一期」语义只对它们生效，见 animAvatar 的解锁块） */
 export function isPerfClip(name: ClipName): boolean {

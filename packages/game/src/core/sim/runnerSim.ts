@@ -1,12 +1,10 @@
 /**
  * 跑酷玩法模拟（core/sim 层，纯逻辑、固定步长、确定性）——docs/01 §2-§9、docs/02 §5、docs/08 §2。
- * 分工：运动学 movement.ts / 几何判定 collision.ts / 拾取 collect.ts /
- *       buff 计时合并 effects/buffEngine.ts / 引擎→世界作用面 simWorld.ts / 实体回收 entitySweep.ts。
- *       本文件只做输入路由、逐帧推进与结算。
- * 原则：只暴露 step()/applyAction()（渲染层读状态不写）；事件由调用方 drainEvents() 取走，
- *       所以 step 外产生的施放事件不会丢；全部数值来自 config/*.json（调手感不改代码）。
+ * 运动/碰撞/拾取/buff/世界/回收各自独立；这里做输入路由、推进与结算。
+ * 渲染层只读状态、消费 drainEvents；玩法数值来自 config/*.json。
  */
 import { RunRng } from '../rng.js';
+import { MAX_RANKED_INPUTS, type ReplayInput } from '../leaderboard.js';
 import type { GameContent } from '../config/configTypes.js';
 import { BuffEngine, type BuffView, type CastContext, type FxState } from '../effects/buffEngine.js';
 import { buildLoadout, itemEffects, type EffectSpec, type Loadout } from './character.js';
@@ -17,6 +15,7 @@ import { Movement } from './movement.js';
 import { resolveHit, type HitCtx } from './resolveHit.js';
 import { TrackGen, type CloudEntity, type CoinEntity, type ObstacleEntity, type PickupEntity } from './trackGen.js';
 import { createSimWorld } from './simWorld.js';
+import { FirstCoinRecord, scoreForState } from './firstCoinRecord.js';
 import { cullByWorldZ, cullObstacles, smashAhead } from './entitySweep.js';
 import {
   EMPTY_LOADOUT, FLY_SPEED_CAP, STEP_DT, initialRunnerState,
@@ -66,8 +65,17 @@ export class RunnerSim {
   private readonly buffCtx: CastContext = { distance: 0, lane: 0 };
   /** scoreAdd 原语与技能释放奖励的额外分 */
   private bonusScore = 0;
+  private itemPickups = 0;
+  /** 任务遥测不改变历史 summary / golden 回放结构。 */
+  get missionStats() { return { slides: this.mv.totalSlides, itemPickups: this.itemPickups }; }
+  /** Actual pickups (before currency multipliers). */
+  collectedCoins = 0;
+  readonly firstCoinRecord = new FirstCoinRecord();
+  replayFrames = 0;
+  readonly replayInputs: ReplayInput[] = [];
+  replayOverflow = false;
 
-  constructor(private readonly content: GameContent, seed: number, charId?: string) {
+  constructor(private readonly content: GameContent, seed: number, charId?: string, private readonly recordReplay = false) {
     const p = content.game.params;
     this.R = (p.runner ?? {}) as Record<string, number>;
     this.SC = (p.score ?? {}) as Record<string, number>;
@@ -130,6 +138,10 @@ export class RunnerSim {
   applyAction(a: SimAction) {
     const s = this.state;
     if (!s.alive) return;
+    if (this.recordReplay) {
+      if (this.replayInputs.length < MAX_RANKED_INPUTS) this.replayInputs.push({ frame: this.replayFrames, action: a });
+      else this.replayOverflow = true;
+    }
     if (a === 'laneL') s.lane = Math.max(-1, s.lane - 1); // 换道（含空中与滑翔，滑翔时可变向）
     else if (a === 'laneR') s.lane = Math.min(1, s.lane + 1);
     else if (a === 'skill') this.castSkill();
@@ -138,10 +150,7 @@ export class RunnerSim {
     else if (a === 'slide') this.mv.slideInput(s, this.fx);
   }
 
-  /**
-   * 主动技能可释放：冷却结束 + 活着 + 积攒门槛达标（docs/01 §6.2）。
-   * 无积攒门槛的技能开局第 0 秒即亮（充能制已移除，纯冷却）。
-   */
+  /** 主动技能：冷却结束、活着、积攒门槛达标；无门槛时开局即可释放。 */
   canCastSkill(): boolean {
     const sk = this.loadout.skill;
     const s = this.state;
@@ -175,11 +184,14 @@ export class RunnerSim {
   }
 
   private grantItem(itemRef: string) {
+    this.itemPickups++;
     this.applyEffects(itemEffects(this.content, itemRef), itemRef);
   }
 
   /** 金币入账：coinValueAdd 的百分比加成走小数累计，避免每枚金币四舍五入丢分 */
   private creditCoin() {
+    this.firstCoinRecord.capture(this.state.distance, scoreForState(this.state, this.SC, this.bonusScore));
+    this.collectedCoins++;
     this.coinCarry += 1 * (1 + this.fx.coinPct / 100);
     const whole = Math.floor(this.coinCarry);
     this.state.coins += whole;
@@ -197,6 +209,7 @@ export class RunnerSim {
     const s = this.state;
     s.prevDistance = s.distance;
     if (!s.alive) { s.topple = Math.min(s.topple + STEP_DT * TOPPLE_RATE, TOPPLE_MAX); return; }
+    this.replayFrames++;
 
     s.t += STEP_DT;
     this.buffCtx.distance = s.distance;
@@ -241,10 +254,7 @@ export class RunnerSim {
     this.cull();
     if (!s.alive) return; // 死亡帧不结算拾取与计分（cull 仍执行，保持实体回收）
 
-    s.score = Math.floor(s.distance) * (this.SC.perMeter ?? 10)
-      + s.coins * (this.SC.perCoin ?? 5)
-      + s.nearMiss * (this.SC.perNearMiss ?? 25)
-      + this.bonusScore;
+    s.score = scoreForState(s, this.SC, this.bonusScore);
   }
 
   private collide() {

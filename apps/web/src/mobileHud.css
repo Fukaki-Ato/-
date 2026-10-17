@@ -1,0 +1,19 @@
+.mobile-hud { position: fixed; inset: 0; z-index: 8; pointer-events: none; color: var(--ui-ink); font-family: 'Thunder Sans', 'PingFang SC', system-ui, sans-serif; padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(24px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)); }
+.hud-top { display: flex; justify-content: space-between; align-items: start; gap: 16px; }
+.hud-score-card { display: grid; gap: 2px; padding: 12px 18px; border: 1px solid #fff9; border-radius: 20px; background: #fffdf3eb; box-shadow: 0 4px 20px #164e5710; }
+.hud-label { font-size: 9px; font-weight: 750; letter-spacing: .16em; color: var(--ui-teal); }
+.hud-score { font-size: 30px; line-height: 1.15; font-weight: 850; font-variant-numeric: tabular-nums; }
+.hud-distance { font-size: 11px; color: var(--ui-muted); }
+.hud-counters { display: grid; gap: 8px; justify-items: end; }
+.hud-coins, .hud-hearts { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border: 1px solid #fff9; border-radius: 13px; background: #fffdf3e8; }
+.hud-coins { min-width: 54px; font-size: 14px; }
+.hud-coins img { width: 20px; height: 20px; object-fit: contain; }
+.hud-hearts { font-size: 17px; color: #df755f; letter-spacing: 2px; }
+.hud-buffs { display: block; width: max-content; max-width: 85%; margin-top: 10px; font-size: 10px; line-height: 1.5; padding: 8px 12px; border-radius: 12px; color: #fffdf4; background: #173f4bd9; }
+.hud-skill { position: absolute; bottom: max(26px, env(safe-area-inset-bottom)); left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 10px; max-width: calc(100% - 32px); width: max-content; padding: 12px 16px; border: 1px solid #fff9; border-radius: 18px; background: #fffdf3ee; box-shadow: 0 5px 20px #164e5710; }
+.hud-skill strong { font-size: 12px; }
+.hud-skill > span:last-child { font-size: 10px; color: var(--ui-muted); white-space: nowrap; }
+.hud-skill-icon { font-size: 22px; color: #94a19b; }
+.hud-skill.is-ready { background: #d9f4e6; border-color: #62b7a4; }
+.hud-skill.is-ready .hud-skill-icon, .hud-skill.is-ready > span:last-child { color: var(--ui-teal); }
+.mobile-hud [hidden] { display: none; }

@@ -13,7 +13,9 @@ import type { GLCanvas, PlatformAdapter, WindowSize } from '@tr/framework/platfo
 import { createAvatar } from './avatarRig.js';
 import { camTargets } from './cameraRig.js';
 import { createCoinField } from './coinField.js';
-import { createCloudLayer, createObstacleLayer, createPickupLayer } from './entityLayers.js';
+import { createCloudLayer, createObstacleLayer } from './entityLayers.js';
+import { createPickupLayer } from './pickupLayer.js';
+import { createPickupModelLoader } from './pickupModels.js';
 import { createIntroPanel } from './introPanel.js';
 import { installRunProbe, uninstallRunProbe } from './runDebugProbe.js';
 import { createSpeedLines } from './speedLines.js';
@@ -40,9 +42,7 @@ export interface RunCallbacks {
   debug?: boolean;
 }
 
-/** 相机参数（docs/02 §8：跟随人物但不 1:1 抬高，否则近处地面会翻出画面下沿）。
- *  机位/注视点/FOV 目标统一由 cameraRig.ts 纯函数派生（地面/空中两套，可回归测试），
- *  这里只保留平滑系数与注视点纵深；审计 T1/T2 的历史口径见 cameraRig.ts 注释。 */
+/** 相机目标/FOV 在 cameraRig.ts 派生，本文件只保留平滑系数与注视点纵深。 */
 /** 注视点纵深（米）：四轮反馈「视角有点远」后由 -11 收到 -9.5（构图更紧、人物不上移出画） */
 const CAM_FOLLOW = 0.25, FOV_LERP = 0.06, LOOK_AHEAD_Z = -9.5;
 /** 加速（speedMul>1）的视野扩张：按 (speedMul-1) 线性加宽并封顶（雷霆冲刺一类技能要看得见加速） */
@@ -113,7 +113,9 @@ export function createRunnerScene(
   const avatar = createAvatar(scene, laneWidth, sim.loadout, adapter);
   const coinField = createCoinField(scene, laneWidth);
   const obstacleLayer = createObstacleLayer(scene, laneWidth);
-  const pickupLayer = createPickupLayer(scene, laneWidth);
+  // 道具 3D 模型（items.json model.prefab/spin）：磁铁有文件→近距换 3D，其余预留路径
+  // 文件缺失→加载器返回 null，保持贴图箱（wx 无 extras.readBinary 同理），捞取判定不受影响
+  const pickupLayer = createPickupLayer(scene, laneWidth, createPickupModelLoader(content, adapter));
   const cloudLayer = createCloudLayer(scene);
   const bursts = createBurstPool(scene);
   const speedLines = createSpeedLines(scene, tint);

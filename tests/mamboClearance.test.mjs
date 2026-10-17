@@ -40,10 +40,10 @@ test('loadout.clearance：按配置读数，缺省回落 STAND_H', () => {
   assert.equal(buildLoadout(content, 'char_mambo').clearance, 1.19);
   // 老角色：显式值均 > BAR_BOTTOM，站立行为与硬编码 1.7 时代一致
   assert.equal(buildLoadout(content, 'char_whale').clearance, 1.52);
-  assert.equal(buildLoadout(content, 'char_bball').clearance, 1.70);
+  assert.equal(buildLoadout(content, 'char_volt').clearance, 1.70);
   assert.equal(buildLoadout(content, 'char_frog').clearance, STAND_H);
   // 无 clearance 字段的角色（程序化模型/未交付 GLB 的 rina、bolt）回落标准身高
-  for (const id of ['char_volt', 'char_ama', 'char_kaze', 'char_rina', 'char_bolt']) {
+  for (const id of ['char_ama', 'char_kaze', 'char_rina', 'char_bolt']) {
     assert.equal(buildLoadout(content, id).clearance, STAND_H, `${id} 应回落 ${STAND_H}`);
   }
   // 找不到角色 → 空装备也带默认净空（sim 的 EMPTY_LOADOUT 路径）
@@ -98,7 +98,7 @@ test('sim 差分：char_mambo 零输入站立冲过滑铲门；对照角色同�
     `应已越过门（dist=${pony.sim.state.distance.toFixed(1)} > ${pony.gate.worldZ + 1}）`);
   assert.equal(pony.sim.state.hits, 0, '全程不应受击');
 
-  for (const id of ['char_whale', 'char_bball', 'char_volt']) {
+  for (const id of ['char_whale', 'char_volt']) {
     const ctrl = gateSim(id);
     assert.ok(!ctrl.sim.state.alive, `${id} 站立冲滑铲门应被挡死`);
     assert.ok(ctrl.sim.state.distance < ctrl.gate.worldZ + 2,

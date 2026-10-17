@@ -44,7 +44,7 @@ const VFX_ANCHOR = {
 } as const;
 
 export function createAvatar(scene: THREE.Scene, laneWidth: number, look: Loadout, adapter?: PlatformAdapter) {
-  const model = createRunnerModel({ body: look.bodyTint, glow: look.emissive, scale: look.modelScale });
+  const model = createRunnerModel({ body: look.bodyTint, glow: look.emissive, scale: look.fallbackModelScale ?? look.modelScale });
   const procGroup = model.group;
   scene.add(procGroup);
 
