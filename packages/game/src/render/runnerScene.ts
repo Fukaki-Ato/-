@@ -253,7 +253,8 @@ export function createRunnerScene(
     if (paused) { last = nowMs; raf = adapter.requestFrame(tick); return; } // 后台冻结：不推进 sim，仅对齐时钟
     const dt = Math.min((nowMs - last) / 1000, 0.05);
     last = nowMs;
-    if (intro?.active()) { intro.update(dt); renderer.render(scene, camera); raf = adapter.requestFrame(tick); return; } // 登场动画：整局冻结，只推进视频
+    intro?.update(dt); // 无视频源时只计时恢复 BGM；active 仅表示需要冻结 sim 的视频面板
+    if (intro?.active()) { renderer.render(scene, camera); raf = adapter.requestFrame(tick); return; } // 登场视频：整局冻结
     acc += dt;
     while (acc >= STEP_DT) {
       sim.step();

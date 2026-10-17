@@ -43,12 +43,28 @@ test('没配 intro：不建面板、一个时点都不报', () => {
   assert.deepEqual(stages, []);
 });
 
-test('配了 intro 但没有视频源（微信端/注入失败）：只报 start 响音效，不冻结画面', () => {
+test('配了 intro 但没有视频源（微信端/注入失败）：只响音效、不冻结画面，时长到后续播 BGM', () => {
   const { scene, camera, stages } = stage();
-  assert.equal(createIntroPanel(scene, camera, SPEC, 'char_frog', onStage(stages)), null,
-    '无源＝没有面板，主循环照常推进');
+  const panel = createIntroPanel(scene, camera, SPEC, 'char_frog', onStage(stages));
+  assert.ok(panel, '无视频源仍需跟踪音频-only让位生命周期');
+  assert.equal(panel.active(), false, '无面板＝主循环照常推进');
   assert.deepEqual(stages, ['start']);
   assert.equal(scene.children.length, 0);
+  panel.update(SPEC.durationS - 0.01);
+  assert.deepEqual(stages, ['start'], '音效预计时长内继续让位');
+  panel.update(0.02);
+  assert.deepEqual(stages, ['start', 'end'], '音频-only 让位必须自动结束并续播 BGM');
+  assert.equal(panel.active(), false, '计时不能冻结跑酷');
+  panel.dispose();
+});
+
+test('音频-only 让位在离开场景时取消，不迟到地发送 end', () => {
+  const { scene, camera, stages } = stage();
+  const panel = createIntroPanel(scene, camera, SPEC, 'char_frog', onStage(stages));
+  assert.ok(panel);
+  panel.dispose();
+  panel.update(SPEC.durationS * 2);
+  assert.deepEqual(stages, ['start'], 'scene dispose 后音频导演由 exitRun/death 收尾');
 });
 
 test('有视频源：面板立在相机正前方 4 米并朝向相机，播完才报 end 并交还渲染权', async () => {

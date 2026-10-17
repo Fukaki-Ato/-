@@ -28,8 +28,9 @@ export function setIntroSource(charId: string, source: IntroSource | null): void
 }
 
 export interface IntroPanel {
-  /** 面板还在播：true 时 runnerScene 只推进本模块并渲染，不推进 sim */
+  /** 视频面板还在播：true 时 runnerScene 冻结 sim；音频-only 回退始终为 false */
   active(): boolean;
+  /** 每帧推进视频兜底或无视频时的音频-only让位计时 */
   update(dt: number): void;
   dispose(): void;
 }
@@ -41,7 +42,21 @@ export function createIntroPanel(
   if (!spec) return null;
   onStage('start'); // 登场音效压过 BGM：无论有没有视频面都先报一声
   const source = sources.get(charId);
-  if (!source) return null; // 无视频源＝纯音频登场，不冻结画面
+  if (!source) {
+    // WX/视频注入失败时只播音效，跑酷不冻结；intro.mp3 取自同一段源片，沿用其时长
+    // 结束这次音频让位。计时由 runnerScene 每帧推进，dispose 会丢弃迟到的结束通知。
+    let elapsed = 0, pending = true;
+    const durationS = Number.isFinite(spec.durationS) ? Math.max(0, spec.durationS) : 0;
+    return {
+      active: () => false,
+      update(dt: number) {
+        if (!pending) return;
+        elapsed += Number.isFinite(dt) ? Math.max(0, dt) : 0;
+        if (elapsed >= durationS) { pending = false; onStage('end'); }
+      },
+      dispose() { pending = false; },
+    };
+  }
 
   const mesh = new THREE.Mesh(
     new THREE.PlaneGeometry(spec.widthM, spec.heightM),

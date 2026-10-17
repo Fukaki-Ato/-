@@ -71,7 +71,7 @@ reach the director through `RunCallbacks.onCast` / `onPickup` / `onDeath` in
 | --- | --- |
 | Enter `run` (selected character) | `<theme>.music` loops (falls back to `bgm.run`); `sfx.start` once |
 | Character intro starts (`characters.json → <id>.intro`) | still-sounding one-shots (the start voice line) are cut via `stopSfx`; BGM ducks via `pauseMusic`; that character's `sfx.intro` plays once |
-| Character intro ends (video finished, or `durationS` + 1.5s safety cap) | BGM resumes in place; the frozen run starts |
+| Character intro ends (video finished, or `durationS` + 1.5s safety cap; with no video source, `durationS` audio-only deadline) | BGM resumes in place; a video-frozen run starts, while audio-only gameplay continues throughout |
 | Sim `cast` event | selected character's `sfx.cast` |
 | Sim `pickup` event (item box, not coins) | selected character's `sfx.pickup` |
 | Sim `death` event (once per run) | run BGM stops; `bgm.death` plays once (no loop); one `sfx.death` pool entry; selected character's `sfx.death` |
@@ -110,7 +110,8 @@ See `assets/audio/README.md` (formats, budget, licensing).
   The element is **muted** — the entrance sound goes through `AudioService.playSfx` instead, so
   autoplay policy can't stall the run and WX still gets the sting. WX has no video decoding and
   `tools/build-wx.mjs` only copies audio/image assets (an `.mp4` under `assets/video/` is not
-  packaged), so on WX an `intro` entry means "audio sting, no freeze".
+  packaged), so on WX an `intro` entry means "audio sting, no freeze"; the run BGM resumes after
+  the configured `durationS` audio-only handoff unless the run ends first.
 - Visibility: Web BGM keeps playing while the page is hidden; WX suspends audio when the
   minigame is backgrounded. Pausing via `onVisibility` is deliberately not wired yet.
 
@@ -126,8 +127,9 @@ npm run dev     # 手动：开局 BGM+开局音效；死亡停 BGM、播死亡�
   duck/resume handoff (including "no `intro` cue means no audio calls at all").
 - `tests/settings-scene.test.mjs` — `themeMusic` follows the setting the player picked and falls
   back for dirty/missing values; every `themes.json` entry's `music` file must exist on disk.
-- `tests/introPanel.test.mjs` — the freeze contract: no spec/no source means no freeze, geometry
-  and camera-facing placement, and the `durationS` + slack cap that always hands the frame back.
+- `tests/introPanel.test.mjs` — the freeze contract: audio-only fallback never freezes and ends
+  its BGM handoff at `durationS`, plus geometry/camera placement and the video `durationS` + slack
+  cap that always hands the frame back.
 - `tests/mainFlow.test.mjs` — scene handoff with the real config and a fake scene: character
   selection, cast/pickup/death callbacks, death BGM through result, retry/menu/Esc cleanup.
 - `tests/platform-wx.test.mjs` — WX path resolution, `InnerAudioContext.src`, and that
