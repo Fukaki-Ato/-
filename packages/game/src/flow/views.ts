@@ -51,6 +51,8 @@ export interface SelectActions {
   onCharacterSelect?(): void;
   onShop?(): void;
   onTasks?(): void;
+  /** 打开限时活动页（大厅「活动」入口）；缺省＝该入口只有按压反馈 */
+  onEvents?(): void;
   /** 打开设置页（右上「设置」徽标）；缺省＝该入口只有按压反馈 */
   onSettings?(): void;
   onLeaderboard?(): void;
@@ -65,10 +67,21 @@ export interface CharacterSelectPageActions {
 
 export interface ShopActions { onBack(): void }
 
-/** 设置页动作：返回大厅；选定跑酷场景主题（流程校验并写本机记忆，返回是否生效） */
+/** 设置页音量声道（存储与音频面同名语义：music＝BGM，sfx＝一次性音效） */
+export type VolumeKind = 'music' | 'sfx';
+
+/** 生效音量（0..1）：流程从本机记忆 + 配置默认解析后传给设置页展示 */
+export interface VolumeSettings {
+  music: number;
+  sfx: number;
+}
+
+/** 设置页动作：返回大厅；选定跑酷场景主题；调节音量（流程校验并写本机记忆，返回是否生效） */
 export interface SettingsActions {
   onBack(): void;
   onSelectTheme(themeId: string): boolean;
+  /** value ∈ 0..1；流程落盘整数百分比并回 true，非法声道/值回 false（视图保持原显示） */
+  onSetVolume(kind: VolumeKind, value: number): boolean;
 }
 
 /** 大厅页本机统计（mainFlow 从 storage 读出注入；视图不直接碰存储键定义方） */
@@ -106,8 +119,13 @@ export interface GameViews {
     entry: EntryMethod | null,
   ): void;
   renderShop(content: GameContent, actions: ShopActions): void;
-  /** 设置页（每个游戏都必须有）：当前首项＝切换跑酷场景；currentThemeId 为流程解析出的生效主题 */
-  renderSettings(content: GameContent, actions: SettingsActions, currentThemeId: string | null): void;
+  /** 设置页（每个游戏都必须有）：切换跑酷场景 + 音量；currentThemeId/volumePrefs 为流程解析出的生效值 */
+  renderSettings(
+    content: GameContent,
+    actions: SettingsActions,
+    currentThemeId: string | null,
+    volumePrefs?: VolumeSettings,
+  ): void;
   renderLeaderboard?(service: LeaderboardService, actions: { onBack(): void }): void;
   mountHud(): HudHandle;
   renderResult(summary: RunSummary, best: number, actions: ResultActions): void;

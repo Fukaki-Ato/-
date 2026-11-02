@@ -13,6 +13,8 @@
  * 中途退出（未死亡）exitRun 直接停 BGM。onCast/onPickup 只播所选角色的技能/拾取音效。
  * 随机源独立于玩法 RNG（可注入，缺省为独立 mulberry32 流），不消耗 RunRng、不影响赛道复现。
  * adapter.audio 缺省（纯逻辑测试壳）或配置缺失/畸形时全部空操作——音频不阻塞玩法。
+ * 用户音量：options.volumes 提供者每次播放时读取（设置页写本机记忆后即改即生效），
+ * 未设置的声道路 params.audio.volume 配置默认——配置是内容作者给出的混音基准，用户偏好只做覆盖。
  * 内容规范见 docs/audio.md。
  */
 import type { PlatformAdapter } from '@tr/framework/platform/platformAdapter.js';
@@ -65,9 +67,20 @@ export interface AudioConfig {
   sfxVolume: number;
 }
 
+/** 用户音量偏好（设置页持久化的本机记忆）；缺某声道＝该声道用配置默认 */
+export interface VolumePrefs {
+  music?: number;
+  sfx?: number;
+}
+
 export interface AudioDirectorOptions {
   /** 音频专用随机源 [0,1)；与玩法 RNG 分离，测试可注入（缺省=固定种子的独立 mulberry32 流） */
   random?: () => number;
+  /**
+   * 用户音量偏好提供者：每次播放时读取（设置页写完存储即改即生效，无需另行同步）。
+   * 缺省＝不用用户偏好，全程走配置默认。
+   */
+  volumes?: () => VolumePrefs;
 }
 
 const AUDIO_SEED = 0xa0d10;
@@ -153,14 +166,15 @@ export function createAudioDirector(
   const audio = adapter.audio;
   const cfg = parseAudioConfig(params);
   const random = options.random ?? mulberry32(AUDIO_SEED);
-  const music = { volume: cfg.musicVolume };
-  const sfx = { volume: cfg.sfxVolume };
+  /** 生效音量：每次播放时读用户偏好（越界夹 0..1，脏值/缺省回配置默认） */
+  const musicVolume = (): number => asVolume(options.volumes?.().music, cfg.musicVolume);
+  const sfxVolume = (): number => asVolume(options.volumes?.().sfx, cfg.sfxVolume);
   /** idle：无局内音乐；run：run BGM 中；dead：死亡 BGM 可能仍在播（结算页） */
   let phase: 'idle' | 'run' | 'dead' = 'idle';
   let cues = NO_CUES;
   /** 登场动画是否已把 run BGM 暂停掉（end 只在这之后续播，避免空续播/重复暂停） */
   let introHeld = false;
-  const playSfx = (url: string) => { if (audio && url) audio.playSfx(url, sfx); };
+  const playSfx = (url: string) => { if (audio && url) audio.playSfx(url, { volume: sfxVolume() }); };
 
   return {
     enterRun(charId, themeBgm) {
@@ -169,7 +183,7 @@ export function createAudioDirector(
       introHeld = false;
       cues = (charId !== undefined && cfg.characters.get(charId)) || NO_CUES;
       const bgm = sanitizeAudioPath(themeBgm) || cfg.bgmRun; // 主题没配 music 就回退全局 run
-      if (audio && bgm) audio.playMusic(bgm, { loop: true, ...music });
+      if (audio && bgm) audio.playMusic(bgm, { loop: true, volume: musicVolume() });
       playSfx(cfg.startSfx);
     },
     exitRun() {
@@ -181,7 +195,7 @@ export function createAudioDirector(
       if (!audio) return;
       introHeld = false;
       audio.stopMusic();
-      if (cfg.bgmDeath) audio.playMusic(cfg.bgmDeath, { loop: false, ...music });
+      if (cfg.bgmDeath) audio.playMusic(cfg.bgmDeath, { loop: false, volume: musicVolume() });
       playSfx(pickFromPool(cfg.deathSfx, random));
       playSfx(cues.death);
     },

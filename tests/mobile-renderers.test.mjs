@@ -25,8 +25,8 @@ test('mobile renderers receive flow data and dispose all pages across the play l
   assert.deepEqual(calls[0], { name: 'lobby', args: [content, actions, 'char_volt', extras] });
   views.renderCharacterSelectPage(content, actions, 'char_volt', 'guest');
   views.renderShop(content, actions);
-  views.renderSettings(content, actions, 'theme_coast');
-  assert.deepEqual(calls.at(-1).args, [content, actions, 'theme_coast']);
+  views.renderSettings(content, actions, 'theme_coast', { music: 0.7, sfx: 1 });
+  assert.deepEqual(calls.at(-1).args, [content, actions, 'theme_coast', { music: 0.7, sfx: 1 }]);
   assert.equal(views.mountHud(), hud);
   hud.dispose();
   const summary = { score: 9876, distance: 543, coins: 12 };

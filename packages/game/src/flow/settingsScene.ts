@@ -1,16 +1,24 @@
 /**
- * 设置场景（settings）：大厅右上「设置」徽标进入的独立页面；当前首项＝切换跑酷场景。
- * 场景主题的存储语义全收口在这里（THEME_KEY 读写、脏值清理、默认回退），mainFlow 只接线：
- * 点选即写本机记忆，run 进局时读同一存储注入渲染场景——「下一局生效」，不重建 GL 场景。
+ * 设置场景（settings）：大厅右上「设置」徽标进入的独立页面；当前项＝切换跑酷场景 + 音乐/音效音量。
+ * 场景主题与音量的存储语义全收口在这里（KEY 读写、脏值清理、默认回退），mainFlow 只接线：
+ * 主题点选即写本机记忆，run 进局时读同一存储注入渲染场景——「下一局生效」，不重建 GL 场景；
+ * 音量只写本机记忆，音频导演每次播放经 volumes 提供者读同一存储——「立即生效」。
  * 铁律同 flow：零 DOM/wx——只读配置/存储、算纯值，页面渲染经注入的 GameViews。
  */
+import { parseAudioConfig } from '@tr/game/core/audio/audioDirector.js';
 import type { GameContent } from '@tr/game/core/config/configTypes.js';
 import type { SceneDef } from '@tr/game/core/scene/sceneMachine.js';
 import type { SyncStorage } from '@tr/framework/platform/platformAdapter.js';
-import type { GameViews } from './views.js';
+import type { GameViews, VolumeKind, VolumeSettings } from './views.js';
 
 /** 设置页「切换场景」所选主题 id（点选即写，run 进局时消费——下一局生效） */
 export const THEME_KEY = 'thunderrun:theme';
+
+/** 音量偏好存储键（0..100 整数百分比字符串；设置页写，音频导演每次播放时读） */
+export const MUSIC_VOLUME_KEY = 'thunderrun:volume-music';
+export const SFX_VOLUME_KEY = 'thunderrun:volume-sfx';
+
+const VOLUME_KEYS: Record<VolumeKind, string> = { music: MUSIC_VOLUME_KEY, sfx: SFX_VOLUME_KEY };
 
 type Entry = Record<string, unknown>;
 
@@ -54,6 +62,33 @@ export function pruneThemeSelection(storage: SyncStorage, content: GameContent |
   if (stored !== null && !themeEntries(content).some(t => t['id'] === stored)) storage.remove(THEME_KEY);
 }
 
+/** 存储里的音量偏好（换算成 0..1）；未存/脏值（非整数、越界百分比）返回 null，交配置默认 */
+export function storedVolume(storage: SyncStorage, kind: VolumeKind): number | null {
+  const raw = storage.get(VOLUME_KEYS[kind]);
+  if (raw === null) return null;
+  const n = Number(raw);
+  return Number.isInteger(n) && n >= 0 && n <= 100 ? n / 100 : null;
+}
+
+/** 生效音量：用户偏好优先，缺省回 params.audio.volume 配置默认（设置页展示与音频播放同一口径） */
+export function volumePrefs(storage: SyncStorage, content: GameContent | null): VolumeSettings {
+  const cfg = parseAudioConfig(content?.game.params);
+  return {
+    music: storedVolume(storage, 'music') ?? cfg.musicVolume,
+    sfx: storedVolume(storage, 'sfx') ?? cfg.sfxVolume,
+  };
+}
+
+/** 进设置页清理：脏音量存档（非整数/越界百分比）→ 移除，存储不长期留脏值 */
+export function pruneVolumePrefs(storage: SyncStorage): void {
+  for (const key of Object.values(VOLUME_KEYS)) {
+    const raw = storage.get(key);
+    if (raw === null) continue;
+    const n = Number(raw);
+    if (!Number.isInteger(n) || n < 0 || n > 100) storage.remove(key);
+  }
+}
+
 export interface SettingsSceneDeps {
   storage: SyncStorage;
   views: GameViews;
@@ -63,13 +98,14 @@ export interface SettingsSceneDeps {
   stopDeathMusic(): void;
 }
 
-/** 设置场景定义：进入即渲染设置页；点选主题＝校验 + 写本机记忆（下一局进 run 时生效） */
+/** 设置场景定义：进入即渲染设置页；点选主题/调节音量＝校验 + 写本机记忆（主题下一局生效，音量立即生效） */
 export function createSettingsScene(d: SettingsSceneDeps): SceneDef {
   return {
     onEnter: () => {
       d.stopDeathMusic(); // 与回大厅同口径：死亡 BGM 不带进设置页
       const content = d.content();
       if (!content) { d.goSelect(); return; }
+      pruneVolumePrefs(d.storage);
       d.views.renderSettings(content, {
         onBack: () => d.goSelect(),
         onSelectTheme: id => {
@@ -78,7 +114,15 @@ export function createSettingsScene(d: SettingsSceneDeps): SceneDef {
           d.views.toast(`已切到「${themeName(content, id)}」，下一局生效`);
           return true;
         },
-      }, currentThemeId(d.storage, content));
+        // 音量按 0..100 整数百分比落盘；音频导演经 volumes 提供者读同一存储，下一次播放即用新值
+        onSetVolume: (kind, value) => {
+          if (kind !== 'music' && kind !== 'sfx') return false;
+          if (typeof value !== 'number' || !Number.isFinite(value)) return false;
+          const pct = Math.round(Math.min(1, Math.max(0, value)) * 100);
+          d.storage.set(VOLUME_KEYS[kind], String(pct));
+          return true;
+        },
+      }, currentThemeId(d.storage, content), volumePrefs(d.storage, content));
     },
   };
 }

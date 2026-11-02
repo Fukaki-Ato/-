@@ -17,7 +17,7 @@ import type { AudioDirector } from '@tr/game/core/audio/audioDirector.js';
 import { hashSeed, mulberry32 } from '@tr/game/core/rng.js';
 import { createRunSession, type RunSessionDeps } from './runSession.js';
 import type { LeaderboardService } from './leaderboard.js';
-import { createSettingsScene, currentThemeId, pruneThemeSelection, themeMusic } from './settingsScene.js';
+import { createSettingsScene, currentThemeId, pruneThemeSelection, themeMusic, volumePrefs } from './settingsScene.js';
 import { createRunnerScene } from '@tr/game/render/runnerScene.js';
 import type { PlatformAdapter } from '@tr/framework/platform/platformAdapter.js';
 import type { GameViews, RunSummary } from './views.js';
@@ -285,6 +285,7 @@ export function createGameFlow(deps: GameFlowDeps): GameFlow {
     pruneThemeSelection(adapter.storage, content); // 存档主题已删/改名 → 清掉，不把无效 id 带进渲染
     audio = createAudioDirector(adapter, content.game.params, {
       random: deps.audioRandom ?? mulberry32(hashSeed('audio-' + Date.now())),
+      volumes: () => volumePrefs(adapter.storage, content), // 用户音量偏好每次播放时读取，设置页改完即生效
     });
     // 游客态直入主界面：不要求登录、不调 adapter.extras.login()、不显示授权弹窗。
     // 开始页（微信/游客两入口）保留在场景机里但不再有入口可达，登录代码零调用。

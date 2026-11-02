@@ -65,6 +65,36 @@ reach the director through `RunCallbacks.onCast` / `onPickup` / `onDeath` in
   non-http schemes, `//host` URLs) are dropped silently; invalid pool items are skipped and
   duplicates removed.
 
+## Player volume
+
+Players control two channels from the settings page — music and SFX. Each row carries a
+channel icon (♪ music note / speaker in the DOM version, ♪/♬ glyphs on canvas), a
+drag-adjustable progress bar, and a live percentage label. The bar drags at 1% granularity;
+the canvas rows additionally keep `<` / `>` buttons stepping 10%. The preference is stored
+locally (per device, like the theme choice):
+
+- Storage keys `thunderrun:volume-music` / `thunderrun:volume-sfx` hold integer percent
+  strings (`"0"`…`"100"`); the storage semantics live in `flow/settingsScene.ts` next to
+  the theme keys.
+- Effective volume = stored preference for that channel, falling back to
+  `params.audio.volume` (the content mix baseline) when unset or dirty. The config entry
+  stays the author's default mix; the player preference only overrides it.
+- `AudioDirector` consults the preference on **every play call** via the
+  `AudioDirectorOptions.volumes` provider (wired in `mainFlow.ts`), so a change made in
+  settings applies from the next playback with no further wiring — the framework
+  `AudioService` contract is unchanged. The settings page itself is silent and BGM only
+  plays during runs, so no live-audio sync is needed.
+- Dirty values (non-integer / out-of-range percent) are pruned when the settings page
+  opens (`pruneVolumePrefs`).
+
+Both settings surfaces get the volume rows: the canvas UI (`ui/settingsView.ts` with the
+game-local `ui/volumeSlider.ts` drag widget, the shared overlay fallback) and the Web
+mobile DOM page (`apps/web/src/mobilePanels.ts`, native `<input type="range">`). The
+slider widget reuses the framework's public `Widget` base — no framework API change.
+Icons/colors: DOM rows use inline SVG (teal for music, coral for SFX, matching the
+seaside skin); canvas rows use the ♪/♬ glyphs from the CJK font atlas (rebuild the atlas
+after adding new rendered glyphs, see AGENTS.md).
+
 ## Lifecycle
 
 | Trigger | Sound |
@@ -123,10 +153,13 @@ npm run dev     # 手动：开局 BGM+开局音效；死亡停 BGM、播死亡�
 ```
 
 - `tests/audioDirector.test.mjs` — parsing (legacy/pool/malformed), the lifecycle against the
-  real `config/game.json`, injected randomness, per-theme BGM override/fallback, and the intro
-  duck/resume handoff (including "no `intro` cue means no audio calls at all").
+  real `config/game.json`, injected randomness, per-theme BGM override/fallback, the intro
+  duck/resume handoff (including "no `intro` cue means no audio calls at all"), and the
+  per-play `volumes` provider (player preference overrides, dirty values fall back, clamping).
 - `tests/settings-scene.test.mjs` — `themeMusic` follows the setting the player picked and falls
-  back for dirty/missing values; every `themes.json` entry's `music` file must exist on disk.
+  back for dirty/missing values; every `themes.json` entry's `music` file must exist on disk;
+  the volume rows step in 10% increments, persist integer-percent storage keys, clamp at the
+  endpoints, and prune dirty values when the page opens.
 - `tests/introPanel.test.mjs` — the freeze contract: audio-only fallback never freezes and ends
   its BGM handoff at `durationS`, plus geometry/camera placement and the video `durationS` + slack
   cap that always hands the frame back.
