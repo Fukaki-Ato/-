@@ -43,6 +43,40 @@ test('enterRun：播放循环 BGM，带配置音量', () => {
   assert.deepEqual(calls, [['playMusic', 'assets/audio/bgm/run.mp3', { loop: true, volume: 0.5 }]]);
 });
 
+test('volumes 提供者：用户偏好覆盖配置音量；缺声道/脏值回配置默认；越界夹 0..1', () => {
+  const { calls, adapter } = makeAdapter();
+  let pref = { music: 0.2 };
+  const d = createAudioDirector(adapter, params, { volumes: () => pref });
+  d.enterRun();
+  assert.deepEqual(calls, [['playMusic', 'assets/audio/bgm/run.mp3', { loop: true, volume: 0.2 }]],
+    'BGM 用用户偏好，不用配置 0.5');
+
+  pref = { music: 0.2, sfx: 0.3 };
+  d.onDeath(); // 停 BGM（一次性死亡音效走 sfx 通道；本配置无死亡 BGM）
+  assert.deepEqual(calls.slice(1), [
+    ['stopMusic'],
+    ['playSfx', 'assets/audio/sfx/death.mp3', { volume: 0.3 }],
+  ], '音效也跟用户偏好走');
+
+  pref = { music: 5, sfx: -1 };
+  d.stopDeathMusic();
+  d.enterRun();
+  assert.deepEqual(calls.at(-1), ['playMusic', 'assets/audio/bgm/run.mp3', { loop: true, volume: 1 }],
+    '越界偏好夹到 1');
+
+  pref = {};
+  d.exitRun();
+  d.enterRun();
+  assert.deepEqual(calls.at(-1), ['playMusic', 'assets/audio/bgm/run.mp3', { loop: true, volume: 0.5 }],
+    '缺声道回配置默认');
+
+  pref = { music: Number.NaN };
+  d.exitRun();
+  d.enterRun();
+  assert.deepEqual(calls.at(-1), ['playMusic', 'assets/audio/bgm/run.mp3', { loop: true, volume: 0.5 }],
+    '脏偏好回配置默认');
+});
+
 test('旧版单路径 sfx.death：先停 BGM 再播一次性死亡音效；死亡后 exitRun 不再停乐，stopDeathMusic 收尾', () => {
   const { calls, adapter } = makeAdapter();
   const d = createAudioDirector(adapter, params);

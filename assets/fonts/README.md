@@ -14,6 +14,12 @@ Full rebuild scans repo text (`packages/game/src`, `apps/web/src`, `config/*.jso
     cd tools/fontgen && npm ci
     node charset.mjs && node gen.mjs --preset cjk
 
+After rebuilding or supplementing, keep both atlas dimensions at most 4096px for mobile GPU compatibility. Repack existing glyphs without a system font or any pixel changes (run from the repository root):
+
+    node tools/fontgen/repack.mjs assets/fonts/cjk 2048
+
+This preserves all glyph bitmap bytes and font metrics, updating only atlas dimensions, cell positions and normalized UVs. The repacker rejects output that exceeds 4096px.
+
 The CJK atlas requires a system CJK font (candidates in `tools/fontgen/fonts.mjs`: Microsoft YaHei / SimHei on Windows).
 
 When the build environment has no such font but new text already landed, `tools/fontgen/supplement.mjs` appends only the missing glyphs from a supplied font (`--font <ttf|ttc> [--face N] [--label ...]`), marks them `fallbackFont` in the metrics, and leaves every existing glyph byte-identical. A later full rebuild supersedes the supplement.

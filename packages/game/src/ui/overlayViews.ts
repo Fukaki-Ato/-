@@ -9,7 +9,9 @@ import type { GameContent } from '@tr/game/core/config/configTypes.js';
 import type {
   BootHandle, CharacterSelectPageActions, GameViews, HudHandle, ResultActions, RunSummary,
   SelectActions, SelectExtras, SettingsActions, ShopActions, StartActions, StartHandle,
+  VolumeSettings,
 } from '../flow/views.js';
+import { DEFAULT_MUSIC_VOLUME, DEFAULT_SFX_VOLUME } from '../core/audio/audioDirector.js';
 import type { EntryMethod } from '../flow/session.js';
 import type { LeaderboardService } from '../flow/leaderboard.js';
 import type { UiHost } from '@tr/framework/ui/host.js';
@@ -36,7 +38,9 @@ export interface OverlayViewsDeps {
   onLobbyVisible?(visible: boolean): void;
   shopRenderer?: (content: GameContent, actions: ShopActions) => () => void;
   lobbyRenderer?: (content: GameContent, actions: SelectActions, currentCharId: string, extras?: SelectExtras) => () => void;
-  settingsRenderer?: (content: GameContent, actions: SettingsActions, currentThemeId: string | null) => () => void;
+  settingsRenderer?: (
+    content: GameContent, actions: SettingsActions, currentThemeId: string | null, volumePrefs?: VolumeSettings,
+  ) => () => void;
   resultRenderer?: (summary: RunSummary, best: number, actions: ResultActions) => () => void;
   hudRenderer?: () => HudHandle;
   leaderboardRenderer?: (service: LeaderboardService, actions: { onBack(): void }) => () => void;
@@ -150,15 +154,15 @@ export function createOverlayViews(deps: OverlayViewsDeps): OverlayViews {
       host.mount(buildShopPage(host, content, actions).view);
     },
 
-    renderSettings(content: GameContent, actions: SettingsActions, currentThemeId: string | null): void {
+    renderSettings(content: GameContent, actions: SettingsActions, currentThemeId: string | null, volumePrefs?: VolumeSettings): void {
       clearTransient();
       stopBackdrop();
       if (deps.settingsRenderer) {
         host.mount(host.makeView(), { transparent: true });
-        disposePanelRenderer = deps.settingsRenderer(content, actions, currentThemeId);
+        disposePanelRenderer = deps.settingsRenderer(content, actions, currentThemeId, volumePrefs);
         return;
       }
-      host.mount(buildSettingsPage(host, { content, actions, currentThemeId }).view);
+      host.mount(buildSettingsPage(host, { content, actions, currentThemeId, volumePrefs: volumePrefs ?? { music: DEFAULT_MUSIC_VOLUME, sfx: DEFAULT_SFX_VOLUME } }).view);
     },
 
     ...(deps.leaderboardRenderer ? {

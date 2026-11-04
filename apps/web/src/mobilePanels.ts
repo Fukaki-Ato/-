@@ -1,10 +1,16 @@
 import type { GameContent } from '@tr/game/core/config/configTypes.js';
-import type { ResultActions, RunSummary, SettingsActions } from '@tr/game/flow/views.js';
+import { DEFAULT_MUSIC_VOLUME, DEFAULT_SFX_VOLUME } from '@tr/game/core/audio/audioDirector.js';
+import type { ResultActions, RunSummary, SettingsActions, VolumeKind, VolumeSettings } from '@tr/game/flow/views.js';
 import { themeOptions } from '@tr/game/ui/settingsView.js';
 import { mountMobilePage, pageHeader, pageLifecycle, uiButton, uiText } from './mobileUi.js';
 import './mobilePanels.css';
 
-export function createMobileSettings(content: GameContent, actions: SettingsActions, currentThemeId: string | null): () => void {
+export function createMobileSettings(
+  content: GameContent,
+  actions: SettingsActions,
+  currentThemeId: string | null,
+  volumePrefs?: VolumeSettings,
+): () => void {
   const { root, frame } = mountMobilePage('设置', 'mobile-settings');
   frame.append(pageHeader('旅途设置', 'MAKE IT YOURS / 设置', actions.onBack));
   const panel = uiText('section', '', 'settings-panel ui-panel');
@@ -39,7 +45,57 @@ export function createMobileSettings(content: GameContent, actions: SettingsActi
   }
   if (!options.length) panel.append(uiText('p', '暂无可选场景', 'ui-muted'));
   panel.append(status);
-  frame.append(panel, uiText('p', '海风会记得你的选择。', 'mobile-page-note'));
+  // 音量面板：图标 + 原生 range 滑条（1% 粒度，拖动/键盘都能调）+ 实时百分比；
+  // input 即回传流程落盘（音频侧每次播放读同一存储，立即生效），流程拒绝则滑条回弹原值。
+  // 图标走内联 SVG 静态字符串（非用户输入），配色随行类切换：音乐=青、音效=珊瑚。
+  const volumePanel = uiText('section', '', 'settings-panel ui-panel');
+  volumePanel.append(uiText('h2', '音量'), uiText('p', '拖动即保存，立即生效', 'ui-muted'));
+  const volumes: VolumeSettings = {
+    music: volumePrefs?.music ?? DEFAULT_MUSIC_VOLUME,
+    sfx: volumePrefs?.sfx ?? DEFAULT_SFX_VOLUME,
+  };
+  const icons: Record<VolumeKind, { label: string; svg: string }> = {
+    music: {
+      label: '音乐音量',
+      svg: '<svg viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>',
+    },
+    sfx: {
+      label: '音效音量',
+      svg: '<svg viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>',
+    },
+  };
+  for (const kind of ['music', 'sfx'] as const) {
+    const icon = icons[kind];
+    const row = uiText('div', '', `volume-row volume-${kind}`);
+    const glyph = uiText('span', '', 'volume-icon');
+    glyph.innerHTML = icon.svg;
+    glyph.setAttribute('aria-hidden', 'true');
+    const input = document.createElement('input');
+    input.type = 'range';
+    input.min = '0';
+    input.max = '100';
+    input.step = '1';
+    input.setAttribute('aria-label', icon.label);
+    const value = uiText('span', '', 'volume-value');
+    value.setAttribute('aria-live', 'polite');
+    const paint = (): void => {
+      const pct = Math.round(volumes[kind] * 100);
+      value.textContent = `${pct}%`;
+      input.value = String(pct);
+      input.style.background = `linear-gradient(90deg, var(--vol-accent) ${pct}%, #e5ebe2 ${pct}%)`;
+    };
+    input.addEventListener('input', () => {
+      const next = Number(input.value) / 100;
+      if (next === volumes[kind]) { paint(); return; }
+      if (!actions.onSetVolume(kind, next)) { paint(); return; } // 流程拒绝：滑条回弹原值
+      volumes[kind] = next;
+      paint();
+    });
+    row.append(glyph, uiText('strong', icon.label), input, value);
+    paint();
+    volumePanel.append(row);
+  }
+  frame.append(panel, volumePanel, uiText('p', '海风会记得你的选择。', 'mobile-page-note'));
   paint();
   return pageLifecycle(root, actions.onBack);
 }
