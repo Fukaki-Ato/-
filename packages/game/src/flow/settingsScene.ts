@@ -65,7 +65,7 @@ export function pruneThemeSelection(storage: SyncStorage, content: GameContent |
 /** 存储里的音量偏好（换算成 0..1）；未存/脏值（非整数、越界百分比）返回 null，交配置默认 */
 export function storedVolume(storage: SyncStorage, kind: VolumeKind): number | null {
   const raw = storage.get(VOLUME_KEYS[kind]);
-  if (raw === null) return null;
+  if (raw === null || !/^(?:0|[1-9]\d?|100)$/.test(raw)) return null;
   const n = Number(raw);
   return Number.isInteger(n) && n >= 0 && n <= 100 ? n / 100 : null;
 }
@@ -81,11 +81,9 @@ export function volumePrefs(storage: SyncStorage, content: GameContent | null): 
 
 /** 进设置页清理：脏音量存档（非整数/越界百分比）→ 移除，存储不长期留脏值 */
 export function pruneVolumePrefs(storage: SyncStorage): void {
-  for (const key of Object.values(VOLUME_KEYS)) {
-    const raw = storage.get(key);
-    if (raw === null) continue;
-    const n = Number(raw);
-    if (!Number.isInteger(n) || n < 0 || n > 100) storage.remove(key);
+  for (const kind of ['music', 'sfx'] as const) {
+    const key = VOLUME_KEYS[kind];
+    if (storage.get(key) !== null && storedVolume(storage, kind) === null) storage.remove(key);
   }
 }
 

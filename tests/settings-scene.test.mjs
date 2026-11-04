@@ -248,6 +248,14 @@ test('设置页：滑条拖动 1% 粒度回传流程、与百分比和步进按�
   assert.deepEqual(calls.at(-1), ['music', 0.7], '按钮步进与滑条共用同一状态');
   assert.equal(Math.round(musicSlider.value * 100), 70, '步进后滑条同步回 70%');
 
+  dragSlider(host, musicSlider, 0.37, 0.37);
+  clickWidget(host, stepButton(rowOf(host, '音乐音量'), '>'));
+  assert.deepEqual(calls.at(-1), ['music', 0.47], '37% 加 10 个百分点保持 1% 精度');
+  assert.equal(valueOf(rowOf(host, '音乐音量')), '47%');
+  clickWidget(host, stepButton(rowOf(host, '音乐音量'), '<'));
+  assert.deepEqual(calls.at(-1), ['music', 0.37], '减 10 个百分点返回原值');
+  assert.equal(Math.round(musicSlider.value * 100), 37);
+
   allow = false;
   dragSlider(host, sfxSlider, 0.5, 0.5);
   assert.deepEqual(calls.at(-1), ['sfx', 0.5], '按下仍回传流程');

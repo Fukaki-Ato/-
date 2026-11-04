@@ -105,7 +105,7 @@ export function buildSettingsPage(host: UiHost, d: SettingsPageDeps): SettingsPa
     return true;
   };
   const stepVolume = (kind: VolumeKind, delta: number): void => {
-    const next = Math.min(1, Math.max(0, Math.round((volume[kind] + delta) * 10) / 10));
+    const next = Math.min(1, Math.max(0, Math.round((volume[kind] + delta) * 100) / 100));
     if (next === volume[kind]) return; // 端点：不回调
     slideVolume(kind)(next);
   };

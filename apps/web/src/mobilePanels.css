@@ -14,7 +14,7 @@
 .volume-sfx { --vol-accent: var(--ui-coral); }
 .volume-icon { display: grid; place-items: center; flex: 0 0 32px; width: 32px; height: 32px; border-radius: 11px; background: #fff; box-shadow: inset 0 0 0 1px #dce8e3; }
 .volume-icon svg { width: 18px; height: 18px; fill: var(--vol-accent); }
-.volume-row input[type="range"] { flex: 1; height: 10px; margin: 0; border: none; border-radius: 5px; appearance: none; -webkit-appearance: none; background: #e5ebe2; cursor: pointer; }
+.volume-row input[type="range"] { flex: 1; min-width: 0; height: 10px; margin: 0; border: none; border-radius: 5px; appearance: none; -webkit-appearance: none; background: #e5ebe2; cursor: pointer; }
 .volume-row input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 22px; height: 22px; border: 3px solid #fff; border-radius: 50%; background: var(--vol-accent); box-shadow: 0 2px 6px #164e5740; }
 .volume-row input[type="range"]::-moz-range-thumb { width: 16px; height: 16px; border: 3px solid #fff; border-radius: 50%; background: var(--vol-accent); box-shadow: 0 2px 6px #164e5740; }
 .volume-row input[type="range"]::-moz-range-track { background: transparent; }
