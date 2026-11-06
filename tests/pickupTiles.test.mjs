@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { PICKUP_TILES, pickupTileFor, setPickupTiles } from '../packages/game/dist/render/pickupTiles.js';
 import { PICKUP_CENTER_Y } from '../packages/game/dist/core/sim/collect.js';
-import { createPickupLayer } from '../packages/game/dist/render/entityLayers.js';
+import { createPickupLayer } from '../packages/game/dist/render/pickupLayer.js';
 
 const MAGNET = { itemRef: 'item_magnet', lane: 0, worldZ: 40 };
 

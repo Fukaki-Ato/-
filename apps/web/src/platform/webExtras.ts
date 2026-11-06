@@ -7,12 +7,18 @@
  */
 import type { CloudBridge, PlatformExtras, SyncStorage, WxIdentity } from '@tr/framework/platform/platformAdapter.js';
 
-const OPENID_KEY = 'thunderrun:…penid';
+const OPENID_KEY = 'thunderrun:openid';
+// 历史事故键（"openid" 的 o 被某次工具处理替换成 U+2026）；只读迁移，新写入一律走正键。
+const OPENID_KEY_LEGACY = 'thunderrun:\u2026penid';
 const PROGRESS_PREFIX = 'thunderrun:progress:';
 
 /** web 壳游客身份：本地生成测试 openid 并持久（与 wx 侧 S9 前的占位游客策略同构）。 */
 async function webLogin(storage: SyncStorage): Promise<WxIdentity> {
   let id = storage.get(OPENID_KEY);
+  if (!id) {
+    const legacy = storage.get(OPENID_KEY_LEGACY);
+    if (legacy) { id = legacy; storage.set(OPENID_KEY, id); }
+  }
   if (!id) {
     id = 'web-guest-' + Math.random().toString(36).slice(2, 10);
     storage.set(OPENID_KEY, id);

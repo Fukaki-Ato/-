@@ -1,21 +1,18 @@
 /**
- * 赛道实体表现层：障碍池 / 道具箱池 / 云团池（docs/02 §8 对象池，每帧零分配）
+ * 赛道实体表现层：障碍池 / 云团池（docs/02 §8 对象池，每帧零分配）
  * 只把 sim 的实体数组映射到预建的 Mesh 槽位上，不做任何玩法判定。
+ * 道具表现层已拆到 pickupLayer.ts（自带 3D 模型槽位），勿在此再造一份。
  */
 import * as THREE from 'three';
-import type { CloudEntity, ObstacleEntity, PickupEntity } from '@tr/game/core/sim/trackGen.js';
+import type { CloudEntity, ObstacleEntity } from '@tr/game/core/sim/trackGen.js';
 import { RAMP_TOP_FLAT_M, obstacleX } from '@tr/game/core/sim/collision.js';
-import { PICKUP_CENTER_Y } from '@tr/game/core/sim/collect.js';
 import { createPosterPicker, posterSize } from './adPosters.js';
-import { pickupTileFor } from './pickupTiles.js';
 
 /** 障碍配色（docs/05 §2：敌对品红/警示黄，可交互蓝青） */
 const OBS_COLOR: Record<string, number> = { low: 0xd9a24a, high: 0x7fd1ff, full: 0xff5fa2, vehicle: 0x4a6fd9, hazard: 0xb48cff, moving: 0xff5fa2, step: 0x9fd8ff };
-/** 道具箱配色（未列出的道具用白色；正式贴图见 docs/05 §6） */
-const PICKUP_COLOR: Record<string, number> = { item_magnet: 0xb48cff, item_boots: 0x43d9a3 };
-const OBS_MAX = 40, PICKUP_MAX = 8, CLOUD_MAX = 12;
+const OBS_MAX = 40, CLOUD_MAX = 12;
 /** 各层的前后可见深度（米）：超出即不占槽位 */
-const OBS_NEAR = 10, OBS_FAR = -140, PICKUP_NEAR = 8, PICKUP_FAR = -320, CLOUD_NEAR = 12, CLOUD_FAR = -140;
+const OBS_NEAR = 10, OBS_FAR = -140, CLOUD_NEAR = 12, CLOUD_FAR = -140;
 /** 高杆横杆下沿（与 core/sim 的 BAR_BOTTOM 对应：杆体画在 1.2m 以上，下方留钻的空间） */
 const BAR_LOW_Y = 1.2;
 /** 高杆横杆的可见透明度：半透明才不挡视线（审计 T3 蹲杆挡视线） */
@@ -213,37 +210,6 @@ export function createObstacleLayer(scene: THREE.Scene, laneWidth: number) {
         }
       }
       for (; i < OBS_MAX; i++) hideUnit(units[i]);
-    },
-  };
-}
-
-export function createPickupLayer(scene: THREE.Scene, laneWidth: number) {
-  const geo = new THREE.BoxGeometry(0.7, 0.7, 0.7);
-  const meshes: THREE.Mesh[] = [];
-  for (let i = 0; i < PICKUP_MAX; i++) {
-    const m = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ roughness: 0.35, emissiveIntensity: 0.5 }));
-    m.visible = false; scene.add(m); meshes.push(m);
-  }
-
-  return {
-    update(list: PickupEntity[], dist: number, t: number) {
-      let i = 0;
-      for (const p of list) {
-        if (p.taken || i >= PICKUP_MAX) continue;
-        const z = dist - p.worldZ;
-        if (z < PICKUP_FAR || z > PICKUP_NEAR) continue;
-        const m = meshes[i++];
-        m.visible = true;
-        const mat = m.material as THREE.MeshStandardMaterial;
-        const tile = pickupTileFor(p.itemRef); // 宿主没注入（微信端）⇒ null，退回纯色箱
-        if (mat.map !== (tile?.tex ?? null)) { mat.map = tile?.tex ?? null; mat.emissiveMap = tile?.tex ?? null; mat.needsUpdate = true; }
-        const col = tile ? tile.bg : PICKUP_COLOR[p.itemRef] ?? 0xffffff;
-        mat.color.setHex(tile ? 0xffffff : col); // 有砖图就不叠色（淡底已画在图里）
-        mat.emissive.setHex(col);                // 自发光叠砖图本身 ⇒ 夜里箱子自己亮着，徽标才跳得出来
-        mat.emissiveIntensity = tile ? 0.9 : 0.55;
-        m.position.set(p.lane * laneWidth, PICKUP_CENTER_Y + Math.sin(t * 2 + p.worldZ) * 0.09, z); // 只浮动不自转：徽标得正对玩家
-      }
-      for (; i < PICKUP_MAX; i++) meshes[i].visible = false;
     },
   };
 }
