@@ -12,7 +12,7 @@
   "dependencies": {
     "@tr/framework": "*",
     "@tr/game": "*",
-    "three": "0.160.1"
+    "three": "0.187.0"
   },
   "devDependencies": {
     "@types/three": "0.160.0"

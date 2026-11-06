@@ -24,3 +24,7 @@ Desktop.ini
 
 # Local leaderboard state (production state lives outside the checkout)
 /data/
+
+# E2E 冒烟截图留档（本地产物）
+tools/e2e-last-run.png
+tools/fontgen/node_modules/

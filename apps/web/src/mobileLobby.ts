@@ -32,16 +32,18 @@ export function createMobileLobby(content: GameContent, actions: SelectActions, 
   const openCharacters = (): void => { if (actions.onCharacterSelect) actions.onCharacterSelect(); else comingSoon(); };
   const header = uiText('header', '', 'lobby-header');
   const currency = uiText('div', '', 'lobby-wallet');
-  const amount = (label: string, value: number, icon: string): HTMLButtonElement => {
+  const amount = (label: string, value: number, icon: string, strongClass?: string): HTMLButtonElement => {
     const button = uiButton('', 'lobby-currency', actions.onShop ?? comingSoon);
     button.setAttribute('aria-label', `${label} ${value}，打开商店`);
     const image = document.createElement('img');
     image.src = `${import.meta.env.BASE_URL}assets/ui/${icon}`;
     image.alt = '';
-    button.append(image, uiText('strong', value.toLocaleString()), uiText('span', '+', 'currency-plus'));
+    const strong = uiText('strong', value.toLocaleString());
+    if (strongClass) strong.classList.add(strongClass); // 外部改值（档案改名扣钻）按类名定位
+    button.append(image, strong, uiText('span', '+', 'currency-plus'));
     return button;
   };
-  currency.append(amount('金币', extras?.coins ?? 0, 'icon_gold.png'), amount('钻石', extras?.diamonds ?? 0, 'icon_diamond.png'));
+  currency.append(amount('金币', extras?.coins ?? 0, 'icon_gold.png'), amount('钻石', extras?.diamonds ?? 0, 'icon_diamond.png', 'lobby-diamond-amount'));
   const settings = uiButton('', 'ui-icon-button lobby-settings', actions.onSettings ?? comingSoon);
   const gear = document.createElement('img');
   gear.src = settingsIcon;

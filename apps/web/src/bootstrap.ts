@@ -10,6 +10,8 @@ import { injectObstaclePosters, injectPickupTiles } from './runAssets.js';
 import { injectIntroVideos } from './introVideo.js';
 import { preloadStartupConfig } from './startupConfig.js';
 import { createMissionIntegration } from './missionIntegration.js';
+import { openProfileOverlay } from './profileOverlay.js';
+import { createEventsOverlay } from './eventsOverlay.js';
 import { createMobileSettings, createMobileResult } from './mobilePanels.js';
 import { createMobileHud } from './mobileHud.js';
 import { createMobileLeaderboard } from './mobileLeaderboard.js';
@@ -37,8 +39,14 @@ async function main(): Promise<void> {
     host: shell.host, badges: shell.badges, backdrop: shell.backdrop,
     onLobbyVisible: v => shell.setBackgroundVisible(v), // 背景视频只在大厅解码
     selectRenderer: (content, actions, currentCharId, entry) =>
-      createCharacterSelectOverlay(content, actions, currentCharId, entry, shell.fonts),
+      createCharacterSelectOverlay(content, actions, currentCharId, entry, shell.fonts, () =>
+        // 档案弹层（M4-5）：改名扣钻后即时回写大厅顶栏钻石数字
+        openProfileOverlay(content, adapter.storage, left => {
+          document.querySelectorAll<HTMLElement>('.lobby-diamond-amount')
+            .forEach(el => { el.textContent = left.toLocaleString(); });
+        })),
     shopRenderer: (content, actions) => createShopOverlay(content, actions, shell.fonts),
+    eventsRenderer: (content, actions) => createEventsOverlay(content, actions, shell.fonts),
     lobbyRenderer: missions.lobbyRenderer,
     settingsRenderer: createMobileSettings,
     resultRenderer: createMobileResult,
@@ -69,6 +77,7 @@ async function main(): Promise<void> {
   if (DEBUG_TOOLS_ENABLED && debug) {
     (globalThis as Record<string, unknown>).__trMachine = flow.machine;
     (globalThis as Record<string, unknown>).__trSeed = () => flow.currentSeed(); // 同种子复现赛道用
+    (globalThis as Record<string, unknown>).__trTelemetry = { snapshot: () => flow.telemetry().snapshot(), summary: () => flow.telemetry().summary() }; // 遥测读取口（S16b 前置）
     (globalThis as Record<string, unknown>).__trUi = { shell, views, version: 1 }; // S5：自绘 UI 快照挂载点
   }
 

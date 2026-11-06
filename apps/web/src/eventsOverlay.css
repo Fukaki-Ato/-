@@ -1,0 +1,68 @@
+/* 活动签到页：纵向日历行，今天高亮、已领取弱化 */
+.tr-events-overlay .events-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+  overflow-y: auto;
+}
+
+.events-title {
+  margin: 0 0 2px;
+  font-size: 18px;
+  text-align: center;
+  color: #ffe9a0;
+}
+
+.events-day {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+}
+
+.events-day.is-today {
+  outline: 2px solid #ffd76a;
+}
+
+.events-day.is-claimed {
+  opacity: 0.55;
+}
+
+.events-day-index {
+  font-weight: 700;
+  min-width: 4.5em;
+}
+
+.events-day-reward {
+  flex: 1;
+}
+
+.events-day-state {
+  font-size: 12px;
+  color: #9fd8ff;
+}
+
+.events-empty {
+  padding: 18px;
+  text-align: center;
+}
+
+.events-hint {
+  margin: 6px 0 0;
+  min-height: 1.4em;
+  font-size: 12px;
+  color: #9fb8d8;
+  text-align: center;
+}
+
+.events-claim {
+  align-self: center;
+  margin-top: 10px;
+  font-size: 15px;
+  padding: 9px 18px;
+}
+
+.events-claim:disabled {
+  opacity: 0.45;
+}

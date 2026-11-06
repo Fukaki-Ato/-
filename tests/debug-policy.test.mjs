@@ -105,6 +105,8 @@ function bootstrapMocks() {
     './introVideo.js': ['injectIntroVideos'],
     './startupConfig.js': ['preloadStartupConfig'],
     './missionIntegration.js': ['createMissionIntegration'],
+    './profileOverlay.js': ['openProfileOverlay'],
+    './eventsOverlay.js': ['createEventsOverlay'],
     './mobileLobby.js': ['createMobileLobby'],
     './mobilePanels.js': ['createMobileSettings', 'createMobileResult'],
     './mobileHud.js': ['createMobileHud'],

@@ -16,6 +16,7 @@ const root = join(fileURLToPath(import.meta.url), '..', '..');
 const NAMES = ['game', 'characters', 'skills', 'items', 'obstacles', 'themes', 'events', 'economy'];
 const load = () => Object.fromEntries(NAMES.map(n => [n, JSON.parse(readFileSync(join(root, 'config', `${n}.json`), 'utf8'))]));
 let content = load();
+delete content.game.params.revive; // 机制类死亡断言在无复活下验证（复活语义专测见 gameplayFixes）
 
 const SIM_SEED = () => hashSeed('char-test');
 /** 跑 n 秒（不注入任何操作，只让 sim 自己走） */
