@@ -81,3 +81,68 @@ export function layCoinChains(d: CoinLayDeps): void {
     d.lastCoinZ[lane] = start + (len - 1) * d.spacing;
   }
 }
+
+/**
+ * 模板教学金币线（docs/01「金币即教学」的 config 直给面）：pattern cells 带 coins 的格子逐枚铺设。
+ * surface:'trainTop' → 骑在 rideTop 载具顶面（y=载具 h）；普通线 y 缺省=地面。
+ * 链长守 chainBuckets 区间 + maxSpanM 跳跃净空；同车道与障碍深度重叠的枚跳过（防御）。
+ */
+export function layTeachingLines(d: {
+  cells: { coins?: number; obsRef?: string; lane: number; segment: number; offsetM: number; surface?: string }[];
+  genZ: number; segLen: number; coinSpacing: number;
+  chainBuckets: { min: number; max: number }[];
+  obstacles: { lane: number; done?: boolean; worldZ: number; d: number; rideTop?: boolean; h?: number }[];
+  coins: CoinEntity[];
+  maxSpanM: number;
+  seq: () => number;
+}): void {
+  const minLen = Math.min(...d.chainBuckets.map(b => b.min));
+  const maxLen = Math.max(...d.chainBuckets.map(b => b.max));
+  for (const cell of d.cells) {
+    if (!cell.coins || cell.obsRef) continue;
+    const z0 = d.genZ + cell.segment * d.segLen + cell.offsetM;
+    const chain = d.seq(); // 一条教学线一个链号（与 layCoinChains 同口径）
+    const spanLen = Math.floor(d.maxSpanM / d.coinSpacing) + 1;
+    for (let i = 0; i < Math.min(Math.max(cell.coins, minLen), maxLen, spanLen); i++) {
+      const z = z0 + i * d.coinSpacing;
+      // trainTop 线先找载具：车顶金币本来就落在火车深度窗内，不能被同车道避障跳掉（验收 P1-1）
+      const carrier = cell.surface === 'trainTop'
+        ? d.obstacles.find(o => o.rideTop === true && o.lane === cell.lane && Math.abs(z - o.worldZ) <= o.d / 2 + 0.6)
+        : undefined;
+      if (!carrier && d.obstacles.some(o => o.lane === cell.lane && !o.done && Math.abs(z - o.worldZ) < o.d / 2 + 0.5)) continue;
+      d.coins.push({ lane: cell.lane, worldZ: z, chain, ...(carrier ? { y: carrier.h } : {}) });
+    }
+  }
+}
+
+/**
+ * 新障碍兜底反向清币（审查 P0-1 修复 + 跨窗回压清理）：
+ *   ① 本窗口新铺的地面链若与新障碍同车道深度重叠 → 按 chain 整链撤回（防御模板参数改小）；
+ *   ② 列车/墙体 d 大，seg1 可回压上一窗尾部的地面金币链 → 按重叠精确移除（不动整链）。
+ * 天空金币带（spawnSky）与奖励金币排（simWorld coinChainSeq）在①的扫描区间外；
+ * 空中/车顶币（y>0）不受地面障碍影响，②豁免。
+ */
+export function purgeOverlappedCoins(d: {
+  coins: CoinEntity[];
+  coinStart: number;
+  newObs: { lane: number; done?: boolean; worldZ: number; d: number }[];
+}): void {
+  const killChains = new Set<number>();
+  for (let ci = d.coinStart; ci < d.coins.length; ci++) {
+    const c = d.coins[ci];
+    if (c.chain == null) continue;
+    for (const o of d.newObs) {
+      if (o.lane === c.lane && Math.abs(c.worldZ - o.worldZ) < o.d / 2 + 0.8) { killChains.add(c.chain); break; }
+    }
+  }
+  if (killChains.size) {
+    for (let i = d.coins.length - 1; i >= d.coinStart; i--) if (d.coins[i].chain != null && killChains.has(d.coins[i].chain!)) d.coins.splice(i, 1);
+  }
+  for (let ci = d.coins.length - 1; ci >= 0; ci--) {
+    const c = d.coins[ci];
+    if ((c.y ?? 0) > 0) continue;
+    for (const o of d.newObs) {
+      if (o.lane === c.lane && Math.abs(c.worldZ - o.worldZ) < o.d / 2 + 0.3) { d.coins.splice(ci, 1); break; }
+    }
+  }
+}

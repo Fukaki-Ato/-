@@ -61,12 +61,19 @@ export type {
 export { GESTURE_DEFAULTS, createGestureClassifier } from './gestureClassifier.js';
 export type { CloudBridge, ShareOptions, WxExtras, WxIdentity } from './extras.js';
 
+/** QA URL 参数的最小只读视图：framework 契约零宿主类型（URLSearchParams 是宿主提供物，
+ *  wx 运行时没有）。web 壳的 new URLSearchParams(...) 天然结构兼容，无需改动。 */
+export interface QueryParamsView {
+  has(name: string): boolean;
+  get(name: string): string | null;
+}
+
 export interface PlatformExtras extends WxExtras {
   /**
-   * extras 的调试扩展（QA）：web 壳注入 location.search 解出的 URLSearchParams，
+   * extras 的调试扩展（QA）：web 壳注入 location.search 解出的查询视图（QueryParamsView），
    * 供 render 层读 ?anim=<ClipName> 锁动作 / ?char=<id> 锁角色（见 render/animClips.ts）。
    * wx 无 location.search 概念，缺省 undefined；packages/** 只读不 import 任何 app/宿主代码。
    */
-  urlParams?: URLSearchParams;
+  urlParams?: QueryParamsView;
 }
 export type { AudioOptions, AudioService } from './audio.js';

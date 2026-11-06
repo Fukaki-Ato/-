@@ -19,6 +19,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { RunnerSim } from '../packages/game/dist/core/sim/runnerSim.js';
 import { TrackGen } from '../packages/game/dist/core/sim/trackGen.js';
+import { buildObstacleEntity } from '../packages/game/dist/core/sim/trackDefs.js';
 import { RunRng } from '../packages/game/dist/core/rng.js';
 import { hitsRunner, lateralGap, obstacleX, HAZARD_HIT_Y } from '../packages/game/dist/core/sim/collision.js';
 import { pickAvatarMode } from '../packages/game/dist/render/avatarRig.js';
@@ -27,6 +28,17 @@ const root = join(fileURLToPath(import.meta.url), '..', '..');
 const NAMES = ['game', 'characters', 'skills', 'items', 'obstacles', 'themes', 'events', 'economy'];
 const content = Object.fromEntries(NAMES.map(n => [n, JSON.parse(readFileSync(join(root, 'config', `${n}.json`), 'utf8'))]));
 
+/** 机制类测试用：关闭复活（删除 config revive 段），让「必死」断言保持原语义 */
+const noReviveContent = (() => { const c = structuredClone(content); delete c.game.params.revive; return c; })();
+function cleanSimNoRevive(seed) {
+  const sim = new RunnerSim(noReviveContent, seed);
+  sim.state.t = 20;
+  sim.obstacles.length = 0;
+  sim.coinsArr.length = 0;
+  sim.pickupsArr.length = 0;
+  sim.cloudsArr.length = 0;
+  return sim;
+}
 function cleanSim(seed) {
   const sim = new RunnerSim(content, seed);
   sim.state.t = 20; // 越过新手保护
@@ -113,7 +125,7 @@ test('冲撞长方体：向玩家冲来、必须换道、沿途撞飞同车道�
 
 test('滚冲小正方体：可跳越；不跳必死', () => {
   const run = (doJump, seed) => {
-    const sim = cleanSim(seed);
+    const sim = cleanSimNoRevive(seed);
     const cube = { obsRef: 'obs_cube_roll', cls: 'low', w: 1.1, h: 1.1, d: 1.1, lane: 0, worldZ: sim.state.distance + 60, moveZ: -6 };
     sim.obstacles.push(cube);
     let hit = false;
@@ -137,7 +149,7 @@ test('滚冲小正方体：可跳越；不跳必死', () => {
 const ZAP = (sim, ahead, lane = 0) => ({ obsRef: 'obs_lightning_circle', cls: 'hazard', w: 2.2, h: 0.12, d: 2.2, lane, worldZ: sim.state.distance + ahead, zap: true });
 
 test('闪电圈：无护具第一次受创不致死（不走 hits），第二次直接致死', () => {
-  const sim = cleanSim(306);
+  const sim = cleanSimNoRevive(306);
   sim.obstacles.push(ZAP(sim, 15));
   let died = false, zaps = 0;
   for (let i = 0; i < 60 * 4; i++) {
@@ -247,7 +259,7 @@ test('滑翔期不清障：远处障碍全程保留（不再「近处消失远�
 });
 
 test('落地帧不清障不给无敌：带内障碍原样保留，落地即恢复判定（无免伤窗口）', () => {
-  const sim = new RunnerSim(content, 311, 'char_volt');
+  const sim = new RunnerSim(noReviveContent, 311, 'char_volt');
   sim.state.t = 20; // 越过新手保护（protectionS）：只测落地判定，不吃教程保护
   for (let k = 0; k < 60; k++) sim.step();
   const s = sim.state;
@@ -278,7 +290,7 @@ test('落地帧不清障不给无敌：带内障碍原样保留，落地即恢�
 // ---------------- 8. 登车板（step）：赤脚也能上静止火车 ----------------
 
 test('登车斜坡：赤脚不起跳，沿可走上去的斜坡走上火车顶（坡中高度随深度线性升高）', () => {
-  const sim = cleanSim(311);
+  const sim = cleanSimNoRevive(311);
   const s = sim.state;
   // 斜坡：坡底贴地、坡顶接火车前脸（与 pat_train_top_run 模板同构：坡远端 = 列车近端）
   const ramp = { obsRef: 'obs_mount_step', cls: 'step', w: 2.0, h: 2.4, d: 6, lane: 0, worldZ: s.distance + 20 };
@@ -450,7 +462,7 @@ function onlyArc(sim, arc) {
 
 test('电弧地面：起跳窗口内可跳过（不跳必死；贴脸到 4m 起跳都活；太早起跳落地在弧内才死）', () => {
   const run = (jumpGap, boots) => {
-    const sim = cleanSim(315);
+    const sim = cleanSimNoRevive(315);
     const s = sim.state;
     const arc = { obsRef: 'obs_arc_floor', cls: 'hazard', w: 2.0, h: 0.1, d: 4, lane: 0, worldZ: s.distance + 30 };
     sim.obstacles.push(arc);
@@ -474,4 +486,110 @@ test('电弧地面：起跳窗口内可跳过（不跳必死；贴脸到 4m 起�
   for (const gap of [1, 3, 4]) assert.equal(run(gap, true), true, `弹跳鞋距弧 ${gap}m 起跳应能跳过`);
   assert.equal(run(6, true), false, '弹跳鞋距弧 6m 起跳落地仍在弧内：保留时机要求');
   assert.equal(HAZARD_HIT_Y, 0.15, '判定线口径 0.15m（原 0.35：与视觉光带等高，几乎跳不过）');
+});
+
+// ---------------- 11. 天空金币带不被地面生成器兜底清理误删（审查 P0-1） ----------------
+
+test('天空金币带与奖励金币排不被地面生成器的兜底清理整链误删', () => {
+  const gen = new TrackGen(content, new RunRng(2026));
+  const obstacles = [], pickups = [];
+  const skyCoins = [];
+  gen.spawnSky(0, 9000, 4.6, skyCoins, []); // 飞行段金币带：chain 用 TrackGen.chainSeq
+  const bonusRow = { lane: 0, worldZ: 500, y: 0, chain: 99999 }; // 奖励排：simWorld 独立计数器的 chain id
+  const coins = [...skyCoins, bonusRow];
+  gen.ensure(0, 9000, obstacles, coins, pickups);
+  assert.ok(coins.includes(bonusRow), '奖励排（独立计数器 chain id）不能被连带删');
+  const key = c => `${c.lane}|${c.worldZ}|${c.y}`;
+  const present = new Set(coins.map(key));
+  const lost = skyCoins.filter(c => !present.has(key(c)));
+  assert.equal(lost.length, 0, `天空金币被误删 ${lost.length} 枚（如 z=${lost[0]?.worldZ}）`);
+  // 非空洞验证：确实存在与天空金币同车道、z 窗口相交的地面障碍——旧实现会因此整链误删
+  const hit = obstacles.some(o => skyCoins.some(c =>
+    o.lane === c.lane && Math.abs(c.worldZ - o.worldZ) < o.d / 2 + 0.8));
+  assert.ok(hit, '应存在与天空金币相交的地面障碍（否则本用例无覆盖力），种子需更换');
+});
+
+// ---------------- 12. 复活（config revive 段，确定性自动复活） ----------------
+
+test('复活：死亡自动触发，无敌+走廊软清障；次数用尽后终局', () => {
+  const sim = cleanSim(77);
+  const s = sim.state;
+  const kill = z => ({ obsRef: 't_marker', cls: 'full', w: 2, h: 2.6, d: 0.8, lane: s.lane, worldZ: z });
+  sim.obstacles.push(kill(s.distance + 1));
+  sim.step();
+  assert.equal(s.alive, true, '第一次死亡应自动复活（webFreeRevivePerRun=1）');
+  assert.equal(s.revivesUsed, 1);
+  assert.ok(s.invulnT > 2.5, `复活给无敌窗（实得 ${s.invulnT}）`);
+  assert.equal(s.hits, 0, '受击计数清零');
+  assert.ok(sim.drainEvents().some(e => e.type === 'revive'), '复活事件派发');
+  for (let i = 0; i < 10; i++) sim.step();
+  assert.equal(s.alive, true, '复活走廊（软清障 ±12/14m）内不二次判负');
+  // 等无敌窗结束再撞第二次：invuln 内 resolveHit 只消耗障碍不判负
+  let guard = 0;
+  while (s.invulnT > 0 && guard++ < 400) sim.step();
+  sim.obstacles.push(kill(s.distance + 1));
+  sim.step();
+  assert.equal(s.alive, false, '次数用尽后终局死亡');
+  assert.equal(s.revivesUsed, 1);
+  assert.ok(sim.drainEvents().some(e => e.type === 'death'), '终局 death 事件照常');
+});
+
+// ---------------- 13. 高难连段可解性（审查 M：逻辑组合模式 + by11 难度带） ----------------
+
+test('高难连段：新 combo 模板进高难池；简单 AI 在 by8+ 可存活推进', () => {
+  // ① 模板池：by9 带（d=9）应含四个连段；by11 带（d=11）五个全在
+  const gen = new TrackGen(content, new RunRng(9));
+  const poolAt = d => { const seen = new Set(); for (let i = 0; i < 400; i++) seen.add(gen.pickPattern(d).id); return seen; };
+  const d9 = poolAt(9), d11 = poolAt(11);
+  for (const id of ['pat_combo_slide_jump', 'pat_combo_wall_zap', 'pat_combo_train_dismount', 'pat_combo_pendulum_gauntlet']) {
+    assert.ok(d9.has(id), `d=9 池应含 ${id}`);
+    assert.ok(d11.has(id), `d=11 池应含 ${id}`);
+  }
+  assert.ok(d11.has('pat_combo_rusher_zap'), 'd=11 池应含 pat_combo_rusher_zap');
+  // ② 封堵纪律：任意模板 blocked 车道 ≤ 2（3 道全封不可解）
+  for (let i = 0; i < 100; i++) assert.ok(gen.maxBlockedLanes(gen.pickPattern(9)) <= 2, '不允许 3 道全封');
+  // ③ 逐模式脚本化解法（精确可解性：干净通关、不消耗复活）。
+  // 构造：按 config cells 手工 buildObstacleEntity，传送进 by8 难度区段后按机制时序过杆。
+  const defsOf = Object.fromEntries(content.obstacles.defs.map(d => [d.id, d]));
+  const build = (id, lane, z) => buildObstacleEntity(defsOf[id], lane, z);
+  const solvePattern = (cells, script, spanM) => {
+    // 专属 sim：无复活（干净通关语义）+ 无全局 zap 生成器/随机生成内容干扰（genZ 推到窗外）
+    const solo = structuredClone(content);
+    delete solo.game.params.revive;
+    delete solo.obstacles.zap;
+    const sim = new RunnerSim(solo, 4242, 'char_volt');
+    sim.state.t = 20;
+    sim.state.distance = 2400;
+    sim.gen.genZ = 2740; // 生成内容从 2740 起：2420-2500 解法窗口内只有手工摆的 pattern
+    for (const [id, lane, off, seg] of cells) sim.obstacles.push(build(id, lane, 2420 + seg * 24 + off));
+    for (let f = 0; f < 60 * Math.ceil(spanM / 24) + 120 && sim.state.alive; f++) {
+      script(sim.state.distance - 2420, sim.state, sim);
+      sim.step();
+      sim.drainEvents();
+    }
+    return { alive: sim.state.alive, revives: sim.state.revivesUsed, dist: sim.state.distance };
+  };
+  // pat_combo_slide_jump：l0 滑铲过闸(+6) → 跳箱(+15) → 留 l0（列车在 l1）
+  const sj = solvePattern(
+    [['obs_gate_low', 0, 6, 0], ['obs_box', 0, 15, 0], ['obs_train_static', 1, 10, 1]],
+    (walked, s, sim) => {
+      const dist = 2420 + walked; // 传送起点 2420；gap = 障碍 worldZ - 当前绝对距离
+      const gateGap = 2426 - dist, boxGap = 2435 - dist;
+      if (gateGap < 4.5 && gateGap > 0 && !s.sliding && s.y <= 0) sim.applyAction('slide');
+      // 滑铲中按跳=起身跳（jumpInput 自带取消）：闸→箱 9m 连段的关键手法
+      if (boxGap < 5.5 && boxGap > 1.5 && s.y <= 0) sim.applyAction('jump');
+    }, 60,
+  );
+  assert.ok(sj.alive && sj.revives === 0 && sj.dist > 2470, `slide_jump 可解且不耗复活（${JSON.stringify(sj)}）`);
+  // pat_combo_wall_zap：双墙封 l±1，l0 跳闪电圈(+8) → 次段滑闸(+32)
+  const wz = solvePattern(
+    [['obs_adwall', -1, 8, 0], ['obs_adwall', 1, 8, 0], ['obs_lightning_circle', 0, 8, 0], ['obs_gate_low', 0, 8, 1]],
+    (walked, s, sim) => {
+      const dist = 2420 + walked;
+      const zapGap = 2428 - dist, gateGap = 2452 - dist;
+      if (zapGap < 5 && zapGap > 1 && s.y <= 0 && !s.sliding) sim.applyAction('jump');
+      if (zapGap < 0 && gateGap < 4.5 && gateGap > 0 && !s.sliding && s.y <= 0) sim.applyAction('slide');
+    }, 80,
+  );
+  assert.ok(wz.alive && wz.revives === 0 && wz.dist > 2490, `wall_zap 可解且不耗复活（${JSON.stringify(wz)}）`);
 });

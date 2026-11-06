@@ -12,29 +12,30 @@
 import * as THREE from 'three';
 import { createCoastProps } from './coast/coastProps.js';
 import { createKonbiniProps } from './konbini/konbiniProps.js';
+import { createHarborProps } from './harbor/harborProps.js';
 
 /** 回收周期（米），与跑道长度同量级；出画即绕回远处 */
-const LOOP = 240;
-const WRAP_Z = 12;
+export const LOOP = 240;
+export const WRAP_Z = 12;
 
 /** rx / rz 供棕榈叶这类需要「先倾后旋」的部件使用（欧拉序 YXZ：先绕自身 x 下垂，再绕世界 y 展开） */
-interface Placement { x: number; z: number; y: number; ry: number; s: number; rx?: number; rz?: number }
-interface Inst { mesh: THREE.InstancedMesh; items: Placement[] }
+export interface Placement { x: number; z: number; y: number; ry: number; s: number; rx?: number; rz?: number }
+export interface Inst { mesh: THREE.InstancedMesh; items: Placement[] }
 
 /** 确定性伪随机：同一下标永远同结果，避免每帧抖动与回放不一致 */
-const rnd = (i: number, salt: number) => {
+export const rnd = (i: number, salt: number) => {
   const s = Math.sin(i * 127.1 + salt * 311.7) * 43758.5453;
   return s - Math.floor(s);
 };
 
-const std = (color: number) => new THREE.MeshLambertMaterial({ color });
+export const std = (color: number) => new THREE.MeshLambertMaterial({ color });
 
 const M4 = new THREE.Matrix4();
 const Q = new THREE.Quaternion();
 const E = new THREE.Euler(0, 0, 0, 'YXZ');
 const V = new THREE.Vector3();
 const S = new THREE.Vector3();
-function writeAll(inst: Inst) {
+export function writeAll(inst: Inst) {
   for (let i = 0; i < inst.items.length; i++) {
     const p = inst.items[i];
     E.set(p.rx ?? 0, p.ry, p.rz ?? 0); Q.setFromEuler(E);
@@ -47,7 +48,7 @@ function writeAll(inst: Inst) {
 
 interface RowOpts { jx?: number; jz?: number; phase?: number; ry?: number; align?: boolean }
 /** 沿 Z 等间隔布点；align=true 时朝向锁 0（栅栏这类要与道路平行），jz=0 时完全等距 */
-function row(side: -1 | 1, base: number, every: number, salt: number, y: number, o: RowOpts = {}): Placement[] {
+export function row(side: -1 | 1, base: number, every: number, salt: number, y: number, o: RowOpts = {}): Placement[] {
   const jx = o.jx ?? 0.5, jz = o.jz ?? 0.3, phase = o.phase ?? 0;
   const out: Placement[] = [];
   for (let z = -LOOP + 10 + phase, i = 0; z < WRAP_Z; z += every, i++) {
@@ -61,7 +62,7 @@ function row(side: -1 | 1, base: number, every: number, salt: number, y: number,
   return out;
 }
 
-function addInst(scene: THREE.Scene, geo: THREE.BufferGeometry, mat: THREE.Material, items: Placement[]): Inst {
+export function addInst(scene: THREE.Scene, geo: THREE.BufferGeometry, mat: THREE.Material, items: Placement[]): Inst {
   const mesh = new THREE.InstancedMesh(geo, mat, items.length);
   scene.add(mesh);
   const inst = { mesh, items };
@@ -70,13 +71,13 @@ function addInst(scene: THREE.Scene, geo: THREE.BufferGeometry, mat: THREE.Mater
 }
 
 /** 给一组实例上多色（墙面/屋顶的粉彩变化） */
-function tint(inst: Inst, colors: number[]) {
+export function tint(inst: Inst, colors: number[]) {
   for (let i = 0; i < inst.items.length; i++) inst.mesh.setColorAt(i, new THREE.Color(colors[i % colors.length]));
   if (inst.mesh.instanceColor) inst.mesh.instanceColor.needsUpdate = true;
 }
 
 /** 落地假投影：真 shadowMap 在微信低端机太贵，用半透明圆面代替 */
-function addShadow(scene: THREE.Scene, insts: Inst[], items: Placement[], radius: number) {
+export function addShadow(scene: THREE.Scene, insts: Inst[], items: Placement[], radius: number) {
   const geo = new THREE.CircleGeometry(radius, 12);
   geo.rotateX(-Math.PI / 2);
   const mat = new THREE.MeshBasicMaterial({ color: 0x6b5a3f, transparent: true, opacity: 0.2, depthWrite: false });
@@ -196,6 +197,7 @@ const SCENERY_SETS: Record<string, (scene: THREE.Scene) => SceneryProps> = {
   seaside: createSeasideProps,
   konbini: createKonbiniProps,
   coast: createCoastProps,
+  harbor: createHarborProps,
 };
 
 export function createSceneryProps(scene: THREE.Scene, scenery: string = 'seaside'): SceneryProps {

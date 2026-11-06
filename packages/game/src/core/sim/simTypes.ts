@@ -37,7 +37,9 @@ export type SimEvent =
   /** slideGuard：下滑护体消耗一次（曼波滑行穿过小型障碍），带剩余次数 */
   | { type: 'slideGuard'; charges: number }
   /** zap 带打击位置（lane/worldZ）：渲染层据此把雷电特效画到闪电圈所在车道与深度 */
-  | { type: 'zap'; gear: 'shield' | 'board' | 'helmet' | null; lane: number; worldZ: number };
+  | { type: 'zap'; gear: 'shield' | 'board' | 'helmet' | null; lane: number; worldZ: number }
+  /** revive：自动复活触发（config revive 段），带本局剩余次数；渲染层可做原地起立特效 */
+  | { type: 'revive'; left: number };
 
 export interface RunnerState {
   t: number; distance: number; prevDistance: number;
@@ -45,6 +47,8 @@ export interface RunnerState {
   sliding: boolean; slideT: number;
   stunT: number; invulnT: number; hits: number; alive: boolean; topple: number;
   shocks: number; // 已被闪电圈电到的次数（无护具时第二次直接致死）
+  /** 本局已消耗的复活次数（config revive 段；渲染 HUD/结算页展示用） */
+  revivesUsed: number;
   coins: number; nearMiss: number; score: number;
   gliding: boolean; // 飞行器燃料耗尽后的降落段
   /** 技能冷却剩余、本局累计主动下滑次数（下滑积攒型技能的门槛计数）、本局释放次数 */
@@ -67,7 +71,7 @@ export function initialRunnerState(): RunnerState {
   return {
     t: 0, distance: 0, prevDistance: 0, lane: 0, x: 0, y: 0, vy: 0,
     sliding: false, slideT: 0, stunT: 0, invulnT: 0, hits: 0, alive: true, topple: 0,
-    shocks: 0,
+    shocks: 0, revivesUsed: 0,
     coins: 0, nearMiss: 0, score: 0, gliding: false,
     skillCd: 0, slideCount: 0, casts: 0,
     supportY: 0,

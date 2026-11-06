@@ -23,10 +23,10 @@ const W = 800, H = 600;
 
 const readConfig = name => JSON.parse(readFileSync(join(root, 'config', `${name}.json`), 'utf8'));
 
-test('当前主题配置让设置页同时提供白日海景与雨夜便利店', () => {
+test('当前主题配置让设置页提供白日海景、雨夜便利店与黄昏渔港', () => {
   const options = themeOptions({ themes: readConfig('themes') });
-  assert.deepEqual(options.map(option => option.id), ['theme_seaside_day', 'theme_rain_konbini']);
-  assert.deepEqual(options.map(option => option.name), ['白日海景', '雨夜便利店']);
+  assert.deepEqual(options.map(option => option.id), ['theme_seaside_day', 'theme_rain_konbini', 'theme_dusk_harbor']);
+  assert.deepEqual(options.map(option => option.name), ['白日海景', '雨夜便利店', '黄昏渔港']);
 
   const glyphs = new Set(JSON.parse(readFileSync(join(root, 'assets/fonts/cjk.metrics.json'), 'utf8')).glyphs.map(g => g.char));
   for (const label of [...options.map(option => option.name), '龙']) {

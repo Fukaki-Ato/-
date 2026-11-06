@@ -7,8 +7,8 @@
  */
 import type { GameContent } from '@tr/game/core/config/configTypes.js';
 import type {
-  BootHandle, CharacterSelectPageActions, GameViews, HudHandle, ResultActions, RunSummary,
-  SelectActions, SelectExtras, SettingsActions, ShopActions, StartActions, StartHandle,
+  BootHandle, CharacterSelectPageActions, EventsActions, GameViews, HudHandle, ResultActions,
+  RunSummary, SelectActions, SelectExtras, SettingsActions, ShopActions, StartActions, StartHandle,
   VolumeSettings,
 } from '../flow/views.js';
 import { DEFAULT_MUSIC_VOLUME, DEFAULT_SFX_VOLUME } from '../core/audio/audioDirector.js';
@@ -21,6 +21,7 @@ import { buildLobbyPage } from './lobbyView.js';
 import { buildHudPage } from './hudView.js';
 import { buildResultPage } from './resultView.js';
 import { buildShopPage } from './shopView.js';
+import { buildEventsPage } from './eventsView.js';
 import { buildSettingsPage } from './settingsView.js';
 import { createMenuBackdrop, type BackdropSet, type MenuBackdrop } from './menuBackdrop.js';
 import type { BadgeSet } from './badges.js';
@@ -37,6 +38,7 @@ export interface OverlayViewsDeps {
    */
   onLobbyVisible?(visible: boolean): void;
   shopRenderer?: (content: GameContent, actions: ShopActions) => () => void;
+  eventsRenderer?: (content: GameContent, actions: EventsActions) => () => void;
   lobbyRenderer?: (content: GameContent, actions: SelectActions, currentCharId: string, extras?: SelectExtras) => () => void;
   settingsRenderer?: (
     content: GameContent, actions: SettingsActions, currentThemeId: string | null, volumePrefs?: VolumeSettings,
@@ -152,6 +154,17 @@ export function createOverlayViews(deps: OverlayViewsDeps): OverlayViews {
         return;
       }
       host.mount(buildShopPage(host, content, actions).view);
+    },
+
+    renderEvents(content: GameContent, actions: EventsActions): void {
+      clearTransient();
+      stopBackdrop();
+      if (deps.eventsRenderer) {
+        host.mount(host.makeView(), { transparent: true });
+        disposePanelRenderer = deps.eventsRenderer(content, actions);
+        return;
+      }
+      host.mount(buildEventsPage(host, content, actions).view);
     },
 
     renderSettings(content: GameContent, actions: SettingsActions, currentThemeId: string | null, volumePrefs?: VolumeSettings): void {

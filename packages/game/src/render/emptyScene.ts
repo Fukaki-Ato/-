@@ -7,6 +7,7 @@
 import * as THREE from 'three';
 import type { PlatformAdapter } from '@tr/framework/platform/platformAdapter.js';
 import { createTrackVisuals } from './trackVisuals.js';
+import { TR_GAME_CANVAS_ATTRIBUTES } from './glContext.js';
 
 /** theme_neon_city 的默认配色（docs/05 场景元素；与 runnerScene 同源但此处不读配置） */
 const SKY_BASE = '#0B1226', SKY_FLASH = '#9FD8FF', TINT = '#7FD1FF';
@@ -24,7 +25,7 @@ export function createEmptyScene(adapter: PlatformAdapter): EmptySceneHandle {
   const size = adapter.canvas.windowSize();
 
   // 与 runnerScene 同一单点断言约定（S10 §7.6）：结构化 GLCanvas → three 的 canvas 形貌
-  const renderer = new THREE.WebGLRenderer({ canvas: canvas as unknown as HTMLCanvasElement, antialias: true });
+  const renderer = new THREE.WebGLRenderer({ canvas: canvas as unknown as HTMLCanvasElement, ...TR_GAME_CANVAS_ATTRIBUTES });
   renderer.setPixelRatio(size.dpr);
   renderer.setSize(size.width, size.height, false);
 

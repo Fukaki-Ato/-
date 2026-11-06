@@ -46,16 +46,19 @@ export class Movement {
     private readonly obstacles: ObstacleEntity[],
   ) {}
 
-  /** ↑/空格：滑行中按跳=起身直接跳；空中按跳=进缓冲等落地 */
+  /** ↑/空格：滑行中按跳=起身直接跳；空中按跳=进缓冲等落地。
+   *  支撑面实时算（floorY 是上一步的）：刚落到车顶那帧按跳也直接起跳，不吃一帧缓冲延迟 */
   jumpInput(s: RunnerState, fx: FxState) {
     if (s.sliding) { this.cancelSlide(s); this.jump(s, fx); }
-    else if (s.y <= 0 || Math.abs(s.y - this.floorY) < 0.05) this.jump(s, fx); // 车顶上也可直接起跳
+    else if (s.y <= 0 || Math.abs(s.y - this.supportHeight(s)) < 0.05) this.jump(s, fx); // 车顶上也可直接起跳
     else this.pendingJump = PENDING_STEPS;
   }
 
-  /** ↓：空中铲=快速落地接铲；地面铲=直接进入滑行 */
+  /** ↓：空中铲=快速落地接铲；地面铲=直接进入滑行。
+   *  「空中」= 高于实时支撑面 0.05 以上：站车顶（y=supportY）按铲是直接滑行，
+   *  不能按 s.y>0 误判空中——那会让车顶滑铲被当「空中铲速降」吞掉（审查 P1）。 */
   slideInput(s: RunnerState, fx: FxState) {
-    if (s.y > 0) { s.vy = Math.min(s.vy, DIVE_VY); this.pendingSlide = PENDING_STEPS; }
+    if (s.y > this.supportHeight(s) + 0.05) { s.vy = Math.min(s.vy, DIVE_VY); this.pendingSlide = PENDING_STEPS; }
     else this.slide(s, fx);
   }
 
@@ -127,7 +130,7 @@ export class Movement {
       return;
     }
     if (this.pendingJump > 0) { this.pendingJump--; if (s.y <= this.floorY + 0.05) { this.jump(s, fx); this.pendingJump = 0; } }
-    if (this.pendingSlide > 0) { this.pendingSlide--; if (s.y <= 0) { this.slide(s, fx); this.pendingSlide = 0; } }
+    if (this.pendingSlide > 0) { this.pendingSlide--; if (s.y <= this.floorY + 0.05) { this.slide(s, fx); this.pendingSlide = 0; } } // 与 jump 缓冲同口径：落上车顶也接铲
     this.floorY = this.supportHeight(s); // 先判支撑后积分：用位移前的 y 判定，避免穿入车体
     s.supportY = this.floorY; // 渲染层据此区分「站车顶跑」与「滞空」
     // floorY>s.y（地面起跑踏上板子）也要进积分：否则贴不上支撑面，会从板子上穿过去

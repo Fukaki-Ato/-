@@ -10,6 +10,11 @@ const root = fileURLToPath(new URL('../', import.meta.url));
 function makeFlow({ storedCharId, lockedCharId } = {}) {
   const store = new Map();
   if (storedCharId) store.set(CHAR_KEY, storedCharId);
+  // 解锁门槛上线（localEconomy）：按「老玩家已解锁全部非 free 角色」播种，用例继续测流转本身
+  store.set('thunderrun:unlocks', JSON.stringify([
+    'char_ama', 'char_kaze', 'char_rina', 'char_bolt', 'char_frog',
+    'char_mambo', 'char_niu', 'char_whale', 'char_penguin',
+  ]));
   const seen = { select: [], start: [] };
   const adapter = {
     env: 'web',

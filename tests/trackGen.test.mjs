@@ -79,6 +79,7 @@ test('金币不与障碍重叠：同车道深度范围内不存在金币', () =>
   for (let d = 0; d <= 10000; d += 200) gen.ensure(d, 400, obstacles, coins);
   assert.ok(coins.length > 300, '样本不足');
   for (const c of coins) {
+    if ((c.y ?? 0) > 0) continue; // 车顶教学线（surface:trainTop）设计上骑在 rideTop 载具上，不作重叠违规
     for (const o of obstacles) {
       if (o.lane === c.lane && Math.abs(c.worldZ - o.worldZ) < o.d / 2 + 0.3) {
         assert.fail(`重叠: lane=${c.lane} coinZ=${c.worldZ.toFixed(1)} obs=${o.obsRef} obsZ=${o.worldZ.toFixed(1)}`);

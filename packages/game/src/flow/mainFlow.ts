@@ -17,6 +17,10 @@ import type { AudioDirector } from '@tr/game/core/audio/audioDirector.js';
 import { hashSeed, mulberry32 } from '@tr/game/core/rng.js';
 import { createRunSession, type RunSessionDeps } from './runSession.js';
 import type { LeaderboardService } from './leaderboard.js';
+import { COINS_KEY, consumeEquipped, shopActions, walletBalance } from './localEconomy.js';
+import { configLocked, isCharacterGated, selectUnlockActions } from './unlock.js';
+import { createEventsScene } from './eventsScene.js';
+import { TelemetryRecorder } from './telemetry.js';
 import { createSettingsScene, currentThemeId, pruneThemeSelection, themeMusic, volumePrefs } from './settingsScene.js';
 import { createRunnerScene } from '@tr/game/render/runnerScene.js';
 import type { PlatformAdapter } from '@tr/framework/platform/platformAdapter.js';
@@ -29,10 +33,8 @@ export const BEST_KEY = 'thunderrun:best';
 const LEGACY_BEST_KEY = 'thunderrun:b\u2026st';
 export const CHAR_KEY = 'thunderrun:character';
 export const DEFAULT_CHAR = 'char_volt';
-/** 累计金币（大厅顶栏展示；结算时累加写入） */
-export const COINS_KEY = 'thunderrun:coins-total';
-/** 钻石总和（大厅顶栏展示；获取渠道待后续玩法接入，先预留键） */
-export const DIAMOND_KEY = 'thunderrun:diamonds-total';
+// 钱包存储键与购买/解锁逻辑在 localEconomy.ts；COINS_KEY 从那里 re-export（旧导入路径兼容）
+export { COINS_KEY, DIAMOND_KEY } from './localEconomy.js';
 export { THEME_KEY } from './settingsScene.js'; // 定义与读写语义见 settingsScene.ts
 
 export interface GameFlowDeps {
@@ -58,6 +60,8 @@ export interface GameFlow {
   boot(): Promise<void>;
   /** 最近一局 seed（同种子复现赛道用）。 */
   currentSeed(): number;
+  /** 遥测骨架读取口（S16b 前置；debug 探针/未来 QA 面板消费） */
+  telemetry(): { snapshot(): unknown[]; summary(): Record<string, unknown> };
 }
 
 export function createGameFlow(deps: GameFlowDeps): GameFlow {
@@ -65,16 +69,14 @@ export function createGameFlow(deps: GameFlowDeps): GameFlow {
   let content: GameContent | null = null;
   let scene: { dispose(): void } | null = null;
   let lastSeed = 0;
+  const telemetry = new TelemetryRecorder(adapter.storage);
   /** 音频导演：配置加载成功后创建；game.params.audio 缺省时为空操作（不阻塞玩法） */
   let audio: AudioDirector | null = null;
 
   /** 历史最佳分：兼容旧键；脏值按 0，result 仅在破纪录时落盘。 */
   const bestScore = (): number => {
     const raw = adapter.storage.get(BEST_KEY);
-    if (raw !== null) {
-      const n = Number(raw);
-      return Number.isFinite(n) && n > 0 ? n : 0;
-    }
+    if (raw !== null) { const n = Number(raw); return Number.isFinite(n) && n > 0 ? n : 0; }
     const legacy = adapter.storage.get(LEGACY_BEST_KEY);
     if (legacy === null) return 0;
     const n = Number(legacy);
@@ -88,12 +90,12 @@ export function createGameFlow(deps: GameFlowDeps): GameFlow {
   const knownCharacterEntry = (id: string): NamedEntry | undefined =>
     content ? playableCharacters(content).find(character => character.id === id) : undefined;
   const knownCharacter = (id: string): boolean => knownCharacterEntry(id) !== undefined;
-  const explicitlyLockedId = (id: string): boolean => {
-    const character = knownCharacterEntry(id);
-    return character ? isCharacterLocked(character) : false;
+  // 可出战 = 未被 config 锁定 且 不被解锁门槛挡住（unlock 字段：coin/key/loot/event，记录在 localEconomy）
+  const availableCharacter = (id: string): boolean => {
+    const c = content;
+    return c !== null && playableCharacters(c).some(character => character.id === id
+      && !isCharacterLocked(character) && !isCharacterGated(c, id, adapter.storage));
   };
-  const availableCharacter = (id: string): boolean =>
-    content !== null && playableCharacters(content).some(character => character.id === id && !isCharacterLocked(character));
   const fallbackCharacter = (): string => {
     if (!content) return '';
     const available = playableCharacters(content).filter(character => !isCharacterLocked(character));
@@ -112,11 +114,6 @@ export function createGameFlow(deps: GameFlowDeps): GameFlow {
       if (stored !== charId) adapter.storage.set(CHAR_KEY, charId);
     } else if (stored !== null) adapter.storage.remove(CHAR_KEY);
   }
-  /** 本机累计计数读取（脏值按 0，不把 NaN 带进大厅展示） */
-  const readCount = (key: string): number => {
-    const n = Number(adapter.storage.get(key) ?? '0');
-    return Number.isFinite(n) && n > 0 ? n : 0;
-  };
   /** 上次在开始页选的入口（本机记忆，选角页展示）；无记忆＝游客态直入主界面 */
   let entry: EntryMethod | null = readEntry(adapter.storage);
   /** 开始页进入代次：登录 promise 回来时若已离开/重进开始页则丢弃结果 */
@@ -167,9 +164,10 @@ export function createGameFlow(deps: GameFlowDeps): GameFlow {
           onBack: () => machine.go('start'),
           onCharacterSelect: views.renderCharacterSelectPage ? () => machine.go('characterSelect') : undefined,
           onShop: () => machine.go('shop', { returnTo: 'select' }),
+          onEvents: views.renderEvents ? () => machine.go('events') : undefined,
           onSettings: () => machine.go('settings'),
           onLeaderboard: deps.leaderboard && views.renderLeaderboard ? () => machine.go('leaderboard') : undefined,
-        }, charId, entry, { coins: readCount(COINS_KEY), diamonds: readCount(DIAMOND_KEY) });
+        }, charId, entry, { coins: walletBalance(adapter.storage, 'coin'), diamonds: walletBalance(adapter.storage, 'diamond') });
       },
     },
     characterSelect: {
@@ -178,15 +176,18 @@ export function createGameFlow(deps: GameFlowDeps): GameFlow {
         if (!content || !views.renderCharacterSelectPage) { machine.go('select'); return; }
         const requested = typeof ctx === 'object' && ctx !== null ? (ctx as { characterId?: unknown }).characterId : undefined;
         const selected = typeof requested === 'string' && knownCharacter(requested) ? requested : charId;
+        const c = content;
         views.renderCharacterSelectPage(content, {
           onSelect: id => { rememberCharacter(id); },
           onStartRun: id => { if (rememberCharacter(id)) machine.go('run'); },
           onBack: () => machine.go('select'),
           onShop: id => {
             if (!knownCharacter(id)) return;
-            if (!explicitlyLockedId(id)) rememberCharacter(id);
+            if (!configLocked(c, id)) rememberCharacter(id);
             machine.go('shop', { returnTo: 'characterSelect', characterId: id });
           },
+          // 解锁门槛（本机经济，审查 M4-3）：coin/key 扣价、碎片合成、活动型只登记
+          ...selectUnlockActions(adapter.storage, c),
         }, selected, entry);
       },
     },
@@ -197,11 +198,14 @@ export function createGameFlow(deps: GameFlowDeps): GameFlow {
         const characterId = typeof request.characterId === 'string' && knownCharacter(request.characterId)
           ? request.characterId : undefined;
         if (!content) { machine.go('select'); return; }
+        const c = content;
         shopBack = () => machine.go(returnTo, returnTo === 'characterSelect' ? { characterId } : undefined);
-        views.renderShop(content, { onBack: () => shopBack?.() });
+        // 本机经济购买（审查 M4-2）：钱包快照供按钮可用态，onBuy 返回结果供视图回显
+        views.renderShop(content, shopActions(adapter.storage, c, () => shopBack?.()));
       },
       onExit: () => { shopBack = null; },
     },
+    events: createEventsScene({ adapter, views, content: () => content, goSelect: () => machine.go('select') }),
     settings: createSettingsScene({
       storage: adapter.storage, views, content: () => content,
       goSelect: () => machine.go('select'), stopDeathMusic: () => audio?.stopDeathMusic(),
@@ -222,19 +226,16 @@ export function createGameFlow(deps: GameFlowDeps): GameFlow {
           adapter, views, content, charId, service: deps.leaderboard,
           createScene: deps.createScene, debug: deps.debug, test: deps.test,
           trackRun: deps.trackRun,
+          consumeItems: () => consumeEquipped(adapter.storage),
+          recordRun: (state, meta) => telemetry.recordRun(state, meta),
           themeId: currentThemeId(adapter.storage, content) ?? undefined,
           onSeed: seed => { lastSeed = seed; }, onEnd: summary => machine.go('result', summary),
-          onDeath: () => audio?.onDeath(),
-          onCast: () => audio?.onCast(),
-          onPickup: () => audio?.onPickup(),
-          onIntro: stage => audio?.onIntro(stage),
+          onDeath: () => audio?.onDeath(), onCast: () => audio?.onCast(),
+          onPickup: () => audio?.onPickup(), onIntro: stage => audio?.onIntro(stage),
         });
       },
-      onExit: () => {
-        scene?.dispose(); scene = null;
-        // 已死亡时 exitRun 保留死亡 BGM 到结算页；中途退出则停 run BGM
-        audio?.exitRun();
-      },
+      // 已死亡时 exitRun 保留死亡 BGM 到结算页；中途退出则停 run BGM
+      onExit: () => { scene?.dispose(); scene = null; audio?.exitRun(); },
     },
     result: {
       onEnter: ctx => {
@@ -244,11 +245,11 @@ export function createGameFlow(deps: GameFlowDeps): GameFlow {
         const best = bestScore();
         if (summary.score > best) adapter.storage.set(BEST_KEY, String(summary.score));
         const coinsGot = summary.coins ?? 0;
-        if (coinsGot > 0) adapter.storage.set(COINS_KEY, String(readCount(COINS_KEY) + coinsGot));
+        if (coinsGot > 0) adapter.storage.set(COINS_KEY, String(walletBalance(adapter.storage, 'coin') + coinsGot));
+        const lbEntry = deps.leaderboard && views.renderLeaderboard ? () => machine.go('leaderboard') : undefined;
         views.renderResult(summary, best, {
           onRetry: () => { if (rememberCharacter(charId)) machine.go('run'); },
-          onSelect: () => machine.go('select'),
-          onLeaderboard: deps.leaderboard && views.renderLeaderboard ? () => machine.go('leaderboard') : undefined,
+          onSelect: () => machine.go('select'), onLeaderboard: lbEntry,
         });
       },
       // 离开结算（重开/回选角）：停死亡 BGM，避免与下一局 run BGM 重叠
@@ -287,14 +288,10 @@ export function createGameFlow(deps: GameFlowDeps): GameFlow {
       random: deps.audioRandom ?? mulberry32(hashSeed('audio-' + Date.now())),
       volumes: () => volumePrefs(adapter.storage, content), // 用户音量偏好每次播放时读取，设置页改完即生效
     });
-    // 游客态直入主界面：不要求登录、不调 adapter.extras.login()、不显示授权弹窗。
-    // 开始页（微信/游客两入口）保留在场景机里但不再有入口可达，登录代码零调用。
-    if (entry === null) {
-      entry = 'guest';
-      saveEntry(adapter.storage, 'guest');
-    }
+    // 游客态直入主界面：不要求登录、不调 adapter.extras.login()（开始页保留在场景机但入口不可达）
+    if (entry === null) { entry = 'guest'; saveEntry(adapter.storage, 'guest'); }
     machine.go('select');
   }
 
-  return { machine, boot, currentSeed: () => lastSeed };
+  return { machine, boot, currentSeed: () => lastSeed, telemetry: () => ({ snapshot: () => telemetry.snapshot(), summary: () => telemetry.summary() }) };
 }

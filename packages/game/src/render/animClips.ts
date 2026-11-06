@@ -123,11 +123,12 @@ export function asClipName(name: string): ClipName | null {
   return (CLIP_NAMES as readonly string[]).includes(name) ? (name as ClipName) : null;
 }
 
-/** QA 锁读取（仅 dev/QA）：URLSearchParams 由壳层注入，本模块不 import 任何 app/宿主代码。
+/** QA 锁读取（仅 dev/QA）：查询视图由壳层注入（framework QueryParamsView，非宿主 URLSearchParams），
+ *  本模块不 import 任何 app/宿主代码。
  *  注意一次性 clip 的锁由 animAvatar 在播完后自动解锁（本文件只管「锁哪个、什么循环口径」）：
  *  URL 参数跨刷新持久，不自动解锁会把角色永久定在末帧（用户实测过的坑）。
  */
-export function readAnimLock(urlParams?: URLSearchParams | null): ClipName | null {
+export function readAnimLock(urlParams?: { get(name: string): string | null } | null): ClipName | null {
   const raw = urlParams?.get('anim');
   return raw ? asClipName(raw) : null;
 }

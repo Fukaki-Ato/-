@@ -11,7 +11,7 @@
 import type { RunRng } from '../rng.js';
 import type { GameContent, NamedEntry } from '../config/configTypes.js';
 import { BLOCKING_CLASSES, buildObstacleEntity, type SwingSpec } from './trackDefs.js';
-import { layCoinChains } from './trackCoins.js';
+import { layCoinChains, layTeachingLines, purgeOverlappedCoins } from './trackCoins.js';
 import { spawnSkyContent } from './trackSky.js';
 import { coinJumpSpan } from './coinJumpSpan.js';
 
@@ -39,7 +39,7 @@ export interface CloudEntity { worldZ: number; x: number; y: number }
 /** 道具箱：落在无障碍的车道上，间隔 ≥ minGapM */
 export interface PickupEntity { itemRef: string; lane: number; worldZ: number; taken?: boolean; passed?: boolean }
 
-interface PatternCell { segment: number; lane: number; offsetM: number; obsRef?: string; coins?: number }
+interface PatternCell { segment: number; lane: number; offsetM: number; obsRef?: string; coins?: number; surface?: string }
 interface Pattern { id: string; minDifficulty: number; weight: number; lengthSegments: number; cells: PatternCell[]; guarantee?: { safeLanePattern: number[] } }
 
 export class TrackGen {
@@ -138,31 +138,29 @@ export class TrackGen {
           obstacles.push(buildObstacleEntity(def, cell.lane, z));
         }
       }
+      // 本窗跳跃净空（教学线与随机链共用同一上限：链长不得超普通跳跃可达距离）
+      const maxSpanM = coinJumpSpan(this.runner, Math.min(this.runner.maxSpeed ?? 26,
+        (this.runner.baseSpeed ?? 12) + (this.runner.speedRampPer100M ?? 0.18) * this.genZ / 100), this.jumpSpanRatio);
+      // 模板教学金币线（docs/01「金币即教学」的 config 直给面）：cells 带 coins 的格子由 trackCoins 铺设
+      layTeachingLines({ cells: pat.cells, genZ: this.genZ, segLen: this.segLen, coinSpacing: this.coinSpacing,
+        chainBuckets: this.chainBuckets, obstacles, coins, maxSpanM, seq: () => ++this.chainSeq });
       // 金币链：主链优先铺在模板安全线（docs/01：金币即教学），再按 laneGroupWeights
       // 抽本组车道数；链不跨窗、不与障碍同车道深度重叠（细则见 trackCoins.ts）。
       const safeLane = pat.guarantee?.safeLanePattern?.[0] ?? 0;
       const newObs = obstacles.slice(patStart); // 本轮新障碍（兜底反向清理用）
+      const coinStart = coins.length; // 本轮新金币起点（兜底清理只扫此区间）
       layCoinChains({
         rng: this.rng, obstacles, coins,
         winStart: this.genZ, winEnd: this.genZ + pat.lengthSegments * this.segLen,
         safeLane, laneWeights: this.laneWeights, chainBuckets: this.chainBuckets,
-        spacing: this.coinSpacing, laneGapM: this.laneGapM, lastCoinZ: this.lastCoinZ,
-        maxSpanM: coinJumpSpan(this.runner, Math.min(this.runner.maxSpeed ?? 26,
-          (this.runner.baseSpeed ?? 12) + (this.runner.speedRampPer100M ?? 0.18) * this.genZ / 100), this.jumpSpanRatio),
+        spacing: this.coinSpacing, laneGapM: this.laneGapM, lastCoinZ: this.lastCoinZ, maxSpanM,
         seq: () => ++this.chainSeq,
       });
-      // 兜底反向清理（理论上不触发：链不跨窗；防御未来模板长度参数改小）
+      // 兜底反向清理（理论上不触发：链不跨窗；防御未来模板长度参数改小）。
+      // 只扫本窗口新铺的地面金币：天空金币带（spawnSky）与奖励金币排（simWorld 的
+      // coinChainSeq 独立计数）都不在此区间，按 id 全数组删会误删无辜链（审查 P0-1）。
       if (newObs.length) {
-        const killChains = new Set<number>();
-        for (const c of coins) {
-          if (c.chain == null) continue;
-          for (const o of newObs) {
-            if (o.lane === c.lane && Math.abs(c.worldZ - o.worldZ) < o.d / 2 + 0.8) { killChains.add(c.chain); break; }
-          }
-        }
-        if (killChains.size) {
-          for (let i = coins.length - 1; i >= 0; i--) if (coins[i].chain != null && killChains.has(coins[i].chain!)) coins.splice(i, 1);
-        }
+        purgeOverlappedCoins({ coins, coinStart, newObs });
         // 道具箱同理：新障碍压到已投道具箱时先尝试换到空车道，无处可换才删除（保持段内数量分布）
         for (let i = pickups.length - 1; i >= 0; i--) {
           const p = pickups[i];

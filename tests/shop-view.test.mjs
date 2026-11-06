@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { Box, Button, Label, defaultUiConfig, findBox } from '../packages/framework/dist/ui/index.js';
 import { UiHost } from '../packages/framework/dist/ui/host.js';
 import { createOverlayViews } from '../packages/game/dist/ui/overlayViews.js';
-import { buildShopCatalog, filterShopCatalog, SHOP_CATEGORIES, SHOP_PAGE_SIZE, shopListingBadgeText } from '../packages/game/dist/ui/shopView.js';
+import { buildShopCatalog, filterShopCatalog, SHOP_CATEGORIES, SHOP_PAGE_SIZE, shopListingBadgeText } from '../packages/game/dist/ui/shopCatalog.js';
 import { loadAllConfig } from '../packages/game/dist/core/config/configLoader.js';
 import { readJson, loadTestFontSet } from './ui-helpers.mjs';
 
@@ -51,6 +51,9 @@ function buttons(host) {
 function findButton(host, label) {
   return buttons(host).find(button => button.label.getText() === label) ?? null;
 }
+function findButtonOptional(host, label) {
+  return findButton(host, label);
+}
 function findWidget(host, predicate) {
   let found = null;
   host.overlay.current?.root.visit(widget => { if (!found && predicate(widget)) found = widget; });
@@ -80,7 +83,7 @@ test('lobby shop slot dispatches to the flow action', async () => {
   host.dispose();
 });
 
-test('canvas shop shows catalog, prices, availability, working category and page controls without purchase actions', async () => {
+test('canvas shop shows catalog, prices, availability, working category and page controls with purchase actions', async () => {
   const content = await loadContent();
   const catalog = buildShopCatalog(content);
   assert.ok(catalog.length > SHOP_PAGE_SIZE);
@@ -88,12 +91,17 @@ test('canvas shop shows catalog, prices, availability, working category and page
   assert.deepEqual(SHOP_CATEGORIES.map(category => category.label), ['全部', '货币', '道具', '角色']);
   const host = makeHost();
   const views = createOverlayViews({ host });
-  views.renderShop(content, { onBack() {} });
+  const bought = [];
+  views.renderShop(content, {
+    onBack() {},
+    wallet: () => ({ coins: 100, keys: 2, diamonds: 0 }),
+    onBuy: offerId => { bought.push(offerId); return { ok: true, message: '购买成功' }; },
+  });
   host.overlay.current.relayout();
 
   let visible = labels(host);
   assert.ok(visible.includes('商店'));
-  assert.ok(visible.some(text => text.includes('仅供浏览')));
+  assert.ok(visible.some(text => text.includes('余额：金币 100')), 'wallet line visible');
   assert.ok(visible.includes(`1/${pageCount} 页`));
   const priced = catalog.slice(0, SHOP_PAGE_SIZE).find(listing => listing.priceText);
   assert.ok(priced);
@@ -103,6 +111,11 @@ test('canvas shop shows catalog, prices, availability, working category and page
   }
   assert.equal(findButton(host, '上一页').state, 'disabled');
   assert.equal(findButton(host, '下一页').state, 'normal');
+  // 可购买商品有「购买」按钮；点击走 actions.onBuy 并回显结果
+  assert.ok(findButtonOptional(host, '购买'), 'buyable offer shows a buy button');
+  click(host, findButton(host, '购买'));
+  assert.deepEqual(bought, [priced.id]);
+  assert.ok(labels(host).some(text => text.includes('购买成功')), 'buy result hint visible');
 
   const rewards = catalog.map(listing => listing.rewardText);
   assert.ok(buttons(host).every(button => !rewards.includes(button.label.getText())), 'catalog offers are never buttons');

@@ -11,6 +11,7 @@ import type { RunCallbacks } from '@tr/game/render/runnerScene.js';
 import type { EntryMethod } from './session.js';
 import type { LeaderboardService, RankingFeedback } from './leaderboard.js';
 import type { FirstCoinStats } from '../core/sim/firstCoinRecord.js';
+import type { SignInState } from './signIn.js';
 
 /** 结算摘要（与 core RunnerSim.summary() 同源）；charName 由 mainFlow 查 characters 配置补入，供结果页显示 */
 export type RunSummary = ReturnType<RunnerSim['summary']> & {
@@ -63,9 +64,32 @@ export interface CharacterSelectPageActions {
   onStartRun(charId: string): void;
   onBack(): void;
   onShop(charId: string): void;
+  /** 解锁门槛（本机经济，localEconomy）：视图据此把「出战」换成「解锁/合成」并显示价格 */
+  isGated?(charId: string): boolean;
+  gatedPriceText?(charId: string): string;
+  canUnlock?(charId: string): boolean;
+  onUnlock?(charId: string): { ok: boolean; message: string };
+  onSynthesize?(charId: string): { ok: boolean; message: string };
 }
 
-export interface ShopActions { onBack(): void }
+/** 本机钱包快照（商店购买按钮可用态与余额显示用） */
+export interface WalletView { coins: number; keys: number; diamonds: number }
+
+export interface BuyResult { ok: boolean; message: string }
+
+export interface ShopActions {
+  onBack(): void;
+  wallet(): WalletView;
+  /** 本机购买（限购/余额/发货都在流程层）；视图消费返回的 message */
+  onBuy(offerId: string): BuyResult;
+}
+
+/** 活动页动作（签到等）：state() 每次取最新签到视图（领取后由视图自查刷新） */
+export interface EventsActions {
+  onBack(): void;
+  onClaim(): BuyResult;
+  state(): SignInState | null;
+}
 
 /** 设置页音量声道（存储与音频面同名语义：music＝BGM，sfx＝一次性音效） */
 export type VolumeKind = 'music' | 'sfx';
@@ -119,6 +143,8 @@ export interface GameViews {
     entry: EntryMethod | null,
   ): void;
   renderShop(content: GameContent, actions: ShopActions): void;
+  /** 活动页（登录签到等）；缺省＝大厅「活动」入口只有按压反馈 */
+  renderEvents?(content: GameContent, actions: EventsActions): void;
   /** 设置页（每个游戏都必须有）：切换跑酷场景 + 音量；currentThemeId/volumePrefs 为流程解析出的生效值 */
   renderSettings(
     content: GameContent,
