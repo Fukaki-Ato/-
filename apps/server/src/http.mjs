@@ -86,6 +86,8 @@ function readJson(request, maxBytes, allowEmpty = false) {
       catch (error) { reject(error); }
     });
     request.on('error', reject);
+    // 客户端中途断开必须让 promise 落定，否则连接挂到 requestTimeout（审查 S-6）
+    request.on('aborted', () => reject(new ApiError(400, '请求中断')));
   });
 }
 
@@ -117,8 +119,15 @@ class RateLimiter {
     }
     if (bucket.count >= maximum) return false;
     bucket.count++;
-    if (this.buckets.size > 10000) {
-      for (const [id, entry] of this.buckets) if (now - entry.startedAt >= windowMs) this.buckets.delete(id);
+    // 有界：单窗口内涌入超上限的不同 key 时按插入序驱逐最旧桶（Map 迭代序），
+    // 内存不随攻击者 IP 数增长（对齐排行榜 BoundedRateLimiter，审查 S-5）
+    const maxBuckets = this.limits.rateMaxBuckets ?? 4096;
+    if (this.buckets.size > maxBuckets) {
+      let excess = this.buckets.size - maxBuckets;
+      for (const id of this.buckets.keys()) {
+        this.buckets.delete(id);
+        if (--excess <= 0) break;
+      }
     }
     return true;
   }
@@ -133,6 +142,16 @@ export function createMissionHttpServer(options = {}) {
   const store = new MissionStore(options.dbPath ?? process.env.MISSIONS_DB_PATH ?? fileURLToPath(new URL('../data/missions.sqlite', import.meta.url)));
   const service = new MissionService({ store, content: options.content ?? loadMissionContent(), now, limits, minRunSeconds: options.minRunSeconds });
   const limiter = new RateLimiter(limits, now);
+
+  // 定期数据清理（runs/users 无限增长审查 S-3）；unref 不阻止进程退出，close 时显式清除
+  const purgeIntervalMs = limits.purgeIntervalMs ?? 30 * 60 * 1000;
+  const purgeTimer = purgeIntervalMs > 0
+    ? setInterval(() => {
+      try { store.purge(now(), { runRetentionMs: limits.runRetentionMs, userRetentionMs: limits.userRetentionMs }); }
+      catch (error) { console.error('mission store purge failed:', error); }
+    }, purgeIntervalMs)
+    : null;
+  if (purgeTimer) purgeTimer.unref();
 
   function authenticate(request) {
     const token = readCookie(request);
@@ -176,7 +195,7 @@ export function createMissionHttpServer(options = {}) {
       if (pathname === '/api/missions/runs' && request.method === 'POST') {
         const userId = authenticate(request);
         const body = await readJson(request, limits.bodyBytes);
-        assertKeys(body, ['seed', 'charId']);
+        assertKeys(body, ['seed', 'charId', 'items']);
         sendJson(response, 201, service.startRun(userId, body));
         return;
       }
@@ -204,9 +223,15 @@ export function createMissionHttpServer(options = {}) {
     }
   });
 
+  // HTTP 层护栏（排行榜 index.mjs 同款，审查 S-6）：慢速发送 body/headers 不再占连接数分钟
+  server.requestTimeout = 30_000;
+  server.headersTimeout = 35_000;
+  server.keepAliveTimeout = 5_000;
+
   return {
     server, store, service,
     async close() {
+      if (purgeTimer) clearInterval(purgeTimer);
       if (server.listening) await new Promise((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
       store.close();
     },

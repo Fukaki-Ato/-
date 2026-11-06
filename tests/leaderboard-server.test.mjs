@@ -441,13 +441,17 @@ test('replay worker queue is bounded and CPU replay leaves the HTTP event loop r
 
   const payload = { seed: 42, charId: CHAR_ID, frames: MAX_RANKED_FRAMES, inputs: [] };
   const active = pool.run(payload);
-  await new Promise(resolve => setTimeout(resolve, 20));
+  // 忙碌探测改为轮询等待（固定 sleep 20ms 在 CI 满载下会假阳性，2026-11 审查期间多次实测）
+  const busyDeadline = Date.now() + 5000;
+  while (!pool.slots[0]?.busy && Date.now() < busyDeadline) await new Promise(resolve => setTimeout(resolve, 10));
   assert.ok(pool.slots[0]?.busy, 'long replay is running off-thread');
   await assert.rejects(pool.run(payload), error => error.code === 'replay_busy');
   const startedAt = performance.now();
   const health = await fetch('http://127.0.0.1:' + healthServer.address().port);
   assert.equal(health.status, 200);
   assert.equal((await health.json()).ok, true);
-  assert.ok(performance.now() - startedAt < 500, 'health response is not queued behind replay CPU');
+  // 阈值 2s：要抓的是「health 被排到重放 CPU 之后」（重放整局要数秒）；500ms 在满载 CI/本地
+  // 编译余波下会假阳性（2026-11 审查期间实测两次 check 各挂过不同用例），放宽到仍有 10 倍余量
+  assert.ok(performance.now() - startedAt < 2000, 'health response is not queued behind replay CPU');
   assert.deepEqual(await active, { accepted: false });
 });

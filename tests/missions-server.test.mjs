@@ -9,6 +9,7 @@ const test = sqliteSupported ? nodeTest : nodeTest.skip;
 const { createMissionHttpServer } = sqliteSupported ? await import('../apps/server/src/http.mjs') : {};
 import { loadMissionContent } from '../apps/server/src/content.mjs';
 import { getMissionPeriods } from '../apps/server/src/periods.mjs';
+import { RunnerSim } from '../packages/game/dist/core/sim/runnerSim.js';
 
 function testContent() {
   const content = structuredClone(loadMissionContent());
@@ -28,6 +29,24 @@ function testContent() {
   };
   return content;
 }
+
+/** 服务端回放的同款确定性死亡局（seed 与 startRun 的 123 一致）：跑到死返回帧数。
+ *  有效局必须死亡收尾（mission-service 与排行榜 worker 同口径，审查 S-1），
+ *  测试局因此也必须按真实终局提交，存活截断局不再计入任务进度。 */
+function deathRunFrames(charId, actions = [], items = []) {
+  const sim = new RunnerSim(loadMissionContent(), 123, charId, false, items);
+  let cursor = 0, frames = 0;
+  for (let frame = 0; frame < 10000; frame++) {
+    while (cursor < actions.length && actions[cursor].frame === frame) { sim.applyAction(actions[cursor].action); cursor++; }
+    sim.step(); sim.drainEvents(); frames++;
+    if (!sim.state.alive) break;
+  }
+  assert.equal(sim.state.alive, false, '无操作测试局必须死亡收尾（否则提交帧数无效）');
+  return frames;
+}
+
+/** 死亡局的墙钟推进（回放耗时闸：elapsedMs ≥ frames*STEP_DT*1000 - allowance） */
+const RUN_MS = frames => frames * 1000 / 60 + 500;
 
 async function setup({ startTime = Date.UTC(2026, 9, 12, 4), limits = {}, minRunSeconds = 0, publicOrigin, trustedProxy } = {}) {
   const directory = mkdtempSync(join(tmpdir(), 'thunder-missions-'));
@@ -69,8 +88,8 @@ async function setup({ startTime = Date.UTC(2026, 9, 12, 4), limits = {}, minRun
     return result;
   };
   state.startRun = async (api, charId = 'char_volt', extra = {}) => api.call('POST', '/api/missions/runs', { seed: 123, charId, ...extra });
-  state.finish = async (api, runId, payload = { frames: 60, actions: [] }) => {
-    state.now += 1000;
+  state.finish = async (api, runId, payload = { frames: 60, actions: [] }, advanceMs = 1000) => {
+    state.now += advanceMs;
     return api.call('POST', `/api/missions/runs/${runId}/finish`, payload);
   };
   return state;
@@ -129,13 +148,16 @@ test('server replays runs, rejects early time, settles once, and atomically clai
     const tooFast = await api.call('POST', `/api/missions/runs/${runId}/finish`, { frames: 60, actions: [] });
     assert.equal(tooFast.response.status, 425);
     assert.match(tooFast.data.error, /过快/);
-    const finished = await state.finish(api, runId, { frames: 60, actions: [{ frame: 0, action: 'slide' }] });
+    const deathActions = [{ frame: 0, action: 'slide' }];
+    const deathFrames = deathRunFrames('char_volt', deathActions);
+    const finished = await state.finish(api, runId, { frames: deathFrames, actions: deathActions }, RUN_MS(deathFrames));
     assert.equal(finished.response.status, 200, JSON.stringify(finished.data));
     assert.equal(finished.data.daily.missions.find(mission => mission.id === 'test_distance').progress, 1);
     assert.equal(finished.data.weekly.missions.find(mission => mission.id === 'test_week_distance').progress, 1);
     assert.equal(finished.data.daily.missions.find(mission => mission.id === 'test_slides').progress, 1);
-    assert.equal(finished.data.daily.missions.find(mission => mission.id === 'test_clean').progress, 1);
-    const duplicate = await api.call('POST', `/api/missions/runs/${runId}/finish`, { frames: 60, actions: [{ frame: 0, action: 'slide' }] });
+    // 死亡收尾局按定义非 clean（无操作局撞车死，hits=1）：用存活截断局刷 cleanRuns 正是收紧的洞
+    assert.equal(finished.data.daily.missions.find(mission => mission.id === 'test_clean').progress, 0);
+    const duplicate = await api.call('POST', `/api/missions/runs/${runId}/finish`, { frames: deathFrames, actions: deathActions });
     assert.equal(duplicate.response.status, 200);
     const changed = await api.call('POST', `/api/missions/runs/${runId}/finish`, { frames: 60, actions: [] });
     assert.equal(changed.response.status, 409);
@@ -164,7 +186,8 @@ test('weekly character progress deduplicates a runner, while daily stale runs ne
     assert.equal(first.response.status, 201);
     const runId = first.data.runId;
     state.now += 2000; // Cross Wednesday 00:00 Beijing, but remain in the same weekly period.
-    const finished = await api.call('POST', `/api/missions/runs/${runId}/finish`, { frames: 60, actions: [] });
+    const voltFrames = deathRunFrames('char_volt');
+    const finished = await state.finish(api, runId, { frames: voltFrames, actions: [] }, RUN_MS(voltFrames));
     assert.equal(finished.response.status, 200);
     assert.equal(finished.data.daily.periodId, '2026-10-14');
     assert.equal(finished.data.daily.missions.find(mission => mission.id === 'test_distance').progress, 0);
@@ -173,11 +196,12 @@ test('weekly character progress deduplicates a runner, while daily stale runs ne
 
     const another = await state.startRun(api, 'char_volt');
     state.now += 1000;
-    const repeatedCharacter = await api.call('POST', `/api/missions/runs/${another.data.runId}/finish`, { frames: 60, actions: [] });
+    const repeatedCharacter = await state.finish(api, another.data.runId, { frames: voltFrames, actions: [] }, RUN_MS(voltFrames));
     assert.equal(repeatedCharacter.data.weekly.missions.find(mission => mission.id === 'test_week_chars').progress, 1);
     const third = await state.startRun(api, 'char_ama');
     state.now += 1000;
-    const newCharacter = await api.call('POST', `/api/missions/runs/${third.data.runId}/finish`, { frames: 60, actions: [] });
+    const amaFrames = deathRunFrames('char_ama');
+    const newCharacter = await state.finish(api, third.data.runId, { frames: amaFrames, actions: [] }, RUN_MS(amaFrames));
     assert.equal(newCharacter.data.weekly.missions.find(mission => mission.id === 'test_week_chars').progress, 2);
   } finally { await state.close(api); }
 });
@@ -287,8 +311,9 @@ test('concurrent finish credits once; rewards and claim flags survive restart; o
     api = await state.create(); await state.session(api);
     const originalCookie = api.cookie;
     const started = await state.startRun(api);
-    const payload = { frames: 600, actions: [{ frame: 0, action: 'slide' }] };
-    state.now += 10000;
+    const concurrentFrames = deathRunFrames('char_volt', [{ frame: 0, action: 'slide' }]);
+    const payload = { frames: concurrentFrames, actions: [{ frame: 0, action: 'slide' }] };
+    state.now += RUN_MS(concurrentFrames);
     api.cookie = ''; await state.session(api);
     assert.equal((await api.call('POST', `/api/missions/runs/${started.data.runId}/finish`, payload)).response.status, 404);
     api.cookie = originalCookie;
@@ -319,5 +344,55 @@ test('weekly rollover rejects old claims and does not carry an old run into the 
     assert.equal((await api.call('POST', '/api/missions/claim', {
       period: 'weekly', periodId: old.weekly.periodId, missionId: old.weekly.missions[0].id,
     })).response.status, 409);
+  } finally { await state.close(api); }
+});
+
+test('replay wall-clock timeout, open-run cap, and data purge guardrails', async () => {
+  const state = await setup({ limits: { replayWallClockMs: 0, openRunsPerUser: 2 } });
+  let api;
+  try {
+    api = await state.create();
+    await state.session(api);
+    const frames = deathRunFrames('char_volt');
+    // 墙钟超时（0ms 必然在首个 600 帧检查点触发）：408 且 run 保持 open 可重试
+    const started = await state.startRun(api);
+    const timedOut = await state.finish(api, started.data.runId, { frames, actions: [] }, RUN_MS(frames));
+    assert.equal(timedOut.response.status, 408, JSON.stringify(timedOut.data));
+    // open-run 上限：已有 1 个 open，第 2 个放行，第 3 个 429
+    assert.equal((await state.startRun(api)).response.status, 201);
+    assert.equal((await state.startRun(api)).response.status, 429);
+    // 数据清理：runs 全部拨到保留期外 → 清 2 条；该用户从此无 runs → 连带清除沉睡用户
+    const store = api.app.store;
+    store.db.prepare('UPDATE runs SET started_at = ?').run(state.now - 8 * 86400000);
+    store.db.prepare('UPDATE users SET created_at = ?').run(state.now - 31 * 86400000);
+    const purged = store.purge(state.now);
+    assert.equal(purged.staleOpenRuns, 2, JSON.stringify(purged));
+    assert.equal(purged.finishedRuns, 0);
+    assert.equal(purged.runlessUsers, 1);
+    assert.equal((await api.call('GET', '/api/missions')).response.status, 401, '用户已清理，旧会话失效');
+  } finally { await state.close(api); }
+});
+
+test('装备道具随票提交：重放同清单注入则 validRun 成立；无效/重复道具 400（道具闭环 M）', async () => {
+  const state = await setup();
+  let api;
+  try {
+    api = await state.create();
+    await state.session(api);
+    const items = ['item_helmet'];
+    const frames = deathRunFrames('char_volt', [], items);
+    assert.ok(frames > 0 && frames !== deathRunFrames('char_volt', [], []), '头盔改变了无操作轨迹（注入生效的前提：lifeAdd 20s 覆盖首死）');
+    const started = await state.startRun(api, 'char_volt', { items });
+    assert.equal(started.response.status, 201);
+    const finished = await state.finish(api, started.data.runId, { frames, actions: [] }, RUN_MS(frames));
+    assert.equal(finished.response.status, 200, JSON.stringify(finished.data));
+    assert.equal(finished.data.daily.missions.find(mission => mission.id === 'test_distance').progress, 1,
+      '道具局重放同清单复现 → validRun 成立');
+    const bad = await state.startRun(api, 'char_volt', { items: ['item_ghost'] });
+    assert.equal(bad.response.status, 400);
+    const dup = await state.startRun(api, 'char_volt', { items: ['item_magnet', 'item_magnet'] });
+    assert.equal(dup.response.status, 400);
+    const over = await state.startRun(api, 'char_volt', { items: ['item_magnet', 'item_boots', 'item_shield', 'item_xp_card'] });
+    assert.equal(over.response.status, 400);
   } finally { await state.close(api); }
 });

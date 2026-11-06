@@ -3,7 +3,7 @@ import { getMissionPeriods } from './periods.mjs';
 import { ApiError } from './errors.mjs';
 import { replayRun, STEP_DT } from './replay.mjs';
 import { DEFAULT_LIMITS } from './limits.mjs';
-import { playableCharacters, isCharacterLocked } from '@tr/game/core/sim/character.js';
+import { playableCharacters, isCharacterLocked, itemEffects } from '@tr/game/core/sim/character.js';
 
 const SUPPORTED_METRICS = new Set([
   'distanceM', 'coins', 'slides', 'runs', 'skillCasts', 'nearMiss', 'cleanRuns', 'score',
@@ -35,13 +35,22 @@ function validateMissionConfig(missions) {
       for (const [kind, value] of Object.entries(mission.reward)) {
         if (kind === 'shard') {
           if (typeof value !== 'string' || !/^[a-z][a-z0-9_]*:[1-9]\d*$/.test(value)) throw new Error(`invalid shard reward for ${mission.id}`);
-        } else if (!['coin', 'key'].includes(kind) || !Number.isSafeInteger(value) || value < 0) {
+          // diamond 是钱包通用物品（wallets 表 item 任意键），改名/档案消费它（审查 M4-4：钻石此前零获取渠道）
+        } else if (!['coin', 'key', 'diamond'].includes(kind) || !Number.isSafeInteger(value) || value < 0) {
           throw new Error(`invalid ${kind} reward for ${mission.id}`);
         }
       }
       ids.add(mission.id);
     }
   }
+}
+
+function parseItemsJson(raw) {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed.filter(x => typeof x === 'string') : [];
+  } catch { return []; }
 }
 
 function stableIndex(userId, periodId, tier, count) {
@@ -119,8 +128,22 @@ export class MissionService {
     return { serverTime, daily: makeGroup('daily'), weekly: makeGroup('weekly'), wallet: this.store.getWallet(userId) };
   }
 
-  startRun(userId, { seed, charId }) {
+  /** 装备道具校验（开局注入，重放必须同清单复现）：存在且有 effects、去重、上限 3 */
+  validateItems(items) {
+    if (items === undefined) return [];
+    if (!Array.isArray(items) || items.length > 3) throw new ApiError(400, 'items 必须是不超过 3 个的道具数组');
+    const seen = new Set();
+    for (const id of items) {
+      if (typeof id !== 'string' || seen.has(id)) throw new ApiError(400, 'items 含无效或重复道具');
+      seen.add(id);
+      if (itemEffects(this.content, id).length === 0) throw new ApiError(400, '未知道具: ' + String(id).slice(0, 32));
+    }
+    return [...seen];
+  }
+
+  startRun(userId, { seed, charId, items }) {
     if (!Number.isInteger(seed) || seed < 0 || seed > 0xffffffff) throw new ApiError(400, 'seed 必须是 32 位无符号整数');
+    const equip = this.validateItems(items);
     if (typeof charId !== 'string' || charId.length > 96) throw new ApiError(400, 'charId 必须是有效角色 ID');
     if (charId && !playableCharacters(this.content).some(character => character.id === charId && !isCharacterLocked(character))) {
       throw new ApiError(400, '所选角色不存在或不可使用');
@@ -129,8 +152,12 @@ export class MissionService {
     const periods = getMissionPeriods(startedAt);
     this.ensurePeriod(userId, 'daily', periods.daily.periodId);
     this.ensurePeriod(userId, 'weekly', periods.weekly.periodId);
+    // open-run 上限：TTL 24h 内行不清理，无上限会被脚本灌库（审查 S-3）
+    if (this.store.countOpenRuns(userId) >= (this.limits.openRunsPerUser ?? 4)) {
+      throw new ApiError(429, '已有过多进行中的跑酷记录，请先完成或等待过期');
+    }
     const id = randomUUID();
-    this.store.createRun({ id, userId, startedAt, dailyId: periods.daily.periodId, weeklyId: periods.weekly.periodId, seed, charId });
+    this.store.createRun({ id, userId, startedAt, dailyId: periods.daily.periodId, weeklyId: periods.weekly.periodId, seed, charId, items: equip });
     return { runId: id };
   }
 
@@ -165,10 +192,17 @@ export class MissionService {
     if (this.activeReplays >= this.limits.maxConcurrentReplays) throw new ApiError(429, '结算繁忙，请稍后重试');
     this.activeReplays++;
     let replay;
-    try { replay = await replayRun(this.content, run, frames, actions); }
+    try { replay = await replayRun(this.content, run, frames, actions, this.limits.replayWallClockMs, parseItemsJson(run.items_json)); }
+    catch (error) {
+      // 墙钟超时：run 保持 open 可重试；不是客户端的 payload 问题，返回 408 而非 4xx 语义混淆
+      if (error?.code === 'REPLAY_TIMEOUT') throw new ApiError(408, '回放超时，请稍后重试');
+      throw error;
+    }
     finally { this.activeReplays--; }
     if (replay.frames !== frames) throw new ApiError(400, '回放包含死亡后的额外帧，请按死亡帧结束');
-    const validRun = replay.elapsedSeconds + 1e-9 >= this.minRunSeconds;
+    // 与排行榜 replay-worker 同口径：有效局必须以死亡帧收尾（endless runner 只有一种终局）。
+    // 不校验 alive 时，脚本可提交任意 ≥minRunSeconds 的存活截断局刷 mruns/mnohit（审查 S-1）。
+    const validRun = replay.elapsedSeconds + 1e-9 >= this.minRunSeconds && replay.summary.alive === false;
     const finishedAt = this.now();
     const metrics = {
       distanceM: replay.summary.distance, coins: replay.summary.coins,

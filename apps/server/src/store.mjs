@@ -39,6 +39,8 @@ export class MissionStore {
       );
       CREATE INDEX IF NOT EXISTS runs_by_user ON runs(user_id, started_at);
     `);
+    // 旧库迁移：items_json 存开局装备道具清单（重放注入用）；已存在则忽略
+    try { this.db.exec('ALTER TABLE runs ADD COLUMN items_json TEXT'); } catch { /* 列已存在 */ }
     this.statements = {
       user: this.db.prepare('SELECT id FROM users WHERE id = ?'),
       createUser: this.db.prepare('INSERT INTO users(id, created_at) VALUES(?, ?)'),
@@ -53,14 +55,19 @@ export class MissionStore {
       wallet: this.db.prepare('SELECT item, amount FROM wallets WHERE user_id = ? ORDER BY item'),
       addWallet: this.db.prepare(`INSERT INTO wallets(user_id, item, amount) VALUES(?, ?, ?)
         ON CONFLICT(user_id, item) DO UPDATE SET amount = amount + excluded.amount`),
-      addRun: this.db.prepare(`INSERT INTO runs(id, user_id, started_at, daily_id, weekly_id, seed, char_id)
-        VALUES(?, ?, ?, ?, ?, ?, ?)`),
+      addRun: this.db.prepare(`INSERT INTO runs(id, user_id, started_at, daily_id, weekly_id, seed, char_id, items_json)
+        VALUES(?, ?, ?, ?, ?, ?, ?, ?)`),
+      countOpen: this.db.prepare(`SELECT COUNT(*) AS count FROM runs WHERE user_id = ? AND status = 'open'`),
       run: this.db.prepare('SELECT * FROM runs WHERE id = ? AND user_id = ?'),
       finishRun: this.db.prepare(`UPDATE runs SET status = 'finished', finished_at = ?,
         payload_hash = ?, valid_run = ? WHERE id = ? AND status = 'open'`),
       addCharacter: this.db.prepare(`INSERT OR IGNORE INTO weekly_characters(user_id, period_id, char_id)
         VALUES(?, ?, ?)`),
       characterCount: this.db.prepare('SELECT COUNT(*) AS count FROM weekly_characters WHERE user_id = ? AND period_id = ?'),
+      // 数据保留：runs/users 无限增长会持续拖垮 SQLite（审查 S-3）；钱包/期次行靠 FK CASCADE 随用户删除
+      purgeFinishedRuns: this.db.prepare(`DELETE FROM runs WHERE status = 'finished' AND finished_at < ?`),
+      purgeStaleOpenRuns: this.db.prepare(`DELETE FROM runs WHERE status = 'open' AND started_at < ?`),
+      purgeRunlessUsers: this.db.prepare('DELETE FROM users WHERE created_at < ? AND id NOT IN (SELECT DISTINCT user_id FROM runs)'),
     };
   }
 
@@ -102,9 +109,21 @@ export class MissionStore {
   }
   addWallet(userId, item, amount) { this.statements.addWallet.run(userId, item, amount); }
   createRun(run) {
-    this.statements.addRun.run(run.id, run.userId, run.startedAt, run.dailyId, run.weeklyId, run.seed, run.charId);
+    this.statements.addRun.run(run.id, run.userId, run.startedAt, run.dailyId, run.weeklyId, run.seed, run.charId,
+      run.items?.length ? JSON.stringify(run.items) : null);
   }
   getRun(runId, userId) { return this.statements.run.get(runId, userId) ?? null; }
+  countOpenRuns(userId) { return Number(this.statements.countOpen.get(userId).count); }
+  /** 定期清理：过期 finished/open runs 与从不跑图的沉睡用户。返回各类删除行数。 */
+  purge(now, { runRetentionMs = 7 * 24 * 60 * 60 * 1000, userRetentionMs = 30 * 24 * 60 * 60 * 1000 } = {}) {
+    const runCutoff = now - runRetentionMs;
+    const userCutoff = now - userRetentionMs;
+    return {
+      finishedRuns: this.statements.purgeFinishedRuns.run(runCutoff).changes,
+      staleOpenRuns: this.statements.purgeStaleOpenRuns.run(runCutoff).changes,
+      runlessUsers: this.statements.purgeRunlessUsers.run(userCutoff).changes,
+    };
+  }
   markRunFinished(runId, finishedAt, hash, validRun) {
     return Number(this.statements.finishRun.run(finishedAt, hash, validRun ? 1 : 0, runId).changes);
   }
