@@ -396,3 +396,46 @@ test('createWxAudio：stopSfx 切掉在响的音效并销毁实例，且不碰�
   assert.equal(made.length, 4, '清空后还能继续放新音效');
   audio.dispose();
 });
+
+// ---------------- 防回归断言（wx-runtime-findings #5：mock 与代码犯同一个错，npm test 全绿也抓不到） ----------------
+
+test('防回归：requestFrame 优先取 GameGlobal 的 rAF（真机 wx.requestAnimationFrame 为 undefined）', async () => {
+  const calls = [];
+  // 场景复刻真机：wx 对象没有 rAF（undefined），GameGlobal 上才有——并给全局一份带 spy 的实现
+  const savedGlobalRaf = globalThis.requestAnimationFrame;
+  const savedGlobalCaf = globalThis.cancelAnimationFrame;
+  globalThis.requestAnimationFrame = cb => { calls.push('global'); return 7; };
+  globalThis.cancelAnimationFrame = () => {};
+  const wx = makeWxMock();
+  delete wx.requestAnimationFrame; delete wx.cancelAnimationFrame;
+  try {
+    const a = createWxAdapter({ wx });
+    a.requestFrame(() => {});
+    assert.deepEqual(calls, ['global'], '必须走 GameGlobal 的 rAF，退回 wx.requestAnimationFrame 在真机上是 undefined（发现 #2）');
+    a.cancelFrame(7);
+  } finally {
+    if (savedGlobalRaf === undefined) delete globalThis.requestAnimationFrame; else globalThis.requestAnimationFrame = savedGlobalRaf;
+    if (savedGlobalCaf === undefined) delete globalThis.cancelAnimationFrame; else globalThis.cancelAnimationFrame = savedGlobalCaf;
+  }
+});
+
+test('防回归：mainCanvas 预创建的 WebGL2 类必须暴露到全局（three 判定依赖，发现 #1）', async () => {
+  const saved = (globalThis).WebGL2RenderingContext;
+  const fakeCtor = { name: 'WebGL2RenderingContext' };
+  const wx = makeWxMock();
+  // 真机形态：只有 webgl2 一个 kind，且上下文构造器名恰好是 WebGL2RenderingContext
+  wx.createCanvas = () => ({
+    width: 300, height: 150,
+    getContext: (kind) => (kind === 'webgl2' ? { __ctx: kind, constructor: fakeCtor } : null),
+  });
+  delete (globalThis).WebGL2RenderingContext;
+  try {
+    const a = createWxAdapter({ wx });
+    a.canvas.mainCanvas();
+    assert.equal((globalThis).WebGL2RenderingContext, fakeCtor, 'exposeWebGL2Class 必须把真实上下文的构造器补到全局');
+    // 二次取画布不得重复暴露/报错（幂等）
+    a.canvas.mainCanvas();
+  } finally {
+    if (saved === undefined) delete (globalThis).WebGL2RenderingContext; else (globalThis).WebGL2RenderingContext = saved;
+  }
+});

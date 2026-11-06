@@ -50,7 +50,11 @@ export interface WxRequestOpts {
   method?: 'GET' | 'POST';
   dataType?: 'json' | string;
   timeout?: number;
-  success?(res: { statusCode: number; data: unknown }): void;
+  /** 请求头（任务 API 的 cookie jar 回传用；基础库 2.10+） */
+  header?: Record<string, string>;
+  /** 请求体：Content-Type 为 application/json 时由基础库序列化为 JSON */
+  data?: unknown;
+  success?(res: { statusCode: number; data: unknown; header?: Record<string, unknown> }): void;
   fail?(err: { errMsg: string }): void;
 }
 
@@ -112,6 +116,8 @@ export interface WxLike {
 
   /** 基础库 2.11.3+；缺失时退化 Date.now（S10 §4） */
   getPerformance?(): { now(): number };
+  /** 运行环境（develop/trial/release）；极老基础库缺失，调用方须容忍抛错或缺省 */
+  getAccountInfoSync?(): { miniProgram?: { envVersion?: string } };
   /** K12：回调参数不保证是时间戳，requestFrame 内部不消费它 */
   requestAnimationFrame(cb: (timeMs: number) => void): number;
   cancelAnimationFrame(handle: number): void;

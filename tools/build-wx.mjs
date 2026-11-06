@@ -18,7 +18,7 @@
 import { build } from 'esbuild';
 import {
   copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync,
-  readdirSync, realpathSync, rmSync, statSync, writeFileSync,
+  readdirSync, realpathSync, renameSync, rmSync, statSync, writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
@@ -40,6 +40,19 @@ const DEFAULT_CHAR = 'char_volt';
 
 /** 运行时音频扩展名（README 等说明文件不进包）。 */
 export const AUDIO_FILE_RE = /\.(mp3|m4a|aac|ogg|wav)$/i;
+
+/** 主包 game.json 修补（wx-runtime-findings #3）：默认剔除 iOSHighPerformance（Windows 模拟器 jsbridge 起不来）；TR_WX_IOS_HP=1 保留 */
+export function patchWxGameJson(outDir, keepIOSHighPerformance) {
+  const p = join(outDir, 'game.json');
+  const json = JSON.parse(readFileSync(p, 'utf8'));
+  if (!keepIOSHighPerformance && 'iOSHighPerformance' in json) delete json.iOSHighPerformance;
+  writeFileSync(p, JSON.stringify(json, null, 2) + '\n');
+}
+
+/** 分包内 config/game.json 撞微信保留名读不出（#4）：包内改名 gameplay.json，运行时 main.ts 名映射还原 */
+export function renamePkgGameConfig(pkgDir) {
+  renameSync(join(pkgDir, 'config', 'game.json'), join(pkgDir, 'config', 'gameplay.json'));
+}
 
 function copyDir(from, to, filter = () => true) {
   mkdirSync(to, { recursive: true });
@@ -128,12 +141,14 @@ async function main() {
     });
 
     for (const f of ['game.json', 'project.config.json']) copyFileSync(join(src, f), join(out, f));
+    patchWxGameJson(out, process.env.TR_WX_IOS_HP === '1');
 
     // 分包 pkg-assets（redesign §3.5：config 随包走 + 字体图集 + 真实音频 + 非默认资源占位）；
     // wx 侧启动链：loadSubpackage → extras.readJson('pkg-assets/config/<name>.json')（apps/wx/src/main.ts）
     const pkg = join(out, 'pkg-assets');
     mkdirSync(pkg, { recursive: true });
     copyDir(join(root, 'config'), join(pkg, 'config'), n => n.endsWith('.json'));
+    renamePkgGameConfig(pkg);
     copyDir(join(root, 'assets/fonts'), join(pkg, 'assets/fonts'), n => /\.(png|metrics\.json)$/.test(n));
     // 主界面 UI 资源随分包走（徽标两帧/纯背景/分层动效贴图；只收 png——
     // 微信小游戏没有 <video> 通路，背景动效在 wx 端由这些贴图驱动，视频不进包）

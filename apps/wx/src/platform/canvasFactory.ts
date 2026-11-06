@@ -4,6 +4,7 @@
  * 离屏画布每次新建（后续 createCanvas()）。上屏画布 width/height 已是物理像素（K6）。
  */
 import type { CanvasFactory, GLCanvas, WindowSize } from '@tr/framework/platform/platformAdapter.js';
+import { TR_GAME_CANVAS_ATTRIBUTES } from '@tr/game/render/glContext.js';
 import { installCanvasShim } from './shim.js';
 import type { WxLike } from './wxTypes.js';
 
@@ -22,8 +23,11 @@ const DPR_CAP = 2;
 function exposeWebGL2Class(canvas: GLCanvas): void {
   const g = globalThis as { WebGL2RenderingContext?: unknown };
   if (g.WebGL2RenderingContext !== undefined) return;
-  const ctx = (canvas as unknown as { getContext(kind: string): { constructor?: { name?: string } } | null })
-    .getContext('webgl2');
+  // 属性必须与 emptyScene/runnerScene 建 renderer 时同源（TR_GAME_CANVAS_ATTRIBUTES）：
+  // WebGL 首次 getContext 后再调用会忽略新 attributes，预创建值即真机实际生效值（审查 W-1）
+  const ctx = (canvas as unknown as {
+    getContext(kind: string, attrs?: Record<string, unknown>): { constructor?: { name?: string } } | null;
+  }).getContext('webgl2', { ...TR_GAME_CANVAS_ATTRIBUTES });
   if (ctx?.constructor?.name === 'WebGL2RenderingContext') g.WebGL2RenderingContext = ctx.constructor;
 }
 
