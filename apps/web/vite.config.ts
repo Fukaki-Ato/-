@@ -1,6 +1,6 @@
 import { defineConfig, type Plugin } from 'vite';
 import { readFile, cp, mkdir } from 'node:fs/promises';
-import { join, normalize, extname, resolve } from 'node:path';
+import { join, normalize, extname, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { rankPageGateway } from './rankPageGateway.js';
 
@@ -33,8 +33,11 @@ function trAssets(): Plugin {
       server.middlewares.use((req, res, next) => {
         const url = (req.url ?? '').split('?')[0] ?? '';
         if (!url.startsWith('/assets/')) return next();
-        const p = normalize(join(assetsDir, decodeURIComponent(url.slice('/assets/'.length))));
-        if (!p.startsWith(assetsDir)) { res.statusCode = 403; res.end('forbidden'); return; }
+        let decoded = url.slice('/assets/'.length);
+        try { decoded = decodeURIComponent(decoded); } catch { res.statusCode = 400; res.end('bad request'); return; }
+        // 前缀检查必须补路径分隔符：不带 sep 会放过 assetsX/ 这类同前缀兄弟目录（审查 W-4）
+        const p = normalize(join(assetsDir, decoded));
+        if (!p.startsWith(assetsDir + sep)) { res.statusCode = 403; res.end('forbidden'); return; }
         readFile(p)
           .then(buf => {
             res.setHeader('Content-Type', MIME[extname(p).toLowerCase()] ?? 'application/octet-stream');
@@ -74,6 +77,7 @@ export default defineConfig({
   },
   build: {
     target: 'es2021',
-    sourcemap: true,
+    // sourcemap 默认关闭（审查 W-5：正式部署不发布源码映射）；需要排查线上问题时 TR_WEB_SOURCEMAP=1 显式开
+    sourcemap: process.env.TR_WEB_SOURCEMAP === '1',
   },
 });

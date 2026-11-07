@@ -76,3 +76,44 @@ test('game.json 的 runner 参数都已在仓库 schema 中声明', () => {
     assert.ok(declared.has(key), `runner.${key} 未写进 schema/config.schema.json`);
   }
 });
+
+test('能抓到：商店 offer 的 give/price/limit/活动引用错误（审查 T-2）', () => {
+  const econ = load('economy');
+  const offers = econ.params.shop.offers;
+  offers[0].give[0].item = 'item_ghost';
+  offers[0].price = { gold: 1 };
+  offers[0].requiresEvent = 'event_ghost';
+  offers[0].limit = { perWeek: 2 };
+  offers.push({ ...offers[1] }); // id 重复
+  const content = {
+    game: load('game'), themes: load('themes'), events: load('events'),
+    characters: load('characters'), skills: load('skills'), items: load('items'),
+    obstacles: load('obstacles'), economy: econ,
+  };
+  const errors = validateRefs(content);
+  assert.ok(errors.some(e => e.includes('give[].item') && e.includes('item_ghost')), errors.join('\n'));
+  assert.ok(errors.some(e => e.includes('price 货币键') && e.includes('gold')), errors.join('\n'));
+  assert.ok(errors.some(e => e.includes('requiresEvent') && e.includes('event_ghost')), errors.join('\n'));
+  assert.ok(errors.some(e => e.includes('limit 不支持的键') && e.includes('perWeek')), errors.join('\n'));
+  assert.ok(errors.some(e => e.includes('id 重复')), errors.join('\n'));
+});
+
+test('能抓到：角色 growth 碎片串与 unlock 引用错误（审查 T-2）', () => {
+  const chars = load('characters');
+  const char = chars.items.find(i => i.id === 'char_volt');
+  char.growth.costPerLevel[0].shards = 'shard_ghost:10';
+  char.growth.costPerLevel[1].shards = 'shard_volt:-3';
+  char.unlock = { type: 'loot', lootRef: 'loot_ghost' };
+  const skin = chars.items.find(i => i.id.startsWith('skin_'));
+  if (skin) skin.unlock = { type: 'coin', cost: 0 };
+  const content = {
+    game: load('game'), themes: load('themes'), events: load('events'),
+    characters: chars, skills: load('skills'), items: load('items'),
+    obstacles: load('obstacles'), economy: load('economy'),
+  };
+  const errors = validateRefs(content);
+  assert.ok(errors.some(e => e.includes('shard_ghost')), errors.join('\n'));
+  assert.ok(errors.some(e => e.includes('shard_volt:-3') || e.includes('shards 应为')), errors.join('\n'));
+  assert.ok(errors.some(e => e.includes('unlock.lootRef') && e.includes('loot_ghost')), errors.join('\n'));
+  if (skin) assert.ok(errors.some(e => e.includes('unlock: cost 应为正整数')), errors.join('\n'));
+});

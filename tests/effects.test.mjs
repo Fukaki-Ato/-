@@ -15,6 +15,7 @@ import { hashSeed } from '../packages/game/dist/core/rng.js';
 const root = join(fileURLToPath(import.meta.url), '..', '..');
 const NAMES = ['game', 'characters', 'skills', 'items', 'obstacles', 'themes', 'events', 'economy'];
 const content = Object.fromEntries(NAMES.map(n => [n, JSON.parse(readFileSync(join(root, 'config', `${n}.json`), 'utf8'))]));
+delete content.game.params.revive; // 机制类死亡断言在无复活下验证（复活语义专测见 gameplayFixes）
 const schema = JSON.parse(readFileSync(join(root, 'schema', 'config.schema.json'), 'utf8'));
 const ctx = sim => ({ distance: sim.state.distance, lane: sim.state.lane });
 

@@ -182,6 +182,12 @@ async function bootRealFlow({ withAudio = true, pageSupport = false, storedCharI
   const store = new Map();
   if (storedCharId !== undefined) store.set(CHAR_KEY, storedCharId);
   if (storedThemeId !== undefined) store.set('thunderrun:theme', storedThemeId);
+  // 解锁门槛（localEconomy）上线：夹具按「老玩家已解锁全部非 free 角色」播种，
+  // 让既有用例继续测流转/音频接线本身；config 锁定（lockedCharId）路径不受影响
+  store.set('thunderrun:unlocks', JSON.stringify([
+    'char_ama', 'char_kaze', 'char_rina', 'char_bolt', 'char_frog',
+    'char_mambo', 'char_niu', 'char_whale', 'char_penguin',
+  ]));
   const adapter = {
     storage: { get: k => store.get(k) ?? null, set: (k, v) => store.set(k, v), remove: k => store.delete(k) },
     fetchJson: async url => {

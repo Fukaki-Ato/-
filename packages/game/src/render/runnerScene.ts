@@ -10,7 +10,7 @@ import { STEP_DT } from '@tr/game/core/sim/simTypes.js';
 import type { RunnerSim } from '@tr/game/core/sim/runnerSim.js';
 import type { GameContent } from '@tr/game/core/config/configTypes.js';
 import type { GLCanvas, PlatformAdapter, WindowSize } from '@tr/framework/platform/platformAdapter.js';
-import { createAvatar } from './avatarRig.js';
+import { createAvatar } from './avatarRig.js'; import { TR_GAME_CANVAS_ATTRIBUTES } from './glContext.js';
 import { camTargets } from './cameraRig.js';
 import { createCoinField } from './coinField.js';
 import { createCloudLayer, createObstacleLayer } from './entityLayers.js';
@@ -80,10 +80,10 @@ export function createRunnerScene(
   const fx = sim.fx;
 
   // ---------- 舞台 ----------
-  // 全仓唯一 three 接线断言点（S10 §7.6 / D3）：GLCanvas 是结构化去 DOM 类型，
-  // 这里喂回 three 需要的 HTMLCanvasElement 形貌；S11 路线 B 的最小垫片（wx canvas 补
-  // addEventListener/style）即在此处兼容，如与此冲突收敛于此单点。
-  const renderer = new THREE.WebGLRenderer({ canvas: host.canvas as unknown as HTMLCanvasElement, antialias: true });
+  // 全仓唯一 three 接线断言点（S10 §7.6 / D3）：GLCanvas 是结构化去 DOM 类型，这里喂回
+  // three 需要的 HTMLCanvasElement 形貌；S11 路线 B 的最小垫片（wx canvas 补 addEventListener/
+  // style）即在此处兼容，如与此冲突收敛于此单点。
+  const renderer = new THREE.WebGLRenderer({ canvas: host.canvas as unknown as HTMLCanvasElement, ...TR_GAME_CANVAS_ATTRIBUTES });
   const { width, height, dpr } = host.size;
   renderer.setPixelRatio(dpr);
   renderer.setSize(width, height, false);

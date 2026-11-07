@@ -1,0 +1,116 @@
+/* 玩家档案弹层：半屏面板 + 背板点击关闭（视觉沿用大厅棕系） */
+.tr-profile-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  background: rgba(8, 22, 38, 0.55);
+  padding: 4vh 12px 0;
+}
+
+.profile-panel {
+  width: min(420px, 100%);
+  background: #5e4b3a;
+  border-radius: 14px 14px 18px 18px;
+  padding: 14px 16px 18px;
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.profile-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.profile-head h2 {
+  margin: 0;
+  font-size: 18px;
+  color: #ffe9a0;
+}
+
+.profile-close {
+  width: 30px;
+  height: 30px;
+  font-size: 16px;
+  line-height: 1;
+}
+
+.profile-avatar-big {
+  width: 84px;
+  height: 84px;
+  border-radius: 50%;
+  align-self: center;
+  background: rgba(255, 233, 160, 0.14);
+}
+
+.profile-name {
+  font-size: 20px;
+  color: #ffd76a;
+}
+
+.profile-id,
+.profile-best {
+  margin: 0;
+  font-size: 13px;
+  color: #d8c3a0;
+}
+
+.profile-hint {
+  margin: 0;
+  font-size: 12px;
+  color: #d8c3a0;
+  min-height: 1.4em;
+}
+
+.profile-avatars,
+.profile-names {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: center;
+}
+
+.profile-avatar-pick img {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  display: block;
+}
+
+.profile-name-pick {
+  font-size: 13px;
+  padding: 5px 9px;
+}
+
+/* 背包（仓库 MVP）：两列键值行 */
+.profile-inventory {
+  border-top: 1px solid rgba(255, 233, 160, 0.25);
+  padding-top: 8px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px 14px;
+}
+
+.profile-inventory-title {
+  grid-column: 1 / -1;
+  margin: 0 0 2px;
+  font-size: 14px;
+  color: #ffe9a0;
+}
+
+.profile-inventory-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: #d8c3a0;
+}
+
+.profile-inventory-row strong {
+  color: #ffe9a0;
+  font-weight: 600;
+}

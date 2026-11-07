@@ -27,6 +27,7 @@ import { BAR_BOTTOM, SLIDE_H, STAND_H } from '../packages/game/dist/core/sim/sim
 const root = join(fileURLToPath(import.meta.url), '..', '..');
 const NAMES = ['game', 'characters', 'skills', 'items', 'obstacles', 'themes', 'events', 'economy'];
 const content = Object.fromEntries(NAMES.map(n => [n, JSON.parse(readFileSync(join(root, 'config', `${n}.json`), 'utf8'))]));
+delete content.game.params.revive; // 机制类死亡断言在无复活下验证（复活语义专测见 gameplayFixes）
 
 /** 滑铲门（obs_gate_low：class=high，size 2×2.6×0.6，杆体占 1.2~2.6m） */
 const GATE = { obsRef: 'obs_gate_low', cls: 'high', w: 2, h: 2.6, d: 0.6, lane: 0, worldZ: 0 };

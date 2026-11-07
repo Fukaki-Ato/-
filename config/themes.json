@@ -1,6 +1,6 @@
 {
   "$schema": "../schema/config.schema.json#/themes",
-  "configVersion": "2.0.0",
+  "configVersion": "2.1.0",
   "minEngineVersion": "1.0.0",
   "updatedAt": "2026-09-29",
   "items": [
@@ -39,6 +39,26 @@
         { "ver": "1.1.0", "date": "2026-10-11", "change": "music 改指 run_rain.mp3（雨声空灵版，响度对齐全局 run.mp3 到 -16.5 LUFS）：本字段自这次起真正被运行时读取——audioDirector.enterRun 收主题 BGM 路径，缺省仍回退 params.audio.bgm.run" },
         { "ver": "1.2.0", "date": "2026-10-12", "change": "run_rain.mp3 换成用户补给的循环母带（雨声空灵版_循环.mp3，8.33 秒无缝版），路径不变、只换字节；仍按 -16.5 LUFS 对齐" },
         { "ver": "1.3.0", "date": "2026-10-13", "change": "两侧街景扩到「便利店 — 空地路面 — 一排 2~3 层临街商铺（门前一巷杂物 + 公交站 + 贴跑道一条 2m 石板小道）— 小花园」，远景居民楼改三套型深蓝灰；groundColor 保持 #2C313D，但地面纹理不再吃沙色，这片地终于按配置显示成蓝灰而不是 muddy 棕" }
+      ]
+    },
+    {
+      "id": "theme_dusk_harbor", "status": "live",
+      "name": { "zh-CN": "黄昏渔港" },
+      "sky": {
+        "shader": "thunder_sky",
+        "baseColor": "#E8935C",
+        "flashColor": "#FFE3B8",
+        "flashEveryS": [9999, 9999]
+      },
+      "fog": { "color": "#E8B27E", "density": 0.011 },
+      "track": { "railMat": "mat_seaside_rail", "groundTiles": ["tile_beach_a"] },
+      "props": [],
+      "scenery": "harbor",
+      "groundColor": "#C98D5A",
+      "music": "assets/audio/bgm/run.mp3", "sfxSet": "city",
+      "vfxTint": "#FFD9A8",
+      "versions": [
+        { "ver": "1.0.0", "date": "2026-11-06", "change": "第三个跑酷场景：黄昏渔港铁道。网搜精密场景提示词合成（工业视差分层 Ansimuz + 霓虹夜城 5 层视差配方 → 橙青调渔港）：远景剪影+门式起重机、长仓库+集装箱堆（撞色 2-3 层错缝）、系船柱/栈桥暖灯/油桶/渔网架/渔船桅杆五层程序化侧景，约 20 个 draw call" }
       ]
     }
   ]

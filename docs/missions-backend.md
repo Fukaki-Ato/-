@@ -31,7 +31,7 @@ SQLite 启用 WAL 和外键，适用于**单个服务进程/实例**。使用本
 所有写请求必须包含与 `PUBLIC_ORIGIN` 完全相同的 `Origin`；未设置时，与请求 `Host` 做 host 比较。缺失或不匹配返回 `{"error":"..."}`。服务不开放 CORS。游客会话使用服务端随机 token，数据库只保存 SHA-256 摘要；cookie 为 `HttpOnly; SameSite=Lax; Path=/`，浏览器需以同源凭据调用。未建立/无效会话的受保护 API 返回 401。错误响应统一为 JSON `{"error":"用户可读文本"}`。
 
 - `POST /api/missions/session`：建立游客会话并设置 cookie；成功返回 `{"ok":true}`。可不带 body。
-- `GET /api/missions`：返回 `MissionSnapshot`：`serverTime`、`daily`、`weekly`、`wallet`。时间戳是 Unix 毫秒；每组含 `periodId`、`resetsAt` 和任务视图。wallet 只包含已发放过的余额。
+- `GET /api/missions`：返回 `MissionSnapshot`：`serverTime`、`daily`、`weekly`、`wallet`、`rewardLedgerId`。时间戳是 Unix 毫秒；每组含 `periodId`、`resetsAt` 和任务视图。wallet 是该 rewardLedgerId 对应的累计已领取奖励账本，不是可消费余额；rewardLedgerId 使用持久游客用户 ID，会话续期不改变它。客户端按币种累计高水位只导入增量到本机钱包，不回写服务端余额。
 - `POST /api/missions/runs`：JSON `{"seed":uint32,"charId":"char_volt"}`（空串表示默认装备），返回 `{"runId":"..."}`。每张 ticket 服务端记录 seed、角色、开始时间和当时周期。
 - `POST /api/missions/runs/:id/finish`：JSON `{"frames":正整数,"actions":[{"frame":0,"action":"jump|slide|laneL|laneR|skill"}]}`，返回最新 `MissionSnapshot`。frame 从 0 开始；同一帧动作按数组顺序执行，并在该帧 `step()` 前应用。帧数表示总模拟 step 次数，动作需按 frame 非降序排列且 `0 <= frame < frames`。死亡帧必须是最后一帧；仍存活时允许玩家主动结束。客户端不得提交 summary。相同 ticket + 完全相同回放重试是幂等的；更换回放内容返回 409。
 - `POST /api/missions/claim`：JSON `{"period":"daily|weekly","periodId":"...","missionId":"..."}`。任务完成且周期仍当前时才领取；SQLite 事务原子更新 claimed 与 wallet，重复领取不会重复入账。
@@ -51,3 +51,9 @@ node --test tests/missions-server.test.mjs
 ```
 
 这是一个单机游客任务服务，不是完整反作弊系统：cookie 可被清除重开，游客没有跨设备身份；可预测的模拟重放只能验证服务端规则，并不阻止自动化/脚本操作。若奖励具备现实或高价值经济影响，应先接入账号身份、持久化滥用检测和运营审计。
+
+## 本机钱包衔接（当前 MVP）
+
+Web 和 WX 的业务存储使用 `createRewardWalletStore`：金币、钻石、钥匙、角色碎片和道具沿用旧键接口，但新值与每个任务账本的已导入累计值保存在同一条 JSON 记录中。旧本机余额在首次写入时懒迁移并保留；现有角色、档案、商店和离线消费都读取这个包装。任务 load / claim / finish 的 snapshot 在返回 UI 前同步；重复响应、刷新、会话续期和较旧的累计值不会补回已消费奖励。大厅只显示本机余额；任务页显示累计奖励。
+
+单条写入失败或写后校验不一致会报错，领取可刷新重试；损坏的钱包记录不会当作空游标重新发奖。所有包装每次读取最新持久数据，不缓存钱包；这仍是单机 MVP，不提供跨设备云存档或多进程事务。清除站点存储会清除本机余额及导入记录，因此不能保留本机消费历史；不要把此实现当作账号级/高价值经济系统。

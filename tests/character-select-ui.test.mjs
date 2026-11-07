@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { importWebModule, fakeDom } from './dom-fixture.mjs';
 
 const { createCharacterSelectOverlay } = await importWebModule('../apps/web/src/characterSelectOverlay.ts');
@@ -114,4 +115,61 @@ test('compact abilities open complete details without leaving selection or cycli
   assert.equal(document.activeElement, summary);
   assert.equal(calls.filter(call => call[0] === 'back').length, 0, 'first Escape closes details, not the selection page');
   dispose();
+});
+
+
+test('shard synthesis is independently enabled and never repeats or bypasses config locks', async t => {
+  const { selectUnlockActions } = await import('../packages/game/dist/flow/unlock.js');
+  const { grant, walletBalance } = await import('../packages/game/dist/flow/localEconomy.js');
+  const fixture = fakeDom(t);
+  const map = new Map();
+  const store = { get: k => map.get(k) ?? null, set: (k, v) => map.set(k, v) };
+  grant(store, [{ item: 'shard_ama', n: 120 }]);
+  const actions = selectUnlockActions(store, fixture.content);
+  const dispose = createCharacterSelectOverlay(fixture.content, {
+    ...actions, onSelect() {}, onStartRun() {}, onShop() {}, onBack() {},
+  }, 'char_ama', 'guest', {});
+  const root = fixture.body.children[0];
+  const find = name => fixture.byClass(root, name)[0];
+  assert.equal(find('select-unlock-button').disabled, true, 'no coins');
+  assert.equal(find('select-synthesize-button').disabled, false, 'enough shards');
+  find('select-synthesize-button').click();
+  assert.equal(find('select-start-button').disabled, false);
+  assert.equal(walletBalance(store, 'shard_ama'), 60);
+  assert.equal(actions.onSynthesize('char_ama').ok, false);
+  assert.equal(walletBalance(store, 'shard_ama'), 60, 'duplicate action does not spend');
+  dispose();
+  fixture.content.characters.items.find(c => c.id === 'char_kaze').locked = true;
+  grant(store, [{ item: 'shard_kaze', n: 60 }]);
+  assert.equal(actions.canSynthesize('char_kaze'), false);
+  assert.equal(actions.onSynthesize('char_kaze').ok, false);
+  assert.equal(walletBalance(store, 'shard_kaze'), 60);
+  const disposeLocked = createCharacterSelectOverlay(fixture.content, {
+    ...actions, onSelect() {}, onStartRun() {}, onShop() {}, onBack() {},
+  }, 'char_kaze', 'guest', {});
+  const locked = fixture.body.children[0];
+  assert.equal(fixture.byClass(locked, 'select-synthesize-button')[0].style.display, 'none');
+  assert.equal(fixture.byClass(locked, 'select-start-button')[0].disabled, true);
+  disposeLocked();
+});
+
+
+test('selection actions reserve a full-width start row with or without unlock actions', t => {
+  const fixture = fakeDom(t);
+  const css = readFileSync(new URL('../apps/web/src/characterSelectOverlay.css', import.meta.url), 'utf8');
+  assert.match(css, /\.select-action-row\s*\{[^}]*grid-template-columns:\s*repeat\(2, minmax\(0, 1fr\)\)/);
+  assert.match(css, /\.select-start-button\s*\{[^}]*grid-column:\s*1 \/ -1/);
+  assert.match(css, /\.select-action-row > button\s*\{[^}]*min-width:\s*0/);
+  for (const gated of [false, true]) {
+    const dispose = createCharacterSelectOverlay(fixture.content, {
+      onSelect() {}, onStartRun() {}, onShop() {}, onBack() {},
+      isGated: () => gated, canUnlock: () => false, canSynthesize: () => false,
+      onUnlock: () => ({ ok: false, message: '' }), onSynthesize: () => ({ ok: false, message: '' }),
+    }, 'char_ama', 'guest', {}, () => {});
+    const row = fixture.byClass(fixture.body.children[0], 'select-action-row')[0];
+    const visible = row.children.filter(child => child.style.display !== 'none');
+    assert.equal(visible.length, gated ? 5 : 3);
+    assert.equal(visible.at(-1).classList.contains('select-start-button'), true);
+    dispose();
+  }
 });

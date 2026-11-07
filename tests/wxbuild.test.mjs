@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url';
 import { PKG_ASSETS, loadWxSubpackage, subpackageAssetPath } from '../apps/wx/build/platform/subpackage.js';
 import { resolveWxAudioPath } from '../apps/wx/build/platform/audio.js';
 import { MAIN_BUDGET, TOTAL_BUDGET, measureDist } from '../tools/check-wx-size.mjs';
-import { AUDIO_FILE_RE, copyAudioAssets } from '../tools/build-wx.mjs';
+import { AUDIO_FILE_RE, copyAudioAssets, patchWxGameJson, renamePkgGameConfig } from '../tools/build-wx.mjs';
 
 const root = join(fileURLToPath(import.meta.url), '..', '..');
 
@@ -146,6 +146,38 @@ test('copyAudioAssets：仓库无 assets/audio 时安全返回 0', () => {
   const dir = mkdtempSync(join(tmpdir(), 'tr-wx-noaudio-'));
   try {
     assert.deepEqual(copyAudioAssets(dir, join(dir, 'out')), { files: 0, bytes: 0 });
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// ---------------- wx 遗留决策回归（wx-runtime-findings #3/#4，审查 M5-4） ----------------
+
+test('patchWxGameJson：默认剔除 iOSHighPerformance；TR_WX_IOS_HP=1 保留', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'tr-wx-gamejson-'));
+  try {
+    const p = join(dir, 'game.json');
+    const write = () => writeFileSync(p, JSON.stringify({ iOSHighPerformance: true, deviceOrientation: 'portrait' }));
+    write();
+    patchWxGameJson(dir, false);
+    assert.equal(JSON.parse(readFileSync(p, 'utf8')).iOSHighPerformance, undefined, '默认剔除（Windows 模拟器兼容）');
+    write();
+    patchWxGameJson(dir, true);
+    assert.equal(JSON.parse(readFileSync(p, 'utf8')).iOSHighPerformance, true, 'TR_WX_IOS_HP=1 时保留');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('renamePkgGameConfig：game.json → gameplay.json（微信保留名规避），源不存在时报错', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'tr-wx-rename-'));
+  try {
+    mkdirSync(join(dir, 'config'), { recursive: true });
+    writeFileSync(join(dir, 'config', 'game.json'), '{}');
+    renamePkgGameConfig(dir);
+    assert.equal(existsSync(join(dir, 'config', 'game.json')), false);
+    assert.equal(existsSync(join(dir, 'config', 'gameplay.json')), true);
+    assert.throws(() => renamePkgGameConfig(dir), '二次改名应报错（源缺失）');
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

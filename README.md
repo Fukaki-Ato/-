@@ -45,7 +45,7 @@ The mobile UI design and verification rules are in [docs/mobile-ui.md](docs/mobi
 
 - Web runs the complete menu, runner, HUD, and result flow.
 - WX currently validates the platform adapter, empty scene, asset subpackage, and config loading chain. The complete WX game-flow and shared-renderer UI integration remain a planned integration task.
-- Audio and telemetry were intentionally not migrated because they were not connected to either runtime.
+- Audio is fully migrated and wired on Web (director, config, assets, and both platform `AudioService` implementations); the player-facing volume controls live in the settings page. Telemetry was intentionally not migrated because it is not connected to either runtime.
 
 ## Collaboration
 

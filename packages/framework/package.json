@@ -4,9 +4,11 @@
   "private": true,
   "type": "module",
   "description": "跨平台运行骨架：平台契约、自绘 UI 与通用运行宿主。",
-  "exports": { "./*": "./dist/*" },
+  "exports": {
+    "./*": "./dist/*"
+  },
   "dependencies": {
-    "three": "0.160.1"
+    "three": "0.187.0"
   },
   "devDependencies": {
     "@types/three": "0.160.0"

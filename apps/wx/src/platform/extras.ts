@@ -11,7 +11,9 @@ import type { CloudBridge, SyncStorage, WxExtras, WxIdentity } from '@tr/framewo
 import { wxReadBinary, wxReadJson } from './network.js';
 import type { WxLike } from './wxTypes.js';
 
-const OPENID_KEY = 'thunderrun:wx…penid';
+const OPENID_KEY = 'thunderrun:wxopenid';
+// 历史事故键（"openid" 的 o 被某次工具处理替换成 U+2026）；只读迁移，新写入一律走正键。
+const OPENID_KEY_LEGACY = 'thunderrun:wx\u2026penid';
 const PROGRESS_PREFIX = 'thunderrun:progress:';
 
 function loginForCode(wx: WxLike): Promise<string> {
@@ -40,6 +42,10 @@ export function createWxExtras(wx: WxLike, storage: SyncStorage): WxExtras {
       let code = '';
       try { code = await loginForCode(wx); } catch (e) { console.warn('[platform-wx] login 占位降级:', (e as Error).message); }
       let id = storage.get(OPENID_KEY);
+      if (!id) {
+        const legacy = storage.get(OPENID_KEY_LEGACY);
+        if (legacy) { id = legacy; storage.set(OPENID_KEY, id); }
+      }
       if (!id) {
         id = 'wx-guest-' + (code ? code.slice(0, 6) : Math.random().toString(36).slice(2, 8));
         storage.set(OPENID_KEY, id);

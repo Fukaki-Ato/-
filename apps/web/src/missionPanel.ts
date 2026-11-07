@@ -85,7 +85,7 @@ export function createMissionPanel(api: MissionApi, content: GameContent, onBack
         busy = true; status.textContent = '正在领取…'; render();
         void api.claim(period, group.periodId, mission.id).then(value => {
           if (disposed) return;
-          snapshot = value; status.textContent = '领取成功，奖励已存入任务钱包';
+          snapshot = value; status.textContent = '领取成功，奖励已存入本机钱包';
         }).catch((error: Error) => {
           if (!disposed) status.textContent = `${error.message}；可刷新后重试`;
         }).finally(() => { if (!disposed) { busy = false; render(); } });
@@ -96,7 +96,7 @@ export function createMissionPanel(api: MissionApi, content: GameContent, onBack
       card.append(heading, progress, counts, bottom);
       list.append(card);
     }
-    wallet.replaceChildren(uiText('strong', '任务钱包'));
+    wallet.replaceChildren(uiText('strong', '任务累计奖励'));
     wallet.append(uiText('p', Object.entries(snapshot.wallet).filter(([, n]) => n > 0)
       .map(([id, n]) => `${itemName(id)} ${n.toLocaleString()}`).join(' · ') || '完成任务领取第一份奖励', 'ui-muted'));
   }

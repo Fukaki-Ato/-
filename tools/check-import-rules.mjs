@@ -12,6 +12,8 @@ const DOM_GLOBALS = [
   [/\blocalStorage\b/g, '禁止直接使用 localStorage'],
   [/\bfetch\(/g, '禁止直接调用 fetch'],
   [/\bwx\./g, '禁止直接使用 wx API'],
+  [/\bperformance\s*\./g, '禁止直接使用 performance（宿主 API；时间走注入的 adapter.now()）'],
+  [/\bURLSearchParams\b/g, '禁止使用 URLSearchParams（宿主 API；查询走注入的 QueryParamsView）'],
 ];
 const APP_IMPORTS = [
   [/from ['"][^'"]*apps\/(web|wx)\//g, 'packages 不得 import app 实现'],
@@ -21,6 +23,7 @@ const WEB_GLOBALS = [
   [/\bwindow\./g, 'WX 平台实现禁止 web 全局 window'],
   [/\bdocument\./g, 'WX 平台实现禁止 web 全局 document'],
   [/\blocalStorage\b/g, 'WX 平台实现禁止 localStorage'],
+  [/\bURLSearchParams\b/g, 'WX 平台实现禁止 URLSearchParams（小游戏运行时没有）'],
 ];
 
 function* walkTs(dir) {
@@ -29,6 +32,16 @@ function* walkTs(dir) {
     const path = join(dir, name);
     if (statSync(path).isDirectory()) yield* walkTs(path);
     else if (path.endsWith('.ts')) yield path;
+  }
+}
+
+function* walkExt(dir, ext) {
+  if (!existsSync(dir)) return;
+  for (const name of readdirSync(dir)) {
+    if (name === 'node_modules' || name === 'dist' || name === 'build') continue;
+    const path = join(dir, name);
+    if (statSync(path).isDirectory()) yield* walkExt(path, ext);
+    else if (path.endsWith(ext)) yield path;
   }
 }
 
@@ -44,9 +57,21 @@ function sourcesUnder(base) {
   return files;
 }
 
+/** src 之外的顶层源码（vite.config.ts、rankPageGateway.ts 等）：以前完全不受检（审查 T-1） */
+function topLevel(dir, ext) {
+  if (!existsSync(dir)) return [];
+  return readdirSync(dir).filter(name => name.endsWith(ext)).map(name => join(dir, name));
+}
+
 const violations = [];
-const files = [...sourcesUnder('packages'), ...sourcesUnder('apps')]
-  .map(path => path.split('\\').join('/'));
+const files = [
+  ...sourcesUnder('packages'),
+  ...sourcesUnder('apps'),
+  ...topLevel('apps/web', '.ts'),
+  ...topLevel('apps/wx', '.ts'),
+  ...walkExt('server', '.mjs'),
+  ...walkExt('apps/server/src', '.mjs'),
+].map(path => path.split('\\').join('/'));
 
 for (const file of files) {
   const lines = readFileSync(file, 'utf8').split('\n');

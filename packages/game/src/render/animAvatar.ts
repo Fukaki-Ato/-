@@ -6,7 +6,7 @@
  */
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import type { PlatformAdapter } from '@tr/framework/platform/platformAdapter.js';
+import type { PlatformAdapter, QueryParamsView } from '@tr/framework/platform/platformAdapter.js';
 import type { FxState } from '@tr/game/core/effects/buffEngine.js';
 import { STEP_DT } from '@tr/game/core/sim/simTypes.js';
 import type { RunnerState } from '@tr/game/core/sim/simTypes.js';
@@ -61,18 +61,20 @@ export interface AnimAvatar {
  *   update 的死实例（QA 采样读到 time=0/ts=0 的冻结快照，曾被误判成「动画卡死」）。
  */
 export function createAnimAvatar(
-  adapter: PlatformAdapter, prefabPath: string, scale = 1, urlParams?: URLSearchParams | null,
+  adapter: PlatformAdapter, prefabPath: string, scale = 1, urlParams?: QueryParamsView | null,
   isDead?: () => boolean,
 ): Promise<AnimAvatar | null> {
   if (!adapter.extras) {
     console.warn('[avatarRig] 平台无 extras（v2 契约 D7），跳过 GLB 角色（保留程序化模型）:', prefabPath);
     return Promise.resolve(null);
   }
+  // QA clipLog 的时间源走注入（契约 D12 now()）；纯逻辑测试壳可能没实现，防御性回落 0。
+  const nowMs = () => (typeof adapter.now === 'function' ? adapter.now() : 0);
   return adapter.extras.readBinary(prefabPath)
     .then(buf => new Promise<AnimAvatar | null>(resolve => {
       new GLTFLoader().parse(buf, '', gltf => {
         try {
-          resolve(build(gltf.scene, gltf.animations, scale, urlParams, isDead));
+          resolve(build(gltf.scene, gltf.animations, scale, urlParams, isDead, nowMs));
         } catch (e) {
           console.warn('[avatarRig] GLB 装配失败（回退程序化模型）', prefabPath, e);
           resolve(null);
@@ -89,8 +91,8 @@ export function createAnimAvatar(
 }
 
 function build(
-  root: THREE.Group, clips: THREE.AnimationClip[], scale: number, urlParams?: URLSearchParams | null,
-  isDead?: () => boolean,
+  root: THREE.Group, clips: THREE.AnimationClip[], scale: number, urlParams?: QueryParamsView | null,
+  isDead?: () => boolean, nowMs?: () => number,
 ): AnimAvatar | null {
   // 核心 clip（10 个）缺一即判资产不合格：半套动作比没有更糟（会静默少播受击/死亡等关键反馈）。
   // 表演 clip 按存在性装配：各模型不同源，缺一个不判失败，缺失由 play() 回落 Run。
@@ -185,7 +187,7 @@ function build(
     if (current !== clip) next.fadeIn(XFADE);
     next.play();
     current = clip;
-    clipLog.push({ clip, loop, restart: restart === true, t: +performance.now().toFixed(1) });
+    clipLog.push({ clip, loop, restart: restart === true, t: +(nowMs?.() ?? 0).toFixed(1) });
     if (clipLog.length > 200) clipLog.splice(0, clipLog.length - 200); // 有界，防长局内存涨
   }
   // 装载完成到首帧 update 之间是待机，不是 T-pose；Idle 按契约只播一次（播完交回首帧）
@@ -279,11 +281,17 @@ function build(
     setFootfallHandler(fn) { footfallHandler = fn; },
     dispose() {
       mixer.stopAllAction();
+      const textures = new Set<THREE.Texture>();
       root.traverse(o => {
         const m = o as THREE.Mesh;
         if (m.geometry) m.geometry.dispose();
-        if (m.material) (Array.isArray(m.material) ? m.material : [m.material]).forEach(mat => mat.dispose());
+        if (m.material) (Array.isArray(m.material) ? m.material : [m.material]).forEach(mat => {
+          // material.dispose() 不释放贴图；GLB 贴图是本实例独占（GLTFLoader 每次加载新建），不释放=逐局泄漏（审查 P1-2）
+          for (const v of Object.values(mat)) if ((v as THREE.Texture | null)?.isTexture) textures.add(v as THREE.Texture);
+          mat.dispose();
+        });
       });
+      for (const t of textures) t.dispose();
     },
   };
 }

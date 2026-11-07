@@ -142,6 +142,76 @@ export function validateRefs(content: GameContent): string[] {
       if (!ok) errors.push(`${loot.id}: 奖池引用不存在 -> ${e.ref}`);
     }
   }
+  // 商店 offers（审查 T-2）：商业化数据此前只查「params 是对象」，give/price/limit/活动引用
+  // 全部无校验——typo 会让付费商品静默不出现或定价错乱直接进包
+  const events = idsOf(content.events);
+  const lootIds = new Set(((content.economy.params?.lootTables ?? []) as { id: string }[]).map(l => l.id));
+  const walletKeys = new Set(['coin', 'key', 'diamond', ...shards]);
+  const grantKeys = new Set(['coin', 'key', 'diamond', ...items, ...chars, ...shards]);
+  const shop = (content.economy.params?.shop ?? {}) as {
+    offers?: { id?: unknown; give?: unknown; price?: unknown; requiresEvent?: unknown; limit?: unknown }[];
+  };
+  const offerIds = new Set<string>();
+  for (const offer of shop.offers ?? []) {
+    if (typeof offer.id !== 'string' || !offer.id.startsWith('offer_')) {
+      errors.push(`economy.shop.offers: id 前缀应为 offer_（${String(offer.id)}）`);
+      continue;
+    }
+    if (offerIds.has(offer.id)) errors.push(`economy.shop.offers: id 重复 -> ${offer.id}`);
+    offerIds.add(offer.id);
+    const where = `economy.shop.${offer.id}`;
+    if (!Array.isArray(offer.give) || offer.give.length === 0) errors.push(`${where}: give 应为非空数组`);
+    else for (const g of offer.give as { item?: unknown; n?: unknown }[]) {
+      if (typeof g?.item !== 'string' || !grantKeys.has(g.item)) errors.push(`${where}: give[].item 不存在 -> ${String(g?.item)}`);
+      if (!Number.isInteger(g?.n) || (g.n as number) <= 0) errors.push(`${where}: give[].n 应为正整数（${String(g?.n)}）`);
+    }
+    const price = offer.price as Record<string, unknown> | undefined;
+    if (!isRecord(price) || Object.keys(price).length === 0) errors.push(`${where}: price 应为非空对象`);
+    else for (const [k, v] of Object.entries(price)) {
+      if (!walletKeys.has(k)) errors.push(`${where}: price 货币键不存在 -> ${k}`);
+      if (!Number.isInteger(v) || (v as number) <= 0) errors.push(`${where}: price.${k} 应为正整数（${String(v)}）`);
+    }
+    need(offer.id, offer.requiresEvent, events, 'requiresEvent');
+    const limit = offer.limit as Record<string, unknown> | undefined;
+    if (limit !== undefined) {
+      if (!isRecord(limit)) errors.push(`${where}: limit 应为对象`);
+      else for (const [k, v] of Object.entries(limit)) {
+        if (!['perDay', 'once'].includes(k)) { errors.push(`${where}: limit 不支持的键 -> ${k}`); continue; }
+        // once 允许布尔 true（一次性购买语义）或正整数；perDay 只允许正整数
+        const okOnce = k === 'once' && (v === true || (Number.isInteger(v) && (v as number) > 0));
+        if (!okOnce && (!Number.isInteger(v) || (v as number) <= 0)) errors.push(`${where}: limit.${k} 应为正整数${k === 'once' ? '或 true' : ''}（${String(v)}）`);
+      }
+    }
+  }
+  // 角色 growth：shards 串与 lootTables 同口径解析（「存在的碎片id:正整数」）
+  for (const entry of content.characters.items ?? []) {
+    const growth = (entry as { growth?: { costPerLevel?: { coin?: unknown; shards?: unknown }[] } }).growth;
+    for (const [i, step] of (growth?.costPerLevel ?? []).entries()) {
+      if (step.coin !== undefined && (!Number.isInteger(step.coin) || (step.coin as number) < 0)) {
+        errors.push(`${entry.id}: growth.costPerLevel[${i}].coin 应为非负整数`);
+      }
+      if (step.shards !== undefined) {
+        const [id, n] = typeof step.shards === 'string' ? step.shards.split(':') : [];
+        if (!shards.has(id) || !/^[1-9]\d*$/.test(n ?? '')) {
+          errors.push(`${entry.id}: growth.costPerLevel[${i}].shards 应为「存在的碎片id:正整数」-> ${String(step.shards)}`);
+        }
+      }
+    }
+  }
+  // 角色 unlock：type 已知 + cost/lootRef/eventRef 指向存在（解锁消费在元游戏代码里，数据先锁对）
+  for (const entry of content.characters.items ?? []) {
+    const unlock = (entry as { unlock?: { type?: unknown; cost?: unknown; lootRef?: unknown; eventRef?: unknown } }).unlock;
+    if (!unlock) continue;
+    if (unlock.type === 'coin' || unlock.type === 'key') {
+      if (!Number.isInteger(unlock.cost) || (unlock.cost as number) <= 0) errors.push(`${entry.id}.unlock: cost 应为正整数`);
+    } else if (unlock.type === 'loot') {
+      need(entry.id, unlock.lootRef, lootIds, 'unlock.lootRef');
+    } else if (unlock.type === 'event') {
+      need(entry.id, unlock.eventRef, events, 'unlock.eventRef');
+    } else if (unlock.type !== 'free') {
+      errors.push(`${entry.id}.unlock: 未知的 type -> ${String(unlock.type)}`);
+    }
+  }
   // dropTable 权重键必须指向 pickup 道具
   for (const key of Object.keys(content.obstacles.dropTable?.weights ?? {})) need('obstacles.dropTable', key, items, 'dropTable.weights');
   return errors;

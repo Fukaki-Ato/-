@@ -5,11 +5,11 @@ import { SHOP_SPRITE_CROPS } from '@tr/game/ui/shopImage.js';
 import {
   buildShopCatalog, filterShopCatalog, SHOP_CATEGORIES, SHOP_PAGE_SIZE, shopListingBadgeText,
   type ShopFilterCategory, type ShopListing,
-} from '@tr/game/ui/shopView.js';
+} from '@tr/game/ui/shopCatalog.js';
 import { mountMobilePage, pageHeader, pageLifecycle, uiButton, uiText } from './mobileUi.js';
 import './shopOverlay.css';
 
-function makeCard(listing: ShopListing): HTMLElement {
+function makeCard(listing: ShopListing, actions: ShopActions, refresh: () => void): HTMLElement {
   const card = uiText('article', '', 'shop-product-card ui-panel');
   card.dataset.listingId = listing.id;
   const art = uiText('div', '', 'shop-product-art');
@@ -33,10 +33,20 @@ function makeCard(listing: ShopListing): HTMLElement {
     icon.alt = '';
     price.prepend(icon);
   }
-  const actionLabel = listing.statusText === '待开放' || listing.statusText === '待补充' ? listing.statusText : '仅供浏览';
-  const action = uiButton(actionLabel, 'shop-product-action');
-  action.disabled = true;
-  action.title = '仅展示配置，不执行购买或兑换';
+  // 可购买 = 正常上架（statusText=null）且有标价；其余保持仅浏览（审查 M4-2）
+  const buyable = listing.statusText === null && !!listing.priceText;
+  const action = buyable
+    ? uiButton('购买', 'shop-product-action', () => {
+      const result = actions.onBuy(listing.id);
+      action.textContent = result.message;
+      action.disabled = true;
+      window.setTimeout(() => { action.disabled = false; refresh(); }, 1200);
+    })
+    : uiButton(listing.statusText ?? '仅供浏览', 'shop-product-action');
+  if (!buyable) {
+    action.disabled = true;
+    action.title = '仅展示配置，不执行购买或兑换';
+  }
   details.append(price, action);
   card.append(art, details);
   return card;
@@ -48,7 +58,8 @@ export function createShopOverlay(content: GameContent, actions: ShopActions, _f
   header.querySelector('button')!.classList.add('shop-close-button');
   header.querySelector('button')!.setAttribute('aria-label', '返回上一页');
   const note = uiText('p', '旅途的小帮手，都在这里。', 'shop-intro');
-  const notice = uiText('div', '预览商店 · 仅供浏览，暂不支持购买或兑换', 'shop-browse-notice');
+  const notice = uiText('div', '金币/钥匙商品可直接购买（本机经济）；皮肤与宝箱暂为展示', 'shop-browse-notice');
+  const walletBar = uiText('p', '', 'shop-wallet');
   const tabBar = uiText('nav', '', 'shop-tabs');
   tabBar.setAttribute('aria-label', '商品分类');
   const tabs = new Map<ShopFilterCategory, HTMLButtonElement>();
@@ -69,7 +80,7 @@ export function createShopOverlay(content: GameContent, actions: ShopActions, _f
   const pageText = uiText('span', '', 'shop-page-label');
   pageText.setAttribute('aria-live', 'polite');
   pageNav.append(previous, pageText, next);
-  frame.append(header, note, notice, tabBar, cards, pageNav);
+  frame.append(header, note, notice, walletBar, tabBar, cards, pageNav);
 
   function render(): void {
     const shown = filterShopCatalog(catalog, activeCategory);
@@ -78,12 +89,14 @@ export function createShopOverlay(content: GameContent, actions: ShopActions, _f
     previous.disabled = page === 0;
     next.disabled = page + 1 >= pageCount;
     pageText.textContent = `${page + 1} / ${pageCount}`;
+    const wallet = actions.wallet();
+    walletBar.textContent = `余额：金币 ${wallet.coins} · 钥匙 ${wallet.keys} · 钻石 ${wallet.diamonds}`;
     for (const [category, button] of tabs) {
       const selected = category === activeCategory;
       button.classList.toggle('is-active', selected);
       button.setAttribute('aria-pressed', String(selected));
     }
-    cards.replaceChildren(...shown.slice(page * SHOP_PAGE_SIZE, (page + 1) * SHOP_PAGE_SIZE).map(makeCard));
+    cards.replaceChildren(...shown.slice(page * SHOP_PAGE_SIZE, (page + 1) * SHOP_PAGE_SIZE).map(listing => makeCard(listing, actions, render)));
     if (!shown.length) cards.append(uiText('p', '暂无可浏览的配置', 'shop-empty-message ui-panel'));
   }
   render();

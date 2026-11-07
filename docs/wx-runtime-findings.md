@@ -11,9 +11,9 @@
 | --- | --- | --- | --- |
 | 1 | three.js 把微信的 WebGL2 上下文**误判成 WebGL1** | 阻断级 | 已定位 + 已修（未提交） |
 | 2 | `wx.requestAnimationFrame` 不存在（rAF 在 GameGlobal 上） | 阻断级 | 已定位 + 已修（未提交） |
-| 3 | `game.json` 的 `iOSHighPerformance` 会让 Windows 模拟器 jsbridge 永远起不来 | 阻断级 | 已定位，待决策 |
-| 4 | 分包里的 `config/game.json` 读不出来（其余 7 个正常） | 中 | 已定位，待改名验证 |
-| 5 | 单测 mock 与代码犯同一个错 → `npm test` 全绿也抓不到 1/2 | 中 | 待补断言 |
+| 3 | `game.json` 的 `iOSHighPerformance` 会让 Windows 模拟器 jsbridge 永远起不来 | 阻断级 | 已决策（2026-11-05）：build-wx 默认剔除，TR_WX_IOS_HP=1 保留；断言 tests/wxbuild.test.mjs |
+| 4 | 分包里的 `config/game.json` 读不出来（其余 7 个正常） | 中 | 已解决（2026-11-05）：包内改名 gameplay.json + main.ts 名映射还原 + renamePkgGameConfig 断言 |
+| 5 | 单测 mock 与代码犯同一个错 → `npm test` 全绿也抓不到 1/2 | 中 | 已补（2026-11-05）：rAF 取 GameGlobal 与 WebGL2 全局暴露两条防回归断言进 tests/platform-wx.test.mjs |
 | 6 | 工程类型在开发者工具里**导入时定死**，之后会回写 `compileType` | 操作坑 | 已记录 |
 | 7 | 游客模式下 CLI 只能打开小程序工程，打不开小游戏工程 | 操作坑 | 已记录 |
 

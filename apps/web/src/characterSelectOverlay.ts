@@ -16,10 +16,15 @@ export function createCharacterSelectOverlay(
   currentCharId: string,
   _entry: EntryMethod | null,
   _fonts: FontSet,
+  onProfile?: () => void,
 ): () => void {
   const items = playableCharacters(content).map(character => ({
     entry: character, loadout: buildLoadout(content, character.id),
-    locked: isCharacterLocked(character), unlockText: unlockLabel(character),
+    // 解锁门槛（本机经济）：gated 角色与 config 锁定同样按「锁定」呈现，但可经按钮解锁（审查 M4-3）
+    locked: isCharacterLocked(character) || (actions.isGated?.(character.id) ?? false),
+    gated: actions.isGated?.(character.id) ?? false,
+    unlockText: (actions.isGated?.(character.id) ?? false)
+      ? (actions.gatedPriceText?.(character.id) || '碎片合成') : unlockLabel(character),
   }));
   let selectedIndex = Math.max(0, items.findIndex(item => item.loadout.charId === currentCharId));
   let chosen = items[selectedIndex]?.loadout.charId ?? '';
@@ -76,6 +81,7 @@ export function createCharacterSelectOverlay(
   rosterHead.append(uiText('h3', '跑者小队', 'select-roster-title'), uiText('span', '左右滑动 · 点选伙伴', 'select-roster-hint'));
   const rosterList = uiText('div', '', 'select-roster-list');
   const cards = new Map<string, HTMLButtonElement>();
+  const tiers = new Map<string, HTMLElement>();
   for (const item of items) {
     const id = item.loadout.charId;
     const card = uiButton('', 'select-roster-card', () => select(id, true));
@@ -85,6 +91,7 @@ export function createCharacterSelectOverlay(
     card.append(createSelectPortrait(item.loadout, 'select-card-art'), uiText('span', item.loadout.name, 'select-card-name'));
     const tier = uiText('span', item.locked ? '锁定' : item.loadout.rarity, 'select-card-tier');
     card.append(tier);
+    tiers.set(id, tier);
     cards.set(id, card);
     rosterList.append(card);
   }
@@ -101,11 +108,31 @@ export function createCharacterSelectOverlay(
   const actionRow = uiText('div', '', 'select-action-row');
   const shopButton = uiButton('商店', 'select-shop-button');
   shopButton.setAttribute('aria-label', '打开商店');
+  // 档案入口（docs/main-menu-handoff.md 建议挂「角色」面板内）：bootstrap 注入 DOM 弹层
+  if (onProfile) {
+    const profileButton = uiButton('档案', 'select-profile-button', onProfile);
+    profileButton.setAttribute('aria-label', '打开玩家档案');
+    actionRow.append(profileButton);
+  }
+  function acquire(synthesize: boolean): void {
+    const item = items.find(candidate => candidate.loadout.charId === chosen);
+    if (!item?.gated || isCharacterLocked(item.entry)) return;
+    const result = synthesize ? actions.onSynthesize?.(chosen) : actions.onUnlock?.(chosen);
+    if (!result) return;
+    if (result.ok) {
+      items[items.indexOf(item)] = { ...item, locked: isCharacterLocked(item.entry), gated: false };
+      select(chosen);
+    }
+    state.textContent = result.message;
+  }
+  const unlockButton = uiButton('', 'select-unlock-button', () => acquire(false));
+  const synthesizeButton = uiButton('碎片合成', 'select-synthesize-button', () => acquire(true));
+  unlockButton.style.display = synthesizeButton.style.display = 'none';
   const startButton = uiButton('', 'select-start-button');
   startButton.append(uiText('span', '开始酷跑', 'select-button-label'), uiText('span', '→', 'select-start-arrow'));
   shopButton.addEventListener('click', () => { if (chosen) actions.onShop(chosen); });
   startButton.addEventListener('click', () => { if (chosen && !startButton.disabled) actions.onStartRun(chosen); });
-  actionRow.append(shopButton, startButton);
+  actionRow.append(shopButton, unlockButton, synthesizeButton, startButton);
   identity.append(footerMeta);
   footer.append(actionRow);
   frame.append(header, showcase, controls, footer);
@@ -145,11 +172,24 @@ export function createCharacterSelectOverlay(
       passive.name.textContent, passive.desc.textContent);
     counter.textContent = `${String(selectedIndex + 1).padStart(2, '0')} / ${String(items.length).padStart(2, '0')}`;
     actionNote.textContent = item.locked ? `${item.loadout.name} · 锁定，仅供查看` : `出战 · ${item.loadout.name}`;
+    // 解锁门槛角色：显示解锁/合成按钮（可解锁才点亮）；config 锁定不可解锁，只保持隐藏
+    const available = item.gated && !isCharacterLocked(item.entry);
+    const showUnlock = available && !!actions.onUnlock;
+    synthesizeButton.style.display = available && actions.onSynthesize ? '' : 'none';
+    synthesizeButton.disabled = !(actions.canSynthesize?.(item.entry.id) ?? false);
+    unlockButton.style.display = showUnlock ? '' : 'none';
+    if (showUnlock) {
+      unlockButton.textContent = `解锁 · ${item.unlockText}`;
+      unlockButton.disabled = !(actions.canUnlock?.(item.entry.id) ?? false);
+    }
     startButton.disabled = item.locked || !chosen;
     startButton.setAttribute('aria-label', item.locked ? `${item.loadout.name}尚未解锁` : `以${item.loadout.name}身份开始酷跑`);
     for (const [cardId, card] of cards) {
       const selected = cardId === id;
       const cardItem = items.find(candidate => candidate.loadout.charId === cardId)!;
+      card.dataset.locked = String(cardItem.locked);
+      const tier = tiers.get(cardId);
+      if (tier) tier.textContent = cardItem.locked ? '锁定' : cardItem.loadout.rarity;
       card.classList.toggle('is-selected', selected);
       card.setAttribute('aria-pressed', String(selected));
       card.setAttribute('aria-label', `${cardItem.loadout.name}，${selected ? '已选' : '选择'}${cardItem.locked ? '，锁定角色，仅查看' : '，演示可选'}`);

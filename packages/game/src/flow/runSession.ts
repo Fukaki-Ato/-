@@ -9,6 +9,10 @@ import type { GameViews, RunSummary } from './views.js';
 
 export interface RunSessionDeps {
   adapter: PlatformAdapter; views: GameViews; content: GameContent; charId: string;
+  /** 装备消费回调（mainFlow 注入）：休闲局消费装备并注入 buffs；排位局跳过（服务端重放无道具，保确定性） */
+  consumeItems?: () => string[];
+  /** 遥测骨架（S16b 前置）：局末记录（环形缓冲在本机，不上报） */
+  recordRun?: (state: import('@tr/game/core/sim/simTypes.js').RunnerState, meta: { seed: number; charId: string; items: string[]; cause: 'death' | 'exit' }) => void;
   service?: LeaderboardService; debug?: boolean; test?: boolean; themeId?: string;
   createScene?: typeof createRunnerScene;
   trackRun?: (sim: RunnerSim, seed: number) => () => void;
@@ -43,7 +47,8 @@ export function createRunSession(d: RunSessionDeps): { dispose(): void } {
     activeTicket = ticket;
     const seed = ticket?.seed ?? hashSeed('run-' + Date.now());
     d.onSeed(seed);
-    const sim = new RunnerSim(d.content, seed, d.charId, !!ticket);
+    const items = ticket ? [] : d.consumeItems?.() ?? [];
+    const sim = new RunnerSim(d.content, seed, d.charId, !!ticket, items);
     finishTracking = d.trackRun?.(sim, seed);
     const host = { canvas: d.adapter.canvas.mainCanvas(), size: d.adapter.canvas.windowSize() };
     hud = d.views.mountHud();
@@ -64,6 +69,7 @@ export function createRunSession(d: RunSessionDeps): { dispose(): void } {
             );
           }
         }
+        d.recordRun?.(sim.state, { seed, charId: d.charId, items: sim.initialItems, cause: 'death' }); // exit 遥测待 dispose 路径接线（S16b）
         d.onEnd({ ...summary, ranking, beforeFirstCoin: sim.firstCoinRecord.snapshot(summary) });
       },
       onDeath: d.onDeath, onCast: d.onCast, onPickup: d.onPickup,

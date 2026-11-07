@@ -12,6 +12,7 @@ import { collectCoins, collectPickups, type CollectDeps } from './collect.js';
 import { hitsRunner, inDepthWindow, isNearMiss, relZ, safestLane } from './collision.js';
 import { clearSkyCoins } from './landing.js';
 import { Movement } from './movement.js';
+import { parseReviveConfig, tryRevive, type ReviveState } from './revive.js';
 import { resolveHit, type HitCtx } from './resolveHit.js';
 import { TrackGen, type CloudEntity, type CoinEntity, type ObstacleEntity, type PickupEntity } from './trackGen.js';
 import { createSimWorld } from './simWorld.js';
@@ -40,7 +41,6 @@ export class RunnerSim {
   readonly lives: number;
   /** 本局装配的角色（docs/09 T2.4）；未指定时为空装备=默认手感 */
   readonly loadout: Loadout;
-  /** buff 调度器；外部一律通过 sim.fx / sim.buffList() 读 */
   readonly buffs: BuffEngine;
   /** 金币收集判定面（角色中心前方 coinCollectM 米处触发，取负号用于 z 轴）。
    *  推导：盒深一半 0.4 + 金币最大半径(含磁铁 1.25 倍放大) 0.43 + 步进余量 ≈ 1.1。
@@ -57,6 +57,8 @@ export class RunnerSim {
   private readonly fly: { heightM: number; speedMul: number; glideSpeedMul: number; glideS: number };
   private readonly collectDeps: CollectDeps;
   private usedProtection = false;
+  /** 复活余量（config revive 段，逻辑在 revive.ts） */
+  private revive: ReviveState = { left: 0, invincibleS: 3 };
   /** 命中结算上下文（resolveHit 用；构造一次复用，教程保护消耗标志在闭包里） */
   private readonly hitCtx: HitCtx;
   /** 金币收益的小数累计（coinValueAdd 的 +5% / ×2 靠它凑整，不逐枚四舍五入） */
@@ -75,7 +77,9 @@ export class RunnerSim {
   readonly replayInputs: ReplayInput[] = [];
   replayOverflow = false;
 
-  constructor(private readonly content: GameContent, seed: number, charId?: string, private readonly recordReplay = false) {
+  /** 开局注入的道具：购买自动装备→开局消费→server 重放按 run.items_json 同构复现 */
+  readonly initialItems: string[];
+  constructor(private readonly content: GameContent, seed: number, charId?: string, private readonly recordReplay = false, initialItems?: string[]) {
     const p = content.game.params;
     this.R = (p.runner ?? {}) as Record<string, number>;
     this.SC = (p.score ?? {}) as Record<string, number>;
@@ -84,18 +88,15 @@ export class RunnerSim {
     this.invulnS = this.R.invulnS ?? 1.4;
     this.coinFront = -(this.R.coinCollectM ?? 1.1);
     this.protectionS = (p.tutorial as Record<string, number>)?.protectionS ?? 15;
+    this.revive = parseReviveConfig((p.revive ?? {}) as Record<string, number>);
     const fl = (p.flight ?? {}) as Record<string, number>;
     this.fly = { heightM: fl.heightM ?? 4.6, speedMul: fl.speedMul ?? 2.5, glideSpeedMul: fl.glideSpeedMul ?? 1.6, glideS: fl.glideS ?? 1.8 };
     this.state = initialRunnerState();
     this.gen = new TrackGen(content, new RunRng(seed));
-    this.mv = new Movement(
-      {
-        laneWidth: this.laneWidth, gravity: this.R.gravity ?? -38, jumpVelocity: this.R.jumpVelocity ?? 15.2,
-        slideS: this.R.slideS ?? 0.6, slideCooldownS: this.R.slideCooldownS ?? 0.3, laneChangeS: this.R.laneChangeS ?? 0.18,
-      },
-      { heightM: this.fly.heightM, glideS: this.fly.glideS },
-      this.obstacles,
-    );
+    this.mv = new Movement({
+      laneWidth: this.laneWidth, gravity: this.R.gravity ?? -38, jumpVelocity: this.R.jumpVelocity ?? 15.2,
+      slideS: this.R.slideS ?? 0.6, slideCooldownS: this.R.slideCooldownS ?? 0.3, laneChangeS: this.R.laneChangeS ?? 0.18,
+    }, { heightM: this.fly.heightM, glideS: this.fly.glideS }, this.obstacles);
     this.buffs = new BuffEngine(createSimWorld({
       state: this.state, obstacles: this.obstacles, coins: this.coinsArr, pickups: this.pickupsArr,
       clouds: this.cloudsArr, events: this.events, gen: this.gen, fly: this.fly,
@@ -113,12 +114,13 @@ export class RunnerSim {
     this.hitCtx = {
       s: this.state, fx: this.buffs.fx, buffs: this.buffs, events: this.events,
       lives: this.lives, invulnS: this.invulnS, hitStunS: this.R.hitStunS ?? 0.8,
-      tutorial: {
-        protectionS: this.protectionS,
-        take: () => { if (this.usedProtection) return false; this.usedProtection = true; return true; },
-      },
+      tutorial: { protectionS: this.protectionS,
+        take: () => { if (this.usedProtection) return false; this.usedProtection = true; return true; } },
     };
     this.applyPassive();
+    // 装备道具注入（t=0 直接加 buff，不计入 itemPickups 拾取指标）：与局内拾取同一条 buff 通路
+    this.initialItems = (initialItems ?? []).filter(id => itemEffects(content, id).length > 0).slice(0, 3);
+    for (const id of this.initialItems) this.applyEffects(itemEffects(content, id), id);
   }
 
   /** buff 派生视图（渲染/HUD/测试统一从这里读，任何地方不得写） */
@@ -183,10 +185,7 @@ export class RunnerSim {
     for (const eff of effects) this.buffs.add(eff.primitive, eff.params, eff.label || fallbackLabel, this.buffCtx, eff.stackRule);
   }
 
-  private grantItem(itemRef: string) {
-    this.itemPickups++;
-    this.applyEffects(itemEffects(this.content, itemRef), itemRef);
-  }
+  private grantItem(itemRef: string) { this.itemPickups++; this.applyEffects(itemEffects(this.content, itemRef), itemRef); }
 
   /** 金币入账：coinValueAdd 的百分比加成走小数累计，避免每枚金币四舍五入丢分 */
   private creditCoin() {
@@ -268,13 +267,16 @@ export class RunnerSim {
       if (o.cls === 'hazard' && o.zap !== true) {
         if (Math.abs(z) > o.d / 2) continue;
       } else if (!inDepthWindow(o, z)) continue;
-      if (!o.passed) {
-        // 首次进入深度窗口的那一帧判一次擦身（先于命中判定；命中时 lateralGap<=0 自然不计）
+      if (!o.passed) { // 首次进深度窗判一次擦身（先于命中判定；命中时 lateralGap<=0 自然不计）
         o.passed = true;
         if (isNearMiss(o, s, this.laneWidth)) { s.nearMiss++; this.events.push({ type: 'nearMiss' }); }
       }
       // 高杆门按角色净空判（loadout.clearance）：char_mambo 站立可钻过，其余角色仍必须滑铲
-      if (hitsRunner(o, s, this.laneWidth, this.loadout.clearance)) { resolveHit(o, this.hitCtx); if (!s.alive) return; }
+      if (hitsRunner(o, s, this.laneWidth, this.loadout.clearance)) {
+        resolveHit(o, this.hitCtx);
+        if (!s.alive) this.revive = tryRevive(this.revive, s, this.gen, this.obstacles, this.events);
+        if (!s.alive) return;
+      }
     }
   }
 
@@ -292,7 +294,7 @@ export class RunnerSim {
     const s = this.state;
     return {
       t: +s.t.toFixed(2), distance: +s.distance.toFixed(2), coins: s.coins, nearMiss: s.nearMiss,
-      hits: s.hits, score: s.score, alive: s.alive, casts: s.casts, charId: this.loadout.charId,
+      hits: s.hits, score: s.score, alive: s.alive, casts: s.casts, charId: this.loadout.charId, revives: s.revivesUsed,
     };
   }
 }

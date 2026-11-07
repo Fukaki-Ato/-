@@ -1,8 +1,8 @@
 {
   "$schema": "../schema/config.schema.json#/obstacles",
-  "configVersion": "1.9.5",
+  "configVersion": "2.0.0",
   "minEngineVersion": "1.0.0",
-  "updatedAt": "2026-10-07",
+  "updatedAt": "2026-11-06",
   "defs": [
     {
       "id": "obs_box",
@@ -672,6 +672,12 @@
           "coins": 12
         },
         {
+          "segment": 0,
+          "lane": -1,
+          "offsetM": 16,
+          "coins": 8
+        },
+        {
           "segment": 1,
           "lane": -1,
           "offsetM": 12,
@@ -829,6 +835,220 @@
           0
         ]
       }
+    },
+    {
+      "id": "pat_combo_slide_jump",
+      "minDifficulty": 4,
+      "weight": 16,
+      "lengthSegments": 2,
+      "cells": [
+        {
+          "segment": 0,
+          "lane": 0,
+          "offsetM": 6,
+          "obsRef": "obs_gate_low"
+        },
+        {
+          "segment": 0,
+          "lane": 0,
+          "offsetM": 15,
+          "obsRef": "obs_box"
+        },
+        {
+          "segment": 0,
+          "lane": 0,
+          "offsetM": 21,
+          "coins": 6
+        },
+        {
+          "segment": 1,
+          "lane": 1,
+          "offsetM": 10,
+          "obsRef": "obs_train_static"
+        },
+        {
+          "segment": 1,
+          "lane": -1,
+          "offsetM": 4,
+          "coins": 8
+        }
+      ]
+    },
+    {
+      "id": "pat_combo_wall_zap",
+      "minDifficulty": 6,
+      "weight": 14,
+      "lengthSegments": 2,
+      "cells": [
+        {
+          "segment": 0,
+          "lane": -1,
+          "offsetM": 8,
+          "obsRef": "obs_adwall"
+        },
+        {
+          "segment": 0,
+          "lane": 1,
+          "offsetM": 8,
+          "obsRef": "obs_adwall"
+        },
+        {
+          "segment": 0,
+          "lane": 0,
+          "offsetM": 8,
+          "obsRef": "obs_lightning_circle"
+        },
+        {
+          "segment": 1,
+          "lane": 0,
+          "offsetM": 8,
+          "obsRef": "obs_gate_low"
+        },
+        {
+          "segment": 1,
+          "lane": -1,
+          "offsetM": 14,
+          "coins": 5
+        }
+      ]
+    },
+    {
+      "id": "pat_combo_train_dismount",
+      "minDifficulty": 7,
+      "weight": 14,
+      "lengthSegments": 3,
+      "cells": [
+        {
+          "segment": 0,
+          "lane": 0,
+          "offsetM": 2,
+          "obsRef": "obs_mount_step"
+        },
+        {
+          "segment": 0,
+          "lane": 0,
+          "offsetM": 14,
+          "obsRef": "obs_train_slow"
+        },
+        {
+          "segment": 0,
+          "lane": 0,
+          "offsetM": 15,
+          "coins": 8
+        },
+        {
+          "segment": 0,
+          "lane": -1,
+          "offsetM": 4,
+          "coins": 8
+        },
+        {
+          "segment": 1,
+          "lane": 0,
+          "offsetM": 6,
+          "obsRef": "obs_gate_low"
+        },
+        {
+          "segment": 1,
+          "lane": -1,
+          "offsetM": 14,
+          "obsRef": "obs_box"
+        },
+        {
+          "segment": 2,
+          "lane": -1,
+          "offsetM": 6,
+          "coins": 5
+        }
+      ]
+    },
+    {
+      "id": "pat_combo_pendulum_gauntlet",
+      "minDifficulty": 8,
+      "weight": 12,
+      "lengthSegments": 2,
+      "cells": [
+        {
+          "segment": 0,
+          "lane": 0,
+          "offsetM": 6,
+          "obsRef": "obs_pendulum"
+        },
+        {
+          "segment": 0,
+          "lane": 1,
+          "offsetM": 12,
+          "obsRef": "obs_adwall"
+        },
+        {
+          "segment": 0,
+          "lane": -1,
+          "offsetM": 2,
+          "coins": 8
+        },
+        {
+          "segment": 1,
+          "lane": 0,
+          "offsetM": 8,
+          "obsRef": "obs_arc_floor"
+        },
+        {
+          "segment": 1,
+          "lane": -1,
+          "offsetM": 14,
+          "obsRef": "obs_box"
+        },
+        {
+          "segment": 1,
+          "lane": 1,
+          "offsetM": 16,
+          "coins": 6
+        }
+      ]
+    },
+    {
+      "id": "pat_combo_rusher_zap",
+      "minDifficulty": 9,
+      "weight": 12,
+      "lengthSegments": 2,
+      "cells": [
+        {
+          "segment": 0,
+          "lane": 0,
+          "offsetM": 4,
+          "obsRef": "obs_rusher_long"
+        },
+        {
+          "segment": 0,
+          "lane": 1,
+          "offsetM": 10,
+          "obsRef": "obs_lightning_circle"
+        },
+        {
+          "segment": 1,
+          "lane": 0,
+          "offsetM": 8,
+          "obsRef": "obs_gate_low"
+        },
+        {
+          "segment": 1,
+          "lane": -1,
+          "offsetM": 14,
+          "obsRef": "obs_box"
+        },
+        {
+          "segment": 1,
+          "lane": 1,
+          "offsetM": 6,
+          "coins": 5
+        },
+        {
+          "segment": 1,
+          "lane": -1,
+          "offsetM": 20,
+          "coins": 5
+        }
+      ]
     }
   ],
   "difficultyCurve": [
@@ -884,14 +1104,16 @@
     {
       "by": 7,
       "poolWeights": {
-        "pat_mid_gate_combo": 14,
-        "pat_mid_wall_dodge": 22,
-        "pat_train_top_run": 14,
-        "pat_hazard_weave": 18,
-        "pat_mid_single_wall": 14,
-        "pat_mid_wall_gauntlet": 18,
-        "pat_easy_cube_charge": 10,
-        "pat_mid_rusher": 14
+        "pat_mid_gate_combo": 12,
+        "pat_mid_wall_dodge": 18,
+        "pat_train_top_run": 12,
+        "pat_hazard_weave": 16,
+        "pat_mid_single_wall": 12,
+        "pat_mid_wall_gauntlet": 14,
+        "pat_easy_cube_charge": 8,
+        "pat_mid_rusher": 12,
+        "pat_combo_slide_jump": 14,
+        "pat_combo_wall_zap": 12
       },
       "coinDensity": 1.2,
       "pickupRate": 1.1
@@ -899,16 +1121,35 @@
     {
       "by": 9,
       "poolWeights": {
-        "pat_mid_wall_dodge": 24,
-        "pat_train_top_run": 16,
-        "pat_hazard_weave": 26,
-        "pat_mid_single_wall": 16,
-        "pat_mid_wall_gauntlet": 18,
-        "pat_easy_cube_charge": 10,
-        "pat_mid_rusher": 14
+        "pat_mid_wall_dodge": 18,
+        "pat_train_top_run": 12,
+        "pat_hazard_weave": 20,
+        "pat_mid_single_wall": 12,
+        "pat_mid_wall_gauntlet": 14,
+        "pat_easy_cube_charge": 8,
+        "pat_mid_rusher": 12,
+        "pat_combo_slide_jump": 12,
+        "pat_combo_wall_zap": 12,
+        "pat_combo_train_dismount": 14,
+        "pat_combo_pendulum_gauntlet": 12
       },
       "coinDensity": 1.25,
       "pickupRate": 1.15
+    },
+    {
+      "by": 11,
+      "poolWeights": {
+        "pat_combo_slide_jump": 14,
+        "pat_combo_wall_zap": 14,
+        "pat_combo_train_dismount": 16,
+        "pat_combo_pendulum_gauntlet": 14,
+        "pat_combo_rusher_zap": 14,
+        "pat_mid_wall_gauntlet": 10,
+        "pat_hazard_weave": 10,
+        "pat_mid_rusher": 8
+      },
+      "coinDensity": 1.3,
+      "pickupRate": 1.2
     }
   ],
   "dropTable": {
