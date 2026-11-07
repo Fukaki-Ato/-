@@ -43,8 +43,9 @@ test('shop daily limits reset at the device-local midnight under UTC, Shanghai, 
     assert.equal(values.get('thunderrun:shop-limit:offer_shard_volt:2026-11-06'), '1');
   `;
   for (const TZ of ['UTC', 'Asia/Shanghai', 'America/Los_Angeles']) {
-    const result = spawnSync(process.execPath, ['--input-type=module', '-e', script], {
-      env: { ...process.env, TZ }, encoding: 'utf8', timeout: 10000,
+    // Send the fixture through stdin instead of exceeding Windows' command-line limit.
+    const result = spawnSync(process.execPath, ['--input-type=module'], {
+      input: script, env: { ...process.env, TZ }, encoding: 'utf8', timeout: 10000,
     });
     assert.equal(result.status, 0, `${TZ}: ${result.stderr || result.error || result.stdout}`);
   }
