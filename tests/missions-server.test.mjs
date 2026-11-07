@@ -125,6 +125,9 @@ test('session cookie, stable daily tiers, all weekly missions, and SQLite persis
     assert.equal(first.daily.periodId, '2026-10-12');
     assert.equal(first.weekly.periodId, '2026-10-12');
     assert.equal(first.wallet && typeof first.wallet, 'object');
+    assert.match(first.rewardLedgerId, /^[a-f0-9]{64}$/);
+    assert.equal(api.app.store.hasUser(first.rewardLedgerId), true);
+    assert.notEqual(first.rewardLedgerId, api.cookie.split('=')[1], 'ledger ID must not expose the bearer token');
     const storedIds = first.daily.missions.map(mission => mission.id);
     assert.deepEqual((await snapshot(api)).daily.missions.map(mission => mission.id), storedIds);
     await api.app.close();
@@ -132,6 +135,10 @@ test('session cookie, stable daily tiers, all weekly missions, and SQLite persis
     const reopened = await snapshot(api);
     assert.deepEqual(reopened.daily.missions.map(mission => mission.id), storedIds);
     assert.equal(reopened.daily.resetsAt, first.daily.resetsAt);
+    assert.equal(reopened.rewardLedgerId, first.rewardLedgerId, 'ledger ID survives restart');
+    api.cookie = '';
+    await state.session(api);
+    assert.notEqual((await snapshot(api)).rewardLedgerId, first.rewardLedgerId, 'new visitors have independent ledgers');
   } finally { await state.close(api); }
 });
 
@@ -394,5 +401,54 @@ test('装备道具随票提交：重放同清单注入则 validRun 成立；无�
     assert.equal(dup.response.status, 400);
     const over = await state.startRun(api, 'char_volt', { items: ['item_magnet', 'item_boots', 'item_shield', 'item_xp_card'] });
     assert.equal(over.response.status, 400);
+  } finally { await state.close(api); }
+});
+
+test('purge retains earned wallets and progress when their last run expires', async () => {
+  const { MissionStore } = await import('../apps/server/src/store.mjs');
+  const store = new MissionStore(':memory:');
+  const day = 86400000;
+  try {
+    for (const id of ['wallet', 'progress', 'claimed', 'characters', 'empty']) {
+      store.createUser(id, 0);
+      store.ensurePeriod(id, 'daily', 'day32', []);
+      store.createRun({ id, userId: id, startedAt: 32 * day, dailyId: 'day32', weeklyId: 'week', seed: 123, charId: '' });
+      store.markRunFinished(id, 32 * day, 'hash', true);
+    }
+    store.addWallet('wallet', 'coin', 1234);
+    store.saveProgress('progress', 'daily', 'day32', { distance: 120 });
+    store.saveClaimed('claimed', 'daily', 'day32', { distance: true });
+    store.addWeeklyCharacter('characters', 'week', 'char_volt');
+    assert.deepEqual(store.purge(40 * day), { finishedRuns: 5, staleOpenRuns: 0, runlessUsers: 1 });
+    for (const id of ['wallet', 'progress', 'claimed', 'characters']) assert.equal(store.hasUser(id), true, id);
+    assert.equal(store.hasUser('empty'), false);
+    assert.deepEqual(store.getWallet('wallet'), { coin: 1234 });
+    assert.deepEqual(store.getPeriod('progress', 'daily', 'day32').progress, { distance: 120 });
+    assert.deepEqual(store.getPeriod('claimed', 'daily', 'day32').claimed, { distance: true });
+  } finally { store.close(); }
+});
+
+test('expired tickets release open-run slots before purge and respect a configured TTL', async () => {
+  const ttl = 60_000;
+  const state = await setup({ limits: { runTicketTtlMs: ttl, openRunsPerUser: 2, purgeIntervalMs: 0 } });
+  let api;
+  try {
+    api = await state.create();
+    await state.session(api);
+    const first = await state.startRun(api);
+    assert.equal(first.response.status, 201);
+    assert.equal((await state.startRun(api)).response.status, 201);
+    assert.equal((await state.startRun(api)).response.status, 429);
+    state.now += ttl;
+    assert.equal((await state.startRun(api)).response.status, 429, 'tickets remain valid at exactly TTL');
+    state.now += 1;
+    const expired = await state.finish(api, first.data.runId, { frames: 1, actions: [] }, 0);
+    assert.equal(expired.response.status, 410);
+    assert.equal((await state.startRun(api)).response.status, 201, 'expired rows must not block a new run');
+    const purged = api.app.store.purge(state.now, { runTicketTtlMs: ttl });
+    assert.equal(purged.staleOpenRuns, 2);
+    assert.equal(purged.runlessUsers, 0);
+    assert.equal((await state.startRun(api)).response.status, 201);
+    assert.equal((await state.startRun(api)).response.status, 429, 'fresh tickets still count');
   } finally { await state.close(api); }
 });

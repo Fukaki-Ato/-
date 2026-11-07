@@ -2,12 +2,13 @@
  * Web 任务 API：MissionApiCore 的 web 装配（fetch 同源 cookie + localStorage 队列）。
  * 队列/会话/幂等结算逻辑在 packages/game/flow/missionApiCore（wx 侧复用同一份，M5-3）。
  */
+import type { RewardWalletStore } from '@tr/game/flow/missionRewardWallet.js';
 import type { MissionQueueStorage, MissionTransport } from '@tr/game/flow/missionApiCore.js';
 import { MissionApiCore } from '@tr/game/flow/missionApiCore.js';
 
 export class MissionApi extends MissionApiCore {
-  constructor() {
-    super(webTransport(), webStorage());
+  constructor(wallet?: RewardWalletStore) {
+    super(webTransport(), webStorage(), wallet ? snapshot => wallet.syncRewards(snapshot) : undefined);
   }
 }
 

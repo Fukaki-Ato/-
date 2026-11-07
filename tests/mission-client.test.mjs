@@ -200,3 +200,29 @@ test('a full pending queue refuses another mission ticket without discarding pri
   assert.equal(network,0,'do not create an unqueueable mission ticket');
   assert.deepEqual(JSON.parse(saved),pending);
 });
+
+test('lobby uses the imported spendable wallet, including diamonds, without adding the ledger twice', async t => {
+  const { body, content, byClass } = fakeDom(t);
+  const { createRewardWalletStore } = await import('@tr/game/flow/missionRewardWallet.js');
+  const { spend, COINS_KEY } = await import('@tr/game/flow/localEconomy.js');
+  const originalFetch = globalThis.fetch, originalStorage = globalThis.localStorage;
+  t.after(() => { globalThis.fetch = originalFetch; globalThis.localStorage = originalStorage; });
+  const data = new Map([[COINS_KEY, '50']]);
+  const storage = { get: k => data.get(k) ?? null, set: (k, v) => data.set(k, v), remove: k => data.delete(k) };
+  globalThis.localStorage = { getItem: storage.get, setItem: storage.set };
+  globalThis.fetch = async () => Response.json({ ...makeSnapshot(), rewardLedgerId: 'lobby-account', wallet: { coin: 400, diamond: 10 } });
+  const wallet = createRewardWalletStore(storage);
+  const integration = createMissionIntegration(false, wallet);
+  const actions = { onStart() {}, onChoose() {}, onShop() {} };
+  let dispose = integration.lobbyRenderer(content, actions, 'char_volt', { coins: 50, diamonds: 0 });
+  for (let i = 0; i < 5; i++) await tick();
+  assert.equal(byClass(body, 'lobby-currency')[0].getAttribute('aria-label'), '金币 450，打开商店');
+  assert.equal(byClass(body, 'lobby-diamond-amount')[0].textContent, '10');
+  dispose();
+  spend(wallet, { coin: 400, diamond: 8 });
+  dispose = integration.lobbyRenderer(content, actions, 'char_volt', { coins: 450, diamonds: 10 });
+  for (let i = 0; i < 5; i++) await tick();
+  assert.equal(byClass(body, 'lobby-currency')[0].getAttribute('aria-label'), '金币 50，打开商店');
+  assert.equal(byClass(body, 'lobby-diamond-amount')[0].textContent, '2');
+  dispose();
+});

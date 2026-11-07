@@ -125,7 +125,9 @@ export class MissionService {
         missions: current.definitions.map(definition => missionView(definition, current.progress, current.claimed)),
       };
     };
-    return { serverTime, daily: makeGroup('daily'), weekly: makeGroup('weekly'), wallet: this.store.getWallet(userId) };
+    // wallet 是本账本累计已领任务奖励，不是扣除本机消费后的可用余额。
+    // 非秘密的持久标识供客户端按账本幂等导入；身份认证仍要求原始会话 cookie。
+    return { serverTime, rewardLedgerId: userId, daily: makeGroup('daily'), weekly: makeGroup('weekly'), wallet: this.store.getWallet(userId) };
   }
 
   /** 装备道具校验（开局注入，重放必须同清单复现）：存在且有 effects、去重、上限 3 */
@@ -152,8 +154,8 @@ export class MissionService {
     const periods = getMissionPeriods(startedAt);
     this.ensurePeriod(userId, 'daily', periods.daily.periodId);
     this.ensurePeriod(userId, 'weekly', periods.weekly.periodId);
-    // open-run 上限：TTL 24h 内行不清理，无上限会被脚本灌库（审查 S-3）
-    if (this.store.countOpenRuns(userId) >= (this.limits.openRunsPerUser ?? 4)) {
+    // 已过期票据不能结算，也不能继续占用开局名额；不依赖后台清理时机。
+    if (this.store.countOpenRuns(userId, startedAt - this.limits.runTicketTtlMs) >= (this.limits.openRunsPerUser ?? 4)) {
       throw new ApiError(429, '已有过多进行中的跑酷记录，请先完成或等待过期');
     }
     const id = randomUUID();

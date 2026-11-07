@@ -98,6 +98,7 @@ function bootstrapMocks() {
     './platform/webPlatform.js': ['createWebPlatform'],
     '@tr/game/flow/mainFlow.js': ['createGameFlow'],
     '@tr/game/ui/overlayViews.js': ['createOverlayViews'],
+    '@tr/game/flow/missionRewardWallet.js': ['createRewardWalletStore'],
     './uiShell.js': ['createUiShell'],
     './characterSelectOverlay.js': ['createCharacterSelectOverlay'],
     './shopOverlay.js': ['createShopOverlay'],
@@ -143,15 +144,22 @@ test('production bootstrap strips URL QA extras and does not construct the test 
     panelCreations: 0,
     storageWrites: [],
     createWebPlatform() {
+      this.rawStorage = { set: (...args) => this.storageWrites.push(args) };
       return {
         fetchJson: async () => ({}),
         extras: { marker: 'preserved', urlParams: new URLSearchParams('?debug=true&test=1') },
-        storage: { set: (...args) => this.storageWrites.push(args) },
+        storage: this.rawStorage,
       };
     },
+    createRewardWalletStore(storage) {
+      this.wrappedStorage = storage;
+      this.wallet = { ...storage, syncRewards() {} };
+      return this.wallet;
+    },
     preloadStartupConfig(fetchJson) { return { fetchJson, clear() {} }; },
-    createMissionIntegration(qa) {
+    createMissionIntegration(qa, wallet) {
       this.missionQa = qa;
+      this.missionWallet = wallet;
       this.trackMissions = () => () => undefined;
       return { lobbyRenderer: this.createMobileLobby, trackRun: this.trackMissions };
     },
@@ -194,6 +202,11 @@ test('production bootstrap strips URL QA extras and does not construct the test 
     assert.deepEqual(capture.flowOptions.test, false);
     assert.equal(Boolean(capture.flowOptions.leaderboard), true, 'QA query keys do not disable production leaderboard wiring');
     assert.equal(capture.missionQa, false);
+    assert.equal(capture.wrappedStorage, capture.rawStorage, 'wallet wraps the platform persistence');
+    assert.notEqual(capture.wallet, capture.rawStorage, 'wallet is a distinct storage wrapper');
+    assert.equal(capture.adapter.storage, capture.wallet, 'UI receives the spendable wallet wrapper');
+    assert.equal(capture.flowOptions.adapter.storage, capture.wallet, 'flow spending uses the same wallet');
+    assert.equal(capture.missionWallet, capture.wallet, 'mission rewards enter the wallet used by the flow');
     assert.equal(capture.flowOptions.trackRun, capture.trackMissions, 'normal mission tracking survives the merge');
     assert.equal(capture.panelCreations, 0);
     assert.equal(capture.storageWrites.length, 0, 'production ignores the QA character preset');

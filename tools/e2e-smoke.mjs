@@ -4,6 +4,7 @@
  *   页面加载 → 大厅 DOM → 商店 overlay → 选角 overlay → 开始酷跑 → HUD/局内 canvas 出帧。
  * 全程硬超时防护（无头 GL 下 page.evaluate 可能永久卡死，任何等待都带 timeout）。
  * 用法：npm run test:e2e；CI 可选步骤（浏览器二进制：npx playwright install chromium 一次性准备）。
+ * 已安装系统 Chromium 时可设 PLAYWRIGHT_CHROMIUM_EXECUTABLE 指向其可执行文件。
  */
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -36,7 +37,9 @@ const preview = spawn(process.execPath,
 let browser;
 try {
   const { chromium } = await import('playwright');
-  browser = await chromium.launch({ headless: true, args: ['--enable-unsafe-swiftshader'] });
+  browser = await chromium.launch({ headless: true,
+    executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE || undefined,
+    args: ['--enable-unsafe-swiftshader'] });
   console.log('  ✔ chromium 启动');
   const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
   page.setDefaultTimeout(15_000);

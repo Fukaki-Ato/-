@@ -115,3 +115,39 @@ test('compact abilities open complete details without leaving selection or cycli
   assert.equal(calls.filter(call => call[0] === 'back').length, 0, 'first Escape closes details, not the selection page');
   dispose();
 });
+
+
+test('shard synthesis is independently enabled and never repeats or bypasses config locks', async t => {
+  const { selectUnlockActions } = await import('../packages/game/dist/flow/unlock.js');
+  const { grant, walletBalance } = await import('../packages/game/dist/flow/localEconomy.js');
+  const fixture = fakeDom(t);
+  const map = new Map();
+  const store = { get: k => map.get(k) ?? null, set: (k, v) => map.set(k, v) };
+  grant(store, [{ item: 'shard_ama', n: 120 }]);
+  const actions = selectUnlockActions(store, fixture.content);
+  const dispose = createCharacterSelectOverlay(fixture.content, {
+    ...actions, onSelect() {}, onStartRun() {}, onShop() {}, onBack() {},
+  }, 'char_ama', 'guest', {});
+  const root = fixture.body.children[0];
+  const find = name => fixture.byClass(root, name)[0];
+  assert.equal(find('select-unlock-button').disabled, true, 'no coins');
+  assert.equal(find('select-synthesize-button').disabled, false, 'enough shards');
+  find('select-synthesize-button').click();
+  assert.equal(find('select-start-button').disabled, false);
+  assert.equal(walletBalance(store, 'shard_ama'), 60);
+  assert.equal(actions.onSynthesize('char_ama').ok, false);
+  assert.equal(walletBalance(store, 'shard_ama'), 60, 'duplicate action does not spend');
+  dispose();
+  fixture.content.characters.items.find(c => c.id === 'char_kaze').locked = true;
+  grant(store, [{ item: 'shard_kaze', n: 60 }]);
+  assert.equal(actions.canSynthesize('char_kaze'), false);
+  assert.equal(actions.onSynthesize('char_kaze').ok, false);
+  assert.equal(walletBalance(store, 'shard_kaze'), 60);
+  const disposeLocked = createCharacterSelectOverlay(fixture.content, {
+    ...actions, onSelect() {}, onStartRun() {}, onShop() {}, onBack() {},
+  }, 'char_kaze', 'guest', {});
+  const locked = fixture.body.children[0];
+  assert.equal(fixture.byClass(locked, 'select-synthesize-button')[0].style.display, 'none');
+  assert.equal(fixture.byClass(locked, 'select-start-button')[0].disabled, true);
+  disposeLocked();
+});

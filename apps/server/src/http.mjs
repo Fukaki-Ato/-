@@ -147,7 +147,7 @@ export function createMissionHttpServer(options = {}) {
   const purgeIntervalMs = limits.purgeIntervalMs ?? 30 * 60 * 1000;
   const purgeTimer = purgeIntervalMs > 0
     ? setInterval(() => {
-      try { store.purge(now(), { runRetentionMs: limits.runRetentionMs, userRetentionMs: limits.userRetentionMs }); }
+      try { store.purge(now(), { runRetentionMs: limits.runRetentionMs, userRetentionMs: limits.userRetentionMs, runTicketTtlMs: limits.runTicketTtlMs }); }
       catch (error) { console.error('mission store purge failed:', error); }
     }, purgeIntervalMs)
     : null;

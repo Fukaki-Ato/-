@@ -30,7 +30,7 @@ export const VACUUM_RANGE_M = 60;
 export type SimAction = 'jump' | 'slide' | 'laneL' | 'laneR' | 'skill';
 export type SimEvent =
   | { type: 'coin' } | { type: 'hit' } | { type: 'protected' } | { type: 'nearMiss' }
-  /** death 可带打击位置（闪电圈致死时）：渲染层据此把雷电画在致死点 */
+  /** death 只表示不可复活的终局；可带闪电圈致死位置，供渲染层绘制雷电 */
   | { type: 'death'; lane?: number; worldZ?: number }
   | { type: 'pickup'; itemRef: string } | { type: 'helmetSave' }
   | { type: 'cast'; skillRef: string } | { type: 'shieldBreak'; layers: number } | { type: 'boardBreak' }

@@ -19,6 +19,8 @@ export interface MissionGroup {
 }
 
 export interface MissionSnapshot {
+  /** Stable identity of the cumulative claimed-reward ledger (not a session token). */
+  rewardLedgerId: string;
   serverTime: number;
   daily: MissionGroup;
   weekly: MissionGroup;

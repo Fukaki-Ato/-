@@ -226,7 +226,7 @@ export function createGameFlow(deps: GameFlowDeps): GameFlow {
           adapter, views, content, charId, service: deps.leaderboard,
           createScene: deps.createScene, debug: deps.debug, test: deps.test,
           trackRun: deps.trackRun,
-          consumeItems: () => consumeEquipped(adapter.storage),
+          consumeItems: () => consumeEquipped(adapter.storage, content!),
           recordRun: (state, meta) => telemetry.recordRun(state, meta),
           themeId: currentThemeId(adapter.storage, content) ?? undefined,
           onSeed: seed => { lastSeed = seed; }, onEnd: summary => machine.go('result', summary),

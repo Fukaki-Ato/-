@@ -5,6 +5,7 @@
  */
 import type { GameContent } from '@tr/game/core/config/configTypes.js';
 import type { ShopArtwork } from './shopImage.js';
+import { canUseEquippedItem } from '../flow/itemAvailability.js';
 
 export type ShopCategory = 'all' | 'currency' | 'items' | 'shards' | 'skins';
 export type ShopFilterCategory = 'all' | 'currency' | 'items' | 'special';
@@ -139,7 +140,8 @@ export function buildShopCatalog(content: GameContent): ShopListing[] {
     const eventRef = typeof offer.requiresEvent === 'string' ? offer.requiresEvent : '';
     const event = eventRef ? events.find(item => item.id === eventRef) : undefined;
     const hasUnavailableReference = Boolean(eventRef && event?.status !== 'live');
-    const hasUnavailableReward = rewards.some(reward => reward.status === 'draft' || reward.status === 'retired');
+    const hasUnavailableReward = rewards.some(reward => reward.status === 'draft' || reward.status === 'retired'
+      || (reward.itemId.startsWith('item_') && !canUseEquippedItem(content, reward.itemId)));
     return [{
       id: offer.id,
       category,

@@ -28,7 +28,12 @@ function store(initial = {}) {
     _map: map,
   };
 }
-const AT = new Date('2026-11-05T12:00:00+08:00');
+const AT = new Date(2026, 10, 5, 12); // Device-local calendar, independent of the test runner's TZ.
+function shopContent() {
+  const c = structuredClone(content);
+  c.economy.params.shop.offers.push({ id: 'offer_helmet', give: [{ item: 'item_helmet', n: 1 }], price: { coin: 1200 }, limit: { perDay: 3 } });
+  return c;
+}
 
 test('钱包：grant 发货、spend all-or-nothing，coin 沿用旧计数键', () => {
   const s = store({ 'thunderrun:coins-total': '100' });
@@ -46,14 +51,14 @@ test('钱包：grant 发货、spend all-or-nothing，coin 沿用旧计数键', (
 
 test('商店购买：成功扣价发货并记 perDay 限购', () => {
   const s = store({ 'thunderrun:coins-total': '1200' });
-  // offer_xp_card：coin 1200 换 item_xp_card×1，perDay 3
-  const first = buyOffer(s, content, 'offer_xp_card', AT);
+  // offer_helmet：coin 1200 换 item_helmet×1，perDay 3
+  const first = buyOffer(s, shopContent(), 'offer_helmet', AT);
   assert.equal(first.ok, true);
   assert.match(first.message, /购买成功/);
   assert.equal(walletBalance(s, 'coin'), 0, '扣价落盘');
-  assert.equal(walletBalance(s, 'item_xp_card'), 1, '发货落盘');
-  assert.equal(s._map.get('thunderrun:shop-limit:offer_xp_card:2026-11-05'), '1', 'perDay 计数');
-  const broke = buyOffer(s, content, 'offer_xp_card', AT);
+  assert.equal(walletBalance(s, 'item_helmet'), 1, '发货落盘');
+  assert.equal(s._map.get('thunderrun:shop-limit:offer_helmet:2026-11-05'), '1', 'perDay 计数');
+  const broke = buyOffer(s, shopContent(), 'offer_helmet', AT);
   assert.equal(broke.ok, false);
   assert.match(broke.message, /余额不足/);
 });
@@ -68,9 +73,9 @@ test('商店购买：requiresEvent 指向 draft 活动的商品被拒（待开�
 
 test('商店购买：perDay 用尽后当日拒绝、次日放行', () => {
   const s = store({ 'thunderrun:coins-total': '120000' });
-  for (let i = 0; i < 3; i++) assert.equal(buyOffer(s, content, 'offer_xp_card', AT).ok, true, `第 ${i + 1} 次可买`);
-  assert.match(buyOffer(s, content, 'offer_xp_card', AT).message, /今日限购/);
-  const nextDay = buyOffer(s, content, 'offer_xp_card', new Date('2026-11-06T00:00:01+08:00'));
+  for (let i = 0; i < 3; i++) assert.equal(buyOffer(s, shopContent(), 'offer_helmet', AT).ok, true, `第 ${i + 1} 次可买`);
+  assert.match(buyOffer(s, shopContent(), 'offer_helmet', AT).message, /今日限购/);
+  const nextDay = buyOffer(s, shopContent(), 'offer_helmet', new Date(2026, 10, 6, 0, 0, 1));
   assert.equal(nextDay.ok, true, '次日重新计数');
 });
 
@@ -161,16 +166,13 @@ test('登录签到：领取入钱包、当天一次、次日推进', () => {
 
 test('装备清单：购买自动装备、开局消费扣库存、上限 3 不重复', () => {
   const s = store({ 'thunderrun:coins-total': '6000' });
-  buyOffer(s, content, 'offer_xp_card', AT); // item_xp_card ×1
-  if (equippedItems(s).includes('item_xp_card')) {
-    const used = consumeEquipped(s);
-    assert.deepEqual(used, ['item_xp_card'], '开局消费返回清单');
-    assert.equal(walletBalance(s, 'item_xp_card'), 0, '扣库存');
-    assert.deepEqual(equippedItems(s), [], '清单清空');
-    assert.deepEqual(consumeEquipped(s), [], '再开局无装备');
-  } else {
-    assert.deepEqual(equippedItems(s), [], '无 effects 的道具不自动装备（当前配置口径）');
-  }
+  buyOffer(s, shopContent(), 'offer_helmet', AT); // item_helmet ×1
+  assert.deepEqual(equippedItems(s), ['item_helmet']);
+  const used = consumeEquipped(s, content);
+  assert.deepEqual(used, ['item_helmet'], '开局消费返回清单');
+  assert.equal(walletBalance(s, 'item_helmet'), 0, '扣库存');
+  assert.deepEqual(equippedItems(s), [], '清单清空');
+  assert.deepEqual(consumeEquipped(s, content), [], '再开局无装备');
   for (let i = 0; i < 4; i++) equipItem(s, 'item_magnet_' + i); // 第 4 件应被拒
   assert.equal(equippedItems(s).length, 3, '上限 3 件');
   assert.equal(equipItem(s, 'item_magnet_0'), false, '重复装备拒绝');

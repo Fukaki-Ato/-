@@ -68,6 +68,7 @@ export interface CharacterSelectPageActions {
   isGated?(charId: string): boolean;
   gatedPriceText?(charId: string): string;
   canUnlock?(charId: string): boolean;
+  canSynthesize?(charId: string): boolean;
   onUnlock?(charId: string): { ok: boolean; message: string };
   onSynthesize?(charId: string): { ok: boolean; message: string };
 }

@@ -65,6 +65,7 @@ export function canUnlockCharacter(store: EconomyStore, content: GameContent, ch
   const entry = characterEntry(content, charId);
   const unlock = (entry as { unlock?: Entry } | undefined)?.unlock;
   if (!entry || !unlock) return { ok: false, message: '角色不存在' };
+  if (configLocked(content, charId)) return { ok: false, message: '角色未开放' };
   if (unlock.type === 'free') return { ok: true, message: '' };
   if (unlockedCharacterIds(store).has(charId)) return { ok: true, message: '' };
   if (unlock.type === 'coin' || unlock.type === 'key') {
@@ -105,12 +106,21 @@ export function unlockCharacter(store: EconomyStore, content: GameContent, charI
 }
 
 /** 碎片合成解锁（选角页「合成」按钮）：余额达成长 1 级门槛即扣碎片解锁 */
-export function synthesizeCharacter(store: EconomyStore, content: GameContent, charId: string): BuyResult {
+export function canSynthesizeCharacter(store: EconomyStore, content: GameContent, charId: string): BuyResult {
+  if (configLocked(content, charId)) return { ok: false, message: '角色未开放' };
+  if (!isCharacterGated(content, charId, store)) return { ok: false, message: '该角色无需解锁' };
   const need = shardSynthesisNeed(content, charId);
   if (!need) return { ok: false, message: '该角色没有碎片合成' };
   if (walletBalance(store, need.shardId) < need.need) {
     return { ok: false, message: `碎片不足（${walletBalance(store, need.shardId)}/${need.need}）` };
   }
+  return { ok: true, message: '' };
+}
+
+export function synthesizeCharacter(store: EconomyStore, content: GameContent, charId: string): BuyResult {
+  const check = canSynthesizeCharacter(store, content, charId);
+  if (!check.ok) return check;
+  const need = shardSynthesisNeed(content, charId)!;
   addBalance(store, need.shardId, -need.need);
   markUnlocked(store, charId);
   return { ok: true, message: '合成成功' };
@@ -118,11 +128,12 @@ export function synthesizeCharacter(store: EconomyStore, content: GameContent, c
 
 /** 选角页解锁动作：门槛判定 + coin/key 解锁 + 碎片合成（活动型在解锁时只登记） */
 export function selectUnlockActions(store: EconomyStore, content: GameContent):
-  Pick<CharacterSelectPageActions, 'isGated' | 'gatedPriceText' | 'canUnlock' | 'onUnlock' | 'onSynthesize'> {
+  Pick<CharacterSelectPageActions, 'isGated' | 'gatedPriceText' | 'canUnlock' | 'canSynthesize' | 'onUnlock' | 'onSynthesize'> {
   return {
     isGated: id => isCharacterGated(content, id, store),
     gatedPriceText: id => unlockPriceText(content, id),
     canUnlock: id => canUnlockCharacter(store, content, id, new Date()).ok,
+    canSynthesize: id => canSynthesizeCharacter(store, content, id).ok,
     onUnlock: id => unlockCharacter(store, content, id, new Date()),
     onSynthesize: id => synthesizeCharacter(store, content, id),
   };

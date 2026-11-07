@@ -57,7 +57,7 @@ export class MissionStore {
         ON CONFLICT(user_id, item) DO UPDATE SET amount = amount + excluded.amount`),
       addRun: this.db.prepare(`INSERT INTO runs(id, user_id, started_at, daily_id, weekly_id, seed, char_id, items_json)
         VALUES(?, ?, ?, ?, ?, ?, ?, ?)`),
-      countOpen: this.db.prepare(`SELECT COUNT(*) AS count FROM runs WHERE user_id = ? AND status = 'open'`),
+      countOpen: this.db.prepare(`SELECT COUNT(*) AS count FROM runs WHERE user_id = ? AND status = 'open' AND started_at >= ?`),
       run: this.db.prepare('SELECT * FROM runs WHERE id = ? AND user_id = ?'),
       finishRun: this.db.prepare(`UPDATE runs SET status = 'finished', finished_at = ?,
         payload_hash = ?, valid_run = ? WHERE id = ? AND status = 'open'`),
@@ -67,7 +67,12 @@ export class MissionStore {
       // 数据保留：runs/users 无限增长会持续拖垮 SQLite（审查 S-3）；钱包/期次行靠 FK CASCADE 随用户删除
       purgeFinishedRuns: this.db.prepare(`DELETE FROM runs WHERE status = 'finished' AND finished_at < ?`),
       purgeStaleOpenRuns: this.db.prepare(`DELETE FROM runs WHERE status = 'open' AND started_at < ?`),
-      purgeRunlessUsers: this.db.prepare('DELETE FROM users WHERE created_at < ? AND id NOT IN (SELECT DISTINCT user_id FROM runs)'),
+      purgeRunlessUsers: this.db.prepare(`DELETE FROM users WHERE created_at < ?
+        AND NOT EXISTS (SELECT 1 FROM runs WHERE user_id = users.id)
+        AND NOT EXISTS (SELECT 1 FROM wallets WHERE user_id = users.id AND amount > 0)
+        AND NOT EXISTS (SELECT 1 FROM mission_periods WHERE user_id = users.id
+          AND (progress_json != '{}' OR claimed_json != '{}'))
+        AND NOT EXISTS (SELECT 1 FROM weekly_characters WHERE user_id = users.id)`),
     };
   }
 
@@ -113,14 +118,16 @@ export class MissionStore {
       run.items?.length ? JSON.stringify(run.items) : null);
   }
   getRun(runId, userId) { return this.statements.run.get(runId, userId) ?? null; }
-  countOpenRuns(userId) { return Number(this.statements.countOpen.get(userId).count); }
-  /** 定期清理：过期 finished/open runs 与从不跑图的沉睡用户。返回各类删除行数。 */
-  purge(now, { runRetentionMs = 7 * 24 * 60 * 60 * 1000, userRetentionMs = 30 * 24 * 60 * 60 * 1000 } = {}) {
+  countOpenRuns(userId, earliestStartedAt = Number.MIN_SAFE_INTEGER) {
+    return Number(this.statements.countOpen.get(userId, earliestStartedAt).count);
+  }
+  /** 只回收无资产、无进度的陈旧游客；历史对局过期不意味着玩家数据可丢弃。 */
+  purge(now, { runRetentionMs = 7 * 24 * 60 * 60 * 1000, userRetentionMs = 30 * 24 * 60 * 60 * 1000, runTicketTtlMs = 24 * 60 * 60 * 1000 } = {}) {
     const runCutoff = now - runRetentionMs;
     const userCutoff = now - userRetentionMs;
     return {
       finishedRuns: this.statements.purgeFinishedRuns.run(runCutoff).changes,
-      staleOpenRuns: this.statements.purgeStaleOpenRuns.run(runCutoff).changes,
+      staleOpenRuns: this.statements.purgeStaleOpenRuns.run(now - runTicketTtlMs).changes,
       runlessUsers: this.statements.purgeRunlessUsers.run(userCutoff).changes,
     };
   }

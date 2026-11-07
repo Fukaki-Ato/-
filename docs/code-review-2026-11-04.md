@@ -1,5 +1,7 @@
 # Thunder Run 代码审查报告与开发计划
 
+PR #52 后续审查修复及最新验证边界见 [pr52-review-fixes.md](pr52-review-fixes.md)。下方保留原批次的历史执行记录。
+
 - 审查日期：2026-11-04（基线 f63de69）· 执行推进至 2026-11-05
 - 方法：机械验证（`npm run check` 全流程实跑）+ 四路并行深读（framework/game、web/wx、server 安全、测试工具链）+ 未完成功能盘点，共精读 200+ 文件
 

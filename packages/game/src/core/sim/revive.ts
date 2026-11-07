@@ -32,6 +32,9 @@ export function tryRevive(
   s.topple = 0;
   gen.softClearObstacles(obstacles, s.distance - 12, s.distance + 14, s.t);
   s.revivesUsed++;
+  // resolveHit 先发死亡事件；免费复活成功即撤回，death 只代表真正终局。
+  // 保留之前的 hit/zap 等反馈，避免渲染层误开结算倒计时和死亡音频。
+  if (events[events.length - 1]?.type === 'death') events.pop();
   events.push({ type: 'revive', left: next.left });
   return next;
 }

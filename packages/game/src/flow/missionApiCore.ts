@@ -29,12 +29,17 @@ export class MissionApiCore {
   constructor(
     private readonly transport: MissionTransport,
     private readonly storage: MissionQueueStorage,
+    private readonly onSnapshot?: (snapshot: MissionSnapshot) => void,
   ) {
     try {
       const saved: unknown = JSON.parse(storage.get(MISSION_QUEUE_KEY) ?? '[]');
       if (Array.isArray(saved)) this.queue = saved.filter(run => run && typeof run.runId === 'string'
         && Number.isSafeInteger(run.frames) && Array.isArray(run.actions)).slice(0, 10);
     } catch { /* 损坏的待同步记录不阻止启动。 */ }
+  }
+  private accept(snapshot: MissionSnapshot): MissionSnapshot {
+    this.onSnapshot?.(snapshot);
+    return this.snapshot = snapshot;
   }
   private async request<T>(path: string, method: 'GET' | 'POST', body?: unknown): Promise<T> {
     let status = 0;
@@ -80,9 +85,9 @@ export class MissionApiCore {
       while (this.queue.length) {
         const run = this.queue[0]!;
         try {
-          this.snapshot = await this.request<MissionSnapshot>(`/runs/${encodeURIComponent(run.runId)}/finish`, 'POST', {
+          this.accept(await this.request<MissionSnapshot>(`/runs/${encodeURIComponent(run.runId)}/finish`, 'POST', {
             frames: run.frames, actions: run.actions,
-          });
+          }));
         } catch (error) {
           const status = (error as { status?: number }).status ?? 0;
           if ([400, 403, 404, 409, 410, 422].includes(status)) {
@@ -103,10 +108,10 @@ export class MissionApiCore {
     await this.settling;
     await this.connect();
     await this.flush();
-    return this.snapshot = await this.request<MissionSnapshot>('', 'GET');
+    return this.accept(await this.request<MissionSnapshot>('', 'GET'));
   }
   async claim(period: MissionPeriod, periodId: string, missionId: string): Promise<MissionSnapshot> {
     await this.connect();
-    return this.snapshot = await this.request<MissionSnapshot>('/claim', 'POST', { period, periodId, missionId });
+    return this.accept(await this.request<MissionSnapshot>('/claim', 'POST', { period, periodId, missionId }));
   }
 }

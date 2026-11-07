@@ -883,12 +883,12 @@
     "eventCounts": {
       "cast": 2,
       "coin": 19,
-      "death": 2,
+      "death": 1,
       "hit": 2,
       "protected": 1,
       "revive": 1
     },
-    "eventsSha256": "eec1c9f7f84ca1d0e7fd7c990c7a7bd4927b1760d40bfe41e80fe98a66fe4f87",
+    "eventsSha256": "9b3a4b00fb3f1e2f9a84d1ce3848027cc61c8c3d5117d6cc9df11c958529c7bf",
     "inputsSha256": "f580cac72111ae239ac7733600f4503475402f73fc062199085aaa29988f2b9e"
   }
 }

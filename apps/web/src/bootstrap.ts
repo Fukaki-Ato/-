@@ -1,4 +1,5 @@
 /** Web entry: assemble the platform adapter, UI host, and shared game flow. */
+import { createRewardWalletStore } from '@tr/game/flow/missionRewardWallet.js';
 import { createWebPlatform } from './platform/webPlatform.js';
 import { createGameFlow } from '@tr/game/flow/mainFlow.js';
 import { createOverlayViews } from '@tr/game/ui/overlayViews.js';
@@ -24,17 +25,18 @@ const { debug, test: testMode, qa } = runtimeDebugFlags(location.search);
 
 async function main(): Promise<void> {
   const platform = createWebPlatform({ mount });
+  const wallet = createRewardWalletStore(platform.storage);
   const configResolve = (name: string) => `${import.meta.env.BASE_URL}${name}.json`;
   // UI 资源加载期间就取配置；UI 与 flow 共用 game.json，不发第二次请求。
   const startupConfig = preloadStartupConfig(platform.fetchJson, configResolve);
-  const adapter = { ...platform, fetchJson: startupConfig.fetchJson,
+  const adapter = { ...platform, storage: wallet, fetchJson: startupConfig.fetchJson,
     extras: platform.extras ? { ...platform.extras, urlParams: runtimeDebugParams(location.search) } : undefined };
   // QA 锁角色 ?char=<id>：覆盖本机记忆的出战角色（mainFlow 的初值就是读这个 storage 键，
   // 键名与 mainFlow.CHAR_KEY 一致，改它两边要同步）。不传则维持原有 UI 选角流程。
   const charParam = DEBUG_TOOLS_ENABLED ? new URLSearchParams(location.search).get('char') : null;
   if (charParam) adapter.storage.set('thunderrun:character', charParam);
   const shell = await createUiShell(adapter, { menuArt: false });
-  const missions = createMissionIntegration(qa);
+  const missions = createMissionIntegration(qa, wallet);
   const views = createOverlayViews({
     host: shell.host, badges: shell.badges, backdrop: shell.backdrop,
     onLobbyVisible: v => shell.setBackgroundVisible(v), // 背景视频只在大厅解码

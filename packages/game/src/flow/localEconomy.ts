@@ -6,6 +6,7 @@
  */
 import type { GameContent } from '../core/config/configTypes.js';
 import type { ShopActions } from './views.js';
+import { canUseEquippedItem } from './itemAvailability.js';
 
 type Entry = Record<string, unknown>;
 
@@ -41,8 +42,9 @@ export function equipItem(store: EconomyStore, itemId: string): boolean {
 }
 
 /** 开局消费：清出本局道具（余额不足的跳过），扣库存并清空装备清单 */
-export function consumeEquipped(store: EconomyStore): string[] {
-  const ids = equippedItems(store).filter(id => walletBalance(store, id) > 0);
+export function consumeEquipped(store: EconomyStore, content: GameContent): string[] {
+  const ids = [...new Set(equippedItems(store))]
+    .filter(id => canUseEquippedItem(content, id) && walletBalance(store, id) > 0).slice(0, 3);
   for (const id of ids) addBalance(store, id, -1);
   store.set(EQUIP_KEY, '[]');
   return ids;
@@ -89,6 +91,7 @@ export function spend(store: EconomyStore, price: Record<string, unknown>): bool
   return true;
 }
 
+// Local shop limits retain their existing device-calendar semantics. Mission periods are server-owned.
 function dateKey(now: Date): string {
   const p = (n: number) => String(n).padStart(2, '0');
   return `${now.getFullYear()}-${p(now.getMonth() + 1)}-${p(now.getDate())}`;
@@ -113,6 +116,9 @@ export function buyOffer(store: EconomyStore, content: GameContent, offerId: str
   const offers = ((content.economy.params?.shop as { offers?: Entry[] } | undefined)?.offers) ?? [];
   const offer = offers.find(o => o.id === offerId);
   if (!offer) return { ok: false, message: '商品不存在' };
+  const rewards = (offer.give ?? []) as { item?: unknown; n?: unknown }[];
+  if (rewards.some(reward => typeof reward.item === 'string' && reward.item.startsWith('item_')
+    && !canUseEquippedItem(content, reward.item))) return { ok: false, message: '道具未开放' };
   const requires = typeof offer.requiresEvent === 'string' ? offer.requiresEvent : '';
   if (requires && !isEventLive(content, requires, now)) return { ok: false, message: '活动未开放' };
   const price = (offer.price ?? {}) as Record<string, unknown>;
@@ -130,9 +136,9 @@ export function buyOffer(store: EconomyStore, content: GameContent, offerId: str
     const key = `thunderrun:shop-limit:${offerId}:${dateKey(now)}`;
     store.set(key, String(readCount(store, key) + 1));
   }
-  grant(store, (offer.give ?? []) as { item?: unknown; n?: unknown }[]);
+  grant(store, rewards);
   // 可装备道具（items.json 有 effects 的 item_*）自动进装备清单，下一局生效
-  for (const g of (offer.give ?? []) as { item?: unknown; n?: unknown }[]) {
+  for (const g of rewards) {
     if (typeof g.item === 'string' && g.item.startsWith('item_')) equipItem(store, g.item);
   }
   return { ok: true, message: '购买成功，已装备到下一局' };

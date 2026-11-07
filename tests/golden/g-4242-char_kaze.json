@@ -960,7 +960,7 @@
     "eventCounts": {
       "cast": 1,
       "coin": 36,
-      "death": 2,
+      "death": 1,
       "hit": 2,
       "pickup": 2,
       "protected": 1,
@@ -968,7 +968,7 @@
       "shieldBreak": 1,
       "zap": 1
     },
-    "eventsSha256": "24addf58cc43d22735f22b19b60fcf7ef2b834c1b4d1bcba2f5947efd1286cd8",
+    "eventsSha256": "0bde18c26cf946bf0a62fe559cd22555fec4ba5ccf6cd69ba355dce3a5dc5543",
     "inputsSha256": "35acd88893cb3f423c23545163036370b5411c921d50193d9a98d7151d6173b0"
   }
 }
