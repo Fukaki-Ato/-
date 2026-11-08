@@ -1276,6 +1276,10 @@
       "2": 16
     }
   },
+  "tideAware": {
+    "lowMax": 0.15,
+    "coinCount": 6
+  },
   "zap": {
     "ref": "obs_lightning_circle",
     "everyM": 200,
