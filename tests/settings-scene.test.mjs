@@ -23,10 +23,10 @@ const W = 800, H = 600;
 
 const readConfig = name => JSON.parse(readFileSync(join(root, 'config', `${name}.json`), 'utf8'));
 
-test('当前主题配置让设置页提供白日海景、雨夜便利店、黄昏渔港、天穹雷脊、沉眠泰坦与熔炉巨兽', () => {
+test('当前主题配置让设置页提供白日海景、雨夜便利店、黄昏渔港、天穹雷脊、沉眠泰坦、熔炉巨兽与失重图书馆', () => {
   const options = themeOptions({ themes: readConfig('themes') });
-  assert.deepEqual(options.map(option => option.id), ['theme_seaside_day', 'theme_rain_konbini', 'theme_dusk_harbor', 'theme_stormspire', 'theme_titan', 'theme_forgeheart']);
-  assert.deepEqual(options.map(option => option.name), ['白日海景', '雨夜便利店', '黄昏渔港', '天穹雷脊', '沉眠泰坦', '熔炉巨兽']);
+  assert.deepEqual(options.map(option => option.id), ['theme_seaside_day', 'theme_rain_konbini', 'theme_dusk_harbor', 'theme_stormspire', 'theme_titan', 'theme_forgeheart', 'theme_library']);
+  assert.deepEqual(options.map(option => option.name), ['白日海景', '雨夜便利店', '黄昏渔港', '天穹雷脊', '沉眠泰坦', '熔炉巨兽', '失重图书馆']);
 
   const glyphs = new Set(JSON.parse(readFileSync(join(root, 'assets/fonts/cjk.metrics.json'), 'utf8')).glyphs.map(g => g.char));
   for (const label of [...options.map(option => option.name), '龙']) {

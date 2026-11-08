@@ -119,6 +119,22 @@
       "versions": [
         { "ver": "1.0.0", "date": "2026-11-09", "change": "第六个跑酷场景：熔炉巨兽（Phase A 平面版，docs/scenes/forgeheart-brief.md）。活火山炉腔内壁的锻运堤道：岩浆海按「炉心心跳」144m 周期潮汐涨落（渲染层纯函数 tide.ts 单源，Phase A 不判负），每 288m 喷发段带 1s 红光预警（eruption.ts 方案 B：LightningFx 同构接口，几何反向地→天喷柱+频闪断口+全场闪橙 FORGE_TINT #FF8A50）。蜂巢柱阵/渣滩阶地/火山颈内壁+螺旋壁架+炉心×2/哑阀/锻像/断链吊桥/焰髓晶簇/渣斗车。调色板 7 色：玄武黑 #1E1713 / 熔渣褐 #4A3A2E / 浮石灰 #B8A99A / 烧结赤 #7A3B2D（热但死）/ 哑青铜 #6E5B3A / 炉火橙 #FF5A1F（唯一发光色）/ 硫壳黄 #D9B545" }
       ]
+    },
+    {
+      "id": "theme_library", "status": "draft",
+      "name": { "zh-CN": "失重图书馆" },
+      "sky": { "shader": "thunder_sky", "baseColor": "#1E1A33", "flashColor": "#A63A2E", "flashEveryS": [9999, 9999] },
+      "fog": { "color": "#46536B", "density": 0.012 },
+      "track": { "railMat": "mat_library_rail", "groundTiles": ["tile_library_a"] },
+      "props": [],
+      "scenery": "library",
+      "groundColor": "#D9C7A0",
+      "lighting": { "hemiSky": "#B8AE9A", "hemiGround": "#241F3D", "hemiIntensity": 0.9, "key": "#D8C9A8", "keyIntensity": 1.0 },
+      "music": "assets/audio/bgm/run.mp3", "sfxSet": "city",
+      "vfxTint": "#FFB65C",
+      "versions": [
+        { "ver": "1.0.0", "date": "2026-11-09", "change": "第七个跑酷场景：失重图书馆（Phase A 平面版，docs/scenes/library-brief.md）。墨海上的缄默书城：书塔暗面墨青/书页陈纸米/蜡封红结构色/烛光琥珀唯一发光色，墨海条+墨雾带+书页风暴三层 1060 片+光尘 600+涟漪，三档书塔四态+摊开书岛+倒挂书山，万卷塔层带剪影+三片公转顶盖+悬索书梯+蜡封拱门×8+反重力书阁视觉隧道（真反重力 Phase B），纸鹤 3 群穿塔缝+墨渊鲸半沉剪影，障碍皮肤六类（vehicle=巨型对开本典籍保 rideTop）" }
+      ]
     }
   ]
 }

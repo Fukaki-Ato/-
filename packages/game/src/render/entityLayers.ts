@@ -12,6 +12,7 @@ import { createPosterPicker, posterSize } from './adPosters.js';
 import { createStormspireObstacleSkin, SKIN_CLASSES, type SkinCalibration } from './stormspire/obstacleSkin.js';
 import { createTitanObstacleSkin } from './titan/obstacleSkin.js';
 import { createForgeheartObstacleSkin } from './forgeheart/obstacleSkin.js';
+import { createLibraryObstacleSkin } from './library/obstacleSkin.js';
 import { applyWorldBend } from './stormspire/worldBend.js';
 
 /** 障碍配色（docs/05 §2：敌对品红/警示黄，可交互蓝青） */
@@ -43,7 +44,7 @@ const POSTER_FRONT = 0.012;
 /** 皮肤工厂同构签名：与 stormspire/obstacleSkin.ts 的工厂逐字对齐（titan 皮同构实现） */
 type SkinFactory = (scene: THREE.Scene, boxGeo: THREE.BufferGeometry, cal: SkinCalibration) => ReturnType<typeof createStormspireObstacleSkin> & { /** 该皮肤是否接管 zap（闪电圈）；未声明的皮肤 zap 走默认盘 */ zapSkin?: boolean };
 /** 皮肤门控提表（titan-brief §10.0-2）：登记已实现皮肤的主题；zap/step 默认盘全主题一致；表外主题 skin 恒 null */
-const SKIN_BY_SCENERY: Record<string, SkinFactory> = { stormspire: createStormspireObstacleSkin, titan: createTitanObstacleSkin, forgeheart: createForgeheartObstacleSkin };
+const SKIN_BY_SCENERY: Record<string, SkinFactory> = { stormspire: createStormspireObstacleSkin, titan: createTitanObstacleSkin, forgeheart: createForgeheartObstacleSkin, library: createLibraryObstacleSkin };
 
 /**
  * 单位斜坡几何（沿 +z 为坡底/玩家侧，-z 为坡顶/火车侧；y 0→1 线性升高）。

@@ -119,3 +119,12 @@ export function setForgeheartBend(t: number, tideLevel: number): void {
   uBendX.value = 4 * Math.sin(t * 0.06);
   uBendY.value = 3 * tideLevel;
 }
+
+/** 失重图书馆假弯道低层写手（仅 libraryProps.update 驱动；其它主题恒零不调用）：
+ *  uBendX = 4·sin(t·0.0655)（周期 ≈96s 平缓横弯）、uBendY = 2.5·sin(t·0.0491 + 1.7)（周期 ≈128s 纵向漂移，
+ *  与横弯相位错开 1.7）——library-brief §11.1-8：100m 处横 4m / 纵 2.5m，书城回廊的缓慢漂移感。
+ *  近场 18m 恒平边界同 setWorldBend。 */
+export function setLibraryBend(t: number): void {
+  uBendX.value = 4 * Math.sin(t * 0.0655);
+  uBendY.value = 2.5 * Math.sin(t * 0.0491 + 1.7);
+}
