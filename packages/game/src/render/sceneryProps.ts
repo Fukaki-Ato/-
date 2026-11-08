@@ -205,7 +205,8 @@ function createSeasideProps(scene: THREE.Scene): SceneryProps {
  * 主题 config 的 `scenery` 字段 → 侧景道具集。
  * 表里没有的 id（如占位场景的 "blank"）就是两侧什么都不摆。
  */
-const SCENERY_SETS: Record<string, (scene: THREE.Scene) => SceneryProps> = {
+type SceneFactory = (scene: THREE.Scene, ctx?: SceneryCtx) => SceneryProps;
+const SCENERY_SETS: Record<string, SceneFactory> = {
   seaside: createSeasideProps,
   konbini: createKonbiniProps,
   coast: createCoastProps,
@@ -216,6 +217,8 @@ const SCENERY_SETS: Record<string, (scene: THREE.Scene) => SceneryProps> = {
   library: createLibraryProps,
 };
 
-export function createSceneryProps(scene: THREE.Scene, scenery: string = 'seaside'): SceneryProps {
-  return SCENERY_SETS[scenery]?.(scene) ?? { update: () => undefined };
+export interface SceneryCtx { crossings?: readonly { kind: string; lane: number; worldZ: number; done?: boolean }[] }
+
+export function createSceneryProps(scene: THREE.Scene, scenery: string = 'seaside', ctx?: SceneryCtx): SceneryProps {
+  return SCENERY_SETS[scenery]?.(scene, ctx) ?? { update: () => undefined };
 }

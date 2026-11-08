@@ -109,7 +109,23 @@ export function createLandmarks(scene: THREE.Scene) {
     mesh.setMatrixAt(i, M);
   };
 
+  // M4 crossings 视觉对齐：sim 判定体（everyM 100）画成可穿金环——z 直接跟判定体（worldZ−dist），done 即隐
+  const simRingGeo = new THREE.TorusGeometry(2.2, 0.14, 8, 24);
+  const simRings = new THREE.InstancedMesh(simRingGeo, gold(), 16);
+  simRings.frustumCulled = false; scene.add(simRings);
+
   return {
+    syncCrossings(list: readonly { lane: number; worldZ: number; done?: boolean }[], dist: number, laneW: number) {
+      let n = 0;
+      for (const c of list) {
+        if (c.done || n >= 16) continue;
+        const rel = c.worldZ - dist;
+        if (rel < -10 || rel > 120) continue;
+        compose(simRings, n++, c.lane * laneW, 2.2, rel, 0, 0.3, 0, 1);
+      }
+      for (let i = n; i < 16; i++) compose(simRings, i, 0, -999, 0, 0, 0, 0.0001);
+      simRings.instanceMatrix.needsUpdate = true;
+    },
     update(move: number, t: number) {
       tower.update(move, t); // 塔件（塔身静态回收 + 碎块/锚缆/信标动画）拆到 tower.ts 自含；先塔后其余，与创建顺序一致
       // 静态件回收

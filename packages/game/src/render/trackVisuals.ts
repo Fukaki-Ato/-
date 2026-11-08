@@ -151,6 +151,7 @@ export function createTrackVisuals(scene: THREE.Scene, laneWidth: number, colors
   scenery: string = 'seaside',
   /** M1 门控契约：features.wetRoad=湿路系统总闸（车道线倒影 + 路面水洼 roughnessMap），由 theme.features 派生 */
   features?: { wetRoad?: boolean },
+  ctx?: { crossings?: readonly { kind: string; lane: number; worldZ: number; done?: boolean }[] },
 ) {
   const roadWidth = 3 * laneWidth + 1.2;
   // 假弯道（渲染层 world-bend，见 stormspire/worldBend.ts 与 titan 呼吸远场）：stormspire/titan 注入弯道材质，
@@ -250,7 +251,7 @@ export function createTrackVisuals(scene: THREE.Scene, laneWidth: number, colors
   }
 
   // 侧景全部由真 3D 几何承担（近景小件 + 中景房屋/棕榈 + 远景房屋/棕榈），道具集由主题 scenery 选定
-  const props: SceneryProps = createSceneryProps(scene, scenery);
+  const props: SceneryProps = createSceneryProps(scene, scenery, ctx);
 
   let lastDist = 0, disposed = false;
   return {

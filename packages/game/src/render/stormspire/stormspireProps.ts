@@ -19,7 +19,7 @@ import { createSkyline } from './skyline.js';
 import { applyWorldBend, setWorldBend } from './worldBend.js';
 import { P } from './palette.js';
 
-export function createStormspireProps(scene: THREE.Scene): SceneryProps {
+export function createStormspireProps(scene: THREE.Scene, ctx?: { crossings?: readonly { kind: string; lane: number; worldZ: number; done?: boolean }[] }): SceneryProps {
   const atmo = createAtmosphere(scene);
   const islands = createIslands(scene);
   const statue = createStatue(scene);
@@ -62,17 +62,18 @@ export function createStormspireProps(scene: THREE.Scene): SceneryProps {
     if (solid && !mat.transparent) applyWorldBend(mat);
   });
 
-  let lastT = 0;
+  let lastT = 0, distAcc = 0;
   return {
     update(move: number, t: number) {
       setWorldBend(t); // 假弯道呼吸（~90s 周期，见 worldBend.ts）：仅 stormspire 活跃时驱动，其它主题恒零
       const dt = Math.min(Math.max(t - lastT, 0), 0.1);
-      lastT = t;
+      lastT = t; distAcc += move;
       atmo.update(move, t, dt);
       islands.update(move, t);
       statue.update(move, t);
       bridge.update(move);
       landmarks.update(move, t);
+      landmarks.syncCrossings?.(ctx?.crossings ?? [], distAcc, 2.2); // M4 crossings 视觉对齐：判定体 z 走
       creatures.update(move, t);
       skyline.update(move, t); // 远景剪影带：视差在自家 update（×0.3），与 banks 同层调用
       for (const inst of banks) {

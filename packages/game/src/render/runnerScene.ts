@@ -103,7 +103,7 @@ export function createRunnerScene(
   const track = createTrackVisuals(scene, laneWidth, {
     baseColor: sky.baseColor, flashColor: sky.flashColor, tint, groundColor,
     sky: { zenith: sky.baseColor, horizon: fogColor },
-  }, scenery, { wetRoad });
+  }, scenery, { wetRoad }, { crossings: sim.crossings });
   const avatar = createAvatar(scene, laneWidth, sim.loadout, adapter);
   const coinField = createCoinField(scene, laneWidth, { envMap: runEnv, scenery });
   // scenery 来源与 createTrackVisuals 同款（themes.json 的 scenery 字段）：stormspire 时障碍层换雷脊废墟皮
