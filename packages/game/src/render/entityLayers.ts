@@ -1,9 +1,7 @@
 /**
  * 赛道实体表现层：障碍池 / 云团池（docs/02 §8 对象池，每帧零分配）
  * 只把 sim 的实体数组映射到预建的 Mesh 槽位上，不做任何玩法判定。
- * 道具表现层已拆到 pickupLayer.ts（自带 3D 模型槽位），勿在此再造一份。
- * 障碍皮肤：scenery === 'stormspire'（雷脊显式分支）时六类障碍换程序化废墟皮
- * （stormspire/obstacleSkin.ts，只换可视替身、判定口径零改动）；zap/step 与其余主题全走默认盘。
+ * 道具表现层已拆到 pickupLayer.ts；障碍皮肤走 SKIN_BY_SCENERY 表（stormspire/titan/forgeheart/library），zap/step 默认盘。
  */
 import * as THREE from 'three';
 import type { CloudEntity, ObstacleEntity } from '@tr/game/core/sim/trackGen.js';

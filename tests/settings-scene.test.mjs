@@ -19,7 +19,8 @@ import { MUSIC_VOLUME_KEY, SFX_VOLUME_KEY, themeMusic } from '../packages/game/d
 import { loadTestFontSet } from './ui-helpers.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
-const W = 800, H = 600;
+const W = 800, H = 720; // 7 主题后设置页内容长于 600：sfx 滑条被排到 601~613 落在 600 视口外（hit-test 整树不可命中）
+// 视口抬高到 720 贴近真机竖屏高度；页面内容溢出的长期解法是设置页滚动化（见 settingsView 布局碰撞记录）
 
 const readConfig = name => JSON.parse(readFileSync(join(root, 'config', `${name}.json`), 'utf8'));
 
@@ -257,6 +258,7 @@ test('设置页：滑条拖动 1% 粒度回传流程、与百分比和步进按�
   assert.equal(Math.round(musicSlider.value * 100), 37);
 
   allow = false;
+
   dragSlider(host, sfxSlider, 0.5, 0.5);
   assert.deepEqual(calls.at(-1), ['sfx', 0.5], '按下仍回传流程');
   assert.equal(Math.round(sfxSlider.value * 100), 100, '被拒绝的滑条保持原值');
