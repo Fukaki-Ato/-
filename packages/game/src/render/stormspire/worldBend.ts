@@ -111,3 +111,11 @@ export function setTitanBreath(t: number, amp: number): void {
   uBendX.value = 0;
   uBendY.value = 2.5 * amp * Math.sin((Math.PI * 2 * t) / 10);
 }
+
+/** 熔炉假弯道低层写手（仅 forgeheartProps.update 驱动；其它主题恒零不调用）：
+ *  uBendX = 4·sin(t·0.06)（~105s 平缓横弯）、uBendY = 3·tideLevel（弯道纵向起伏跟着岩浆潮位走——
+ *  forgeheart-brief §13-6；tideLevel 由调用方传 level(distAcc)）。近场 18m 恒平边界同 setWorldBend。 */
+export function setForgeheartBend(t: number, tideLevel: number): void {
+  uBendX.value = 4 * Math.sin(t * 0.06);
+  uBendY.value = 3 * tideLevel;
+}

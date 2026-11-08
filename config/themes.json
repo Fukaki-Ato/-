@@ -102,6 +102,23 @@
       "versions": [
         { "ver": "1.0.0", "date": "2026-11-09", "change": "第五个跑酷场景：沉眠泰坦（Phase A 平面版，docs/scenes/titan-brief.md）。跑在横跨峡谷的巨神尸体脊沟上：尸身仍按 ~10s 周期呼吸（worldBend 远场 + 矩阵梯度近场），脊沟两侧椎棘骨锥列与甲缝亡火金导引纹，胸廓体块/肋拱×12/断剑冢/弑神箭丛/葬仪石环/须发帘摆动/颅首瞳孔 420m 距离闩锁睁眼，渡魂鸦 1 群 30 只穿拱飞行。调色板 7 色：烬空暮蓝 #151C2C / 雾灰青 #46606E / 骨象牙 #D9D2BE / 苍岩肤 #8A8271 / 尸苔绿 #5C7A5E / 铁锈红褐 #8A4A32 / 亡火金 #FFB454（唯一发光色）" }
       ]
+    },
+    {
+      "id": "theme_forgeheart", "status": "draft",
+      "name": { "zh-CN": "熔炉巨兽" },
+      "sky": { "shader": "thunder_sky", "baseColor": "#1E1713", "flashColor": "#FF8A50", "flashEveryS": [9999, 9999] },
+      "fog": { "color": "#4A3226", "density": 0.013 },
+      "track": { "railMat": "mat_forgeheart_rail", "groundTiles": ["tile_forge_a"] },
+      "props": [],
+      "scenery": "forgeheart",
+      "groundColor": "#2A201A",
+      "lighting": { "hemiSky": "#B8A99A", "hemiGround": "#5A2E1C", "hemiIntensity": 1.0, "key": "#FFD2A8", "keyIntensity": 1.1 },
+      "grade": { "vignette": 0.30, "grain": 0.04, "bloom": 0.34 },
+      "music": "assets/audio/bgm/run.mp3", "sfxSet": "city",
+      "vfxTint": "#FF5A1F",
+      "versions": [
+        { "ver": "1.0.0", "date": "2026-11-09", "change": "第六个跑酷场景：熔炉巨兽（Phase A 平面版，docs/scenes/forgeheart-brief.md）。活火山炉腔内壁的锻运堤道：岩浆海按「炉心心跳」144m 周期潮汐涨落（渲染层纯函数 tide.ts 单源，Phase A 不判负），每 288m 喷发段带 1s 红光预警（eruption.ts 方案 B：LightningFx 同构接口，几何反向地→天喷柱+频闪断口+全场闪橙 FORGE_TINT #FF8A50）。蜂巢柱阵/渣滩阶地/火山颈内壁+螺旋壁架+炉心×2/哑阀/锻像/断链吊桥/焰髓晶簇/渣斗车。调色板 7 色：玄武黑 #1E1713 / 熔渣褐 #4A3A2E / 浮石灰 #B8A99A / 烧结赤 #7A3B2D（热但死）/ 哑青铜 #6E5B3A / 炉火橙 #FF5A1F（唯一发光色）/ 硫壳黄 #D9B545" }
+      ]
     }
   ]
 }

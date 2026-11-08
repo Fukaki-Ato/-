@@ -86,7 +86,8 @@ export function deriveRunStage(content: GameContent, opts?: { themeId?: string }
   const skyBase = new THREE.Color(sky.baseColor), fogBase = new THREE.Color(fogColor);
   /** scenery（themes.json）：track/obstacle 层选景 + 雷脊 IBL 环境贴图的门控字段 */
   const scenery = (theme?.['scenery'] as string | undefined) ?? 'seaside';
-  const flashTint = new THREE.Color(scenery === 'titan' ? '#FFE9B8' : FLASH_TINT);
+  // 闪色按 scenery 分支：titan=亡火暖金（护栏语义）/ forgeheart=熔橙 FORGE_TINT（喷发「炉膛开盖」，brief §12 矛盾 2 方案 B）
+  const flashTint = new THREE.Color(scenery === 'titan' ? '#FFE9B8' : scenery === 'forgeheart' ? '#FF8A50' : FLASH_TINT);
   /** 环境闪电（theme.sky.flashEveryS=[min,max] 秒区间随机；缺省 [9999,9999]=关闭）：
    *  渲染层定时器，落点在前方 14~34m 随机车道，与玩法判定无关（lightning 同款渲染层随机口径）。 */
   const flashEvery = ((theme?.sky as Record<string, unknown> | undefined)?.['flashEveryS'] as number[] | undefined) ?? [9999, 9999];

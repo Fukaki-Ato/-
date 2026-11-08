@@ -11,6 +11,7 @@ import { RAMP_TOP_FLAT_M, obstacleX } from '@tr/game/core/sim/collision.js';
 import { createPosterPicker, posterSize } from './adPosters.js';
 import { createStormspireObstacleSkin, SKIN_CLASSES, type SkinCalibration } from './stormspire/obstacleSkin.js';
 import { createTitanObstacleSkin } from './titan/obstacleSkin.js';
+import { createForgeheartObstacleSkin } from './forgeheart/obstacleSkin.js';
 import { applyWorldBend } from './stormspire/worldBend.js';
 
 /** 障碍配色（docs/05 §2：敌对品红/警示黄，可交互蓝青） */
@@ -40,11 +41,9 @@ const RAMP_COLOR = 0x9fd8ff;
 const POSTER_FRONT = 0.012;
 
 /** 皮肤工厂同构签名：与 stormspire/obstacleSkin.ts 的工厂逐字对齐（titan 皮同构实现） */
-type SkinFactory = (scene: THREE.Scene, boxGeo: THREE.BufferGeometry, cal: SkinCalibration) => ReturnType<typeof createStormspireObstacleSkin>;
+type SkinFactory = (scene: THREE.Scene, boxGeo: THREE.BufferGeometry, cal: SkinCalibration) => ReturnType<typeof createStormspireObstacleSkin> & { /** 该皮肤是否接管 zap（闪电圈）；未声明的皮肤 zap 走默认盘 */ zapSkin?: boolean };
 /** 皮肤门控提表（titan-brief §10.0-2）：登记已实现皮肤的主题；zap/step 默认盘全主题一致；表外主题 skin 恒 null */
-const SKIN_BY_SCENERY: Record<string, SkinFactory> = {
-  stormspire: createStormspireObstacleSkin, titan: createTitanObstacleSkin,
-};
+const SKIN_BY_SCENERY: Record<string, SkinFactory> = { stormspire: createStormspireObstacleSkin, titan: createTitanObstacleSkin, forgeheart: createForgeheartObstacleSkin };
 
 /**
  * 单位斜坡几何（沿 +z 为坡底/玩家侧，-z 为坡顶/火车侧；y 0→1 线性升高）。
@@ -164,8 +163,9 @@ export function createObstacleLayer(scene: THREE.Scene, laneWidth: number, scene
         const isZap = o.zap === true;
         // moving（摆锤/挡板）横摆位置与 core 判定同源（obstacleX：含「不得扫出路面」限幅与脏数据防呆）
         const ox = o.cls === 'moving' ? obstacleX(o, t, laneWidth) : o.lane * laneWidth;
-        // 雷脊皮肤：六类障碍换皮（zap 闪电圈/step 斜坡不在内）；非 stormspire 恒 false ⇒ 原路径
-        const skinned = skin !== null && !isZap && o.cls !== 'step' && SKIN_CLASSES.has(o.cls);
+        // 皮肤：六类换皮。zap 走默认盘，但声明 zapSkin 的皮肤（forgeheart 灼痕盘）也接；未声明者（stormspire/titan）逐字节不变
+        const skinned = skin !== null && o.cls !== 'step' && SKIN_CLASSES.has(o.cls)
+          && (!isZap || skin.zapSkin === true);
         /** 正面海报（广告墙竖版图 / 矮障·横杆·车头的方版图）；不挂或宿主未注入时为 null ⇒ 纯色挡板 */
         const slot = pickPoster(o);
         const m = u.bar;
@@ -223,9 +223,9 @@ export function createObstacleLayer(scene: THREE.Scene, laneWidth: number, scene
           rampMat.opacity = 1 - sink;
           rampMat.transparent = sink > 0;
         }
-        // 闪电圈：黑色圆盘 + 黄色闪电标志（加色混合、按帧闪烁）
-        u.disc.visible = isZap;
-        u.bolt.visible = isZap;
+        // 闪电圈：黑色圆盘 + 黄色闪电标志（加色混合、按帧闪烁）；已上皮（forgeheart 灼痕盘）时让位
+        u.disc.visible = isZap && !skinned;
+        u.bolt.visible = isZap && !skinned;
         if (isZap) {
           u.disc.position.set(ox, 0.05 - sinkY, z);
           (u.disc.material as THREE.MeshBasicMaterial).opacity = 0.96 * (1 - sink);

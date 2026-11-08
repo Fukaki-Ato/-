@@ -26,6 +26,7 @@ import { applyLightningFlash, createLightningFx, FLASH_LIGHT_GAIN } from './ligh
 import { deriveRunStage, wireRunInput } from './runTheme.js';
 import { createPostFx } from './postfx.js';
 import { createEnvMap, disposeEnvMap } from './stormspire/env.js';
+import { createEruption } from './forgeheart/eruption.js';
 
 export interface RunCallbacks {
   onHud(h: {
@@ -100,6 +101,8 @@ export function createRunnerScene(
   // 主题 IBL：theme.env 声明了配色的主题挂程序化环境贴图（stormspire 雷暴/harbor 晚霞），null=无 IBL 自然降级
   const runEnv = env ? createEnvMap(renderer, env) : null;
   if (runEnv) scene.environment = runEnv;
+  // 喷发管线（方案 B）：forgeheart 挂 eruption（LightningFx 同构，自排程 1s 预警+喷柱），flash 并入现有管线
+  const eruption = scenery === 'forgeheart' ? createEruption(scene) : null;
   // 后处理全主题启用（bloom 阈值 0.82 下非自发光场景几乎无泛光，参数不分主题）；wx/非 WebGL2 自动降级
   // 后处理全主题启用（bloom 阈值下非自发光场景几乎无泛光）；画面 grade 由 theme.grade 覆盖（coast 晴天档），wx/非 WebGL2 自动降级
   const postfx = createPostFx(renderer, scene, camera, grade);
@@ -164,6 +167,7 @@ export function createRunnerScene(
       else if (ev.type === 'zap') {
         fireAtPlayer(ZAP_BURST_COLOR); shakeT = 0.32;
         lightning.strike(ev.lane, ev.worldZ, laneWidth); // MC 式雷电：天→落点 + 全场闪白
+        if (eruption) eruption.strike(ev.lane, ev.worldZ, laneWidth); // forgeheart：zap 继承喷柱+闪橙视觉
       }
       // pickup：按用户要求不加特效与震动，仅 HUD 显示 buff 倒计时（只回调音频）
       else if (ev.type === 'pickup') cb.onPickup?.();
@@ -200,7 +204,7 @@ export function createRunnerScene(
       ambientT = flashGap();
       lightning.strike(Math.round(Math.random() * 2 - 1), dist + 14 + Math.random() * 20, laneWidth);
     }
-    const flash = lightning.update(dt, dist);
+    const flash = Math.max(lightning.update(dt, dist), eruption ? eruption.update(dt, dist) : 0);
     hemi.intensity = HEMI_BASE + flash * FLASH_LIGHT_GAIN;
     keyLight.intensity = KEY_BASE + flash * FLASH_LIGHT_GAIN;
     const bg = scene.background as THREE.Color;
@@ -284,7 +288,7 @@ export function createRunnerScene(
     lightning.dispose();
     track.dispose();
     postfx.dispose(); // composer/逐 pass/双缓冲 target 全量释放（wx 降级态是 no-op）
-    if (runEnv) disposeEnvMap(runEnv);
+    if (runEnv) disposeEnvMap(runEnv); eruption?.dispose();
     renderer.dispose();
     scene.traverse(o => {
       const m = o as THREE.Mesh;
