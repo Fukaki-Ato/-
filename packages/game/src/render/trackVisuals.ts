@@ -153,9 +153,9 @@ export function createTrackVisuals(scene: THREE.Scene, laneWidth: number, colors
   features?: { wetRoad?: boolean },
 ) {
   const roadWidth = 3 * laneWidth + 1.2;
-  // 雷脊假弯道（渲染层 world-bend，见 stormspire/worldBend.ts）：仅 stormspire 注入弯道材质，
+  // 假弯道（渲染层 world-bend，见 stormspire/worldBend.ts 与 titan 呼吸远场）：stormspire/titan 注入弯道材质，
   // 并把长面片按纵深加密分段（其余主题几何/着色路径与旧版一致，零 shader 开销）
-  const deep = scenery === 'stormspire';
+  const deep = scenery === 'stormspire' || scenery === 'titan';
   const wet = features?.wetRoad ?? false;
   const zenith = colors.sky?.zenith ?? colors.baseColor;
   const horizon = colors.sky?.horizon ?? colors.baseColor;

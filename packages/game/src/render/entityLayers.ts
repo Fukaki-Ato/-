@@ -9,7 +9,8 @@ import * as THREE from 'three';
 import type { CloudEntity, ObstacleEntity } from '@tr/game/core/sim/trackGen.js';
 import { RAMP_TOP_FLAT_M, obstacleX } from '@tr/game/core/sim/collision.js';
 import { createPosterPicker, posterSize } from './adPosters.js';
-import { createStormspireObstacleSkin, SKIN_CLASSES } from './stormspire/obstacleSkin.js';
+import { createStormspireObstacleSkin, SKIN_CLASSES, type SkinCalibration } from './stormspire/obstacleSkin.js';
+import { createTitanObstacleSkin } from './titan/obstacleSkin.js';
 import { applyWorldBend } from './stormspire/worldBend.js';
 
 /** 障碍配色（docs/05 §2：敌对品红/警示黄，可交互蓝青） */
@@ -38,6 +39,13 @@ const RAMP_COLOR = 0x9fd8ff;
 /** 海报面片浮在挡板正前方的间距（米）：贴 0 会和盒体正面 z-fighting */
 const POSTER_FRONT = 0.012;
 
+/** 皮肤工厂同构签名：与 stormspire/obstacleSkin.ts 的工厂逐字对齐（titan 皮同构实现） */
+type SkinFactory = (scene: THREE.Scene, boxGeo: THREE.BufferGeometry, cal: SkinCalibration) => ReturnType<typeof createStormspireObstacleSkin>;
+/** 皮肤门控提表（titan-brief §10.0-2）：登记已实现皮肤的主题；zap/step 默认盘全主题一致；表外主题 skin 恒 null */
+const SKIN_BY_SCENERY: Record<string, SkinFactory> = {
+  stormspire: createStormspireObstacleSkin, titan: createTitanObstacleSkin,
+};
+
 /**
  * 单位斜坡几何（沿 +z 为坡底/玩家侧，-z 为坡顶/火车侧；y 0→1 线性升高）。
  * 与 core/sim movement.supportHeight 的 step 截面同源（末端平顶另用盒体拼，见 update）。
@@ -59,11 +67,9 @@ function createRampGeometry(): THREE.BufferGeometry {
 
 export function createObstacleLayer(scene: THREE.Scene, laneWidth: number, scenery = 'seaside') {
   const boxGeo = new THREE.BoxGeometry(1, 1, 1);
-  // 雷脊显式分支：只有 scenery === 'stormspire' 才建皮肤实例池；其余主题（seaside/coast/konbini/
-  // harbor/未登记 id）skin 恒为 null，update 逐行与旧版完全一致（新增 0 个对象、0 条 draw call）。
-  const skin = scenery === 'stormspire'
-    ? createStormspireObstacleSkin(scene, boxGeo, { obsMax: OBS_MAX, lowVisH: LOW_VISUAL_H, barLowY: BAR_LOW_Y })
-    : null;
+  // 障碍皮肤门控提表（titan-brief §10.0-2）：scenery → 皮肤工厂（stormspire/titan 同构签名，判定口径一致）；
+  // 表外主题（seaside/coast/konbini/harbor/未登记 id）skin 恒为 null，update 逐行与旧版一致，stormspire 行为逐字节等价。
+  const skin = SKIN_BY_SCENERY[scenery]?.(scene, boxGeo, { obsMax: OBS_MAX, lowVisH: LOW_VISUAL_H, barLowY: BAR_LOW_Y }) ?? null;
   const postMat = new THREE.MeshStandardMaterial({ color: 0x8a93a8, roughness: 0.5, metalness: 0.3 });
   // 闪电圈专用几何：黑色圆盘（平放的圆柱薄片）与地面闪电标志（Shape 挤出的平面片）
   const zapDiscGeo = new THREE.CylinderGeometry(1.0, 1.05, 0.06, 22);

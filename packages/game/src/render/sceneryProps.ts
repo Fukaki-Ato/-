@@ -14,6 +14,7 @@ import { createCoastProps } from './coast/coastProps.js';
 import { createKonbiniProps } from './konbini/konbiniProps.js';
 import { createHarborProps } from './harbor/harborProps.js';
 import { createStormspireProps } from './stormspire/stormspireProps.js';
+import { createTitanProps } from './titan/titanProps.js';
 import { applyWorldBend } from './stormspire/worldBend.js';
 
 /** 回收周期（米），与跑道长度同量级；出画即绕回远处 */
@@ -208,6 +209,7 @@ const SCENERY_SETS: Record<string, (scene: THREE.Scene) => SceneryProps> = {
   coast: createCoastProps,
   harbor: createHarborProps,
   stormspire: createStormspireProps,
+  titan: createTitanProps,
 };
 
 export function createSceneryProps(scene: THREE.Scene, scenery: string = 'seaside'): SceneryProps {

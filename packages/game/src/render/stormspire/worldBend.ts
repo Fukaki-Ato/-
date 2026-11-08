@@ -103,3 +103,11 @@ export function setWorldBend(t: number): void {
   uBendX.value = 7 * Math.sin(t * 0.071);
   uBendY.value = 4 * Math.sin(t * 0.053 + 2);
 }
+
+/** 泰坦呼吸低层写手（仅 titanProps.update 驱动；其它主题恒零不调用）：远场呼吸经 uBendY 的 k² 权重
+ *  生效——远方起伏可见、近场 18m 恒平（安全边界同 setWorldBend）；amp=1 基线（颅首醒态总装传 ~1.5，
+ *  呼吸振幅 +50%）；周期 10s（titan-brief §1.2）。100m 处全幅 2.5m。 */
+export function setTitanBreath(t: number, amp: number): void {
+  uBendX.value = 0;
+  uBendY.value = 2.5 * amp * Math.sin((Math.PI * 2 * t) / 10);
+}

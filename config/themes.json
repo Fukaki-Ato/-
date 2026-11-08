@@ -86,6 +86,22 @@
         { "ver": "1.0.0", "date": "2026-11-08", "change": "第四个跑酷场景：天穹雷脊（Phase A 平面版，docs/stormspire-brief.md）。无尽雷暴云海之上的驭雷者废墟：三车道读作云海之上的雷渡石桥，两侧浮空岛链（八原型实例化）+ 雷脊塔远景剪影 + 导雷铜环横跨 + 摆链/风车/瀑布动件 + 风暴魟群与云渊鲸剪影；flashEveryS [7,14] 启用环境闪电（渲染层接线）。调色板 7 色：深渊靛 #16233E / 风暴青 #3D6B8F / 云白 #E9EFF3 / 石灰岩 #97A0AE / 铜绿 #4E9B8F / 熔金电光 #FFC145 / 苔灰绿 #6E8F6B" },
         { "ver": "1.1.0", "date": "2026-11-09", "change": "IBL 门控契约化：env 字段显式声明雷暴配色（sky #CFE4FF/glow #FFC145/ground #16233E，与原 env.ts 硬编码逐字节同值）——行为零变化，只是从 stormspire 专属硬编码迁到 theme 字段（harbor-audit ②-8 门控契约统一）" }
       ]
+    },
+    {
+      "id": "theme_titan", "status": "draft",
+      "name": { "zh-CN": "沉眠泰坦" },
+      "sky": { "shader": "thunder_sky", "baseColor": "#151C2C", "flashColor": "#FFE9B8", "flashEveryS": [9999, 9999] },
+      "fog": { "color": "#46606E", "density": 0.012 },
+      "track": { "railMat": "mat_titan_rail", "groundTiles": ["tile_titan_a"] },
+      "props": [],
+      "scenery": "titan",
+      "groundColor": "#4E4A3E",
+      "lighting": { "hemiSky": "#6B7A8C", "hemiGround": "#1A2030", "hemiIntensity": 0.9, "key": "#C9B896", "keyIntensity": 1.05 },
+      "music": "assets/audio/bgm/run.mp3", "sfxSet": "city",
+      "vfxTint": "#FFB454",
+      "versions": [
+        { "ver": "1.0.0", "date": "2026-11-09", "change": "第五个跑酷场景：沉眠泰坦（Phase A 平面版，docs/scenes/titan-brief.md）。跑在横跨峡谷的巨神尸体脊沟上：尸身仍按 ~10s 周期呼吸（worldBend 远场 + 矩阵梯度近场），脊沟两侧椎棘骨锥列与甲缝亡火金导引纹，胸廓体块/肋拱×12/断剑冢/弑神箭丛/葬仪石环/须发帘摆动/颅首瞳孔 420m 距离闩锁睁眼，渡魂鸦 1 群 30 只穿拱飞行。调色板 7 色：烬空暮蓝 #151C2C / 雾灰青 #46606E / 骨象牙 #D9D2BE / 苍岩肤 #8A8271 / 尸苔绿 #5C7A5E / 铁锈红褐 #8A4A32 / 亡火金 #FFB454（唯一发光色）" }
+      ]
     }
   ]
 }

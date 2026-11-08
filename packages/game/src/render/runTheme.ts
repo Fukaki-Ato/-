@@ -80,14 +80,17 @@ export function deriveRunStage(content: GameContent, opts?: { themeId?: string }
   );
   const KEY_BASE = typeof lig.keyIntensity === 'number' ? lig.keyIntensity : 1.9;
   const keyLight = new THREE.DirectionalLight(new THREE.Color((lig.key as string | undefined) ?? '#fff2d0'), KEY_BASE);
-  /** 闪白（雷电）：背景/雾色的基色与目标色缓存，逐帧按闪白强度插值 */
-  const skyBase = new THREE.Color(sky.baseColor), fogBase = new THREE.Color(fogColor), flashTint = new THREE.Color(FLASH_TINT);
+  /** 闪白（雷电）：背景/雾色的基色与目标色缓存，逐帧按闪白强度插值。
+   *  flashTint 按 scenery 分支（titan-brief §10.0-8）：泰坦的 sky.flashColor #FFE9B8 是「护栏/闪白语义」
+   *  的亡火暖金（ revive 闪、护栏），不是雷暴冷白——titan-brief §10.0-8 矛盾清单的裁决。 */
+  const skyBase = new THREE.Color(sky.baseColor), fogBase = new THREE.Color(fogColor);
+  /** scenery（themes.json）：track/obstacle 层选景 + 雷脊 IBL 环境贴图的门控字段 */
+  const scenery = (theme?.['scenery'] as string | undefined) ?? 'seaside';
+  const flashTint = new THREE.Color(scenery === 'titan' ? '#FFE9B8' : FLASH_TINT);
   /** 环境闪电（theme.sky.flashEveryS=[min,max] 秒区间随机；缺省 [9999,9999]=关闭）：
    *  渲染层定时器，落点在前方 14~34m 随机车道，与玩法判定无关（lightning 同款渲染层随机口径）。 */
   const flashEvery = ((theme?.sky as Record<string, unknown> | undefined)?.['flashEveryS'] as number[] | undefined) ?? [9999, 9999];
   const flashGap = () => Math.max(1, flashEvery[0] ?? 9999) + Math.random() * Math.max(0, (flashEvery[1] ?? 9999) - (flashEvery[0] ?? 9999));
-  /** scenery（themes.json）：track/obstacle 层选景 + 雷脊 IBL 环境贴图的门控字段 */
-  const scenery = (theme?.['scenery'] as string | undefined) ?? 'seaside';
   // M1 门控契约三件：grade（postfx 画面参数）/ features.wetRoad（湿路总闸）/ env（IBL 配色）。
   // 缺省值=雨夜口径常量（postfx.ts 同名）：不配置的主题渲染结果与旧版逐字节一致。
   const g = (theme?.['grade'] ?? {}) as Record<string, number | undefined>;
