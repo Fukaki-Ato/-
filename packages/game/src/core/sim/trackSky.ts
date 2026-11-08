@@ -32,7 +32,7 @@ export function spawnSkyContent(d: SkyLayDeps): void {
     for (const lane of lanes.slice(0, laneCount)) {
       for (let i = 0; i < len; i++) {
         const cz = z + i * spacing;
-        if (cz < d.toZ - 4) d.coins.push({ lane, worldZ: cz, y: d.skyY, chain: id });
+        if (cz < d.toZ - 4) d.coins.push({ lane, worldZ: cz, y: d.skyY, flight: true, chain: id });
       }
     }
     z += len * spacing + d.rng.range(10, 18); // 组间留空档，密度可控

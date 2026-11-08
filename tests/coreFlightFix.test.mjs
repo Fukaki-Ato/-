@@ -107,7 +107,7 @@ test('落地回收空中金币带：着陆后天上金币全部撤走，地面�
   for (const seed of [91001, 92003]) {
     const sim = flyingSim(seed);
     for (let k = 0; k < 40; k++) sim.step(); // 先升到飞行高度（flyWasActive 置位，撤燃料才转滑翔）
-    const isSky = c => c.y != null && c.y > 2;
+    const isSky = c => c.flight === true;
     const skyBefore = sim.coinsArr.filter(isSky).length;
     assert.ok(skyBefore > 0, `seed=${seed} 飞行段应铺有空中金币，实际 ${skyBefore}`);
     sim.buffs.remove('fly'); // 燃料耗尽 → 滑翔 → 落地
