@@ -882,9 +882,10 @@
       "coin": 16,
       "death": 1,
       "hit": 2,
-      "revive": 1
+      "revive": 1,
+      "surge": 1
     },
-    "eventsSha256": "c06565f0096af5454ee8ac3950bdbaa51c7fcf6798181bbf86e3e21793067ea3",
+    "eventsSha256": "102b16b88def23c1bb46d869f884d545f652e2c0fa31a1086818da8a92b61d3e",
     "inputsSha256": "0afbb178e286d03bffa75c41afb1ae623cfd78d13235854b0db91edb4142f5ba"
   }
 }

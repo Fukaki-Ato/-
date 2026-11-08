@@ -21,6 +21,23 @@ const S_OFF = 72;
 
 /** smoothstep 0..1（钳制端点） */
 const ss = (x: number) => { const c = x < 0 ? 0 : x > 1 ? 1 : x; return c * c * (3 - 2 * c); };
+/** step 步长（秒）：与 runnerSim 同频，预警窗换算用 */
+const STEP = 1 / 60;
+
+/**
+ * M4 喷发判定化 step 钩子（runnerSim 每步调用；状态 surgeFired 由调用方持有，本文件其余仍是纯函数）：
+ * 进喷发段（surgeWindow 起沿）一次性 push surge 事件（渲染层接 eruption 喷柱+闪橙）；
+ * 1s 红光预警窗（距下一段起点 ≤ 估速×1.0s）写 s.surgeWarn（HUD 消费）。返回新的 surgeFired。
+ */
+export function applySurgeStep(s: { distance: number; surgeWarn: number }, dm: number,
+  events: { type: string; lane?: number; worldZ?: number }[], surgeFired: boolean): boolean {
+  const inSurge = surgeWindow(s.distance);
+  if (inSurge && !surgeFired) { surgeFired = true; events.push({ type: 'surge', lane: 0, worldZ: s.distance }); }
+  if (!inSurge) surgeFired = false; // 离开喷发段复位（每段一次）
+  const v = Math.max(12, Math.min(26, dm / STEP)), toSurge = surgeStart(s.distance) - s.distance;
+  s.surgeWarn = !inSurge && toSurge > 0 && toSurge <= v * 1.0 ? toSurge / v : 0;
+  return surgeFired;
+}
 
 /** 潮位 0..1：0=低潮驻留（岩浆面在堤道缘下 6.5m）、1=高潮驻留（缘下 0.8m，火星溅路缘） */
 export function level(dist: number): number {

@@ -993,9 +993,10 @@
       "hit": 2,
       "protected": 1,
       "revive": 1,
+      "surge": 1,
       "zap": 1
     },
-    "eventsSha256": "a900b39d8e3e9855f888d8d3f36b9ae78f817126a49cc6a897c4e5a16c1b510a",
+    "eventsSha256": "d444afaa55c3b199d38616d770ae50167117dbe7a018c19a3d41ba45b13889b7",
     "inputsSha256": "5fdb3e2b7f68785468fc7a2d0307e6bbeae3efbc0325d9964e733b22e5252104"
   }
 }

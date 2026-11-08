@@ -919,9 +919,10 @@
       "pickup": 1,
       "protected": 1,
       "revive": 1,
+      "surge": 1,
       "zap": 1
     },
-    "eventsSha256": "620dad8aa182e1b4c659738d0dd12ef7600b8b55615fe46dd49ad9cafec7dba6",
+    "eventsSha256": "15033dca46afe24e1c26b513226494f31b09921c67b0f849d5acfa822889ccc6",
     "inputsSha256": "007e5dc2dda3c60ed09aff263bbb04ce6409ced16e699b9c7c644916e60b43d3"
   }
 }

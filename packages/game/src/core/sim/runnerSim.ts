@@ -1,17 +1,15 @@
 /**
  * 跑酷玩法模拟（core/sim 层，纯逻辑、固定步长、确定性）——docs/01 §2-§9、docs/02 §5、docs/08 §2。
- * 运动/碰撞/拾取/buff/世界/回收各自独立；这里做输入路由、推进与结算。
  * 渲染层只读状态、消费 drainEvents；玩法数值来自 config/*.json。
  */
-import { RunRng } from '../rng.js';
-import { MAX_RANKED_INPUTS, type ReplayInput } from '../leaderboard.js';
+import { RunRng } from '../rng.js'; import { MAX_RANKED_INPUTS, type ReplayInput } from '../leaderboard.js';
 import type { GameContent } from '../config/configTypes.js';
 import { BuffEngine, type BuffView, type CastContext, type FxState } from '../effects/buffEngine.js';
 import { buildLoadout, itemEffects, type EffectSpec, type Loadout } from './character.js';
 import { collectCoins, collectPickups, type CollectDeps } from './collect.js';
 import { hitsRunner, inDepthWindow, isNearMiss, relZ, safestLane } from './collision.js';
 import { clearSkyCoins } from './landing.js';
-import { level } from './tide.js';
+import { applySurgeStep, level } from './tide.js';
 import { Movement } from './movement.js';
 import { parseReviveConfig, tryRevive, type ReviveState } from './revive.js';
 import { resolveHit, type HitCtx } from './resolveHit.js';
@@ -37,6 +35,7 @@ export class RunnerSim {
   readonly pickupsArr: PickupEntity[] = [];
   readonly cloudsArr: CloudEntity[] = [];
   readonly events: SimEvent[] = [];
+  private surgeFired = false; readonly tideAware: boolean; // M4 喷发判定化：tideAware=obstacles.json 有 tideAware 块
   readonly state: RunnerState;
   /** 生命数（game.json runner.lives，默认 1：一撞即出局，新手保护仍生效） */
   readonly lives: number;
@@ -44,8 +43,7 @@ export class RunnerSim {
   readonly loadout: Loadout;
   readonly buffs: BuffEngine;
   /** 金币收集判定面（角色中心前方 coinCollectM 米处触发，取负号用于 z 轴）。
-   *  推导：盒深一半 0.4 + 金币最大半径(含磁铁 1.25 倍放大) 0.43 + 步进余量 ≈ 1.1。
-   *  数值在 game.json runner.coinCollectM，玩家看着仍偏就微调这一格。 */
+   *  推导：盒深一半 0.4 + 金币最大半径(含磁铁 1.25 倍放大) 0.43 + 步进余量 ≈ 1.1。 数值在 game.json runner.coinCollectM，玩家看着仍偏就微调这一格。 */
   private readonly coinFront: number;
   private readonly gen: TrackGen;
   private readonly mv: Movement;
@@ -81,6 +79,7 @@ export class RunnerSim {
   /** 开局注入的道具：购买自动装备→开局消费→server 重放按 run.items_json 同构复现 */
   readonly initialItems: string[];
   constructor(private readonly content: GameContent, seed: number, charId?: string, private readonly recordReplay = false, initialItems?: string[]) {
+    this.tideAware = !!(content.obstacles as unknown as { tideAware?: unknown }).tideAware;
     const p = content.game.params;
     this.R = (p.runner ?? {}) as Record<string, number>;
     this.SC = (p.score ?? {}) as Record<string, number>;
@@ -230,7 +229,8 @@ export class RunnerSim {
     // 飞行/滑翔段允许超过地面 max（2.5 倍巡航），但单步位移仍有绝对上限（FLY_SPEED_CAP）
     const cap = fx.flyT > 0 || s.gliding ? FLY_SPEED_CAP : max;
     const dm = Math.min(raw, cap) * STEP_DT;
-    s.distance += dm; s.tideLevel = level(s.distance); // M4 潮位单源：全主题算（~4 op），潮汐主题消费其余忽略
+    s.distance += dm;
+    if (this.tideAware) this.surgeFired = applySurgeStep(s, dm, this.events, this.surgeFired); else s.surgeWarn = 0; s.tideLevel = level(s.distance); // M4 潮位单源：全主题算（~4 op），潮汐主题消费其余忽略
 
     // 纵向漂移障碍（moveZ<0=向玩家冲来的冲撞体）：推进 worldZ，并把沿途同车道障碍撞开
     for (const o of this.obstacles) {

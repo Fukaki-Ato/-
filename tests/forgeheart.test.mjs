@@ -81,3 +81,21 @@ test('喷发管线：进入喷发段触发全场闪橙尖峰，段外 flash 归�
   assert.equal(idle, 0, '喷发段之外的偶数周期不得有 flash');
   eruption.dispose();
 });
+
+test('喷发判定化：sim 进喷发段一次性 surge 事件 + 1s 预警窗先于事件出现', async () => {
+  const { RunnerSim } = await import('../packages/game/dist/core/sim/runnerSim.js');
+  const { loadContent } = await import('../tools/replay/runner.mjs');
+  const sim = new RunnerSim(loadContent(), 4242, 'char_volt');
+  const seen = [];
+  let maxWarn = 0, warnBeforeSurge = false;
+  for (let i = 0; i < 60 * 20; i++) { // 20s ≈ 250m @12m/s：覆盖首个喷发段 216~252
+    sim.step();
+    for (const ev of sim.drainEvents()) if (ev.type === 'surge') { seen.push({ z: ev.worldZ }); warnBeforeSurge = maxWarn > 0; }
+    maxWarn = Math.max(maxWarn, sim.state.surgeWarn);
+    if (seen.length && sim.state.surgeWarn === 0 && sim.state.distance > 260) break;
+  }
+  assert.equal(seen.length, 1, `喷发段事件应一次性（每段一枚），实得 ${seen.length}`);
+  const z0 = seen[0] ? seen[0].z : -1;
+  assert.ok(z0 >= 216 && z0 <= 252, `事件落点应在喷发窗 216~252，实得 ${z0}`);
+  assert.ok(warnBeforeSurge, 'surge 事件前必须出现过 1s 预警（surgeWarn > 0）');
+});

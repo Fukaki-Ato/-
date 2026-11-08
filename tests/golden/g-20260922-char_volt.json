@@ -894,9 +894,10 @@
       "hit": 2,
       "nearMiss": 1,
       "revive": 1,
+      "surge": 1,
       "zap": 1
     },
-    "eventsSha256": "6d3cdc90965784086e2e399c9f5457409776a29828adc210be18a71daa3fa60b",
+    "eventsSha256": "b1e80c06b3606f50b4d0fbfb2cc9aeea021bd487940d2d83b28455ca365a1fee",
     "inputsSha256": "b9cfae83fe633124d7f40f0317c401408f618cdff9a7ab6ecfad14eb1fa9c191"
   }
 }

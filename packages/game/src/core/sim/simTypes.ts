@@ -39,7 +39,9 @@ export type SimEvent =
   /** zap 带打击位置（lane/worldZ）：渲染层据此把雷电特效画到闪电圈所在车道与深度 */
   | { type: 'zap'; gear: 'shield' | 'board' | 'helmet' | null; lane: number; worldZ: number }
   /** revive：自动复活触发（config revive 段），带本局剩余次数；渲染层可做原地起立特效 */
-  | { type: 'revive'; left: number };
+  | { type: 'revive'; left: number }
+  /** surge（M4 喷发判定化）：进入喷发段一次性事件（lane/worldZ=喷柱落点；渲染层接 eruption 喷柱+闪橙） */
+  | { type: 'surge'; lane: number; worldZ: number };
 
 export interface RunnerState {
   t: number; distance: number; prevDistance: number;
@@ -55,6 +57,8 @@ export interface RunnerState {
   skillCd: number; slideCount: number; casts: number;
   /** 潮位 0..1（M4 潮位单源：sim 每步由 core/sim/tide.level(distance) 更新；非潮汐主题不消费该值） */
   tideLevel: number;
+  /** 喷发预警剩余秒（M4 喷发判定化：进入 1s 红光预警窗时 >0；HUD 提示与红光渐起消费，0=无预警） */
+  surgeWarn: number;
   /** 当前可站立支撑面高度（米，0=地面；>0=列车顶/坡道面）。每帧由 movement 算好后写回：
    *  渲染层据此区分「站在支撑面上跑」与「真正离地」，sim→render 单向数据流 */
   supportY: number;
@@ -77,6 +81,7 @@ export function initialRunnerState(): RunnerState {
     coins: 0, nearMiss: 0, score: 0, gliding: false,
     skillCd: 0, slideCount: 0, casts: 0,
     tideLevel: 0,
+    surgeWarn: 0,
     supportY: 0,
   };
 }

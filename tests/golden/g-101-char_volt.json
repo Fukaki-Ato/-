@@ -886,9 +886,10 @@
       "death": 1,
       "hit": 2,
       "protected": 1,
-      "revive": 1
+      "revive": 1,
+      "surge": 1
     },
-    "eventsSha256": "d1866c5030f8e722fb5488bfeb98e3a30cda2fd4e8e8e2b3679f111e76ca720e",
+    "eventsSha256": "34f8327b1f85a870fb3e3d77996a257cdc406906918b558607d06e9cb9819cf5",
     "inputsSha256": "f580cac72111ae239ac7733600f4503475402f73fc062199085aaa29988f2b9e"
   }
 }
