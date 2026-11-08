@@ -921,21 +921,21 @@
         {
           "segment": 0,
           "lane": 0,
-          "offsetM": 2,
+          "offsetM": 0,
           "obsRef": "obs_mount_step"
         },
         {
           "segment": 0,
           "lane": 0,
-          "offsetM": 14,
+          "offsetM": 15,
           "obsRef": "obs_train_slow"
         },
         {
           "segment": 0,
           "lane": 0,
-          "offsetM": 15,
-          "coins": 8,
-          "surface": "trainTop"
+          "offsetM": 6,
+          "surface": "trainTop",
+          "coins": 6
         },
         {
           "segment": 0,
@@ -946,13 +946,13 @@
         {
           "segment": 1,
           "lane": 0,
-          "offsetM": 6,
+          "offsetM": 16,
           "obsRef": "obs_gate_low"
         },
         {
           "segment": 1,
           "lane": -1,
-          "offsetM": 14,
+          "offsetM": 22,
           "obsRef": "obs_box"
         },
         {

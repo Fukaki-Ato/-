@@ -23,8 +23,9 @@ function validateMissionConfig(missions) {
     throw new Error('economy.json missions must define daily pick 3 and weekly pick 4');
   }
   for (const tier of ['easy', 'mid', 'hard']) {
-    if (!daily.pool.some(mission => mission.tier === tier)) throw new Error(`daily missions has no ${tier} mission`);
+    if (!daily.pool.some(mission => mission.tier === tier && mission.metric !== 'cleanRuns')) throw new Error(`daily missions has no ${tier} mission`);
   }
+  if (weekly.pool.some(mission => mission.metric === 'cleanRuns')) throw new Error('weekly cleanRuns missions cannot be completed');
   for (const [period, pool] of [['daily', daily.pool], ['weekly', weekly.pool]]) {
     const ids = new Set();
     for (const mission of pool) {
@@ -61,7 +62,7 @@ function stableIndex(userId, periodId, tier, count) {
 function selectedMissions(userId, period, periodId, config) {
   if (period === 'weekly') return config.weekly.pool.map(mission => ({ ...mission, reward: { ...mission.reward } }));
   return ['easy', 'mid', 'hard'].map(tier => {
-    const candidates = config.daily.pool.filter(mission => mission.tier === tier);
+    const candidates = config.daily.pool.filter(mission => mission.tier === tier && mission.metric !== 'cleanRuns');
     return { ...candidates[stableIndex(userId, periodId, tier, candidates.length)], reward: { ...candidates[stableIndex(userId, periodId, tier, candidates.length)].reward } };
   });
 }
@@ -111,7 +112,30 @@ export class MissionService {
 
   ensurePeriod(userId, period, periodId) {
     const config = this.content.economy.params.missions;
-    return this.store.ensurePeriod(userId, period, periodId, selectedMissions(userId, period, periodId, config));
+    const selected = selectedMissions(userId, period, periodId, config);
+    let current = this.store.ensurePeriod(userId, period, periodId, selected);
+    // 只迁移未领取的旧任务，保留其 ID/奖励；新指标不能继承旧指标进度。
+    // 比较交换兼容 claim 的外层事务，也不会覆盖其他连接刚保存的进度。
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const progress = { ...current.progress };
+      let changed = false;
+      const definitions = current.definitions.map(definition => {
+        if (definition.metric !== 'cleanRuns' || current.claimed[definition.id] === true
+          || Number(current.progress[definition.id] ?? 0) >= definition.target) return definition;
+        const replacement = selected.find(mission => mission.tier === definition.tier);
+        if (!replacement) throw new Error('no achievable replacement for legacy cleanRuns mission');
+        changed = true;
+        progress[definition.id] = 0;
+        return { ...definition, metric: replacement.metric, type: replacement.type, target: replacement.target,
+          title: replacement.title ?? TITLES[replacement.id] ?? replacement.id };
+      });
+      if (!changed) return current;
+      if (this.store.replacePeriod(userId, period, periodId, current, definitions, progress)) {
+        return { ...current, definitions, progress };
+      }
+      current = this.store.getPeriod(userId, period, periodId);
+    }
+    throw new ApiError(409, '任务状态正在更新，请稍后重试');
   }
 
   snapshot(userId) {
@@ -219,8 +243,12 @@ export class MissionService {
       if (!latest || latest.status !== 'open') throw new ApiError(409, '跑酷记录已被处理');
       if (validRun) {
         const current = getMissionPeriods(finishedAt);
-        if (run.daily_id === current.daily.periodId) updatePeriodProgress(this.store, userId, 'daily', current.daily.periodId, metrics);
+        if (run.daily_id === current.daily.periodId) {
+          this.ensurePeriod(userId, 'daily', current.daily.periodId);
+          updatePeriodProgress(this.store, userId, 'daily', current.daily.periodId, metrics);
+        }
         if (run.weekly_id === current.weekly.periodId) {
+          this.ensurePeriod(userId, 'weekly', current.weekly.periodId);
           const playedCount = replay.summary.charId ? this.store.addWeeklyCharacter(userId, current.weekly.periodId, replay.summary.charId) : 0;
           updatePeriodProgress(this.store, userId, 'weekly', current.weekly.periodId, metrics, playedCount);
         }

@@ -593,3 +593,41 @@ test('高难连段：新 combo 模板进高难池；简单 AI 在 by8+ 可存活
   );
   assert.ok(wz.alive && wz.revives === 0 && wz.dist > 2490, `wall_zap 可解且不耗复活（${JSON.stringify(wz)}）`);
 });
+
+// ---------------- 14. 登车斜坡 + 车顶金币高度回归（用户实测反馈 2026-11-08） ----------------
+
+test('登车修复：真实配置经 TrackGen 生成后可登车、收币、落车滑闸', () => {
+  for (const speed of [12, 16.32, 20, 26]) for (const phase of [0, 0.07, 0.19]) {
+    const solo = structuredClone(content);
+    delete solo.game.params.revive;
+    delete solo.obstacles.zap;
+    Object.assign(solo.game.params.runner, { baseSpeed: speed, maxSpeed: speed, speedRampPer100M: 0 });
+    const pattern = solo.obstacles.patterns.find(p => p.id === 'pat_combo_train_dismount');
+    const sim = new RunnerSim(solo, 4242, 'char_volt');
+    sim.state.t = 20;
+    sim.state.distance = 2400 + phase;
+    sim.gen.genZ = 2420;
+    // 只固定抽中的模板，不复制模板坐标；仍使用生产生成器的限长与反向清币逻辑。
+    sim.gen.pickPattern = () => pattern;
+    sim.gen.ensure(2400, 40, sim.obstacles, sim.coinsArr, sim.pickupsArr);
+    sim.gen.genZ = 10000;
+    const train = sim.obstacles.find(o => o.obsRef === 'obs_train_slow');
+    const gate = sim.obstacles.find(o => o.obsRef === 'obs_gate_low');
+    const topCoins = sim.coinsArr.filter(c => (c.y ?? 0) > 0);
+    assert.ok(topCoins.length >= Math.min(...solo.game.params.coins.chainBuckets.map(b => b.min)), '真实模板必须生成可拾取的车顶币');
+    for (const coin of topCoins) assert.equal(coin.y, train.h + 0.65);
+    let maxY = 0;
+    for (let f = 0; f < 1200 && sim.state.alive && sim.state.distance < gate.worldZ + 20; f++) {
+      const gap = gate.worldZ - sim.state.distance;
+      if (gap < 4.5 && gap > 0 && sim.state.y <= 0.1 && !sim.state.sliding) sim.applyAction('slide');
+      sim.step();
+      sim.drainEvents();
+      maxY = Math.max(maxY, sim.state.y);
+    }
+    const context = `speed=${speed}, phase=${phase}`;
+    assert.ok(sim.state.alive && sim.state.distance > gate.worldZ + 19, context);
+    assert.equal(sim.state.revivesUsed, 0, context);
+    assert.equal(maxY, train.h, context);
+    assert.ok(topCoins.every(c => c.taken), `全部车顶币可收取：${context}`);
+  }
+});

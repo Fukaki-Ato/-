@@ -84,14 +84,14 @@ export function layCoinChains(d: CoinLayDeps): void {
 
 /**
  * 模板教学金币线（docs/01「金币即教学」的 config 直给面）：pattern cells 带 coins 的格子逐枚铺设。
- * surface:'trainTop' → 骑在 rideTop 载具顶面（y=载具 h）；普通线 y 缺省=地面。
+ * surface:'trainTop' → 骑在 rideTop 载具顶面（y=载具 h + 0.65）；普通线 y 缺省=地面。
  * 链长守 chainBuckets 区间 + maxSpanM 跳跃净空；同车道与障碍深度重叠的枚跳过（防御）。
  */
 export function layTeachingLines(d: {
   cells: { coins?: number; obsRef?: string; lane: number; segment: number; offsetM: number; surface?: string }[];
   genZ: number; segLen: number; coinSpacing: number;
   chainBuckets: { min: number; max: number }[];
-  obstacles: { lane: number; done?: boolean; worldZ: number; d: number; rideTop?: boolean; h?: number }[];
+  obstacles: { lane: number; done?: boolean; worldZ: number; d: number; rideTop?: boolean; h: number }[];
   coins: CoinEntity[];
   maxSpanM: number;
   seq: () => number;
@@ -110,7 +110,8 @@ export function layTeachingLines(d: {
         ? d.obstacles.find(o => o.rideTop === true && o.lane === cell.lane && Math.abs(z - o.worldZ) <= o.d / 2 + 0.6)
         : undefined;
       if (!carrier && d.obstacles.some(o => o.lane === cell.lane && !o.done && Math.abs(z - o.worldZ) < o.d / 2 + 0.5)) continue;
-      d.coins.push({ lane: cell.lane, worldZ: z, chain, ...(carrier ? { y: carrier.h } : {}) });
+      // 悬停高度与地面金币同口径（地面币 y=0.65 = 高出地面 0.65）：车顶币 = 载具顶面 + 0.65，不然半埋进车顶
+      d.coins.push({ lane: cell.lane, worldZ: z, chain, ...(carrier ? { y: carrier.h + 0.65 } : {}) });
     }
   }
 }

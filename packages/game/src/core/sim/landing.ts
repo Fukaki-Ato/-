@@ -12,21 +12,17 @@
 import type { CoinEntity } from './trackGen.js';
 import type { RunnerState } from './simTypes.js';
 
-/** 空中金币带的最低高度（米）：高于此值的金币视为飞行段内容，着陆时回收 */
-const SKY_COIN_MIN_Y = 2;
-
 /** 落地帧不做任何保护动作（不清障/不无敌/不缓速）：保留为钩子供后续策略扩展 */
 export function applyLandingSafety(_s: RunnerState, _landed: boolean): void { /* 无操作 */ }
 
 /**
  * 着陆回收空中金币带（用户反馈：用飞行背包回到地面后，天上的金币应消失）。
- * 判定：coin.y 高于 SKY_COIN_MIN_Y 的即飞行段铺的空带（地面链 y=0.65，见 trackSky）。
+ * 按 trackSky 写入的来源标记清理；高度不是来源，车顶币和技能奖励币必须保留。
  * swap-pop 摘除、不播吸入动画：落地即整套撤走，不再有悬在空中的地面关卡币。
  */
 export function clearSkyCoins(coins: CoinEntity[]): void {
   for (let i = coins.length - 1; i >= 0; i--) {
-    const y = coins[i]!.y;
-    if (y != null && y > SKY_COIN_MIN_Y) {
+    if (coins[i]!.flight === true) {
       coins[i] = coins[coins.length - 1]!;
       coins.pop();
     }
