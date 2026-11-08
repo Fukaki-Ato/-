@@ -10,10 +10,11 @@ import { collectCoins, collectPickups, type CollectDeps } from './collect.js';
 import { hitsRunner, inDepthWindow, isNearMiss, relZ, safestLane } from './collision.js';
 import { clearSkyCoins } from './landing.js';
 import { applySurgeStep, level } from './tide.js';
+import { CROSSING_DEFAULTS, cullCrossings, stepCrossings } from './crossings.js';
 import { Movement } from './movement.js';
 import { parseReviveConfig, tryRevive, type ReviveState } from './revive.js';
 import { resolveHit, type HitCtx } from './resolveHit.js';
-import { TrackGen, type CloudEntity, type CoinEntity, type ObstacleEntity, type PickupEntity } from './trackGen.js';
+import { TrackGen, type CloudEntity, type CoinEntity, type CrossingEntity, type ObstacleEntity, type PickupEntity } from './trackGen.js';
 import { createSimWorld } from './simWorld.js';
 import { FirstCoinRecord, scoreForState } from './firstCoinRecord.js';
 import { cullByWorldZ, cullObstacles, smashAhead } from './entitySweep.js';
@@ -34,6 +35,7 @@ export class RunnerSim {
   readonly coinsArr: CoinEntity[] = [];
   readonly pickupsArr: PickupEntity[] = [];
   readonly cloudsArr: CloudEntity[] = [];
+  readonly crossings: CrossingEntity[] = []; // M4 穿越判定体（crossings 配置出生，cross 事件计分）
   readonly events: SimEvent[] = [];
   private surgeFired = false; readonly tideAware: boolean; // M4 喷发判定化：tideAware=obstacles.json 有 tideAware 块
   readonly state: RunnerState;
@@ -230,7 +232,10 @@ export class RunnerSim {
     const cap = fx.flyT > 0 || s.gliding ? FLY_SPEED_CAP : max;
     const dm = Math.min(raw, cap) * STEP_DT;
     s.distance += dm;
-    if (this.tideAware) this.surgeFired = applySurgeStep(s, dm, this.events, this.surgeFired); else s.surgeWarn = 0; s.tideLevel = level(s.distance); // M4 潮位单源：全主题算（~4 op），潮汐主题消费其余忽略
+    if (this.tideAware) this.surgeFired = applySurgeStep(s, dm, this.events, this.surgeFired); else s.surgeWarn = 0;
+    // M4 穿越判定层：深度窗+高度带一次性判定（playerY=s.y），命中加分并推 cross 事件（渲染层爆点）
+    s.score += stepCrossings(this.crossings, s.distance, s.y, CROSSING_DEFAULTS, this.events) * CROSSING_DEFAULTS.scorePer;
+    cullCrossings(this.crossings, s.distance, CULL_BEHIND_M); s.tideLevel = level(s.distance); // M4 潮位单源：全主题算（~4 op），潮汐主题消费其余忽略
 
     // 纵向漂移障碍（moveZ<0=向玩家冲来的冲撞体）：推进 worldZ，并把沿途同车道障碍撞开
     for (const o of this.obstacles) {
@@ -244,7 +249,7 @@ export class RunnerSim {
     this.mv.advanceVertical(s, fx, STEP_DT);
     if (this.mv.landedThisStep) clearSkyCoins(this.coinsArr); // 着陆回收空中金币带（用户反馈：回地面后天上的金币应消失）
 
-    this.gen.ensure(s.distance, GEN_AHEAD_M, this.obstacles, this.coinsArr, this.pickupsArr);
+    this.gen.ensure(s.distance, GEN_AHEAD_M, this.obstacles, this.coinsArr, this.pickupsArr, this.crossings);
     this.collide();
     if (s.alive) {
       collectCoins(this.collectDeps);

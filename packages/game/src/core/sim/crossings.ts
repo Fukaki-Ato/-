@@ -69,3 +69,14 @@ export function cullCrossings(list: CrossingEntity[], dist: number, cullBehindM:
     } else i++;
   }
 }
+
+/** trackGen 出生钩子：[from, target) 区间按 everyM 均匀插 ring，返回新的 nextZ（调用方持有游标） */
+export function spawnRings(list: CrossingEntity[], target: number, nextZ: number,
+  everyM: number, fromM: number, yMin: number, yMax: number): number {
+  let z = Math.max(nextZ, fromM);
+  while (z < target) {
+    insertCrossing(list, { kind: 'ring', lane: 0, worldZ: z, yMin, yMax });
+    z += everyM;
+  }
+  return Math.max(z, fromM);
+}

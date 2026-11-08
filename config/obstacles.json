@@ -1280,6 +1280,9 @@
     "lowMax": 0.15,
     "coinCount": 6
   },
+  "crossings": {
+    "ring": { "everyM": 100, "fromM": 150, "yMin": 0, "yMax": 3 }
+  },
   "zap": {
     "ref": "obs_lightning_circle",
     "everyM": 200,

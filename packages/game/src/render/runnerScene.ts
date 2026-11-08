@@ -167,6 +167,7 @@ export function createRunnerScene(
         lightning.strike(ev.lane, ev.worldZ, laneWidth); // MC 式雷电：天→落点 + 全场闪白
         if (eruption) eruption.strike(ev.lane, ev.worldZ, laneWidth); // forgeheart：zap 继承喷柱+闪橙视觉
       } else if (ev.type === 'surge') { if (eruption) eruption.strike(ev.lane, ev.worldZ, laneWidth); } // M4 喷发判定化
+        else if (ev.type === 'cross') { fireAtPlayer(0xffb454); shakeT = 0.1; } // M4 穿越判定：走位奖励爆点（泰坦亡火金色系）
       // pickup：按用户要求不加特效与震动，仅 HUD 显示 buff 倒计时（只回调音频）
       else if (ev.type === 'pickup') cb.onPickup?.();
     }

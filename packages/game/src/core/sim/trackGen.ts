@@ -15,6 +15,8 @@ import { layCoinChains, layTeachingLines, purgeOverlappedCoins } from './trackCo
 import { spawnSkyContent } from './trackSky.js';
 import { coinJumpSpan } from './coinJumpSpan.js';
 import { level as tideLevel } from './tide.js';
+import { spawnRings, type CrossingEntity } from './crossings.js';
+export type { CrossingEntity };
 
 export interface ObstacleEntity {
   obsRef: string;
@@ -66,7 +68,12 @@ export class TrackGen {
   private readonly pickupMinGapM: number;
   private readonly blockFromDiff: number;          // 封路概率规则生效的难度档
   private readonly blockWeights: Record<number, number>; // 封堵 1/2 条道的权重       // 同段两箱最小间隔
-  private readonly tideAware?: { lowMax: number; coinCount: number }; // M4 潮汐感知放置（方案 A）：低潮窗渣滩金币线，未配置=零变化
+  private readonly tideAware?: { lowMax: number; coinCount: number };
+  /** M4 穿越判定层出生规则（crossings 配置块；缺省无=不出生，全主题零变化） */
+  private readonly crossingEveryM: number;
+  private readonly crossingFromM: number;
+  private readonly crossingY: [number, number];
+  private nextCrossZ = Infinity; // M4 穿越判定体出生游标（crossings 配置；未配置=Infinity 不出生）
   /** 闪电圈生成规则（obstacles.json zap 段）：引用 def / 间隔米 / 下一枚 z */
   private readonly zapRef: string;
   private readonly zapEveryM: number;
@@ -106,6 +113,11 @@ export class TrackGen {
     this.blockWeights = { 1: lb?.weights?.['1'] ?? 80, 2: lb?.weights?.['2'] ?? 20 };
     const ta = (content.obstacles as unknown as { tideAware?: { lowMax?: number; coinCount?: number } }).tideAware;
     this.tideAware = ta && typeof ta.lowMax === 'number' && typeof ta.coinCount === 'number' ? { lowMax: ta.lowMax, coinCount: ta.coinCount } : undefined;
+    const cr = (content.obstacles as unknown as { crossings?: { ring?: { everyM?: number; fromM?: number; yMin?: number; yMax?: number } } }).crossings?.ring;
+    this.crossingEveryM = typeof cr?.everyM === 'number' && cr.everyM > 0 ? cr.everyM : Infinity;
+    this.crossingFromM = typeof cr?.fromM === 'number' ? cr.fromM : 0;
+    this.crossingY = [cr?.yMin ?? 0, cr?.yMax ?? 3];
+    this.nextCrossZ = this.crossingFromM;
     const zapRaw = (ob as unknown as { zap?: { ref?: unknown; everyM?: unknown; fromM?: unknown } }).zap;
     this.zapRef = typeof zapRaw?.ref === 'string' ? zapRaw.ref : '';
     this.zapEveryM = typeof zapRaw?.everyM === 'number' && zapRaw.everyM > 0 ? zapRaw.everyM : 0;
@@ -129,8 +141,9 @@ export class TrackGen {
   }
 
   /** 保证赛道铺到 distance + aheadM；新障碍/金币/道具箱追加进传入数组（sim 持有所有权） */
-  ensure(distance: number, aheadM: number, obstacles: ObstacleEntity[], coins: CoinEntity[], pickups: PickupEntity[] = []) {
+  ensure(distance: number, aheadM: number, obstacles: ObstacleEntity[], coins: CoinEntity[], pickups: PickupEntity[] = [], crossings: CrossingEntity[] = []) {
     const target = distance + aheadM;
+    this.nextCrossZ = spawnRings(crossings, target, this.nextCrossZ, this.crossingEveryM, this.crossingFromM, this.crossingY[0], this.crossingY[1]);
     while (this.genZ < target) {
       const pat = this.pickPattern(this.difficulty(this.genZ));
       const patStart = obstacles.length; // 记录本轮新障碍起点（金币反向清理用）
