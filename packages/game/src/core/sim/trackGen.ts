@@ -1,12 +1,8 @@
 /**
- * 赛道程序化生成器（core/sim 层，纯逻辑、确定性）
- * 对应文档：docs/01 §4（赛道与障碍）、docs/09 T1.3。
- * 规则：
- *   1. 以 obstacles.json 的布局模板(pattern)为单位向前拼接，难度随距离升档；
- *   2. 金币链铺在模板声明的安全线上（docs/01：金币即教学）；
- *   3. 所有随机来自注入的 RunRng（同 seed 必同赛道，支撑每日挑战/回放校验）。
- * 坐标约定：entity.worldZ = 生成时固定在「前方多少米」；
- *          渲染/判定时 rel = distance - worldZ（负=还在前方，0=到达角色面，正=已掠过）。
+ * 赛道程序化生成器（core/sim 层，纯逻辑、确定性） 对应文档：docs/01 §4（赛道与障碍）、docs/09 T1.3。
+ * 规则： 1. 以 obstacles.json 的布局模板(pattern)为单位向前拼接，难度随距离升档；
+ *   2. 金币链铺在模板声明的安全线上（docs/01：金币即教学）； 3. 所有随机来自注入的 RunRng（同 seed 必同赛道，支撑每日挑战/回放校验）。
+ * 坐标约定：entity.worldZ = 生成时固定在「前方多少米」； 渲染/判定时 rel = distance - worldZ（负=还在前方，0=到达角色面，正=已掠过）。
  */
 import type { RunRng } from '../rng.js';
 import type { GameContent, NamedEntry } from '../config/configTypes.js';
@@ -14,7 +10,7 @@ import { BLOCKING_CLASSES, buildObstacleEntity, type SwingSpec } from './trackDe
 import { layCoinChains, layTeachingLines, purgeOverlappedCoins } from './trackCoins.js';
 import { spawnSkyContent } from './trackSky.js';
 import { coinJumpSpan } from './coinJumpSpan.js';
-import { level as tideLevel } from './tide.js';
+import { layTideCoins, type TideAwareCfg } from './tide.js';
 import { spawnRings, type CrossingEntity } from './crossings.js';
 export type { CrossingEntity };
 
@@ -68,12 +64,12 @@ export class TrackGen {
   private readonly pickupMinGapM: number;
   private readonly blockFromDiff: number;          // 封路概率规则生效的难度档
   private readonly blockWeights: Record<number, number>; // 封堵 1/2 条道的权重       // 同段两箱最小间隔
-  private readonly tideAware?: { lowMax: number; coinCount: number };
   /** M4 穿越判定层出生规则（crossings 配置块；缺省无=不出生，全主题零变化） */
   private readonly crossingEveryM: number;
   private readonly crossingFromM: number;
   private readonly crossingY: [number, number];
   private nextCrossZ = Infinity; // M4 穿越判定体出生游标（crossings 配置；未配置=Infinity 不出生）
+  private readonly tideAware?: TideAwareCfg; // M4 潮汐感知门控（缺省无=零变化）
   /** 闪电圈生成规则（obstacles.json zap 段）：引用 def / 间隔米 / 下一枚 z */
   private readonly zapRef: string;
   private readonly zapEveryM: number;
@@ -111,12 +107,12 @@ export class TrackGen {
     const lb = (content.obstacles as unknown as { laneBlock?: { fromDifficulty?: number; weights?: Record<string, number> } }).laneBlock;
     this.blockFromDiff = lb?.fromDifficulty ?? 3;
     this.blockWeights = { 1: lb?.weights?.['1'] ?? 80, 2: lb?.weights?.['2'] ?? 20 };
-    const ta = (content.obstacles as unknown as { tideAware?: { lowMax?: number; coinCount?: number } }).tideAware;
-    this.tideAware = ta && typeof ta.lowMax === 'number' && typeof ta.coinCount === 'number' ? { lowMax: ta.lowMax, coinCount: ta.coinCount } : undefined;
     const cr = (content.obstacles as unknown as { crossings?: { ring?: { everyM?: number; fromM?: number; yMin?: number; yMax?: number } } }).crossings?.ring;
     this.crossingEveryM = typeof cr?.everyM === 'number' && cr.everyM > 0 ? cr.everyM : Infinity;
     this.crossingFromM = typeof cr?.fromM === 'number' ? cr.fromM : 0;
     this.crossingY = [cr?.yMin ?? 0, cr?.yMax ?? 3];
+    const ta = (content.obstacles as unknown as { tideAware?: TideAwareCfg }).tideAware;
+    this.tideAware = ta && typeof ta.lowMax === 'number' && typeof ta.coinCount === 'number' ? ta : undefined;
     this.nextCrossZ = this.crossingFromM;
     const zapRaw = (ob as unknown as { zap?: { ref?: unknown; everyM?: unknown; fromM?: unknown } }).zap;
     this.zapRef = typeof zapRaw?.ref === 'string' ? zapRaw.ref : '';
@@ -127,10 +123,8 @@ export class TrackGen {
   difficulty(z: number): number { return Math.floor(z / 300); }
 
   /**
-   * 铺设空中内容（飞行器触发/续时）：在 [fromZ,toZ] 生成悬浮在飞行高度的金币带（本组车道数
-   * 按地面同款 laneGroupWeights 抽 1/2/3 道，不再条条铺满三条路——用户反馈）与随机分布的云团。
-   * 地面内容（障碍/地面金币/道具箱）不受影响、照常生成——飞行只是从上方掠过，
-   * 玩家要求「天上也能看到地面障碍」；着陆安全由滑翔段的动态清道保证。
+   * 铺设空中内容（飞行器触发/续时）：在 [fromZ,toZ] 生成悬浮在飞行高度的金币带（本组车道数 按地面同款 laneGroupWeights 抽 1/2/3 道，不再条条铺满三条路——用户反馈）与随机分布的云团。
+   * 地面内容（障碍/地面金币/道具箱）不受影响、照常生成——飞行只是从上方掠过， 玩家要求「天上也能看到地面障碍」；着陆安全由滑翔段的动态清道保证。
    */
   spawnSky(fromZ: number, toZ: number, skyY: number, coins: CoinEntity[], clouds: CloudEntity[]) {
     spawnSkyContent({
@@ -173,14 +167,8 @@ export class TrackGen {
         spacing: this.coinSpacing, laneGapM: this.laneGapM, lastCoinZ: this.lastCoinZ, maxSpanM,
         seq: () => ++this.chainSeq,
       });
-      // M4 潮汐感知放置（方案 A）：出生即预判到达潮相——低潮窗安全道追加渣滩金币线（未配置=零变化）；链三纪律全守
-      const ta = this.tideAware;
-      if (ta && tideLevel(this.genZ) <= ta.lowMax && tideLevel(this.genZ + pat.lengthSegments * this.segLen) <= ta.lowMax) {
-        const span = Math.min(pat.lengthSegments * this.segLen, maxSpanM * 0.9),
-          n = Math.min(ta.coinCount, Math.floor(span / this.coinSpacing));
-        const lineSeq = ++this.chainSeq;
-        for (let k = 0; k < n; k++) coins.push({ lane: safeLane, worldZ: this.genZ + (k + 1) * this.coinSpacing, y: 0.65, chain: lineSeq });
-      }
+      layTideCoins(this.tideAware, coins, safeLane, this.genZ, this.genZ + pat.lengthSegments * this.segLen,
+        this.coinSpacing, Math.min(pat.lengthSegments * this.segLen, maxSpanM * 0.9), () => ++this.chainSeq);
       // 兜底反向清理（理论上不触发：链不跨窗；防御未来模板长度参数改小）。
       // 只扫本窗口新铺的地面金币：天空金币带（spawnSky）与奖励金币排（simWorld 的
       // coinChainSeq 独立计数）都不在此区间，按 id 全数组删会误删无辜链（审查 P0-1）。
@@ -233,8 +221,7 @@ export class TrackGen {
   }
 
   /** 当前难度档可用模板池按权重抽一；高难度段（by ≥ laneBlock.fromDifficulty）
-   *  再按「同时封堵车道数」（仅 full/vehicle/moving）二次过滤：默认 1 道 80% / 2 道 20%，
-   *  3 道封堵永不出现；池内有 ≥2 个可选时排除上一个抽中的模板，避免连续同模板导致体感单一化。
+   *  再按「同时封堵车道数」（仅 full/vehicle/moving）二次过滤：默认 1 道 80% / 2 道 20%， 3 道封堵永不出现；池内有 ≥2 个可选时排除上一个抽中的模板，避免连续同模板导致体感单一化。
    *  public：供测试与 M5 可解性求解器复用 */
   pickPattern(d: number): Pattern {
     let band = this.curve[0];

@@ -65,3 +65,17 @@ export function surgeStart(dist: number): number {
   if (odd && u < U_FALL) return k * P + S_OFF;   // 本周期喷发段（未到或正在其中）
   return (odd ? k + 2 : k + 1) * P + S_OFF;      // 已过则下下个 / 下一个奇数周期
 }
+
+/** 潮汐感知门控配置（obstacles.json tideAware 块） */
+export interface TideAwareCfg { lowMax: number; coinCount: number }
+
+/** M4 潮汐感知放置（矛盾 1 方案 A）：到达潮位全程低潮（level ≤ ta.lowMax）时，安全道追加渣滩金币线。
+ *  链三纪律全守：同链号（长度落 chainBuckets）/ 跨度 ≤ 跳跃净空 span / 间距恰 = coinSpacing。 */
+export function layTideCoins(ta: { lowMax: number; coinCount: number } | undefined, coins: { lane: number; worldZ: number; y?: number; chain?: number }[],
+  safeLane: number, winStart: number, winEnd: number, coinSpacing: number, span: number, seq: () => number): number {
+  if (!ta || !(level(winStart) <= ta.lowMax && level(winEnd) <= ta.lowMax)) return 0;
+  const n = Math.min(ta.coinCount, Math.floor(span / coinSpacing));
+  const chain = seq();
+  for (let k = 0; k < n; k++) coins.push({ lane: safeLane, worldZ: winStart + (k + 1) * coinSpacing, y: 0.65, chain });
+  return n;
+}

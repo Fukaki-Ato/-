@@ -1,5 +1,4 @@
 /**
- * 跑酷玩法模拟（core/sim 层，纯逻辑、固定步长、确定性）——docs/01 §2-§9、docs/02 §5、docs/08 §2。
  * 渲染层只读状态、消费 drainEvents；玩法数值来自 config/*.json。
  */
 import { RunRng } from '../rng.js'; import { MAX_RANKED_INPUTS, type ReplayInput } from '../leaderboard.js';
@@ -62,11 +61,9 @@ export class RunnerSim {
   private revive: ReviveState = { left: 0, invincibleS: 3 };
   /** 命中结算上下文（resolveHit 用；构造一次复用，教程保护消耗标志在闭包里） */
   private readonly hitCtx: HitCtx;
-  /** 金币收益的小数累计（coinValueAdd 的 +5% / ×2 靠它凑整，不逐枚四舍五入） */
   private coinCarry = 0;
   /** 传给 buff 引擎的可复用上下文（里程/车道）：每步就地改写，避免热路径分配 */
   private readonly buffCtx: CastContext = { distance: 0, lane: 0 };
-  /** scoreAdd 原语与技能释放奖励的额外分 */
   private bonusScore = 0;
   private itemPickups = 0;
   /** 任务遥测不改变历史 summary / golden 回放结构。 */
@@ -128,10 +125,8 @@ export class RunnerSim {
   /** buff 派生视图（渲染/HUD/测试统一从这里读，任何地方不得写） */
   get fx(): FxState { return this.buffs.fx; }
 
-  /** HUD 用的 buff 列表（名称来自配置，含剩余秒数） */
   buffList(): BuffView[] { return this.buffs.list(this.hudBuffs); }
 
-  /** 取走并清空事件（渲染/音效每帧调用） */
   drainEvents(): SimEvent[] {
     if (!this.events.length) return this.events;
     const out = this.events.slice();
