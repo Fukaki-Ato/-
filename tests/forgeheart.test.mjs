@@ -99,3 +99,25 @@ test('喷发判定化：sim 进喷发段一次性 surge 事件 + 1s 预警窗先
   assert.ok(z0 >= 216 && z0 <= 252, `事件落点应在喷发窗 216~252，实得 ${z0}`);
   assert.ok(warnBeforeSurge, 'surge 事件前必须出现过 1s 预警（surgeWarn > 0）');
 });
+
+test('穿越判定层：深度窗+高度带一次性判定，错过不计分，事件进管线', async () => {
+  const { insertCrossing, stepCrossings, CROSSING_DEFAULTS } = await import('../packages/game/dist/core/sim/crossings.js');
+  const list = [];
+  insertCrossing(list, { kind: 'ring', lane: 0, worldZ: 100, yMin: 0, yMax: 3, });
+  insertCrossing(list, { kind: 'rib', lane: 0, worldZ: 103, yMin: 0, yMax: 2.2 }); // 升序插入校验
+  const events = [];
+  // 玩家 y=1（带内）：先到 103（rib 先判——升序列表先 rib？不对：100 在前）→ 依次穿越两个
+  let hits = 0;
+  for (const d of [99, 100.5, 103.5]) hits += stepCrossings(list, d, 1, CROSSING_DEFAULTS, events);
+  assert.equal(hits, 2, '两个穿越体都在高度带内 ⇒ 各计一次');
+  assert.equal(list[0].done && list[1].done, true, '全部置 done（一次性）');
+  assert.equal(events.filter(e => e.type === 'cross').length, 2, 'cross 事件进管线');
+  assert.equal(events[0].kind, 'ring', '事件带 kind');
+  // 玩家 y=5（带外）：穿越体不再重复计分；新体带外穿越不计数
+  insertCrossing(list, { kind: 'ring', lane: 0, worldZ: 106, yMin: 0, yMax: 3 });
+  assert.equal(stepCrossings(list, 106, 5, CROSSING_DEFAULTS, events), 0, '高度带外穿越不计分');
+  // 错过：跑到身后 ⇒ done 但不计分
+  insertCrossing(list, { kind: 'ring', lane: 0, worldZ: 110, yMin: 0, yMax: 3 });
+  assert.equal(stepCrossings(list, 130, 1, CROSSING_DEFAULTS, events), 0, '错过的穿越体不补计');
+  assert.equal(list[2].done, true, '错过也置 done（一次性语义）');
+});

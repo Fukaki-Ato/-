@@ -41,7 +41,8 @@ export type SimEvent =
   /** revive：自动复活触发（config revive 段），带本局剩余次数；渲染层可做原地起立特效 */
   | { type: 'revive'; left: number }
   /** surge（M4 喷发判定化）：进入喷发段一次性事件（lane/worldZ=喷柱落点；渲染层接 eruption 喷柱+闪橙） */
-  | { type: 'surge'; lane: number; worldZ: number };
+  | { type: 'surge'; lane: number; worldZ: number }
+  | { type: 'cross'; kind: string; lane: number; worldZ: number };
 
 export interface RunnerState {
   t: number; distance: number; prevDistance: number;
