@@ -13,6 +13,7 @@
       "props": [],
       "scenery": "coast",
       "groundColor": "#F0C67A",
+      "grade": { "vignette": 0.12, "grain": 0, "bloom": 0.22, "vignetteBoost": 0.07, "saturationBoost": 0.07, "bloomBoost": 0.09 },
       "music": "assets/audio/bgm/run.mp3", "sfxSet": "city",
       "vfxTint": "#FFF0C8",
       "versions": [
@@ -20,25 +21,28 @@
         { "ver": "2.0.0", "date": "2026-09-29", "change": "替换为白天海滨主题：删除霓虹下城与风暴上层，新增晴天天空/淡雾/暖沙地面配色" },
         { "ver": "2.1.0", "date": "2026-10-06", "change": "补 scenery 字段声明侧景道具集（seaside = sceneryProps 的既有那套），供设置面板切换场景时按主题取侧景" },
         { "ver": "3.0.0", "date": "2026-10-08", "change": "改名「白日海景」并切到 coast 道具集：右侧每 100m 一栋双层海景别墅（正方形平台底座 + 全屋落地玻璃 + 室内满陈设），左侧 100m 一节的海滩（木栅栏/长椅/礁石/椰林/浅滩/薄雾），沙地摆遮阳伞躺椅；海面起伏、波光、薄雾、玻璃反光、室内呼吸灯、草灌风动六组轻量化动效" },
-        { "ver": "3.0.1", "date": "2026-10-13", "change": "groundColor 由 #EFDDB8 改 #F0C67A：地面纹理不再自带沙色（改近中性，色调交回主题），这里把沙色补回配置里，渲染结果与原先一致（暖沙），不是改配色" }
+        { "ver": "3.0.1", "date": "2026-10-13", "change": "groundColor 由 #EFDDB8 改 #F0C67A：地面纹理不再自带沙色（改近中性，色调交回主题），这里把沙色补回配置里，渲染结果与原先一致（暖沙），不是改配色" },
+        { "ver": "3.1.0", "date": "2026-11-09", "change": "M0 晴天档：新增 grade 字段覆盖后处理画面参数（暗角 0.28→0.12/颗粒 0.035→0/bloom 0.32→0.22/冲刺联动减半）——雨夜口径的 grade 一直在压 live 默认的晴天通透感（coast-audit ⑤-1 头号风险）；其它主题零漂移（grade 缺省回雨夜常量）" }
       ]
     },
     {
       "id": "theme_rain_konbini", "status": "draft",
       "name": { "zh-CN": "雨夜便利店" },
-      "sky": { "shader": "thunder_sky", "baseColor": "#1A2340", "flashColor": "#9FD8FF", "flashEveryS": [9999, 9999] },
+      "sky": { "shader": "thunder_sky", "baseColor": "#1A2340", "flashColor": "#9FD8FF", "flashEveryS": [11, 24] },
       "fog": { "color": "#243050", "density": 0.011 },
       "track": { "railMat": "mat_rain_rail", "groundTiles": ["tile_wet_a"] },
       "props": [],
       "scenery": "konbini",
       "groundColor": "#2C313D",
+      "features": { "wetRoad": true },
       "music": "assets/audio/bgm/run_rain.mp3", "sfxSet": "city",
       "vfxTint": "#9FD8FF",
       "versions": [
         { "ver": "1.0.0", "date": "2026-10-06", "change": "第二个跑酷场景：雨夜日式便利店街角。三条跑道沿用，两侧改为「便利店（每 100m 两侧交替）+ 有围栏小花园（中间段）+ 远景楼群」，纯程序化几何零素材，含降雨/滴水/涟漪/雨痕/自动门/招牌闪烁/信号灯七组手写动效" },
         { "ver": "1.1.0", "date": "2026-10-11", "change": "music 改指 run_rain.mp3（雨声空灵版，响度对齐全局 run.mp3 到 -16.5 LUFS）：本字段自这次起真正被运行时读取——audioDirector.enterRun 收主题 BGM 路径，缺省仍回退 params.audio.bgm.run" },
         { "ver": "1.2.0", "date": "2026-10-12", "change": "run_rain.mp3 换成用户补给的循环母带（雨声空灵版_循环.mp3，8.33 秒无缝版），路径不变、只换字节；仍按 -16.5 LUFS 对齐" },
-        { "ver": "1.3.0", "date": "2026-10-13", "change": "两侧街景扩到「便利店 — 空地路面 — 一排 2~3 层临街商铺（门前一巷杂物 + 公交站 + 贴跑道一条 2m 石板小道）— 小花园」，远景居民楼改三套型深蓝灰；groundColor 保持 #2C313D，但地面纹理不再吃沙色，这片地终于按配置显示成蓝灰而不是 muddy 棕" }
+        { "ver": "1.3.0", "date": "2026-10-13", "change": "两侧街景扩到「便利店 — 空地路面 — 一排 2~3 层临街商铺（门前一巷杂物 + 公交站 + 贴跑道一条 2m 石板小道）— 小花园」，远景居民楼改三套型深蓝灰；groundColor 保持 #2C313D，但地面纹理不再吃沙色，这片地终于按配置显示成蓝灰而不是 muddy 棕" },
+        { "ver": "1.4.0", "date": "2026-11-09", "change": "M1 开闸（konbini-audit ④ Phase 1）：①环境闪电 flashEveryS [9999,9999]→[11,24]（闪电本就是本主题血脉，闭环同款三段式）；②features.wetRoad=true 开车道线倒影 + 路面水洼 roughnessMap（全主题门控字段，替代 scenery 硬编码）" }
       ]
     },
     {
@@ -55,10 +59,14 @@
       "props": [],
       "scenery": "harbor",
       "groundColor": "#C98D5A",
+      "lighting": { "hemiSky": "#7FA0C0", "hemiGround": "#8A5A3A", "hemiIntensity": 1.05, "key": "#FFC98F", "keyIntensity": 1.5 },
+      "env": { "sky": "#E8B27E", "glow": "#FFC98F", "ground": "#4A342A" },
+      "features": { "wetRoad": true },
       "music": "assets/audio/bgm/run.mp3", "sfxSet": "city",
       "vfxTint": "#FFD9A8",
       "versions": [
-        { "ver": "1.0.0", "date": "2026-11-06", "change": "第三个跑酷场景：黄昏渔港铁道。网搜精密场景提示词合成（工业视差分层 Ansimuz + 霓虹夜城 5 层视差配方 → 橙青调渔港）：远景剪影+门式起重机、长仓库+集装箱堆（撞色 2-3 层错缝）、系船柱/栈桥暖灯/油桶/渔网架/渔船桅杆五层程序化侧景，约 20 个 draw call" }
+        { "ver": "1.0.0", "date": "2026-11-06", "change": "第三个跑酷场景：黄昏渔港铁道。网搜精密场景提示词合成（工业视差分层 Ansimuz + 霓虹夜城 5 层视差配方 → 橙青调渔港）：远景剪影+门式起重机、长仓库+集装箱堆（撞色 2-3 层错缝）、系船柱/栈桥暖灯/油桶/渔网架/渔船桅杆五层程序化侧景，约 20 个 draw call" },
+        { "ver": "1.1.0", "date": "2026-11-09", "change": "M1 湿路与光（harbor-audit ④ Phase 1）：①lighting 字段定调黄昏光（hemiSky 白日冷蓝 #bfe3ff→黄昏青蓝 #7FA0C0、key 暖阳→低角度暖橙 #FFC98F/1.5，色值实机可调）；②env 字段挂晚霞 IBL（金币抛光金+湿面晚霞反射）；③features.wetRoad=true 开雨后码头湿路（倒影+水洼）；④栈桥灯头/仓库高窗改暖橙自发光（bloom 轻微溢光，发光只认暖橙一种）" }
       ]
     },
     {
@@ -70,11 +78,13 @@
       "props": [],
       "scenery": "stormspire",
       "groundColor": "#24425A",
+      "env": { "sky": "#CFE4FF", "glow": "#FFC145", "ground": "#16233E" },
       "lighting": { "hemiSky": "#7FA8CC", "hemiGround": "#1A2438", "hemiIntensity": 0.95, "key": "#BFD8EF", "keyIntensity": 1.15 },
       "music": "assets/audio/bgm/run.mp3", "sfxSet": "city",
       "vfxTint": "#FFC145",
       "versions": [
-        { "ver": "1.0.0", "date": "2026-11-08", "change": "第四个跑酷场景：天穹雷脊（Phase A 平面版，docs/stormspire-brief.md）。无尽雷暴云海之上的驭雷者废墟：三车道读作云海之上的雷渡石桥，两侧浮空岛链（八原型实例化）+ 雷脊塔远景剪影 + 导雷铜环横跨 + 摆链/风车/瀑布动件 + 风暴魟群与云渊鲸剪影；flashEveryS [7,14] 启用环境闪电（渲染层接线）。调色板 7 色：深渊靛 #16233E / 风暴青 #3D6B8F / 云白 #E9EFF3 / 石灰岩 #97A0AE / 铜绿 #4E9B8F / 熔金电光 #FFC145 / 苔灰绿 #6E8F6B" }
+        { "ver": "1.0.0", "date": "2026-11-08", "change": "第四个跑酷场景：天穹雷脊（Phase A 平面版，docs/stormspire-brief.md）。无尽雷暴云海之上的驭雷者废墟：三车道读作云海之上的雷渡石桥，两侧浮空岛链（八原型实例化）+ 雷脊塔远景剪影 + 导雷铜环横跨 + 摆链/风车/瀑布动件 + 风暴魟群与云渊鲸剪影；flashEveryS [7,14] 启用环境闪电（渲染层接线）。调色板 7 色：深渊靛 #16233E / 风暴青 #3D6B8F / 云白 #E9EFF3 / 石灰岩 #97A0AE / 铜绿 #4E9B8F / 熔金电光 #FFC145 / 苔灰绿 #6E8F6B" },
+        { "ver": "1.1.0", "date": "2026-11-09", "change": "IBL 门控契约化：env 字段显式声明雷暴配色（sky #CFE4FF/glow #FFC145/ground #16233E，与原 env.ts 硬编码逐字节同值）——行为零变化，只是从 stormspire 专属硬编码迁到 theme 字段（harbor-audit ②-8 门控契约统一）" }
       ]
     }
   ]

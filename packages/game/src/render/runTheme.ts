@@ -10,6 +10,17 @@ import type { RunnerSim } from '@tr/game/core/sim/runnerSim.js';
 import type { GameContent } from '@tr/game/core/config/configTypes.js';
 import type { InputEvent, PlatformAdapter, Unsubscribe } from '@tr/framework/platform/platformAdapter.js';
 import { FLASH_TINT } from './lightning.js';
+import type { EnvSpec } from './stormspire/env.js';
+
+/** postfx 画面 grade 的主题覆盖（M1 门控契约：theme.grade 字段，缺省=雨夜口径，postfx.ts 同名常量） */
+export interface GradeSpec {
+  vignette: number;
+  grain: number;
+  bloom: number;
+  vignetteBoost: number;
+  saturationBoost: number;
+  bloomBoost: number;
+}
 
 /** 主题派生结果：runnerScene 解构接回，字段名与拆分前的局部变量一一对应（最小 diff）。 */
 export interface RunStage {
@@ -36,6 +47,12 @@ export interface RunStage {
   flashGap(): number;
   /** scenery（themes.json）：track/obstacle 层选景 + 雷脊 IBL 环境贴图的门控字段 */
   scenery: string;
+  /** postfx 画面 grade（theme.grade 覆盖；缺省=雨夜口径） */
+  grade: GradeSpec;
+  /** theme.features.wetRoad：湿路系统总闸（车道线倒影 + 路面水洼 roughnessMap），trackVisuals 消费 */
+  wetRoad: boolean;
+  /** theme.env：主题 IBL 环境贴图配色（null=该主题不挂 envMap） */
+  env: EnvSpec | null;
 }
 
 export function deriveRunStage(content: GameContent, opts?: { themeId?: string }): RunStage {
@@ -71,9 +88,27 @@ export function deriveRunStage(content: GameContent, opts?: { themeId?: string }
   const flashGap = () => Math.max(1, flashEvery[0] ?? 9999) + Math.random() * Math.max(0, (flashEvery[1] ?? 9999) - (flashEvery[0] ?? 9999));
   /** scenery（themes.json）：track/obstacle 层选景 + 雷脊 IBL 环境贴图的门控字段 */
   const scenery = (theme?.['scenery'] as string | undefined) ?? 'seaside';
+  // M1 门控契约三件：grade（postfx 画面参数）/ features.wetRoad（湿路总闸）/ env（IBL 配色）。
+  // 缺省值=雨夜口径常量（postfx.ts 同名）：不配置的主题渲染结果与旧版逐字节一致。
+  const g = (theme?.['grade'] ?? {}) as Record<string, number | undefined>;
+  const grade: GradeSpec = {
+    vignette: g.vignette ?? 0.28,
+    grain: g.grain ?? 0.035,
+    bloom: g.bloom ?? 0.32,
+    vignetteBoost: g.vignetteBoost ?? 0.14,
+    saturationBoost: g.saturationBoost ?? 0.14,
+    bloomBoost: g.bloomBoost ?? 0.18,
+  };
+  const features = (theme?.['features'] ?? {}) as Record<string, unknown>;
+  const wetRoad = features.wetRoad === true;
+  const envRaw = (theme?.['env'] ?? null) as Record<string, string> | null;
+  const env = envRaw && envRaw.sky && envRaw.glow && envRaw.ground
+    ? { sky: envRaw.sky, glow: envRaw.glow, ground: envRaw.ground }
+    : null;
   return {
     laneWidth, glideFallMps, sky, fogColor, tint, groundColor,
     hemi, keyLight, HEMI_BASE, KEY_BASE, skyBase, fogBase, flashTint, flashGap, scenery,
+    grade, wetRoad, env,
   };
 }
 

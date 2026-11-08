@@ -149,11 +149,14 @@ function densifyProfile(pts: readonly StripPoint[], stepM: number): StripPoint[]
 export function createTrackVisuals(scene: THREE.Scene, laneWidth: number, colors: TrackColors,
   /** 主题 config 的 scenery 字段：选哪一套跑道侧景道具（缺省 seaside，未登记的 id 两侧为空） */
   scenery: string = 'seaside',
+  /** M1 门控契约：features.wetRoad=湿路系统总闸（车道线倒影 + 路面水洼 roughnessMap），由 theme.features 派生 */
+  features?: { wetRoad?: boolean },
 ) {
   const roadWidth = 3 * laneWidth + 1.2;
   // 雷脊假弯道（渲染层 world-bend，见 stormspire/worldBend.ts）：仅 stormspire 注入弯道材质，
   // 并把长面片按纵深加密分段（其余主题几何/着色路径与旧版一致，零 shader 开销）
   const deep = scenery === 'stormspire';
+  const wet = features?.wetRoad ?? false;
   const zenith = colors.sky?.zenith ?? colors.baseColor;
   const horizon = colors.sky?.horizon ?? colors.baseColor;
   const skyDome = addSkyDome(scene, zenith, horizon);
@@ -169,11 +172,11 @@ export function createTrackVisuals(scene: THREE.Scene, laneWidth: number, colors
   ground.rotation.x = -Math.PI / 2; ground.position.set(0, -0.02, -100); scene.add(ground);
 
   const roadMat = new THREE.MeshStandardMaterial({ color: 0x18233c, roughness: 0.85 });
-  // 湿路水洼（仅天穹雷脊；其它主题不建图，road 材质与旧版完全一致）：程序化粗糙度图 + envMap 强度预留。
+  // 湿路水洼（theme.features.wetRoad 总闸；其它主题不建图，road 材质与旧版完全一致）：程序化粗糙度图 + envMap 强度预留。
   // roughnessMap 与 material.roughness 相乘 ⇒ 挂图时基线调 1.0，绝对粗糙度全部由图承载（基底 0.92 / 水洼 0.15，见 roadTex.ts）。
   // envMapIntensity 0.6：envMap 本体由 runnerScene 接进 scene.environment，这里只留强度（metalness 保持 0）。
   let roadRoughTex: THREE.DataTexture | null = null;
-  if (scenery === 'stormspire') {
+  if (wet) {
     roadRoughTex = makeRoadRoughnessTexture(roadWidth);
     roadMat.roughnessMap = roadRoughTex;
     roadMat.roughness = 1;
@@ -193,12 +196,12 @@ export function createTrackVisuals(scene: THREE.Scene, laneWidth: number, colors
     line.position.set(l * laneWidth, 0.012, 0); scene.add(line);
   }
 
-  // 湿路面假倒影（仅天穹雷脊；其它主题不进此分支，零新增对象）：主线同配方条带摊在路面上。
+  // 湿路面假倒影（theme.features.wetRoad 总闸；其它主题不进此分支，零新增对象）：主线同配方条带摊在路面上。
   // y=0.004：主线 0.012 的镜像下移位再抬 2mm——在路面（y=0）之上不被遮挡，又低于虚线 0.014；
   // 宽 ×2.2（湿面漫射把光带摊宽）、加色混合、峰值 alpha 0.14、depthWrite 关（加色不拦截后方排序）。
   // 沿 z 确定性正弦揉出 2~3 段明暗断续（像水洼把倒影揉碎），且在条带 0.55 长度处即完全隐没——
   // 比主线（残 0.25 一路到 -150m）消失得更快，透视感更强。颜色用主题 vfxTint，不出调色板。
-  if (scenery === 'stormspire') {
+  if (wet) {
     const reflMat = new THREE.MeshBasicMaterial({
       vertexColors: true, transparent: true, fog: false, side: THREE.DoubleSide,
       blending: THREE.AdditiveBlending, depthWrite: false,

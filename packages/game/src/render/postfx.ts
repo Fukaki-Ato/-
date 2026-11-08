@@ -29,6 +29,20 @@ const BOOST_LERP = 0.08;
 const GRAIN_AMT = 0.035;
 
 /**
+ * 画面 grade 的主题覆盖（M1 门控契约：theme.grade 字段经 runTheme 派生传入）。
+ * 全部可选：不传/缺省字段=雨夜口径常量（上面那组），渲染结果与旧版逐字节一致。
+ * coast 晴天档：暗角 0.12 / 颗粒 0 / bloom 0.22 / 联动减半（coast-audit ④ Phase 1 ①）。
+ */
+export interface GradeOverride {
+  vignette?: number;
+  grain?: number;
+  bloom?: number;
+  vignetteBoost?: number;
+  saturationBoost?: number;
+  bloomBoost?: number;
+}
+
+/**
  * grade 着色器：一个 pass 打包四件套（暗角/颗粒/饱和度/色差）。
  * 工作在线性空间（composer 中间缓冲是 HalfFloat 线性），色彩空间编码一律交给链尾 OutputPass。
  */
@@ -38,6 +52,7 @@ const GRADE_SHADER = {
     uFrame: { value: 0 }, // 确定性颗粒的帧计数（同一帧永远算出同一颗粒，回放可复现）
     uVignette: { value: VIGNETTE_BASE },
     uSaturation: { value: SATURATION_BASE },
+    uGrain: { value: GRAIN_AMT }, // 主题可覆盖（coast 晴天档=0）：ShaderPass 克隆 uniform 后按局写入
     uAberration: { value: 0 }, // 轻微色差默认关（0 时走单次采样分支，零额外开销）
   },
   vertexShader: /* glsl */ `
@@ -52,6 +67,7 @@ const GRADE_SHADER = {
     uniform float uFrame;
     uniform float uVignette;
     uniform float uSaturation;
+    uniform float uGrain;
     uniform float uAberration;
     varying vec2 vUv;
     float hash21(vec2 p) {
@@ -80,7 +96,7 @@ const GRADE_SHADER = {
       col = mix(vec3(luma), col, uSaturation);
       // 胶片颗粒：hash(帧计数, 屏幕坐标) 确定性抖动——无随机数状态、逐帧可复现
       float n = hash21(uv * 917.0 + vec2(uFrame * 0.717, uFrame * 0.913));
-      col += (n - 0.5) * ${GRAIN_AMT};
+      col += (n - 0.5) * uGrain;
       gl_FragColor = vec4(col, 1.0);
     }
   `,
@@ -99,7 +115,16 @@ export interface PostFx {
 
 export function createPostFx(
   renderer: THREE.WebGLRenderer, scene: THREE.Scene, camera: THREE.PerspectiveCamera,
+  /** 主题 grade 覆盖（runTheme 从 theme.grade 派生；不传=雨夜口径常量） */
+  grade?: GradeOverride,
 ): PostFx {
+  // 主题覆盖解析：全部缺省回雨夜口径常量——不配置的主题行为与旧版逐字节一致
+  const vBase = grade?.vignette ?? VIGNETTE_BASE;
+  const vBoost = grade?.vignetteBoost ?? VIGNETTE_BOOST;
+  const sBoost = grade?.saturationBoost ?? SATURATION_BOOST;
+  const bBase = grade?.bloom ?? BLOOM_STRENGTH;
+  const bBoost = grade?.bloomBoost ?? BLOOM_BOOST;
+  const gAmt = grade?.grain ?? GRAIN_AMT;
   let composer: EffectComposer | null = null;
   let bloomPass: UnrealBloomPass | null = null;
   let gradePass: ShaderPass | null = null;
@@ -123,10 +148,11 @@ export function createPostFx(
       composer = new EffectComposer(renderer);
       composer.addPass(new RenderPass(scene, camera));
       bloomPass = new UnrealBloomPass(
-        new THREE.Vector2(viewSize.x, viewSize.y), BLOOM_STRENGTH, BLOOM_RADIUS, BLOOM_THRESHOLD,
+        new THREE.Vector2(viewSize.x, viewSize.y), bBase, BLOOM_RADIUS, BLOOM_THRESHOLD,
       );
       composer.addPass(bloomPass);
       gradePass = new ShaderPass(GRADE_SHADER);
+      gradePass.uniforms.uGrain.value = gAmt; // 主题覆盖的颗粒幅度（coast 晴天档=0）
       composer.addPass(gradePass);
       // OutputPass 必须放链尾（r152+ 色彩管理口径）：composer 中间缓冲全是线性 HalfFloat，
       // 没有它，最终写入 canvas 的仍是线性值——整体发灰/过暗（本链路最容易翻车的点）；
@@ -142,7 +168,7 @@ export function createPostFx(
   }
 
   let frame = 0;
-  let vignette = VIGNETTE_BASE, saturation = SATURATION_BASE, bloomStrength = BLOOM_STRENGTH;
+  let vignette = vBase, saturation = SATURATION_BASE, bloomStrength = bBase;
 
   return {
     composer,
@@ -152,9 +178,9 @@ export function createPostFx(
       frame++;
       gradePass.uniforms.uFrame.value = frame;
       const boost = Math.min(1, Math.max(0, speedMul - 1)); // 雷霆冲刺等提速 buff 的表现强度
-      vignette += (VIGNETTE_BASE + VIGNETTE_BOOST * boost - vignette) * BOOST_LERP;
-      saturation += (SATURATION_BASE - SATURATION_BOOST * boost - saturation) * BOOST_LERP;
-      bloomStrength += (BLOOM_STRENGTH + BLOOM_BOOST * boost - bloomStrength) * BOOST_LERP;
+      vignette += (vBase + vBoost * boost - vignette) * BOOST_LERP;
+      saturation += (SATURATION_BASE - sBoost * boost - saturation) * BOOST_LERP;
+      bloomStrength += (bBase + bBoost * boost - bloomStrength) * BOOST_LERP;
       gradePass.uniforms.uVignette.value = vignette;
       gradePass.uniforms.uSaturation.value = saturation;
       bloomPass.strength = bloomStrength;

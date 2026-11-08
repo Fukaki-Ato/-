@@ -25,7 +25,7 @@ import { createBurstPool } from './vfxBurst.js';
 import { applyLightningFlash, createLightningFx, FLASH_LIGHT_GAIN } from './lightning.js';
 import { deriveRunStage, wireRunInput } from './runTheme.js';
 import { createPostFx } from './postfx.js';
-import { createStormEnvMap, disposeStormEnvMap } from './stormspire/env.js';
+import { createEnvMap, disposeEnvMap } from './stormspire/env.js';
 
 export interface RunCallbacks {
   onHud(h: {
@@ -71,6 +71,7 @@ export function createRunnerScene(
   const {
     laneWidth, glideFallMps, sky, fogColor, tint, groundColor, scenery,
     hemi, keyLight, HEMI_BASE, KEY_BASE, skyBase, fogBase, flashTint, flashGap,
+    grade, wetRoad, env,
   } = deriveRunStage(content, opts);
   /** buff 派生视图：引擎原地更新同一个对象，渲染层缓存引用安全（docs/09 T2.2） */
   const fx = sim.fx;
@@ -96,18 +97,19 @@ export function createRunnerScene(
   scene.add(keyLight);
   const lightning = createLightningFx(scene);
   let ambientT = flashGap(); // 环境闪电间隔（theme.sky.flashEveryS 区间随机，缺省关闭）由 runTheme 派生
-  // 雷脊 IBL：stormspire 主题挂程序化环境贴图（另一路 env.ts 提供，null=无 IBL 自然降级）
-  const stormEnv = scenery === 'stormspire' ? createStormEnvMap(renderer) : null;
-  if (stormEnv) scene.environment = stormEnv;
+  // 主题 IBL：theme.env 声明了配色的主题挂程序化环境贴图（stormspire 雷暴/harbor 晚霞），null=无 IBL 自然降级
+  const runEnv = env ? createEnvMap(renderer, env) : null;
+  if (runEnv) scene.environment = runEnv;
   // 后处理全主题启用（bloom 阈值 0.82 下非自发光场景几乎无泛光，参数不分主题）；wx/非 WebGL2 自动降级
-  const postfx = createPostFx(renderer, scene, camera);
+  // 后处理全主题启用（bloom 阈值下非自发光场景几乎无泛光）；画面 grade 由 theme.grade 覆盖（coast 晴天档），wx/非 WebGL2 自动降级
+  const postfx = createPostFx(renderer, scene, camera, grade);
 
   const track = createTrackVisuals(scene, laneWidth, {
     baseColor: sky.baseColor, flashColor: sky.flashColor, tint, groundColor,
     sky: { zenith: sky.baseColor, horizon: fogColor },
-  }, scenery);
+  }, scenery, { wetRoad });
   const avatar = createAvatar(scene, laneWidth, sim.loadout, adapter);
-  const coinField = createCoinField(scene, laneWidth, { envMap: stormEnv, scenery });
+  const coinField = createCoinField(scene, laneWidth, { envMap: runEnv, scenery });
   // scenery 来源与 createTrackVisuals 同款（themes.json 的 scenery 字段）：stormspire 时障碍层换雷脊废墟皮
   const obstacleLayer = createObstacleLayer(scene, laneWidth, scenery);
   // 道具 3D 模型（items.json model.prefab/spin）：磁铁有文件→近距换 3D，其余预留路径
@@ -282,7 +284,7 @@ export function createRunnerScene(
     lightning.dispose();
     track.dispose();
     postfx.dispose(); // composer/逐 pass/双缓冲 target 全量释放（wx 降级态是 no-op）
-    if (stormEnv) disposeStormEnvMap(stormEnv);
+    if (runEnv) disposeEnvMap(runEnv);
     renderer.dispose();
     scene.traverse(o => {
       const m = o as THREE.Mesh;

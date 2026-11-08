@@ -1,20 +1,30 @@
 /**
- * 天穹雷脊 IBL 环境贴图（真实实现，替换占位骨架）：用 PMREMGenerator.fromScene 渲一张
- * 微型程序化雷暴环境——上冷天光微弱、地平金光带极弱、下深渊靛——供金属与湿面反射出云海天光，
+ * 主题 IBL 环境贴图（门控契约统一，roadmap M1 共享底座）：用 PMREMGenerator.fromScene 渲一张
+ * 微型程序化环境——上空天光、地平光带、下地面色——供金属与湿面反射出天光，
  * 是金币「抛光金视觉锚点」与湿路面反射的高光来源。
- * ⚠️ 只供 stormspire 主题接线（runnerScene 按 scenery 门控调用并挂 scene.environment），其它主题不调；
+ * 配色由主题 config 的 env 字段提供（{ sky, glow, ground }，runTheme 派生）：
+ *   stormspire = 冷天光 + 金光带 + 深渊靛；harbor = 晚霞青 + 暖橙光带 + 暗码头；
+ * ⚠️ 只供声明了 env 字段的主题接线（runnerScene 挂 scene.environment），其它主题不调；
  * 任何异常返回 null＝无 IBL，调用方按 null 自然降级为纯灯光照明。
  */
 import * as THREE from 'three';
-import { FLASH_TINT } from '../lightning.js';
-import { P } from './palette.js';
 
-/** 微型环境场景：3 块大面片包住原点。亮度用颜色明度压低（微弱/极弱＝不抢主光源，只给反射定调），
- *  面片用 MeshBasicMaterial（不受光、恒定辐射），PMREM 立方相机从原点拍满 6 面。 */
-function buildStormEnvScene(): THREE.Scene {
+/** 主题 env 字段口径：sky=上半球天光色、glow=地平光带色（金属高光方向来源）、ground=下半球地面色 */
+export interface EnvSpec {
+  sky: string;
+  glow: string;
+  ground: string;
+  /** 天光亮度系数（缺省 0.35＝微弱，不抢主光源） */
+  skyDim?: number;
+  /** 地平光带亮度系数（缺省 0.12＝极弱） */
+  glowDim?: number;
+}
+
+/** 微型环境场景：3 块大面片包住原点。亮度用颜色明度压低，面片用 MeshBasicMaterial（不受光、恒定辐射）。 */
+function buildEnvScene(spec: EnvSpec): THREE.Scene {
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(P.abyss); // 面片没盖住的四周方向 = 深渊靛，不留纯黑
-  const panel = (w: number, h: number, color: number, dim: number, rotX: number, y: number, z: number) => {
+  scene.background = new THREE.Color(spec.ground); // 面片没盖住的四周方向 = 地面色，不留纯黑
+  const panel = (w: number, h: number, color: string, dim: number, rotX: number, y: number, z: number) => {
     const mesh = new THREE.Mesh(
       new THREE.PlaneGeometry(w, h),
       new THREE.MeshBasicMaterial({ color: new THREE.Color(color).multiplyScalar(dim) }),
@@ -23,19 +33,19 @@ function buildStormEnvScene(): THREE.Scene {
     mesh.position.set(0, y, z);
     return mesh;
   };
-  const sky = panel(160, 160, FLASH_TINT, 0.35, Math.PI / 2, 45, 0);  // 上：冷天光（微弱，与闪电闪色同源）
-  const gold = panel(240, 10, P.gold, 0.12, 0, 2, -60);               // 地平：金光带（极弱，金属高光的方向来源）
-  const abyss = panel(160, 160, P.abyss, 1, -Math.PI / 2, -45, 0);    // 下：深渊靛
-  scene.add(sky, gold, abyss);
+  const sky = panel(160, 160, spec.sky, spec.skyDim ?? 0.35, Math.PI / 2, 45, 0);   // 上：天光（微弱）
+  const glow = panel(240, 10, spec.glow, spec.glowDim ?? 0.12, 0, 2, -60);          // 地平：光带（极弱，高光方向来源）
+  const ground = panel(160, 160, spec.ground, 1, -Math.PI / 2, -45, 0);             // 下：地面色
+  scene.add(sky, glow, ground);
   return scene;
 }
 
-/** 渲染 stormspire 环境贴图；PMREM/WebGL 任一环节异常都返回 null（调用方兜底，不挂 envMap） */
-export function createStormEnvMap(renderer: THREE.WebGLRenderer): THREE.Texture | null {
+/** 渲染主题环境贴图；PMREM/WebGL 任一环节异常都返回 null（调用方兜底，不挂 envMap） */
+export function createEnvMap(renderer: THREE.WebGLRenderer, spec: EnvSpec): THREE.Texture | null {
   try {
     const pmrem = new THREE.PMREMGenerator(renderer);
-    const src = buildStormEnvScene();
-    const rt = pmrem.fromScene(src, 0.03, 0.1, 120); // 小 sigma：保留金光带的方向性，高光才锐
+    const src = buildEnvScene(spec);
+    const rt = pmrem.fromScene(src, 0.03, 0.1, 120); // 小 sigma：保留光带的方向性，高光才锐
     const tex = rt.texture;
     pmrem.dispose();
     for (const child of src.children) { // 临时场景即用即弃，防几何/材质泄漏
@@ -50,6 +60,6 @@ export function createStormEnvMap(renderer: THREE.WebGLRenderer): THREE.Texture 
 }
 
 /** 按局释放环境贴图（runnerScene 的 dispose 清单调用；容错 null/undefined） */
-export function disposeStormEnvMap(tex: THREE.Texture | null | undefined): void {
+export function disposeEnvMap(tex: THREE.Texture | null | undefined): void {
   tex?.dispose();
 }
