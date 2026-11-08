@@ -31,7 +31,7 @@ export interface ObstacleEntity {
   passed?: boolean;    // 已掠过角色面（近失判定一次性）
 }
 
-export interface CoinEntity { lane: number; worldZ: number; y?: number; taken?: boolean; passed?: boolean; chain?: number; takenAt?: number }
+export interface CoinEntity { lane: number; worldZ: number; y?: number; flight?: true; taken?: boolean; passed?: boolean; chain?: number; takenAt?: number }
 
 /** 云团：纯视觉实体（位置由生成器管理，渲染层负责穿云特效与消散） */
 export interface CloudEntity { worldZ: number; x: number; y: number }

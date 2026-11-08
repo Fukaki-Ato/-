@@ -20,7 +20,6 @@ import { fileURLToPath } from 'node:url';
 import { RunnerSim } from '../packages/game/dist/core/sim/runnerSim.js';
 import { TrackGen } from '../packages/game/dist/core/sim/trackGen.js';
 import { buildObstacleEntity } from '../packages/game/dist/core/sim/trackDefs.js';
-import { layTeachingLines } from '../packages/game/dist/core/sim/trackCoins.js';
 import { RunRng } from '../packages/game/dist/core/rng.js';
 import { hitsRunner, lateralGap, obstacleX, HAZARD_HIT_Y } from '../packages/game/dist/core/sim/collision.js';
 import { pickAvatarMode } from '../packages/game/dist/render/avatarRig.js';
@@ -597,44 +596,38 @@ test('高难连段：新 combo 模板进高难池；简单 AI 在 by8+ 可存活
 
 // ---------------- 14. 登车斜坡 + 车顶金币高度回归（用户实测反馈 2026-11-08） ----------------
 
-test('登车修复回归：dismount 连段可正常上列车，车顶金币 y=顶面+0.65 且可拾取', () => {
-  const solo = structuredClone(content);
-  delete solo.game.params.revive;
-  delete solo.obstacles.zap;
-  const sim = new RunnerSim(solo, 4242, 'char_volt');
-  sim.state.t = 20;
-  sim.state.distance = 2400;
-  sim.gen.genZ = 2740;
-  const defsOf = Object.fromEntries(solo.obstacles.defs.map(d => [d.id, d]));
-  // 几何对齐 pat_train_top_run 的可用口径：坡道中心 0（跨 -3..3）、列车中心 15（跨 3..27）
-  for (const [id, lane, off, seg] of [['obs_mount_step', 0, 0, 0], ['obs_train_slow', 0, 15, 0], ['obs_gate_low', 0, 16, 1], ['obs_box', -1, 22, 1]]) {
-    sim.obstacles.push(buildObstacleEntity(defsOf[id], lane, 2420 + seg * 24 + off));
+test('登车修复：真实配置经 TrackGen 生成后可登车、收币、落车滑闸', () => {
+  for (const speed of [12, 16.32, 20, 26]) for (const phase of [0, 0.07, 0.19]) {
+    const solo = structuredClone(content);
+    delete solo.game.params.revive;
+    delete solo.obstacles.zap;
+    Object.assign(solo.game.params.runner, { baseSpeed: speed, maxSpeed: speed, speedRampPer100M: 0 });
+    const pattern = solo.obstacles.patterns.find(p => p.id === 'pat_combo_train_dismount');
+    const sim = new RunnerSim(solo, 4242, 'char_volt');
+    sim.state.t = 20;
+    sim.state.distance = 2400 + phase;
+    sim.gen.genZ = 2420;
+    // 只固定抽中的模板，不复制模板坐标；仍使用生产生成器的限长与反向清币逻辑。
+    sim.gen.pickPattern = () => pattern;
+    sim.gen.ensure(2400, 40, sim.obstacles, sim.coinsArr, sim.pickupsArr);
+    sim.gen.genZ = 10000;
+    const train = sim.obstacles.find(o => o.obsRef === 'obs_train_slow');
+    const gate = sim.obstacles.find(o => o.obsRef === 'obs_gate_low');
+    const topCoins = sim.coinsArr.filter(c => (c.y ?? 0) > 0);
+    assert.ok(topCoins.length >= Math.min(...solo.game.params.coins.chainBuckets.map(b => b.min)), '真实模板必须生成可拾取的车顶币');
+    for (const coin of topCoins) assert.equal(coin.y, train.h + 0.65);
+    let maxY = 0;
+    for (let f = 0; f < 1200 && sim.state.alive && sim.state.distance < gate.worldZ + 20; f++) {
+      const gap = gate.worldZ - sim.state.distance;
+      if (gap < 4.5 && gap > 0 && sim.state.y <= 0.1 && !sim.state.sliding) sim.applyAction('slide');
+      sim.step();
+      sim.drainEvents();
+      maxY = Math.max(maxY, sim.state.y);
+    }
+    const context = `speed=${speed}, phase=${phase}`;
+    assert.ok(sim.state.alive && sim.state.distance > gate.worldZ + 19, context);
+    assert.equal(sim.state.revivesUsed, 0, context);
+    assert.equal(maxY, train.h, context);
+    assert.ok(topCoins.every(c => c.taken), `全部车顶币可收取：${context}`);
   }
-  // 教学金币线走真实的 layTeachingLines（含 trainTop 骑顶语义）
-  layTeachingLines({
-    cells: [
-      { segment: 0, lane: 0, offsetM: 6, surface: 'trainTop', coins: 6 },
-      { segment: 0, lane: -1, offsetM: 4, coins: 8 },
-      { segment: 2, lane: -1, offsetM: 6, coins: 5 },
-    ],
-    genZ: 2420, segLen: 24, coinSpacing: 1.5,
-    chainBuckets: solo.game.params.coins.chainBuckets,
-    obstacles: sim.obstacles, coins: sim.coinsArr, maxSpanM: 20, seq: () => 9000,
-  });
-  const topCoins = sim.coinsArr.filter(c => (c.y ?? 0) > 0);
-  assert.ok(topCoins.length >= 5, `车顶教学币已铺设（实铺 ${topCoins.length}）`);
-  for (const c of topCoins) assert.ok(Math.abs(c.y - (2.4 + 0.65)) < 0.01, `车顶币 y=${c.y} 应为顶面 2.4 + 悬停 0.65（修前是 2.4 半埋车顶）`);
-  // 骑乘全程：自动上坡 → 车顶收币 → 车尾落地 → 滑铲过闸
-  let topGot = 0;
-  for (let f = 0; f < 60 * 6 && sim.state.alive; f++) {
-    sim.step();
-    sim.drainEvents();
-    topGot = Math.max(topGot, sim.state.coins);
-    const gateGap = 2460 - sim.state.distance;
-    if (gateGap < 4.5 && gateGap > 0 && sim.state.y <= 0.1 && !sim.state.sliding) sim.applyAction('slide');
-  }
-  assert.ok(sim.state.alive, '骑乘+落车+滑闸全程存活');
-  assert.ok(sim.state.revivesUsed === 0, '不消耗复活');
-  assert.ok(topGot >= 4, `车顶金币至少吃到 4 枚（实得 ${topGot}）——金币高度修后可拾取`);
-  assert.ok(sim.state.distance > 2470, `滑闸后继续推进（${Math.round(sim.state.distance)}m）`);
 });

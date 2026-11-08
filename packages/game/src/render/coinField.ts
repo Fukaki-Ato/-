@@ -64,7 +64,8 @@ export function createCoinField(scene: THREE.Scene, laneWidth: number) {
     }
     // 大顶堆维护「最近 COIN_MAX 枚」：堆顶是名额里最远的一枚，新的更近就换掉它再下沉
     heap.length = 0;
-    for (let i = 0; i < COIN_MAX; i++) heap.push(coinCand[i]);
+    // 堆内统一使用候选索引；输出时才映射回 coins，避免过滤后索引错位。
+    for (let i = 0; i < COIN_MAX; i++) heap.push(i);
     const siftDown = (start: number) => {
       let p = start;
       for (;;) {
@@ -80,7 +81,7 @@ export function createCoinField(scene: THREE.Scene, laneWidth: number) {
     for (let i = COIN_MAX; i < visN; i++) {
       if (coinKey[i] < coinKey[heap[0]]) { heap[0] = i; siftDown(0); }
     }
-    for (let i = 0; i < COIN_MAX; i++) coinIdx[i] = heap[i];
+    for (let i = 0; i < COIN_MAX; i++) coinIdx[i] = coinCand[heap[i]];
     return COIN_MAX;
   }
 

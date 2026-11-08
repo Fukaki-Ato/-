@@ -84,7 +84,7 @@ export function layCoinChains(d: CoinLayDeps): void {
 
 /**
  * 模板教学金币线（docs/01「金币即教学」的 config 直给面）：pattern cells 带 coins 的格子逐枚铺设。
- * surface:'trainTop' → 骑在 rideTop 载具顶面（y=载具 h）；普通线 y 缺省=地面。
+ * surface:'trainTop' → 骑在 rideTop 载具顶面（y=载具 h + 0.65）；普通线 y 缺省=地面。
  * 链长守 chainBuckets 区间 + maxSpanM 跳跃净空；同车道与障碍深度重叠的枚跳过（防御）。
  */
 export function layTeachingLines(d: {

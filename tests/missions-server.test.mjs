@@ -18,7 +18,7 @@ function testContent() {
     daily: { pick: 3, pool: [
       { id: 'test_distance', tier: 'easy', type: 'accumulate', metric: 'distanceM', target: 1, reward: { coin: 7 } },
       { id: 'test_slides', tier: 'mid', type: 'count', metric: 'slides', target: 1, reward: { shard: 'shard_volt:3' } },
-      { id: 'test_clean', tier: 'hard', type: 'count', metric: 'cleanRuns', target: 1, reward: { key: 2 } },
+      { id: 'test_score', tier: 'hard', type: 'bestScore', metric: 'score', target: 1, reward: { key: 2 } },
     ] },
     weekly: { pick: 4, pool: [
       { id: 'test_week_distance', tier: 'mid', type: 'accumulate', metric: 'distanceM', target: 1, reward: { coin: 11 } },
@@ -162,8 +162,7 @@ test('server replays runs, rejects early time, settles once, and atomically clai
     assert.equal(finished.data.daily.missions.find(mission => mission.id === 'test_distance').progress, 1);
     assert.equal(finished.data.weekly.missions.find(mission => mission.id === 'test_week_distance').progress, 1);
     assert.equal(finished.data.daily.missions.find(mission => mission.id === 'test_slides').progress, 1);
-    // 死亡收尾局按定义非 clean（无操作局撞车死，hits=1）：用存活截断局刷 cleanRuns 正是收紧的洞
-    assert.equal(finished.data.daily.missions.find(mission => mission.id === 'test_clean').progress, 0);
+    assert.equal(finished.data.daily.missions.find(mission => mission.id === 'test_score').progress, 1);
     const duplicate = await api.call('POST', `/api/missions/runs/${runId}/finish`, { frames: deathFrames, actions: deathActions });
     assert.equal(duplicate.response.status, 200);
     const changed = await api.call('POST', `/api/missions/runs/${runId}/finish`, { frames: 60, actions: [] });

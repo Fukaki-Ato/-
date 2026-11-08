@@ -48,6 +48,9 @@ export class MissionStore {
         (user_id, period_type, period_id, definitions_json) VALUES(?, ?, ?, ?)`),
       period: this.db.prepare(`SELECT definitions_json, progress_json, claimed_json
         FROM mission_periods WHERE user_id = ? AND period_type = ? AND period_id = ?`),
+      replacePeriod: this.db.prepare(`UPDATE mission_periods SET definitions_json = ?, progress_json = ?
+        WHERE user_id = ? AND period_type = ? AND period_id = ?
+          AND definitions_json = ? AND progress_json = ? AND claimed_json = ?`),
       saveProgress: this.db.prepare(`UPDATE mission_periods SET progress_json = ?
         WHERE user_id = ? AND period_type = ? AND period_id = ?`),
       saveClaimed: this.db.prepare(`UPDATE mission_periods SET claimed_json = ?
@@ -102,6 +105,11 @@ export class MissionStore {
       progress: JSON.parse(row.progress_json),
       claimed: JSON.parse(row.claimed_json),
     };
+  }
+  replacePeriod(userId, period, periodId, expected, definitions, progress) {
+    return this.statements.replacePeriod.run(JSON.stringify(definitions), JSON.stringify(progress),
+      userId, period, periodId, JSON.stringify(expected.definitions), JSON.stringify(expected.progress),
+      JSON.stringify(expected.claimed)).changes === 1;
   }
   saveProgress(userId, period, periodId, progress) {
     this.statements.saveProgress.run(JSON.stringify(progress), userId, period, periodId);
