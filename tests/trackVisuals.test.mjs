@@ -93,7 +93,8 @@ test('track disposal releases its ground map and per-scene toon ramp', t => {
       for (const material of materials) material.dispose();
     });
   });
-  assert.equal(textures.size, 2, 'track owns the ground DataTexture and scenery toon ramp');
+  // konbini 现拥有 3 张：地面纹理 + toon ramp + 贴地薄雾 alpha 贴图（M1 ③-6；wetRoad 主题另有水洼 roughness 图）
+  assert.equal(textures.size, 3, 'track owns the ground DataTexture, scenery toon ramp and konbini mist map');
   track.dispose();
   assert.equal(disposed.size, textures.size, 'owned textures are explicitly released');
   track.dispose();
