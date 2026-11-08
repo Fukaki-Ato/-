@@ -10,6 +10,7 @@ import type { PickupEntity } from '@tr/game/core/sim/trackGen.js';
 import { PICKUP_CENTER_Y } from '@tr/game/core/sim/collect.js';
 import { pickupTileFor } from './pickupTiles.js';
 import { createPickupModelSlots, type PickupModelLoader } from './pickupModels.js';
+import { applyWorldBend } from './stormspire/worldBend.js';
 
 /** 道具箱配色（未列出的道具用白色；正式贴图见 docs/05 §6） */
 const PICKUP_COLOR: Record<string, number> = { item_magnet: 0xb48cff, item_boots: 0x43d9a3 };
@@ -22,6 +23,9 @@ export function createPickupLayer(scene: THREE.Scene, laneWidth: number, models?
   const meshes: THREE.Mesh[] = [];
   for (let i = 0; i < PICKUP_MAX; i++) {
     const m = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ roughness: 0.35, emissiveIntensity: 0.5 }));
+    // world-bend 注入（幂等）：弯道量全局恒零时=恒等变换，仅雷脊驱动非零——道具箱要与弯带路面同弯，
+    // 否则远处分家（见 stormspire/worldBend.ts）。GLB 模型槽在近场恒直区，不注入。
+    applyWorldBend(m.material as THREE.MeshStandardMaterial);
     m.visible = false; scene.add(m); meshes.push(m);
   }
   // 3D 模型槽位（与箱槽位分离：近距道具占模型槽、远的占箱槽）

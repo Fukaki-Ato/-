@@ -2,7 +2,8 @@
  * 跑酷局渲染场景（render 层总装，docs/02 §5）
  * 本文件只做三件事：搭 Three.js 舞台、按固定步长推进 sim 并用插值 alpha 渲染、把事件翻成表现反馈。
  * 具体表现拆在同目录模块里：trackVisuals（道路）/ avatarRig（角色）/ coinField（金币）/
- * entityLayers（障碍·道具箱·云）/ vfxBurst（爆点）/ runDebugProbe（?debug 自动化探针）。
+ * entityLayers（障碍·道具箱·云）/ vfxBurst（爆点）/ runDebugProbe（?debug 自动化探针）/
+ * runTheme（主题派生 deriveRunStage + 输入接线 wireRunInput）。
  * 铁律：只读 sim 状态，不反写玩法数据（单向数据流）。
  */
 import * as THREE from 'three';
@@ -21,7 +22,10 @@ import { installRunProbe, uninstallRunProbe } from './runDebugProbe.js';
 import { createSpeedLines } from './speedLines.js';
 import { createTrackVisuals } from './trackVisuals.js';
 import { createBurstPool } from './vfxBurst.js';
-import { applyLightningFlash, createLightningFx, FLASH_LIGHT_GAIN, FLASH_TINT } from './lightning.js';
+import { applyLightningFlash, createLightningFx, FLASH_LIGHT_GAIN } from './lightning.js';
+import { deriveRunStage, wireRunInput } from './runTheme.js';
+import { createPostFx } from './postfx.js';
+import { createStormEnvMap, disposeStormEnvMap } from './stormspire/env.js';
 
 export interface RunCallbacks {
   onHud(h: {
@@ -63,19 +67,11 @@ export function createRunnerScene(
   adapter: PlatformAdapter, sim: RunnerSim, content: GameContent, cb: RunCallbacks,
   opts?: { themeId?: string },
 ) {
-  const runner = (content.game.params.runner ?? {}) as Record<string, number>;
-  const laneWidth = runner.laneWidth ?? 2.2;
-  /** 滑翔倒计时换算：core 以 heightM/glideS 匀速下降（movement.ts），HUD 显示与 s.gliding 一致的真实剩余秒数 */
-  const flight = (content.game.params.flight ?? {}) as Record<string, number>;
-  const glideFallMps = (flight.heightM ?? 4.6) / (flight.glideS ?? 1.8);
-  // 默认主题 = 大厅「场景切换」所选（storage 经 mainFlow 注入）；缺省回首个 live 条目（不硬编码 id，避免删主题时漏改）
-  const themeItems = (content.themes.items ?? []) as Record<string, unknown>[];
-  const theme = (opts?.themeId ? themeItems.find(t => t['id'] === opts.themeId) : undefined)
-    ?? themeItems.find(t => t['status'] === 'live') ?? themeItems[0];
-  const sky = (theme?.sky ?? { baseColor: '#8ED0F2', flashColor: '#FFF3C4' }) as { baseColor: string; flashColor: string };
-  const fogColor = ((theme?.fog as Record<string, unknown> | undefined)?.color as string | undefined) ?? sky.baseColor;
-  const tint = (theme?.vfxTint as string | undefined) ?? '#FFD98A';
-  const groundColor = (theme?.groundColor as string | undefined) ?? '#E3CFA4';
+  // 主题派生（runner 参数 / 主题查找 / sky·fog·vfxTint·groundColor·lighting·scenery 推导）拆到 runTheme.ts
+  const {
+    laneWidth, glideFallMps, sky, fogColor, tint, groundColor, scenery,
+    hemi, keyLight, HEMI_BASE, KEY_BASE, skyBase, fogBase, flashTint, flashGap,
+  } = deriveRunStage(content, opts);
   /** buff 派生视图：引擎原地更新同一个对象，渲染层缓存引用安全（docs/09 T2.2） */
   const fx = sim.fx;
 
@@ -94,25 +90,26 @@ export function createRunnerScene(
   const camera = new THREE.PerspectiveCamera(rig0.fov, width / height, 0.1, 160);
   camera.position.set(0, rig0.camY, rig0.camZ);
   camera.lookAt(0, rig0.lookY, LOOK_AHEAD_Z);
-  // 白天海滨的光：半球光天空浅蓝/地面暖沙，主光偏暖阳色（夜景那套冷光会让晴天发灰）
-  const hemi = new THREE.HemisphereLight(0xbfe3ff, 0xd8c39a, 1.15);
-  const HEMI_BASE = 1.15;
-  const keyLight = new THREE.DirectionalLight(0xfff2d0, 1.9);
-  const KEY_BASE = 1.9;
+  // 光（hemi/keyLight）与闪白插值色（skyBase/fogBase/flashTint）由 runTheme 按主题 lighting 派生；add 顺序不变
   scene.add(hemi);
   keyLight.position.set(3, 8, 4);
   scene.add(keyLight);
-  /** 闪白（雷电）：背景/雾色的基色与目标色缓存，逐帧按闪白强度插值 */
-  const skyBase = new THREE.Color(sky.baseColor), fogBase = new THREE.Color(fogColor), flashTint = new THREE.Color(FLASH_TINT);
   const lightning = createLightningFx(scene);
+  let ambientT = flashGap(); // 环境闪电间隔（theme.sky.flashEveryS 区间随机，缺省关闭）由 runTheme 派生
+  // 雷脊 IBL：stormspire 主题挂程序化环境贴图（另一路 env.ts 提供，null=无 IBL 自然降级）
+  const stormEnv = scenery === 'stormspire' ? createStormEnvMap(renderer) : null;
+  if (stormEnv) scene.environment = stormEnv;
+  // 后处理全主题启用（bloom 阈值 0.82 下非自发光场景几乎无泛光，参数不分主题）；wx/非 WebGL2 自动降级
+  const postfx = createPostFx(renderer, scene, camera);
 
   const track = createTrackVisuals(scene, laneWidth, {
     baseColor: sky.baseColor, flashColor: sky.flashColor, tint, groundColor,
     sky: { zenith: sky.baseColor, horizon: fogColor },
-  }, (theme?.['scenery'] as string | undefined) ?? 'seaside');
+  }, scenery);
   const avatar = createAvatar(scene, laneWidth, sim.loadout, adapter);
-  const coinField = createCoinField(scene, laneWidth);
-  const obstacleLayer = createObstacleLayer(scene, laneWidth);
+  const coinField = createCoinField(scene, laneWidth, { envMap: stormEnv, scenery });
+  // scenery 来源与 createTrackVisuals 同款（themes.json 的 scenery 字段）：stormspire 时障碍层换雷脊废墟皮
+  const obstacleLayer = createObstacleLayer(scene, laneWidth, scenery);
   // 道具 3D 模型（items.json model.prefab/spin）：磁铁有文件→近距换 3D，其余预留路径
   // 文件缺失→加载器返回 null，保持贴图箱（wx 无 extras.readBinary 同理），捞取判定不受影响
   const pickupLayer = createPickupLayer(scene, laneWidth, createPickupModelLoader(content, adapter));
@@ -125,24 +122,8 @@ export function createRunnerScene(
   let chestX = 0, chestY = avatar.chestY;
   const fireAtPlayer = (color?: number) => bursts.fireAt(chestX, chestY, BURST_Z, color);
 
-  // ---------- 输入 → sim（v2：手势与键盘合并为单个 onInput 订阅，§7.8） ----------
-  const offInput = adapter.onInput(e => {
-    if (e.type === 'doubleTap') { sim.applyAction('skill'); return; } // 主动技能：双击屏幕（skills.json trigger=double_tap）
-    if (e.type === 'swipe') {
-      if (e.dir === 'left') sim.applyAction('laneL');
-      else if (e.dir === 'right') sim.applyAction('laneR');
-      else if (e.dir === 'up') sim.applyAction('jump');
-      else if (e.dir === 'down') sim.applyAction('slide');
-      return;
-    }
-    if (e.type !== 'key' || e.phase !== 'down') return; // v1 隐式仅 down（§7.8）；up 留给 UI 按压态
-    const code = e.code;
-    if (code === 'ArrowLeft') sim.applyAction('laneL');
-    else if (code === 'ArrowRight') sim.applyAction('laneR');
-    else if (code === 'ArrowUp' || code === 'Space') sim.applyAction('jump');
-    else if (code === 'ArrowDown') sim.applyAction('slide');
-    else if (code === 'KeyE' || code === 'ShiftLeft' || code === 'ShiftRight') sim.applyAction('skill');
-  });
+  // ---------- 输入 → sim（v2）：swipe/key → applyAction 映射拆到 runTheme.ts（wireRunInput） ----------
+  const offInput = wireRunInput(adapter, sim);
 
   // ---------- 窗口尺寸变化（v2 新增 D9）：重设绘制缓冲 + 相机宽高比，退订进 dispose ----------
   const offResize = adapter.canvas.onResize(size => {
@@ -150,6 +131,7 @@ export function createRunnerScene(
     renderer.setSize(size.width, size.height, false);
     camera.aspect = size.width / size.height;
     camera.updateProjectionMatrix();
+    postfx.resize(size.width, size.height, size.dpr); // composer 与 renderer 同口径（px=dpr×css）
   });
 
   // ---------- 主循环：固定步长推进 + 插值渲染 ----------
@@ -209,7 +191,13 @@ export function createRunnerScene(
     const airborne = fx.flyT > 0 || s.gliding;
     const boost = Math.max(0, fx.speedMul - 1); // 雷霆冲刺等提速 buff 的表现强度
     speedLines.update(dist, boost);
+    postfx.update(dt, fx.speedMul); // 后处理冲刺联动：暗角收紧/饱和压低/bloom 微增（postfx 内部 lerp）
     // 雷电闪白：灯光增益 + 背景/雾色向冷白插值（MC 闪电式全场变亮，约 0.26s 回落）
+    ambientT -= dt;
+    if (ambientT <= 0) {
+      ambientT = flashGap();
+      lightning.strike(Math.round(Math.random() * 2 - 1), dist + 14 + Math.random() * 20, laneWidth);
+    }
     const flash = lightning.update(dt, dist);
     hemi.intensity = HEMI_BASE + flash * FLASH_LIGHT_GAIN;
     keyLight.intensity = KEY_BASE + flash * FLASH_LIGHT_GAIN;
@@ -221,7 +209,10 @@ export function createRunnerScene(
     camY += (rig.camY - camY) * CAM_FOLLOW;
     lookY += (rig.lookY - lookY) * CAM_FOLLOW;
     camera.position.x = camX + sk;
-    camera.position.y = camY + sk;
+    // 高速行驶的镜头微颠簸（用户点名）：仅地面态叠加，空中机位本身在升降、再叠会晕；
+    // 幅度口径 0.03m≈半块挡风玻璃的呼吸感（23Hz 的 0.012m 是引擎细碎抖动），远小于最低障碍高度，不干扰预判。
+    // 只加在 position.y 显示值上、不进 camY 平滑状态：颠簸是镜头噪声，不该被平滑器追赶也不该回摆。
+    camera.position.y = camY + sk + (airborne ? 0 : Math.sin(s.t * 10) * 0.03 + Math.sin(s.t * 23) * 0.012);
     camera.position.z = rig.camZ;
     camera.lookAt(camX, lookY, LOOK_AHEAD_Z);
     const targetFov = rig.fov + Math.min(SPEED_FOV_MAX, boost * SPEED_FOV_PER_MUL); // 空中视野更广；加速再扩
@@ -229,7 +220,8 @@ export function createRunnerScene(
       camera.fov += (targetFov - camera.fov) * FOV_LERP;
       camera.updateProjectionMatrix();
     }
-    renderer.render(scene, camera);
+    if (postfx.composer) postfx.composer.render(); // 后处理链尾 OutputPass 负责色彩空间收尾
+    else renderer.render(scene, camera); // 降级路径（wx/非 WebGL2/构建失败）走裸渲染
   }
 
   function pushHud() {
@@ -289,6 +281,8 @@ export function createRunnerScene(
     intro?.dispose(); // 只弃面板自身；视频元素与贴图归 apps 侧复用
     lightning.dispose();
     track.dispose();
+    postfx.dispose(); // composer/逐 pass/双缓冲 target 全量释放（wx 降级态是 no-op）
+    if (stormEnv) disposeStormEnvMap(stormEnv);
     renderer.dispose();
     scene.traverse(o => {
       const m = o as THREE.Mesh;

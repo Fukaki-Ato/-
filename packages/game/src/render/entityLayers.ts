@@ -2,11 +2,15 @@
  * 赛道实体表现层：障碍池 / 云团池（docs/02 §8 对象池，每帧零分配）
  * 只把 sim 的实体数组映射到预建的 Mesh 槽位上，不做任何玩法判定。
  * 道具表现层已拆到 pickupLayer.ts（自带 3D 模型槽位），勿在此再造一份。
+ * 障碍皮肤：scenery === 'stormspire'（雷脊显式分支）时六类障碍换程序化废墟皮
+ * （stormspire/obstacleSkin.ts，只换可视替身、判定口径零改动）；zap/step 与其余主题全走默认盘。
  */
 import * as THREE from 'three';
 import type { CloudEntity, ObstacleEntity } from '@tr/game/core/sim/trackGen.js';
 import { RAMP_TOP_FLAT_M, obstacleX } from '@tr/game/core/sim/collision.js';
 import { createPosterPicker, posterSize } from './adPosters.js';
+import { createStormspireObstacleSkin, SKIN_CLASSES } from './stormspire/obstacleSkin.js';
+import { applyWorldBend } from './stormspire/worldBend.js';
 
 /** 障碍配色（docs/05 §2：敌对品红/警示黄，可交互蓝青） */
 const OBS_COLOR: Record<string, number> = { low: 0xd9a24a, high: 0x7fd1ff, full: 0xff5fa2, vehicle: 0x4a6fd9, hazard: 0xb48cff, moving: 0xff5fa2, step: 0x9fd8ff };
@@ -53,8 +57,13 @@ function createRampGeometry(): THREE.BufferGeometry {
   return g;
 }
 
-export function createObstacleLayer(scene: THREE.Scene, laneWidth: number) {
+export function createObstacleLayer(scene: THREE.Scene, laneWidth: number, scenery = 'seaside') {
   const boxGeo = new THREE.BoxGeometry(1, 1, 1);
+  // 雷脊显式分支：只有 scenery === 'stormspire' 才建皮肤实例池；其余主题（seaside/coast/konbini/
+  // harbor/未登记 id）skin 恒为 null，update 逐行与旧版完全一致（新增 0 个对象、0 条 draw call）。
+  const skin = scenery === 'stormspire'
+    ? createStormspireObstacleSkin(scene, boxGeo, { obsMax: OBS_MAX, lowVisH: LOW_VISUAL_H, barLowY: BAR_LOW_Y })
+    : null;
   const postMat = new THREE.MeshStandardMaterial({ color: 0x8a93a8, roughness: 0.5, metalness: 0.3 });
   // 闪电圈专用几何：黑色圆盘（平放的圆柱薄片）与地面闪电标志（Shape 挤出的平面片）
   const zapDiscGeo = new THREE.CylinderGeometry(1.0, 1.05, 0.06, 22);
@@ -107,6 +116,21 @@ export function createObstacleLayer(scene: THREE.Scene, laneWidth: number) {
     units.push({ bar, posts, band, disc, bolt, ramp, rampTop, poster });
   }
 
+  // 雷脊假弯道：默认盘残件（zap 圆盘/闪电标志/step 斜坡/海报/电弧光带/横杆立柱）与雷脊皮肤
+  // 一样跟着地面弯，否则远处未换皮障碍漂出弯道（皮肤件在 obstacleSkin.ts 内注入；
+  // applyWorldBend 幂等，重复到达直接跳过，见 stormspire/worldBend.ts）
+  if (scenery === 'stormspire') {
+    applyWorldBend(postMat);
+    applyWorldBend(rampMat);
+    for (const u of units) {
+      applyWorldBend(u.bar.material as THREE.Material);
+      applyWorldBend(u.band.material as THREE.Material);
+      applyWorldBend(u.disc.material as THREE.Material);
+      applyWorldBend(u.bolt.material as THREE.Material);
+      applyWorldBend(u.poster.material as THREE.Material);
+    }
+  }
+
   const hideUnit = (u: ObsUnit) => {
     u.bar.visible = false;
     u.band.visible = false;
@@ -120,6 +144,7 @@ export function createObstacleLayer(scene: THREE.Scene, laneWidth: number) {
 
   return {
     update(list: ObstacleEntity[], dist: number, t: number) {
+      if (skin) skin.beginFrame(); // 皮肤实例每帧按当前可见障碍全量重写（count 归零即整池不可见）
       let i = 0;
       for (const o of list) {
         if (i >= OBS_MAX) break;
@@ -133,10 +158,12 @@ export function createObstacleLayer(scene: THREE.Scene, laneWidth: number) {
         const isZap = o.zap === true;
         // moving（摆锤/挡板）横摆位置与 core 判定同源（obstacleX：含「不得扫出路面」限幅与脏数据防呆）
         const ox = o.cls === 'moving' ? obstacleX(o, t, laneWidth) : o.lane * laneWidth;
+        // 雷脊皮肤：六类障碍换皮（zap 闪电圈/step 斜坡不在内）；非 stormspire 恒 false ⇒ 原路径
+        const skinned = skin !== null && !isZap && o.cls !== 'step' && SKIN_CLASSES.has(o.cls);
         /** 正面海报（广告墙竖版图 / 矮障·横杆·车头的方版图）；不挂或宿主未注入时为 null ⇒ 纯色挡板 */
         const slot = pickPoster(o);
         const m = u.bar;
-        m.visible = !isZap && o.cls !== 'step'; // 闪电圈用圆盘+闪电标志、斜坡用坡道几何，不画通用方块
+        m.visible = !isZap && o.cls !== 'step' && !skinned; // 闪电圈用圆盘+闪电标志、斜坡用坡道几何，不画通用方块
         let sx = o.w, sy = o.h, sz = o.d, py = o.h / 2;
         if (m.visible) {
           const mat = m.material as THREE.MeshStandardMaterial;
@@ -156,7 +183,7 @@ export function createObstacleLayer(scene: THREE.Scene, laneWidth: number) {
           m.position.set(ox, py - sinkY, z);
         }
         const ps = u.poster;
-        ps.visible = slot !== null && m.visible;
+        ps.visible = slot !== null && m.visible; // 换皮障碍 bar 不可见 ⇒ 海报自动不画（废墟不贴二次元海报）
         if (ps.visible && slot !== null) { // 海报内接「可见盒体」并与其同心：横杆在 1.2m 以上，不能按贴地算
           const img = slot.tex.image as { width?: number; height?: number } | undefined;
           const fit = posterSize(sx, sy, img?.width ?? 0, img?.height ?? 0);
@@ -202,14 +229,16 @@ export function createObstacleLayer(scene: THREE.Scene, laneWidth: number) {
         }
         for (let pi = 0; pi < 2; pi++) { // 高杆支撑柱：立在横杆两端，从地面顶到杆顶
           const post = u.posts[pi];
-          post.visible = o.cls === 'high';
+          post.visible = o.cls === 'high' && !skinned; // 雷脊换皮：金属立柱换成石柱+柱头（obstacleSkin）
           if (post.visible) {
             post.scale.set(0.14, o.h, 0.14);
             post.position.set(ox + (pi === 0 ? -1 : 1) * (o.w / 2 - 0.07), o.h / 2 - sinkY, z);
           }
         }
+        if (skin !== null && skinned) skin.emit(o, ox, z, sinkY); // 雷脊：写本障碍的皮肤实例（判定位姿复用）
       }
       for (; i < OBS_MAX; i++) hideUnit(units[i]);
+      if (skin) skin.endFrame(); // 收尾：按写满的实例数定 count 与可见性（≤7 条新增 draw call）
     },
   };
 }

@@ -60,6 +60,22 @@
       "versions": [
         { "ver": "1.0.0", "date": "2026-11-06", "change": "第三个跑酷场景：黄昏渔港铁道。网搜精密场景提示词合成（工业视差分层 Ansimuz + 霓虹夜城 5 层视差配方 → 橙青调渔港）：远景剪影+门式起重机、长仓库+集装箱堆（撞色 2-3 层错缝）、系船柱/栈桥暖灯/油桶/渔网架/渔船桅杆五层程序化侧景，约 20 个 draw call" }
       ]
+    },
+    {
+      "id": "theme_stormspire", "status": "draft",
+      "name": { "zh-CN": "天穹雷脊" },
+      "sky": { "shader": "thunder_sky", "baseColor": "#16233E", "flashColor": "#CFE4FF", "flashEveryS": [7, 14] },
+      "fog": { "color": "#3D6B8F", "density": 0.012 },
+      "track": { "railMat": "mat_stormspire_rail", "groundTiles": ["tile_storm_a"] },
+      "props": [],
+      "scenery": "stormspire",
+      "groundColor": "#24425A",
+      "lighting": { "hemiSky": "#7FA8CC", "hemiGround": "#1A2438", "hemiIntensity": 0.95, "key": "#BFD8EF", "keyIntensity": 1.15 },
+      "music": "assets/audio/bgm/run.mp3", "sfxSet": "city",
+      "vfxTint": "#FFC145",
+      "versions": [
+        { "ver": "1.0.0", "date": "2026-11-08", "change": "第四个跑酷场景：天穹雷脊（Phase A 平面版，docs/stormspire-brief.md）。无尽雷暴云海之上的驭雷者废墟：三车道读作云海之上的雷渡石桥，两侧浮空岛链（八原型实例化）+ 雷脊塔远景剪影 + 导雷铜环横跨 + 摆链/风车/瀑布动件 + 风暴魟群与云渊鲸剪影；flashEveryS [7,14] 启用环境闪电（渲染层接线）。调色板 7 色：深渊靛 #16233E / 风暴青 #3D6B8F / 云白 #E9EFF3 / 石灰岩 #97A0AE / 铜绿 #4E9B8F / 熔金电光 #FFC145 / 苔灰绿 #6E8F6B" }
+      ]
     }
   ]
 }

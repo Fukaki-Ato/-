@@ -224,8 +224,13 @@ export class TrackGen {
       if (fresh.length) candidates = fresh;
     }
     if (d >= this.blockFromDiff && (this.blockWeights[1] ?? 0) + (this.blockWeights[2] ?? 0) > 0) {
-      const want = this.rng.weighted([1, 2], k => this.blockWeights[k] ?? 0);
-      const fit = candidates.filter(p => this.maxBlockedLanes(p) === want);
+      // want=0（喘息段）：无封堵模板（纯金币/低障）也能在 laneBlock 过滤中被抽中——
+      // 这是「障碍疏密节奏」的开关：obstacles.json laneBlock.weights 配 "0" 即启用呼吸段，
+      // 不配则与旧口径完全一致（0 权重 = 永不抽中，体感零变化）。
+      const want = this.rng.weighted([0, 1, 2], k => this.blockWeights[k] ?? 0);
+      const fit = want === 0
+        ? candidates.filter(p => this.maxBlockedLanes(p) === 0)
+        : candidates.filter(p => this.maxBlockedLanes(p) === want);
       if (fit.length) candidates = fit; // 该封堵数无可用模板时保留原池（不会死锁）
     }
     if (!candidates.length) throw new Error('TrackGen.pickPattern: 模板池为空（configValidator 应已拦截）');
