@@ -25,8 +25,29 @@ export const FOV_GROUND = 55, FOV_AIR = 68;
 
 export interface CamTargets { camY: number; lookY: number; camZ: number; fov: number }
 
-/** 按角色高度 y 与是否空中，派生机位/注视点/纵深/视野目标（渲染层按 CAM_FOLLOW 平滑过渡） */
-export function camTargets(y: number, airborne: boolean): CamTargets {
+/**
+ * 按角色高度 y 与是否空中，派生机位/注视点/纵深/视野目标（渲染层按 CAM_FOLLOW 平滑过渡）。
+ * @param flip 反重力上下文（B-7，缺省 1=正常重力，既有调用/回归零改动）：flip=-1 时把
+ *  地面/空中机位式照代 y 后绕天花板平面镜像——camY=ceilH−(y·比率+基座)、lookY 同理，
+ *  相机落到下方仰视天花板上的倒挂角色；camZ/fov 不镜像（纵深与视野无上下语义）。
+ */
+export function camTargets(y: number, airborne: boolean, flip: 1 | -1 = 1, ceilH = 0): CamTargets {
+  if (flip === -1) {
+    if (airborne) {
+      return {
+        camY: ceilH - (y * CAM_AIR_Y_RATIO + CAM_AIR_Y_BASE),
+        lookY: ceilH - (y * LOOK_AIR_Y_RATIO + LOOK_AIR_Y_BASE),
+        camZ: CAM_Z_AIR,
+        fov: FOV_AIR,
+      };
+    }
+    return {
+      camY: ceilH - (y * CAM_Y_RATIO_GROUND + CAM_Y_BASE_GROUND),
+      lookY: ceilH - y * CAM_Y_RATIO_GROUND,
+      camZ: CAM_Z_GROUND,
+      fov: FOV_GROUND,
+    };
+  }
   if (airborne) {
     return {
       camY: y * CAM_AIR_Y_RATIO + CAM_AIR_Y_BASE,

@@ -201,3 +201,28 @@ test('footDust：池满时静默丢弃，不抛异常', () => {
   dust.dispose();
   assert.equal(scene.children.length, 0, 'dispose 后全部移出场景');
 });
+
+test('footDust B-7：flip=-1 时尘土镜像贴天花板（y\'=2·ceilH−y），微粒先弹离顶面再被「回落」拉回', () => {
+  const scene = new THREE.Scene();
+  const dust = createFootDust(scene);
+  const g = firstPuff(scene);
+  // 探测口径 y=支撑面+抬升（ceilH+0.03）→ 镜像后贴在顶面下侧同抬升处（ceilH−0.03），防与吊顶共面
+  dust.spawn(0.5, 4.63, -0.2, -1, 4.6);
+  assert.ok(Math.abs(g.position.x - 0.5) < 1e-9 && Math.abs(g.position.z + 0.2) < 1e-9
+    && Math.abs(g.position.y - (2 * 4.6 - 4.63)) < 1e-9, `镜像式 y'=2·ceilH−y，实测 ${g.position.y}`);
+  // 微粒初速反相：第一帧向「离开顶面」方向（向下）弹开；0.1→0.3s 之间被反向重力拉回顶面（y 回升）
+  const speck = g.children[1]; // children[0]=冲击环，其后 3 粒微粒
+  dust.update(1 / 60, 0);
+  assert.ok(speck.position.y < 0, `倒挂尘微粒应先向下弹离顶面，实测 ${speck.position.y.toFixed(3)}`);
+  dust.update(0.1, 0);
+  const y1 = speck.position.y;
+  dust.update(0.2, 0);
+  assert.ok(speck.position.y > y1, `0.1→0.3s 应被反向重力拉回顶面（${y1.toFixed(3)}→${speck.position.y.toFixed(3)}）`);
+  // flip=1 缺省（既有调用点）与地面口径逐字节同值
+  const scene2 = new THREE.Scene();
+  const dust2 = createFootDust(scene2);
+  const g2 = firstPuff(scene2);
+  dust2.spawn(0.5, 4.63, -0.2, 1, 4.6);
+  assert.deepEqual([g2.position.x, g2.position.y, g2.position.z], [0.5, 4.63, -0.2], 'flip=1 不做镜像');
+  dust.dispose(); dust2.dispose();
+});

@@ -26,6 +26,13 @@ const LEAN_PER_M = -0.08, STUN_ROLL = 0.14;
 const PITCH_FLY = 0.85, PITCH_GLIDE = 0.5;
 /** 判定「离地」的高度余量（米）：站在支撑面上时 y=支撑面高度，跑动姿态；超出该余量才算腾空 */
 const AIRBORNE_EPS = 0.05;
+/** 倒挂滚转时长（秒）：B-7——与 sim flip 事件节奏（B-6 约 0.35s 镜头滚转）对齐，dt 累计推进 */
+const FLIP_ROLL_S = 0.35;
+/** 倒挂合成蹬地的步频口径（镜像 animAvatar.ts 内部常量，未导出故就地同值）：Run clip 0.725s、
+ *  步幅 2.25m/周期、timeScale 钳 [0.6,1.4]——半周期（左右脚交替）放一粒天花板尘（B-7） */
+const RUN_CLIP_S = 0.725, RUN_STRIDE_M = 2.25, RUN_TS_MIN = 0.6, RUN_TS_MAX = 1.4;
+/** 合成蹬地的尘土抬升（米）：与 animFootfall.DUST_LIFT_Y 同值（贴支撑面防共面，镜像后贴顶面下侧） */
+const DUST_LIFT_Y = 0.03;
 
 /**
  * 姿态档选择（纯函数，可回归测试）：站在支撑面（地面/车顶/坡道）上就是**跑动**，
@@ -75,6 +82,9 @@ export function createAvatar(scene: THREE.Scene, laneWidth: number, look: Loadou
   // 落脚尘土（render 层）：GLB 路径专属。脚行程被腿长锁死在 0.65m/周期而 12 m/s 下身体前进
   // 6.7m/周期，没有落地反馈就读不出在跑；冲击环贴地随赛道平流，把滑步读成蹬地。
   const dust = createFootDust(scene);
+  // B-7 翻转渲染状态（闭包，update 从 s 刷新）：rollK=滚转进度 0..1（0=正向 / 1=roll π 倒挂），
+  // flipStepD=倒挂合成蹬地的里程相位（米），dFlip/dCeil=落脚尘的翻转上下文（探测回调读取）。
+  let rollK = 0, flipStepD = 0, dFlip: 1 | -1 = 1, dCeil = 0;
   // 异步热替换：加载完成前 procGroup 照常驱动；任何失败都静默保留程序化路径（见 animAvatar.ts 头）。
   // ?anim= QA 锁由壳层经 adapter.extras.urlParams 注入（wx 无 location.search，缺省 undefined）。
   let glb: AnimAvatar | null = null;
@@ -87,7 +97,7 @@ export function createAvatar(scene: THREE.Scene, laneWidth: number, look: Loadou
         if (!a) return;
         if (disposed) { a.dispose(); return; } // 双保险：fetch 期间本局已销毁
         glb = a;
-        a.setFootfallHandler((x, y, z) => dust.spawn(x, y, z));
+        a.setFootfallHandler((x, y, z) => dust.spawn(x, y, z, dFlip, dCeil)); // B-7：flip=-1 时由 footDust 镜像贴顶
         scene.add(a.group);
         // 挂件从程序化躯干迁到骨骼：GLB 姿态由 clip 驱动，挂件必须跟着骨骼走才不漂移
         for (const mesh of [flame, helmet, shieldOrb]) model.body.remove(mesh);
@@ -106,8 +116,10 @@ export function createAvatar(scene: THREE.Scene, laneWidth: number, look: Loadou
   return {
     /** 当前可见的角色组（GLB 就绪后是 gltf.scene，否则程序化模型） */
     get group() { return glbReady && glb ? glb.group : procGroup; },
-    /** 胸口世界高度：爆点、护盾等表现对齐到这里，而不是对齐脚底 */
-    get chestY() { return glbReady && glb ? glb.chestY : model.chestY; },
+    /** 胸口相对脚底的高度：爆点、护盾等表现对齐到这里，而不是对齐脚底。
+     *  B-7 身体挂点镜像：倒挂时挂点垂向翻转（chest 在脚底原点下方），按滚转角 cos 插值——
+     *  正是挂点绕脚底原点 roll 的真实 y 投影；flip=1 时乘 cos(0)=1 与旧版逐字节同值 */
+    get chestY() { return (glbReady && glb ? glb.chestY : model.chestY) * Math.cos(rollK * Math.PI); },
     /** 局末释放：停 GLB 混流器（几何体由 runnerScene 统一 traverse 销毁） */
     dispose() { glb?.dispose(); dust.dispose(); },
     /** @param dt 帧间隔（秒），驱动 GLB 混流器 */
@@ -116,12 +128,18 @@ export function createAvatar(scene: THREE.Scene, laneWidth: number, look: Loadou
       const flash = (s.invulnT > 0 || fx.invincible) ? (Math.sin(s.t * FLASH_HZ) > 0 ? FLASH_ON : FLASH_OFF) : 0;
       const lean = (s.lane * laneWidth - s.x) * LEAN_PER_M + (stunned ? Math.sin(s.t * 26) * STUN_ROLL : 0);
       const flying = fx.flyT > 0;
+      // B-7 倒挂滚转：目标由 s.flip 推导（进区 -1 / 出区 1，与 sim flip 事件同步），0.35s 内 roll 0↔π
+      // 绕前进轴转半圈（脚朝天、身挂天花板）；dt 累计推进，确定性无随机，roll=0 时与旧版逐字节同值
+      const rollT = s.flip === -1 ? 1 : 0;
+      rollK = rollT > rollK ? Math.min(rollT, rollK + dt / FLIP_ROLL_S) : Math.max(rollT, rollK - dt / FLIP_ROLL_S);
+      const roll = rollK * Math.PI;
+      dFlip = s.flip; dCeil = s.ceilH; // 刷新落脚尘上下文（探测回调在本帧稍后触发，读到的必是本帧值）
 
       if (glbReady && glb) {
         // 先落位再跑混流器：animAvatar 的落脚探测读的是本帧脚世界坐标，
         // 旧顺序（先 update 后 setPosition）会让尘土每晚一帧、12 m/s 下偏 0.2m。
         glb.group.position.set(s.x, s.y, 0);
-        glb.group.rotation.z = lean;
+        glb.group.rotation.z = lean + roll; // roll 与 lean 同轴（前进轴）叠加；flip=1 时 roll=0 值不变
         glb.update(dt, s, fx);
         // 不写 rotation.x：飞行/滑翔俯角与死亡翻倒做在 clip 里，外层再叠会拧成扭曲姿勢
         glb.group.traverse(o => {
@@ -137,13 +155,23 @@ export function createAvatar(scene: THREE.Scene, laneWidth: number, look: Loadou
         model.update(s.t, s.distance, mode, stunned ? 0.35 : 1, flash);
 
         procGroup.position.set(s.x, s.y, 0);
-        procGroup.rotation.z = lean;
+        procGroup.rotation.z = lean + roll; // 同 GLB 路径：侧倾与倒挂滚转同轴叠加
         // 死亡：整人绕脚底翻倒（docs/01 §8 失败动画=被电麻定住后翻倒，不做受伤表现）
         if (!s.alive) procGroup.rotation.x = s.topple;
         else if (flying) procGroup.rotation.x = PITCH_FLY * 0.35;
         else if (s.gliding) procGroup.rotation.x = PITCH_GLIDE * 0.3;
         else procGroup.rotation.x = 0;
       }
+
+      // B-7 倒挂落脚尘（GLB 路径专属，与地面尘同口径）：animFootfall 判的是「脚抬高离开触地区」，
+      // 倒挂位形下脚全程低于支撑面上沿、探测恒不触发——贴顶跑（y 已钳在 supportY=ceilH）时按
+      // 步频口径（镜像 animAvatar 的 ts 公式）合成蹬地，y 传支撑面+抬升，footDust 镜像贴到顶面下侧
+      if (glbReady && glb && s.flip === -1 && s.y >= s.supportY - AIRBORNE_EPS) {
+        const spd = (s.distance - s.prevDistance) / STEP_DT;
+        flipStepD += spd * dt;
+        const half = spd * (RUN_CLIP_S / Math.min(RUN_TS_MAX, Math.max(RUN_TS_MIN, spd / RUN_STRIDE_M))) * 0.5;
+        if (spd > 0 && flipStepD >= half) { flipStepD -= half; dust.spawn(s.x, s.y + DUST_LIFT_Y, 0, -1, s.ceilH); }
+      } else flipStepD = 0; // 出区/腾空清相位：回来时不补发过期蹬地（与 animFootfall.reset 同思路）
 
       flame.visible = flying || s.gliding;
       if (flame.visible) {

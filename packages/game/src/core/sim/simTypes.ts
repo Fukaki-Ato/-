@@ -42,6 +42,9 @@ export type SimEvent =
   | { type: 'revive'; left: number }
   /** surge（M4 喷发判定化）：进入喷发段一次性事件（lane/worldZ=喷柱落点；渲染层接 eruption 喷柱+闪橙） */
   | { type: 'surge'; lane: number; worldZ: number }
+  /** flip（B-6 反重力区）：翻转状态实际变化时发一次（进区/出区各一次；飞行/滑翔进区按 B-3 落地后才翻）。
+   *  渲染/音频据此做约 0.35s 镜头滚转 + 音效下潜；ceilH=区顶高（出区回 0） */
+  | { type: 'flip'; flip: 1 | -1; ceilH: number }
   | { type: 'cross'; kind: string; lane: number; worldZ: number };
 
 export interface RunnerState {
@@ -63,6 +66,10 @@ export interface RunnerState {
   /** 当前可站立支撑面高度（米，0=地面；>0=列车顶/坡道面）。每帧由 movement 算好后写回：
    *  渲染层据此区分「站在支撑面上跑」与「真正离地」，sim→render 单向数据流 */
   supportY: number;
+  /** 反重力区状态（B-2）：flip=重力方向（1 正常 / -1 倒挂跑天花板）；ceilH=所在区顶高（0=不在区内）。
+   *  每步 step 由 zoneAt(distance) 推导写入（单向门：飞行/滑翔中不翻转，B-3），渲染层只读不反写 */
+  flip: 1 | -1;
+  ceilH: number;
 }
 
 /** 空装备：未指定角色时的默认手感（保持 M1 行为不变） */
@@ -84,5 +91,6 @@ export function initialRunnerState(): RunnerState {
     tideLevel: 0,
     surgeWarn: 0,
     supportY: 0,
+    flip: 1, ceilH: 0,
   };
 }

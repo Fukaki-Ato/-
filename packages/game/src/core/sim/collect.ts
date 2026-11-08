@@ -44,7 +44,8 @@ export function collectCoins(d: CollectDeps): void {
   for (const c of coins) {
     if (c.taken) continue;
     const z = s.distance - c.worldZ; // 负=前方逼近中
-    const yOK = Math.abs(s.y + 0.9 - (c.y ?? 0.65)) < COIN_Y_TOL; // 空中金币带 / 地面金币各自匹配
+    // 身体中心（B-5：倒挂镜像 s.y+flip*0.9——垂挂在天花板下时中心在 s.y−0.9）；空中金币带 / 区内天花板带 / 地面金币各自匹配
+    const yOK = Math.abs(s.y + s.flip * 0.9 - (c.y ?? 0.65)) < COIN_Y_TOL;
     // 磁铁：身前 magnetRadius 米内三车道金币直接吸取（渲染层做飞向角色的吸入表现）
     if (fx.magnetT > 0 && yOK && z <= coinFront && z >= -fx.magnetRadius) { takeCoin(d, c); continue; }
     if (z >= coinFront && !c.passed) {

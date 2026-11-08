@@ -1287,5 +1287,11 @@
     "ref": "obs_lightning_circle",
     "everyM": 200,
     "fromM": 200
+  },
+  "antigrav": {
+    "lengthM": 90,
+    "everyM": 500,
+    "fromM": 600,
+    "ceilingH": 4.6
   }
 }
