@@ -101,7 +101,7 @@ export function createRibs(scene: THREE.Scene) {
       for (const inst of insts) {
         for (const p of inst.items) {
           p.z += move;
-          if (p.z > WRAP_Z) p.z -= LOOP;
+          p.z -= Math.ceil((p.z - WRAP_Z) / LOOP) * LOOP;
         }
       }
       // 呼吸 ±0.35m（§4.2）：sin 按 4 帧轮写分桶（§4.0 纪律 5，20Hz 采样，确定性帧序取桶）

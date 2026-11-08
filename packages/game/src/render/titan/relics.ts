@@ -237,14 +237,14 @@ export function createRelics(scene: THREE.Scene) {
       for (const inst of insts) {
         for (const p of inst.items) {
           p.z += move;
-          if (p.z > WRAP_Z) p.z -= LOOP;
+          p.z -= Math.ceil((p.z - WRAP_Z) / LOOP) * LOOP;
         }
         writeAll(inst);
       }
       // 魂火 ±8% 呼吸（相位互错）+ 火星爆：6~11s 确定性相位，窗 0.07s ≈ 2~3 帧（landmarks 电弧口径）
       for (let i = 0; i < LAMPS; i++) {
         const f = flames[i];
-        f.z += move; if (f.z > WRAP_Z) f.z -= LOOP;
+        f.z += move; f.z -= Math.ceil((f.z - WRAP_Z) / LOOP) * LOOP;
         const sc = 1 + Math.sin(t * 1.1 + f.ph) * 0.08;
         const fy = f.y + Math.sin(t * 0.9 + f.ph) * 0.12;       // 悬浮微浮沉
         compose(flameMesh, i, f.x, fy, f.z, t * 0.7 + f.ph, f.ph, 0, sc);
@@ -263,7 +263,7 @@ export function createRelics(scene: THREE.Scene) {
       for (const inst of handInsts) {
         for (const p of inst.items) {
           p.z += move;
-          if (p.z > WRAP_Z) p.z -= LOOP;
+          p.z -= Math.ceil((p.z - WRAP_Z) / LOOP) * LOOP;
         }
       }
       for (const br of handBreath) br.p.y = br.baseY + Math.sin(t * 0.6283 + br.ph) * 0.1;

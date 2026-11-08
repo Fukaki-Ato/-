@@ -42,7 +42,7 @@ export function createTitanProps(scene: THREE.Scene): SceneryProps {
   return {
     update(move: number, t: number) {
       moveAccum += move;
-      setTitanBreath(t, Math.min(2, Math.max(1, skull.awakeBoost))); // 醒态呼吸 +50%（1→1.5）
+      setTitanBreath(t, 1 + 0.5 * Math.min(1, Math.max(0, skull.awakeBoost))); // awakeBoost=睁眼渐起 k(0→1)，amp 1→1.5（醒态 +50%）
       bodyKit.update(move, t);
       mist.update(move, t);
       relics.update(move, t);

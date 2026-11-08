@@ -190,7 +190,7 @@ export function createBodyKit(scene: THREE.Scene): SceneryProps {
       for (const inst of insts) {
         for (const p of inst.items) {
           p.z += move;
-          if (p.z > WRAP_Z) p.z -= LOOP;
+          p.z -= Math.ceil((p.z - WRAP_Z) / LOOP) * LOOP;
         }
         writeAll(inst);
       }
@@ -198,7 +198,7 @@ export function createBodyKit(scene: THREE.Scene): SceneryProps {
       for (const inst of wallInsts) {
         for (const p of inst.items) {
           p.z += move * 0.55;
-          if (p.z > 60) p.z -= 300;
+          p.z -= Math.ceil((p.z - 60) / 300) * 300;
         }
         writeAll(inst);
       }

@@ -91,7 +91,7 @@ export function createVeils(scene: THREE.Scene) {
       for (let i = 0; i < cap; i++) {
         const s = defs[i]!;
         s.z += move;
-        if (s.z > WRAP_Z) s.z -= LOOP;
+        s.z -= Math.ceil((s.z - WRAP_Z) / LOOP) * LOOP;
         if ((i & 1) === half) s.ang = Math.sin((t * Math.PI * 2) / s.per + s.ph) * amp; // 动效改写：轮写桶内才重算
         compose(strands, i, s.x, s.ay, s.z, s.ang, s.r * 2, s.len, s.r * 2);
         // 束尾魂火珠：钉在束的尾端（随缓存摆角摆出），随滚动基线重写

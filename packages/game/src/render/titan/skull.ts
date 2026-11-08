@@ -111,18 +111,26 @@ export function createSkull(scene: THREE.Scene): TitanSkull {
   // ---- 瞳孔（右窝）+ 光晕壳 + 眼窝点光 + 涟漪环：闩锁前完全不可见（沉睡铁律）----
   // 右窝 = 颅自身右侧（面朝 +z 时其右 = 世界 −x）；左窝 Empty（瞳孔早被打落，§4.1 损毁态）
   const pupilMat = new THREE.MeshBasicMaterial({ color: EMBER, transparent: true, opacity: 0, depthWrite: false });
-  const pupil = new THREE.Mesh(new THREE.OctahedronGeometry(0.9, 0), pupilMat);
+  const pupil = new THREE.InstancedMesh(new THREE.OctahedronGeometry(0.9, 0), pupilMat, 1);
   pupil.visible = false; scene.add(pupil);
   const shellMat = new THREE.MeshBasicMaterial({ color: EMBER, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false });
-  const shell = new THREE.Mesh(new THREE.OctahedronGeometry(1.7, 0), shellMat);
+  const shell = new THREE.InstancedMesh(new THREE.OctahedronGeometry(1.7, 0), shellMat, 1);
   shell.visible = false; scene.add(shell);
   const eyeLight = new THREE.PointLight(EMBER, 0, 18, 2);     // 半径 18m，强度 0→8（§4.1）
   eyeLight.visible = false; scene.add(eyeLight);
   const ripGeo = new THREE.RingGeometry(0.7, 1.0, 24);
   const ripMat = new THREE.MeshBasicMaterial({ color: EMBER, transparent: true, opacity: 0,
     blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
-  const ripple = new THREE.Mesh(ripGeo, ripMat);
+  const ripple = new THREE.InstancedMesh(ripGeo, ripMat, 1);
   ripple.visible = false; scene.add(ripple);
+  // 三枚单实例件走 setMatrixAt（全实例化纪律）；模块级暂存零分配
+  const SM = new THREE.Matrix4(), SQ = new THREE.Quaternion(), SE = new THREE.Euler(),
+    SV = new THREE.Vector3(), SS = new THREE.Vector3();
+  const setInst = (m: THREE.InstancedMesh, x: number, y: number, z: number, q: THREE.Quaternion, s: number) => {
+    SV.set(x, y, z); SS.setScalar(s);
+    SM.compose(SV, q, SS);
+    m.setMatrixAt(0, SM); m.instanceMatrix.needsUpdate = true;
+  };
 
   // 锚点姿态矩阵 → 瞳孔窝底/窝心、点光、涟漪环的世界偏移（建场算一次，逐帧零分配）
   const placeM = new THREE.Matrix4().compose(
@@ -144,11 +152,11 @@ export function createSkull(scene: THREE.Scene): TitanSkull {
     awakeBoost: 0,
     update(move: number, t: number, moveAccum: number) {
       // 回收 + 颅段矩阵呼吸 ±0.2m（骨穹/牙列/暗窝/苔斑同相位升降，§3.3 一尸一息）
-      zCur += move; if (zCur > WRAP_Z) zCur -= LOOP;
+      zCur += move; zCur -= Math.ceil((zCur - WRAP_Z) / LOOP) * LOOP;
       for (const inst of insts) {
         for (const p of inst.items) {
           p.z += move;
-          if (p.z > WRAP_Z) p.z -= LOOP;
+          p.z -= Math.ceil((p.z - WRAP_Z) / LOOP) * LOOP;
         }
       }
       const delta = Math.sin(t * 0.6283 + 1.3) * 0.2;
@@ -163,16 +171,16 @@ export function createSkull(scene: THREE.Scene): TitanSkull {
       const px = pupilLo.x + (pupilHi.x - pupilLo.x) * k;
       const py = pupilLo.y + (pupilHi.y - pupilLo.y) * k + delta;
       const pz = pupilLo.z + (pupilHi.z - pupilLo.z) * k + dz;
-      pupil.position.set(px, py, pz); pupil.rotation.y = t * 0.6;
+      SE.set(0, t * 0.6, 0, 'YXZ'); SQ.setFromEuler(SE);     // 瞳/壳同轴慢旋
+      setInst(pupil, px, py, pz, SQ, 1);
       pupilMat.opacity = k;                                  // 瞳孔亡火金自发光渐起 0→1
-      shell.position.set(px, py, pz); shell.rotation.y = t * 0.6;
+      setInst(shell, px, py, pz, SQ, 1);
       shellMat.opacity = 0.22 * k;
       eyeLight.intensity = 8 * k;
       eyeLight.position.set(lightPos.x, lightPos.y + delta, lightPos.z + dz);
       if (k < 1) {                                           // 涟漪环：0.3→5m 渐大 + 0.35→0 渐隐，一次性
         ripple.visible = true;
-        ripple.position.set(ripPos.x, ripPos.y + delta, ripPos.z + dz);
-        ripple.scale.setScalar(0.3 + 4.7 * k);
+        setInst(ripple, ripPos.x, ripPos.y + delta, ripPos.z + dz, faceQuat, 0.3 + 4.7 * k);
         ripMat.opacity = 0.35 * (1 - k);
       } else ripple.visible = false;                         // 醒态常亮：瞳孔 + 点光不可逆常驻
     },

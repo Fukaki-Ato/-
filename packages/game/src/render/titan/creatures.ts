@@ -104,7 +104,7 @@ export function createCreatures(scene: THREE.Scene) {
     for (let i = 0; i < list.length; i++) {
       const f = list[i]!;
       f.z += m;
-      if (f.z > BAND_TOP) f.z -= BAND;
+      f.z -= Math.ceil((f.z - BAND_TOP) / BAND) * BAND;
     }
   };
 
@@ -116,7 +116,7 @@ export function createCreatures(scene: THREE.Scene) {
       const spin = school.spin * (awake ? 1.3 : 1);
       // 渡魂鸦：群心随 LOOP 回收 + 缓慢游移；个体绕群心盘旋（ry=-a 使鼻向贴合切线）
       school.z += move;
-      if (school.z > WRAP_Z) school.z -= LOOP;
+      school.z -= Math.ceil((school.z - WRAP_Z) / LOOP) * LOOP;
       const cx = school.x0 + Math.sin(t * school.wob + 2.1) * 3;
       const cy = school.y0 + Math.sin(t * school.wob * 0.7) * 0.9;
       const cz = school.z + Math.sin(t * school.wob * 0.41 + 1.2) * school.wander;

@@ -154,7 +154,7 @@ function addSoulFires(scene: THREE.Scene) {
         if (y > YTOP) y = YBOT;                                    // 出雾顶回谷底
         yOf[i] = y;
         let z = zOf[i] + move;
-        if (z > WRAP_Z) z -= LOOP;
+        z -= Math.ceil((z - WRAP_Z) / LOOP) * LOOP;
         zOf[i] = z;
         const br = Math.sin(t * rate[i] + ph[i]);
         M.makeScale(scl[i], scl[i] * (1 + br * 0.12), scl[i]);
