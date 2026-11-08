@@ -174,3 +174,13 @@ M7     各场景品牌件与 Phase B 收尾（长期并行轨道）
 - 实测命令与输出：`ls packages/game/src/render/stormspire/`（15 个 .ts）、`wc -l`（stormspire 2220 行；coast+konbini+harbor 合计 2780 行，其中 coast 754 / konbini 1864 / harbor 162 与三份审计自述一致）、`grep -n status config/themes.json`（4 主题及 live/draft 状态）、SCENERY_SETS 注册表（sceneryProps.ts:205-211）。
 - 文中其余 `文件:行` 引用均转引自六份文稿与 stormspire-brief 的核实记录（titan-brief 附录、forgeheart §12、library §11.0、三份 audit 的证据列），本次未逐行重验源码；各场景开工时按 brief 惯例「动手前先重读」对应文件。
 - 未能验证项：所有工作量估算（标注为估算）；三份审计与三份 brief 的「待实机验证」项（弯道 toon 注入、poolMat 脱开、z-fighting 等）仍待实机，本文不销项。
+
+---
+
+## ⑦ 专属 BGM 后补流程（M7 唯一遗留，2026-11-09 现状：五 draft 主题暂用 run.mp3）
+
+音频补给后按此接入（每主题一行配置，机制现成——雨夜便利店 run_rain.mp3 先例）：
+1. 循环母带落盘 `assets/audio/bgm/run_<scene>.mp3`（命名建议：run_stormspire / run_titan / run_forgeheart / run_library / run_rain 已有）。
+2. 对应主题条目 `music` 字段改指新文件（themes.json）。
+3. 响度对齐 -16.5 LUFS（先例口径，audio.md）；`npm run check` 全绿后提交。
+用户决策项同步在案：①五个 draft 主题（stormspire/titan/forgeheart/library/konbini）试玩后转 live——settings 面板逐个试玩，报主题名即改 status；②反重力实跑视觉验收——图书馆主题 + `?debug` 面板开无敌，跑过 600m 进反重力区看倒挂翻转（sim 侧 8/8 flip fixture 已证正确）。
