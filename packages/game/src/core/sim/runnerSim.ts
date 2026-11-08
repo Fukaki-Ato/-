@@ -11,6 +11,7 @@ import { buildLoadout, itemEffects, type EffectSpec, type Loadout } from './char
 import { collectCoins, collectPickups, type CollectDeps } from './collect.js';
 import { hitsRunner, inDepthWindow, isNearMiss, relZ, safestLane } from './collision.js';
 import { clearSkyCoins } from './landing.js';
+import { level } from './tide.js';
 import { Movement } from './movement.js';
 import { parseReviveConfig, tryRevive, type ReviveState } from './revive.js';
 import { resolveHit, type HitCtx } from './resolveHit.js';
@@ -220,8 +221,7 @@ export class RunnerSim {
     s.skillCd = Math.max(0, s.skillCd - STEP_DT);
     this.mv.slideCd = Math.max(0, this.mv.slideCd - STEP_DT);
 
-    // 速度：基础值随距离提升；飞行 ×speedMul、滑翔 ×glideSpeedMul、受击 ×0.6；
-    // 再叠 buff 乘区（speedMul 提速；timeSlow 让世界变慢而操作不变慢 = 更多反应时间）
+    // 速度：基础值随距离提升（飞行/滑翔/受击各有乘区），再叠 buff 乘区（timeSlow=世界变慢操作不变）
     const base = this.R.baseSpeed ?? 12;
     const max = this.R.maxSpeed ?? 26;
     const ramp = this.R.speedRampPer100M ?? 0.18;
@@ -230,7 +230,7 @@ export class RunnerSim {
     // 飞行/滑翔段允许超过地面 max（2.5 倍巡航），但单步位移仍有绝对上限（FLY_SPEED_CAP）
     const cap = fx.flyT > 0 || s.gliding ? FLY_SPEED_CAP : max;
     const dm = Math.min(raw, cap) * STEP_DT;
-    s.distance += dm;
+    s.distance += dm; s.tideLevel = level(s.distance); // M4 潮位单源：全主题算（~4 op），潮汐主题消费其余忽略
 
     // 纵向漂移障碍（moveZ<0=向玩家冲来的冲撞体）：推进 worldZ，并把沿途同车道障碍撞开
     for (const o of this.obstacles) {

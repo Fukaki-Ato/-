@@ -53,6 +53,8 @@ export interface RunnerState {
   gliding: boolean; // 飞行器燃料耗尽后的降落段
   /** 技能冷却剩余、本局累计主动下滑次数（下滑积攒型技能的门槛计数）、本局释放次数 */
   skillCd: number; slideCount: number; casts: number;
+  /** 潮位 0..1（M4 潮位单源：sim 每步由 core/sim/tide.level(distance) 更新；非潮汐主题不消费该值） */
+  tideLevel: number;
   /** 当前可站立支撑面高度（米，0=地面；>0=列车顶/坡道面）。每帧由 movement 算好后写回：
    *  渲染层据此区分「站在支撑面上跑」与「真正离地」，sim→render 单向数据流 */
   supportY: number;
@@ -74,6 +76,7 @@ export function initialRunnerState(): RunnerState {
     shocks: 0, revivesUsed: 0,
     coins: 0, nearMiss: 0, score: 0, gliding: false,
     skillCd: 0, slideCount: 0, casts: 0,
+    tideLevel: 0,
     supportY: 0,
   };
 }
