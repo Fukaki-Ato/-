@@ -46,10 +46,20 @@ export function inNoPlantWindow(zn: Zone, z: number): boolean {
 /** ensure 落 cell 的统一过滤（B-1 预注册法配套）：禁铺窗内任何 cell 都跳过；区体内只拦
  *  vehicle/moving/step 障碍格（金币格保留，铺设后由 trackGen 统一改写到天花板带）。 */
 export function skipCell(zones: Zone[], z: number, cls: string): boolean {
-  const zn = zoneAt(zones, z);
-  if (!zn) return false;
-  if (inNoPlantWindow(zn, z)) return true;
-  return cls !== '' && ZONE_SKIP_CLASSES.has(cls);
+  // 按扩展后的出口二分定位：zoneAt 只查区体，查询不到区外净空。
+  let lo = 0, hi = zones.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (zones[mid]!.endM + NO_PLANT_M < z) lo = mid + 1; else hi = mid;
+  }
+  let inZone = false;
+  // 相邻区的净空可能重叠；净空优先于区体类别过滤，保持零分配。
+  for (let i = lo; i < zones.length && zones[i]!.startM - NO_PLANT_M <= z; i++) {
+    const zn = zones[i]!;
+    if (inNoPlantWindow(zn, z)) return true;
+    if (z >= zn.startM && z < zn.endM) inZone = true;
+  }
+  return inZone && ZONE_SKIP_CLASSES.has(cls);
 }
 
 /** spawnZones 游标预注册：把起点 ≤ target+SPAWN_LEAD_M 的区按 everyM 逐个登记进 zones（必须先于
