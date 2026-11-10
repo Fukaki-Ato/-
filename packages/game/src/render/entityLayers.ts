@@ -98,7 +98,9 @@ export function createObstacleLayer(scene: THREE.Scene, laneWidth: number, scene
       color: 0xb48cff, transparent: true, opacity: 0.3, blending: THREE.AdditiveBlending, depthWrite: false,
     }));
     band.visible = false; root.add(band);
-    const disc = new THREE.Mesh(zapDiscGeo, new THREE.MeshBasicMaterial({ color: ZAP_DISC_COLOR, transparent: true, opacity: 0.96 }));
+    // 黑盘减淡（2026-11-11 用户反馈「贴地影过重」）：0.96 近乎实心黑、在暗色路面上读成
+    // 一坨影子；降到 0.55 让路面纹理透出，闪电标志仍负责辨识（zap 盘本体位置不变）
+    const disc = new THREE.Mesh(zapDiscGeo, new THREE.MeshBasicMaterial({ color: ZAP_DISC_COLOR, transparent: true, opacity: 0.55 }));
     disc.visible = false; root.add(disc);
     const bolt = new THREE.Mesh(boltGeo, new THREE.MeshBasicMaterial({
       color: ZAP_BOLT_COLOR, transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide,
@@ -228,7 +230,7 @@ export function createObstacleLayer(scene: THREE.Scene, laneWidth: number, scene
         u.bolt.visible = isZap && !skinned;
         if (isZap) {
           u.disc.position.set(ox, 0.05 - sinkY, z);
-          (u.disc.material as THREE.MeshBasicMaterial).opacity = 0.96 * (1 - sink);
+          (u.disc.material as THREE.MeshBasicMaterial).opacity = 0.55 * (1 - sink);
           u.bolt.position.set(ox, 0.08 - sinkY, z);
           const flick = 0.5 + 0.5 * Math.sin(t * 12 + o.worldZ * 2.7);
           (u.bolt.material as THREE.MeshBasicMaterial).opacity = (0.45 + 0.5 * flick) * (1 - sink);

@@ -276,6 +276,8 @@ export function createRunnerScene(
 
   if (cb.debug) installRunProbe(sim, () => ({ x: +camX.toFixed(2), y: +camY.toFixed(2) }), bursts,
     () => ({ calls: renderer.info.render.calls, triangles: renderer.info.render.triangles }), coinField);
+  // 斜板定位临时钩子，修完删（二分法用：控制台经 window.__trScene 逐组 visible 开关）
+  if (cb.debug) (globalThis as any).__trScene = scene;
 
   // 只销毁本局资源：不销毁主画布/GL 上下文（wx 屏幕画布不可重建，S10 D1 跨局复用）。
   function dispose() {

@@ -6,6 +6,8 @@
  * 2026-11-08 细节刻画：瀑布丝带换程序化竖纹（每帧 offset.y 向下滚）+ 落点雾团 ±8% 呼吸；
  * 风剪林脚下草簇、神庙倒地柱头 + 倒伏躯干、踏脚残岛碎石、岛顶神龛条件修复。
  * 2026-11-11 三轮：岛主行/信标/幡改 rhythmZ 疏密节奏取 z（口径见 bridge.ts），完柱/信标/幡杆三档高度错落。
+ * 2026-11-11 穿帮整改：中景带（|x| 8.5~16 贴地残柱/断鼓/幡杆 ×16，复用网格 0 新增 draw call）
+ * 补 20~60m 段空旷；断叶斜插改按侧别统一朝外倾倒——叶梢不再可摆进路面走廊/扫过相机位。
  * 全部 InstancedMesh + 确定性 rnd；不读 sim。
  * 岩体/摆位配方与四原型拆在同目录 islandParts.ts（300 行红线机械拆分，配方逐字搬家）；
  * 本文件只留主装配（排布节奏）/实例化/逐帧回收，材质创建顺序不变。
@@ -121,7 +123,9 @@ export function createIslands(scene: THREE.Scene) {
     else if (kind === 2) addGrove(b, { x, y, z, s, ry: 0 });
     else if (kind === 3) { addFalls({ x, y, z, s, ry: 0 }, ribbons, mists); }
     else {
-      blades.push({ x: x + s * 0.6, y: y + s * 0.7, z, s: s * 1.1, ry: rnd(z | 0, 13) * 6.283, rz: 1.1 });
+      // 断叶斜插：倾倒向按侧别统一朝外（§1.2 暴风同向掀倒），叶梢只向路外翘——
+      // 旧版 ry 随机让最长 14m 的叶梢可摆进路面走廊并扫过相机位（穿帮同族审计项）
+      blades.push({ x: x + side * s * 0.6, y: y + s * 0.7, z, s: s * 1.1, ry: (side < 0 ? 0 : Math.PI) + (rnd(z | 0, 13) - 0.5) * 0.5, rz: 1.1 });
     }
     if (kind === 0 || kind === 1) {
       const bt = tierOf(2, rnd(z | 0, 121)); // 信标柱三档参差（0.72/1/1.32），符文晶随杆顶走
@@ -135,7 +139,7 @@ export function createIslands(scene: THREE.Scene) {
   for (let c = 0; c < 3; c++) {
     const cz = -60 - c * 70, side: -1 | 1 = (c % 2 === 0) ? -1 : 1;
     for (let k = 0; k < 4; k++) {
-      put(side * (7.5 + rnd(cz + k, 17 + k) * 3), -1.6 - rnd(cz + k, 19) * 1.6 + k * 0.9, cz - k * 9 - rnd(cz, 23) * 4,
+      put(side * (13 + rnd(cz + k, 17 + k) * 4), -1.6 - rnd(cz + k, 19) * 1.6 + k * 0.9, cz - k * 9 - rnd(cz, 23) * 4,
         0.9 + rnd(cz + k, 29) * 0.7, false, 1, true);
     }
   }
@@ -154,6 +158,33 @@ export function createIslands(scene: THREE.Scene) {
     bannerPoles.push({ x: side * 5.6, y: 1.5, z, s: bt, ry: 0 });
     bannerCloth.push({ x: side * 5.6, y: 1.5 + 1.1 * bt, z, s: 1, ry: 0 });
     bannerCloth.push({ x: side * 5.6 - side * 0.5, y: 1.5 + 1.1 * bt - 0.45, z, s: 1, ry: 0 });
+  }
+
+  // 中景带（|x| 8.5~16，deck 面上的残柱/断鼓/幡杆，20~60m 段不再空旷）：大道柱廊（7.6）与
+  // 低空岛链（≥11、在 deck 之下）之间的贴地废墟层，16 件（每侧 8），全部复用既有实例网格
+  // ——0 新增 draw call；节奏取 z 与大道柱（0/5）、灯（3.6）、幡（6.8）、岛行（8）错开
+  const midZs: number[] = [];
+  rhythmZ(16, 11.4, midZs);
+  for (let i = 0; i < midZs.length; i++) {
+    const z = midZs[i]! + (rnd(i, 171) - 0.5) * 6;
+    const side: -1 | 1 = (i % 2 === 0) ? -1 : 1;
+    const x = side * (8.5 + rnd(z | 0, 173) * 7.5);
+    const kind = Math.floor(rnd(z | 0, 177) * 3);
+    if (kind === 0) {
+      // 残柱：三段式柱几何小比例立桩（1.8~3.6m），微歪读作断头残柱
+      const s = 0.3 + rnd(z | 0, 179) * 0.3;
+      tShaft.push({ x, y: 3 * s, z, s, ry: 0, rz: (rnd(z | 0, 181) - 0.5) * 0.14 });
+    } else if (kind === 1) {
+      // 断鼓：檐带盒几何横躺（0.4~0.65m 高），随机转向滚落姿态
+      const s = 0.8 + rnd(z | 0, 183) * 0.5;
+      tBeam.push({ x, y: 0.25 * s, z, s, ry: rnd(z | 0, 185) * 6.283, rz: 0 });
+    } else {
+      // 幡杆：与路缘幡同款杆身 + 双幡布（y 已按网格的 +1.1s 映射预扣，杆底落地）
+      const bt = tierOf(2, rnd(i, 187));
+      bannerPoles.push({ x, y: 0.5 * bt, z, s: bt, ry: 0 });
+      bannerCloth.push({ x, y: 1.6 * bt, z, s: 1, ry: 0 });
+      bannerCloth.push({ x: x - side * 0.5, y: 1.6 * bt - 0.45, z, s: 1, ry: 0 });
+    }
   }
 
   // ---- 实例化 ----

@@ -5,9 +5,10 @@
  * high 杆下 1.2m 净空、rideTop 列车 o.h 支撑面）零改动。
  *
  * 分工：entityLayers 仍拥有实体选择/回收/更新骨架（单位池、sink 下沉、obstacleX 横摆、海报注入）；
- * 这里只提供 7 个 InstancedMesh 槽（= 皮肤全部新增 draw call，≤10 铁律），每帧由 entityLayers
- * 按当前可见障碍重写实例矩阵——实例不与单位槽绑定，count 归零即整池不可见，回收零成本。
- * zap（obs_lightning_circle 黑盘闪电本就是雷主题）与 step（obs_mount_step 登车斜坡）不在皮内。
+ * 这里只提供 9 个 InstancedMesh 槽（= 皮肤全部新增 draw call，≤10 铁律；其中 2 槽为雷击圈
+ * 换皮，替换 entityLayers 默认黑盘后净增 0），每帧由 entityLayers 按当前可见障碍重写实例矩阵
+ * ——实例不与单位槽绑定，count 归零即整池不可见，回收零成本。
+ * zap（obs_lightning_circle，zapSkin 接管为导雷落地盘）换皮；step（obs_mount_step 登车斜坡）不在皮内。
  *
  * 铁律：确定性 rnd（种子在实体首见时一次性落 WeakMap——moveZ 冲刺件的 worldZ 逐帧漂移，
  * 直接拿它当随机会让残块/背鳍每帧换位置）；每帧零分配（dummy/Color 预建，HULL 分段比常量预置）；
@@ -35,13 +36,17 @@ interface SkinSlot { mesh: THREE.InstancedMesh; cap: number; n: number }
 export function createStormspireObstacleSkin(scene: THREE.Scene, boxGeo: THREE.BufferGeometry, cal: SkinCalibration) {
   const M = cal.obsMax;
   // 四色直接取 stormspire/palette 的 P（与场景同源不抄色值，brief §2 七色不出圈）：
-  // 石体/铜绿走 Lambert 与侧景同光；金纹走 Basic（发光物不受光，同 bridge 符文条口径）。
-  const stoneMat = new THREE.MeshLambertMaterial({ color: P.stone });
-  const darkMat = new THREE.MeshLambertMaterial({ color: P.stoneDark });
-  const bronzeMat = new THREE.MeshLambertMaterial({ color: P.verdigris });
+  // 石体/铜绿换 Standard 走主题 IBL（scene.environment，env.ts 程序化环境）——Lambert 只有
+  // hemi 一路光，背光象限只剩 hemiGround 近黑（骑乘鲸背/跳跃断鼓时在角色脚下糊成一坨
+  // 「贴地影」穿帮）；Standard 的暗象限能吃进天光+地平光带，且与路面（Standard+IBL）同口径。
+  const stoneMat = new THREE.MeshStandardMaterial({ color: P.stone, roughness: 0.88, metalness: 0.04 });
+  const darkMat = new THREE.MeshStandardMaterial({ color: P.stoneDark, roughness: 0.92, metalness: 0.04 });
+  const bronzeMat = new THREE.MeshStandardMaterial({ color: P.verdigris, roughness: 0.55, metalness: 0.18 });
   const goldMat = new THREE.MeshBasicMaterial({ color: P.gold });
-  // 假弯道：皮肤四材质与地面同弯（同一 f(z)，见 worldBend.ts），否则远处障碍与弯掉的路面分家
-  for (const m of [stoneMat, darkMat, bronzeMat, goldMat]) applyWorldBend(m);
+  // 雷击圈导雷盘材质（淡渊靛 38%、不写深度）：近黑 0.96 盘的替代，警示靠环箍+金弧不靠黑度
+  const zapDiscMat = new THREE.MeshBasicMaterial({ color: P.abyss, transparent: true, opacity: 0.38, depthWrite: false });
+  // 假弯道：皮肤材质与地面同弯（同一 f(z)，见 worldBend.ts），否则远处障碍与弯掉的路面分家
+  for (const m of [stoneMat, darkMat, bronzeMat, goldMat, zapDiscMat]) applyWorldBend(m);
   // 单位几何：尺寸全靠实例矩阵（圆柱沿 y；rx=±PI/2 只换朝向，横躺/立放共用同一套）
   const cylGeo = new THREE.CylinderGeometry(0.5, 0.5, 1, 14);
   const finGeo = new THREE.ConeGeometry(0.5, 1, 5);
@@ -64,6 +69,13 @@ export function createStormspireObstacleSkin(scene: THREE.Scene, boxGeo: THREE.B
   const fin = mk(finGeo, darkMat, M * 4);       // 背鳍
   const gold = mk(boxGeo, goldMat, M * 3);      // 灼痕 / 符文 / 电弧纹 / 侧腹金纹
   const bronze = mk(ballGeo, bronzeMat, M * 4); // 摆链锤头 + 链节
+  // 雷击圈（zap）换皮双槽：淡渊靛导雷盘 + 平贴环箍——entityLayers 默认盘是 0x0b0e16
+  // 近黑 96% 圆盘，玩家跳跃时正好糊在角色脚下（用户截图穿帮②「脚下黑坨」）；本主题以
+  // 「导雷铜环落地态」语言接管：警示可读性靠环箍与金弧，不再靠黑度。
+  const zapDisc = mk(cylGeo, zapDiscMat, M);
+  const zapRimGeo = new THREE.TorusGeometry(0.5, 0.045, 6, 26);
+  zapRimGeo.rotateX(Math.PI / 2); // 平贴地面环（管径向 y 薄、径向宽）
+  const zapRim = mk(zapRimGeo, goldMat, M);
   const dummy = new THREE.Object3D();
   const tmpC = new THREE.Color();
   /** 写一个实例：位置/尺寸/绕 x 倾角 + 灰阶微差（1=原色）。count 满则丢弃（极端场面少画一件不崩） */
@@ -167,6 +179,17 @@ export function createStormspireObstacleSkin(scene: THREE.Scene, boxGeo: THREE.B
         break;
       }
       case 'hazard': {
+        if (o.zap) {
+          // 雷击圈 = 导雷铜环落地态：淡盘（38% 渊靛，alpha 低不糊脚下）+ 环箍贴缘示形 +
+          // 两段错位金电弧纹示警；判定体（o.w/o.d 2.2m、可跳）口径零改动
+          put(zapDisc, ox, 0.026 - sinkY, z, o.w * 1.02, 0.05, o.d * 1.02);
+          put(zapRim, ox, 0.07 - sinkY, z, o.w * 1.04, 1, o.d * 1.04);
+          for (let i = 0; i < 2; i++) {
+            put(gold, ox + (rnd(s, 30 + i) - 0.5) * o.w * 0.35, 0.045 - sinkY,
+              z + (i === 0 ? 1 : -1) * o.d * 0.22, o.w * 0.38, 0.04, 0.06);
+          }
+          break;
+        }
         // 导雷石板：石灰岩薄板（顶面齐 o.h=0.1m）+ 两段错位金电弧纹；0.35m 可跳提示带仍由 entityLayers 的 band 出
         put(boxStone, ox, o.h / 2 - sinkY, z, o.w, o.h, o.d, 0, 0.9 + rnd(s, 5) * 0.1);
         for (let i = 0; i < 2; i++) {
@@ -179,7 +202,7 @@ export function createStormspireObstacleSkin(scene: THREE.Scene, boxGeo: THREE.B
     }
   }
 
-  return {
+  const api = {
     beginFrame() { for (const sl of slots) sl.n = 0; },
     emit,
     endFrame() {
@@ -191,4 +214,9 @@ export function createStormspireObstacleSkin(scene: THREE.Scene, boxGeo: THREE.B
       }
     },
   };
+  // 声明接管闪电圈：entityLayers 门控读取本标记，对 isZap 障碍也调 emit（默认黑盘+闪电标志让位）。
+  // 运行时挂载而非写进返回字面量：SkinFactory 的 ReturnType 交叉类型会把静态 zapSkin 变成
+  // 其余三套皮肤（titan/forgeheart/library，不在本仓改动范围）的必填属性。
+  (api as { zapSkin?: boolean }).zapSkin = true;
+  return api;
 }
