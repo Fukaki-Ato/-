@@ -45,6 +45,7 @@ export function formatResult(replay, result) {
   const counts = Object.entries(result.eventCounts).map(([k, v]) => `${k}=${v}`).join(' ') || '(无)';
   return [
     `重放 v${replay.version}: seed=${replay.seed} char=${replay.charId || '(默认)'} dtMs=${(STEP_DT * 1000).toFixed(3)} 输入=${replay.inputs.length} 条`,
+    ...(result.context ? [`实际上下文: theme=${result.context.themeId ?? '(默认)'} initialItems=${JSON.stringify(result.context.initialItems)}`] : []),
     `推进: ${result.frames} 帧（${secs.toFixed(1)}s） 终局: ${s.alive ? '存活（达帧数上限）' : '死亡'}`,
     `结算: score=${s.score} distance=${s.distance}m coins=${s.coins} nearMiss=${s.nearMiss} hits=${s.hits} casts=${s.casts} t=${s.t}s`,
     `事件计数: ${counts}`,

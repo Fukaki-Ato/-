@@ -1,0 +1,10 @@
+{
+  "version": 2,
+  "seed": 777,
+  "charId": "char_volt",
+  "dtMs": 16.666666666666668,
+  "maxFrames": 1200,
+  "themeId": "theme_library",
+  "initialItems": ["item_helmet"],
+  "inputs": [{ "frame": 24, "type": "swipe", "payload": { "dir": "left" } }]
+}
