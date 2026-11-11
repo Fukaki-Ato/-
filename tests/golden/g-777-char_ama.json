@@ -845,10 +845,10 @@
     "summary": {
       "t": 28.52,
       "distance": 351.13,
-      "coins": 104,
+      "coins": 112,
       "nearMiss": 0,
       "hits": 1,
-      "score": 4320,
+      "score": 4360,
       "alive": false,
       "casts": 2,
       "charId": "char_ama",
@@ -856,13 +856,15 @@
     },
     "eventCounts": {
       "cast": 2,
-      "coin": 104,
+      "coin": 112,
+      "cross": 1,
       "death": 1,
       "hit": 2,
       "protected": 1,
-      "revive": 1
+      "revive": 1,
+      "surge": 1
     },
-    "eventsSha256": "8233717d673a53e6bf83842c0929371255c54e902f733b0a0cac38065c3e4c9b",
+    "eventsSha256": "a43493fd07260fcb985d8439c6da8f0278575f5e79414746f48a9d85a6155265",
     "inputsSha256": "d42957334761c8ea4b10d680f2a44dbfffef32dd40714364198a0439417048a8"
   }
 }

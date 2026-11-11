@@ -106,10 +106,14 @@ export function createKonbiniProps(scene: THREE.Scene): SceneryProps {
   // ---------- 跑道边的路灯：每家店往后 3 盏、间距 20m；每座花园往后 10m 补一盏 ----------
   const lamp = new Diorama();
   buildLamp(lamp);
-  const lamps: Spot[] = [
-    spot(LAMP_X, -40, Math.PI), spot(LAMP_X, -60, Math.PI), spot(LAMP_X, -80, Math.PI), spot(LAMP_X, -186, Math.PI),
-    spot(-LAMP_X, -84, 0), spot(-LAMP_X, -140, 0), spot(-LAMP_X, -160, 0), spot(-LAMP_X, -180, 0),
-  ];
+  // ③-5 灯距密疏节奏（konbini-audit ④ Phase 1）：200m 循环切 8 段×25m，偶数段密（灯随店）/奇数段疏
+  // ——侧景呼吸口径；rhythmZ 共享化待 §⑥-1 拍板，先本地抄写（span 系数 0.7/1.45 与 bridge.ts 同源）
+  const lamps: Spot[] = [];
+  for (let seg = 0; seg < 8; seg++) {
+    const side: -1 | 1 = seg % 2 === 0 ? 1 : -1;          // 密段（偶）随右舷店、疏段（奇）左舷花园
+    const zc = -12 - seg * 25 - (seg % 2 === 0 ? 0 : 8);  // 段内锚点：密段早、疏段晚，拉开灯距差
+    lamps.push(spot(side * LAMP_X, zc, side === 1 ? Math.PI : 0));
+  }
   // 灯头不再挂强晕层：便利店门口那盏本来就只有一个朝下的发光面、没有光晕，
   // 用户要「道路两旁路灯的灯头亮度和它一致」⇒ 跑道边/商铺门前/后巷/广场全部统一成同款灯头，不加晕。
 
@@ -193,6 +197,48 @@ export function createKonbiniProps(scene: THREE.Scene): SceneryProps {
   // 店招与路口信号灯原来是两个逐帧改亮度的动画层（闪烁 / 绿黄红轮转），
   // 用户 2026-10-13 要求「不要闪」⇒ 已删，亮灯态直接烘进 store.ts / streetProps.ts。
 
+  // ③-6 贴地薄雾两条（konbini-audit ④ Phase 1；抄 stormspire/atmosphere.ts:97-110 配方，色 #243050）：
+  // alpha 贴图 u 向匀白微斑（供横漂可读）、v 向近淡远浓；主层跟世界滚动、亮层再叠自身缓漂
+  const makeMistTex = () => {
+    const N = 128;
+    const data = new Uint8Array(N * N * 4);
+    const hash = (x: number, y: number) => { const v = Math.sin(x * 127.1 + y * 311.7) * 43758.5453; return v - Math.floor(v); };
+    const blob = (x: number, y: number, fx: number, fy: number) =>
+      Math.sin(((x / N) * fx + hash(fx, fy)) * 6.2832) * Math.cos(((y / N) * fy + hash(fy, fx)) * 6.2832);
+    for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+      const m = blob(x, y, 2, 3) * 0.55 + blob(x, y, 5, 4) * 0.3 + blob(x, y, 9, 7) * 0.15;
+      const i = (y * N + x) * 4;
+      data[i] = 255; data[i + 1] = 255; data[i + 2] = 255;           // 色调交回材质 color（#243050）
+      data[i + 3] = Math.min(255, (Math.max(0, m) * 0.9 + 0.1) * (0.25 + 0.75 * Math.min(1, y / N)) * 255);
+    }
+    const tex = new THREE.DataTexture(data, N, N, THREE.RGBAFormat);
+    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+    tex.magFilter = THREE.LinearFilter; tex.minFilter = THREE.LinearMipmapLinearFilter;
+    tex.generateMipmaps = true; tex.needsUpdate = true;
+    return tex;
+  };
+  // 两片合并成 1 个 InstancedMesh(2)：零散 mesh 红线 + 单纹理单 draw call；opacity 取两档折中 0.09（≤0.12 档）
+  const mistTex = makeMistTex();
+  mistTex.repeat.set(2, 8);
+  const mistMesh = new THREE.InstancedMesh(
+    new THREE.PlaneGeometry(14, 200),
+    new THREE.MeshBasicMaterial({ map: mistTex, color: '#243050', transparent: true, opacity: 0.09, depthWrite: false }),
+    2,
+  );
+  {
+    const M = new THREE.Matrix4(), Q = new THREE.Quaternion().setFromEuler(new THREE.Euler(-Math.PI / 2, 0, 0)),
+      V = new THREE.Vector3(), S = new THREE.Vector3(1, 1, 1), E = new THREE.Euler();
+    for (const [i, y] of [[0, 0.5], [1, 1.1]] as const) {
+      E.set(-Math.PI / 2, i * Math.PI / 2, 0, 'YXZ'); Q.setFromEuler(E); // 第二片转 ½π：云斑错纹不重影
+      V.set(0, y, -86);
+      M.compose(V, Q, S);
+      mistMesh.setMatrixAt(i, M);
+    }
+    mistMesh.instanceMatrix.needsUpdate = true;
+    mistMesh.frustumCulled = false;
+    scene.add(mistMesh);
+  }
+
   return {
     update(move: number, t: number): void {
       scroll = (scroll + move) % LOOP;
@@ -207,7 +253,8 @@ export function createKonbiniProps(scene: THREE.Scene): SceneryProps {
       ripple.update(t); glassRun.update(t);
       ripple.flushColors();
       splash.update(move, t); rowFX.update(t);
+      mistTex.offset.x = (mistTex.offset.x + move / 60) % 1; // 薄雾横漂（v 渐变不动）
     },
-    dispose(): void { toonRamp?.dispose(); },
+    dispose(): void { toonRamp?.dispose(); mistTex.dispose(); },
   };
 }

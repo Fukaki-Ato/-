@@ -13,6 +13,11 @@ import * as THREE from 'three';
 import { createCoastProps } from './coast/coastProps.js';
 import { createKonbiniProps } from './konbini/konbiniProps.js';
 import { createHarborProps } from './harbor/harborProps.js';
+import { createStormspireProps } from './stormspire/stormspireProps.js';
+import { createTitanProps } from './titan/titanProps.js';
+import { createForgeheartProps } from './forgeheart/forgeheartProps.js';
+import { createLibraryProps } from './library/libraryProps.js';
+import { applyWorldBend } from './stormspire/worldBend.js';
 
 /** 回收周期（米），与跑道长度同量级；出画即绕回远处 */
 export const LOOP = 240;
@@ -28,7 +33,14 @@ export const rnd = (i: number, salt: number) => {
   return s - Math.floor(s);
 };
 
-export const std = (color: number) => new THREE.MeshLambertMaterial({ color });
+/** 全注入 + 单主题驱动：std 是全主题共享的侧景材质工厂，这里统一挂 world-bend（见 stormspire/worldBend.ts）——
+ *  海/便利店/渔港也因此带注入，但它们从不调 setWorldBend ⇒ uniforms 恒零 ⇒ 恒等变换；
+ *  代价只是这些主题的顶点着色器多几条不被触发的 ALU，换来弯道主题侧景与路面同弯不分家。 */
+export const std = (color: number) => {
+  const mat = new THREE.MeshLambertMaterial({ color });
+  applyWorldBend(mat);
+  return mat;
+};
 
 const M4 = new THREE.Matrix4();
 const Q = new THREE.Quaternion();
@@ -193,13 +205,20 @@ function createSeasideProps(scene: THREE.Scene): SceneryProps {
  * 主题 config 的 `scenery` 字段 → 侧景道具集。
  * 表里没有的 id（如占位场景的 "blank"）就是两侧什么都不摆。
  */
-const SCENERY_SETS: Record<string, (scene: THREE.Scene) => SceneryProps> = {
+type SceneFactory = (scene: THREE.Scene, ctx?: SceneryCtx) => SceneryProps;
+const SCENERY_SETS: Record<string, SceneFactory> = {
   seaside: createSeasideProps,
   konbini: createKonbiniProps,
   coast: createCoastProps,
   harbor: createHarborProps,
+  stormspire: createStormspireProps,
+  titan: createTitanProps,
+  forgeheart: createForgeheartProps,
+  library: createLibraryProps,
 };
 
-export function createSceneryProps(scene: THREE.Scene, scenery: string = 'seaside'): SceneryProps {
-  return SCENERY_SETS[scenery]?.(scene) ?? { update: () => undefined };
+export interface SceneryCtx { crossings?: readonly { kind: string; lane: number; worldZ: number; done?: boolean }[] }
+
+export function createSceneryProps(scene: THREE.Scene, scenery: string = 'seaside', ctx?: SceneryCtx): SceneryProps {
+  return SCENERY_SETS[scenery]?.(scene, ctx) ?? { update: () => undefined };
 }

@@ -55,3 +55,24 @@ test('起飞→滑翔→落地全程：空中机位不贴地、与地面目标�
     assert.equal(air.camZ, CAM_Z_AIR);
   }
 });
+
+test('B-7 反重力机位：flip=-1 时机位/注视点绕天花板平面镜像（相机落下方仰视），flip=1 缺省与旧版同值', () => {
+  const CEIL = 4.6;
+  // 地面式镜像：camY=ceilH−(y·0.5+2.7)、lookY=ceilH−y·0.5——进区瞬间（y=0）先仰望天花板，贴顶后机位落到顶面下方
+  const g0 = camTargets(0, false, -1, CEIL);
+  assert.ok(Math.abs(g0.camY - (CEIL - 2.7)) < 1e-9, `y=0 时 camY=ceilH−2.7，实测 ${g0.camY}`);
+  assert.ok(Math.abs(g0.lookY - CEIL) < 1e-9, `y=0 时注视点在天花板（镜面地板），实测 ${g0.lookY}`);
+  const gTop = camTargets(CEIL, false, -1, CEIL);
+  assert.ok(Math.abs(gTop.camY - (CEIL - (CEIL * 0.5 + 2.7))) < 1e-9, `贴顶 camY 镜像式，实测 ${gTop.camY}`);
+  assert.ok(Math.abs(gTop.lookY - (CEIL - CEIL * 0.5)) < 1e-9, `贴顶 lookY 镜像式，实测 ${gTop.lookY}`);
+  assert.ok(gTop.camY < gTop.lookY, '倒挂机位在下方仰视（camY < lookY）');
+  // 空中式镜像：camY=ceilH−(y·0.75+5.3)、lookY=ceilH−(y·0.28+0.8)；纵深/视野无上下语义不镜像
+  const air = camTargets(CEIL, true, -1, CEIL);
+  assert.ok(Math.abs(air.camY - (CEIL - (CEIL * 0.75 + 5.3))) < 1e-9, `空中 camY 镜像式，实测 ${air.camY}`);
+  assert.ok(Math.abs(air.lookY - (CEIL - (CEIL * 0.28 + 0.8))) < 1e-9, `空中 lookY 镜像式，实测 ${air.lookY}`);
+  assert.equal(air.camZ, CAM_Z_AIR); assert.equal(air.fov, FOV_AIR);
+  assert.equal(gTop.camZ, CAM_Z_GROUND); assert.equal(gTop.fov, FOV_GROUND);
+  // flip=1 缺省参数（既有调用点/回归）与地面口径逐字节同值
+  assert.deepEqual([camTargets(2, false).camY, camTargets(2, false).lookY], [3.7, 1]);
+  assert.deepEqual([camTargets(2, false, 1, 0).camY, camTargets(2, false, 1, 0).lookY], [3.7, 1]);
+});
