@@ -31,7 +31,7 @@ export function createCoinField(scene: THREE.Scene, laneWidth: number,
   const ringMat = new THREE.MeshStandardMaterial({ color: 0xffcf3f, emissive: 0xffb300, emissiveIntensity: 0.85, metalness: 0.4, roughness: 0.25 });
   const faceGeo = new THREE.CircleGeometry(0.23, 18);
   const faceMat = new THREE.MeshStandardMaterial({ color: 0xe8a921, metalness: 0.5, roughness: 0.4, side: THREE.DoubleSide });
-  if (opts?.scenery === 'stormspire') {
+  if (['stormspire', 'titan', 'forgeheart', 'library'].includes(opts?.scenery ?? '')) {
     // 假弯道：金币与地面同弯（同一 f(z)，见 stormspire/worldBend.ts），否则远处金币漂出车道
     applyWorldBend(ringMat);
     applyWorldBend(faceMat);

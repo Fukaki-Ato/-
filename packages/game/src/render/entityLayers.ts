@@ -119,7 +119,7 @@ export function createObstacleLayer(scene: THREE.Scene, laneWidth: number, scene
 
   // 雷脊假弯道：默认盘残件（zap 圆盘/闪电标志/step 斜坡/海报/电弧光带/横杆立柱）与雷脊皮肤一样跟着地面弯，
   // 否则远处未换皮障碍漂出弯道（皮肤件在 obstacleSkin.ts 内注入；applyWorldBend 幂等，见 stormspire/worldBend.ts）
-  if (scenery === 'stormspire') {
+  if (['stormspire', 'titan', 'forgeheart', 'library'].includes(scenery)) {
     applyWorldBend(postMat);
     applyWorldBend(rampMat);
     for (const u of units) {
