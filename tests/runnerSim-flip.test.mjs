@@ -58,7 +58,7 @@ test('zones.ts 纯函数：解析降级 / 二分查询 / 禁铺窗边界 / 游�
 
 test('硬门：未配置 antigrav ⇒ flip 恒 1、ceilH 恒 0、y 恒 0，且与配置版进区前轨迹逐字节一致', () => {
   const run = c => {
-    const sim = new RunnerSim(c, 777);
+    const sim = new RunnerSim(c, 777, undefined, false, [], 'theme_library');
     const trace = [];
     for (let i = 0; i < 2700; i++) {
       sim.step();
@@ -77,7 +77,7 @@ test('硬门：未配置 antigrav ⇒ flip 恒 1、ceilH 恒 0、y 恒 0，且�
 });
 
 test('flip 轨迹：地面步入 flip=-1 升到天花板，出区 flip=1 落回地面，进/出各发一次 flip 事件', () => {
-  const sim = new RunnerSim(blankContent(), 777);
+  const sim = new RunnerSim(blankContent(), 777, undefined, false, [], 'theme_library');
   sim.state.t = 20; sim.state.distance = 560; sim.gen.genZ = 560; // 传送近区缩短步数（同 seed 仍确定性）
   sim.step();
   const flips = [];
@@ -106,7 +106,7 @@ test('flip 轨迹：地面步入 flip=-1 升到天花板，出区 flip=1 落回�
 });
 
 test('yEff 镜像判负：倒挂站天花板（y=4.6）时区内 low 障碍仍判负（不镜像则 y=4.6>0.9 不应命中）', () => {
-  const sim = new RunnerSim(blankContent(), 99);
+  const sim = new RunnerSim(blankContent(), 99, undefined, false, [], 'theme_library');
   sim.state.t = 20; sim.state.distance = ZS + 20; sim.gen.genZ = 10000; // 净空世界+手工布置
   let guard = 0;
   while (sim.state.flip !== -1 && guard++ < 10) sim.step(); // 首步 ensure 预注册区，次步起推导 flip
@@ -121,7 +121,7 @@ test('yEff 镜像判负：倒挂站天花板（y=4.6）时区内 low 障碍仍�
 });
 
 test('单向门：flyT>0 进区不立即翻转，滑翔按正常重力落地（y≈0）后才翻转', () => {
-  const sim = new RunnerSim(blankContent(), 5);
+  const sim = new RunnerSim(blankContent(), 5, undefined, false, [], 'theme_library');
   sim.state.t = 20; sim.state.distance = 560; sim.gen.genZ = 560;
   sim.step();
   sim.buffs.add('fly', { durationS: 1.8 }, 'test_fly', { distance: sim.state.distance, lane: 0 });
@@ -150,7 +150,7 @@ test('单向门：flyT>0 进区不立即翻转，滑翔按正常重力落地（y
 
 test('金币带：真实铺设落进区内的地面金币统一改到 y=ceilH−0.65，区外保持地面高度', () => {
   const c = structuredClone(raw); delete c.obstacles.zap;
-  const sim = new RunnerSim(c, 4242);
+  const sim = new RunnerSim(c, 4242, undefined, false, [], 'theme_library');
   sim.state.t = 20; sim.state.distance = 500; sim.gen.genZ = 500; // 与生成前沿对齐后铺进区段
   for (let i = 0; i < 4; i++) sim.step(); // ensure 一次铺到 ~820m（zone 过滤与金币改写均在铺设时生效）
   const inZone = sim.coinsArr.filter(co => !co.flight && co.worldZ >= ZS && co.worldZ < ZE);
@@ -164,7 +164,7 @@ test('金币带：真实铺设落进区内的地面金币统一改到 y=ceilH−
 
 test('禁铺窗：入口前 12m 与出口后 12m 不铺任何障碍 cell；区内只放 low/high/full/hazard', () => {
   const c = structuredClone(raw); delete c.obstacles.zap;
-  const sim = new RunnerSim(c, 4242);
+  const sim = new RunnerSim(c, 4242, undefined, false, [], 'theme_library');
   sim.state.t = 20; sim.state.distance = 500; sim.gen.genZ = 500;
   for (let i = 0; i < 4; i++) sim.step();
   for (const o of sim.obstacles) {
@@ -178,7 +178,7 @@ test('禁铺窗：入口前 12m 与出口后 12m 不铺任何障碍 cell；区�
 });
 
 test('倒挂收集：天花板带金币（y=ceilH−0.65）被翻转身体中心命中；地面高度币不吃', () => {
-  const sim = new RunnerSim(blankContent(), 7);
+  const sim = new RunnerSim(blankContent(), 7, undefined, false, [], 'theme_library');
   sim.gen.nextZoneZ = Infinity; // 冻结配置游标，手工布置近距 zone（直构 fixture）
   sim.gen.zones.push({ startM: 60, endM: 150, ceilH: CEIL });
   sim.state.t = 20; sim.state.distance = 62; sim.gen.genZ = 10000;

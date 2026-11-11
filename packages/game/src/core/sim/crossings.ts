@@ -58,16 +58,14 @@ export function insertCrossing(list: CrossingEntity[], c: CrossingEntity): void 
   list.splice(i, 0, c);
 }
 
-/** 清理已掠过（done 且落后于回收线）的穿越体：swap-pop，O(1) 摊销（对齐 runnerSim 的实体回收口径） */
+/** 保序压缩：stepCrossings 与 insertCrossing 都依赖 worldZ 升序，不能 swap-pop。 */
 export function cullCrossings(list: CrossingEntity[], dist: number, cullBehindM: number): void {
-  let i = 0;
-  while (i < list.length) {
-    const c = list[i]!;
-    if (c.done && c.worldZ < dist - cullBehindM) {
-      list[i] = list[list.length - 1]!;
-      list.pop();
-    } else i++;
+  let kept = 0;
+  for (const c of list) {
+    if (c.done && c.worldZ < dist - cullBehindM) continue;
+    list[kept++] = c;
   }
+  list.length = kept;
 }
 
 /** trackGen 出生钩子：[from, target) 区间按 everyM 均匀插 ring，返回新的 nextZ（调用方持有游标） */

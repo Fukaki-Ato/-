@@ -37,6 +37,9 @@ export interface ObstaclesFile {
     guarantee?: { safeLanePattern: number[] } }>;
   difficultyCurve: Array<{ by: number; poolWeights: Record<string, number>; coinDensity: number; pickupRate: number }>;
   dropTable: { pickupBoxRatePerSeg: number; weights: Record<string, number> };
+  tideAware?: { lowMax: number; coinCount: number };
+  crossings?: { ring?: { everyM: number; fromM: number; yMin: number; yMax: number } };
+  antigrav?: { lengthM: number; everyM: number; fromM: number; ceilingH: number };
 }
 
 /** 加载完成后拼给业务层的「全量内容」 */

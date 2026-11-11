@@ -15,9 +15,10 @@ import { parseReviveConfig, tryRevive, type ReviveState } from './revive.js';
 import { resolveHit, type HitCtx } from './resolveHit.js';
 import { TrackGen, type CloudEntity, type CoinEntity, type CrossingEntity, type ObstacleEntity, type PickupEntity } from './trackGen.js';
 import { zoneAt } from './zones.js';
+import { contentForRunTheme, resolveRunThemeId } from './themeRules.js';
 import { createSimWorld } from './simWorld.js';
 import { FirstCoinRecord, scoreForState } from './firstCoinRecord.js';
-import { cullByWorldZ, cullObstacles, smashAhead } from './entitySweep.js';
+import { advanceMovingObstacles, cullByWorldZ, cullObstacles } from './entitySweep.js';
 import {
   EMPTY_LOADOUT, FLY_SPEED_CAP, STEP_DT, initialRunnerState,
   type RunnerState, type SimAction, type SimEvent,
@@ -79,7 +80,10 @@ export class RunnerSim {
 
   /** 开局注入的道具：购买自动装备→开局消费→server 重放按 run.items_json 同构复现 */
   readonly initialItems: string[];
-  constructor(private readonly content: GameContent, seed: number, charId?: string, private readonly recordReplay = false, initialItems?: string[]) {
+  readonly themeId: string | undefined;
+  constructor(private readonly content: GameContent, seed: number, charId?: string, private readonly recordReplay = false, initialItems?: string[], themeId?: string) {
+    this.themeId = resolveRunThemeId(content, themeId);
+    content = contentForRunTheme(content, this.themeId);
     this.tideAware = !!(content.obstacles as unknown as { tideAware?: unknown }).tideAware;
     const p = content.game.params;
     this.R = (p.runner ?? {}) as Record<string, number>;
@@ -221,16 +225,10 @@ export class RunnerSim {
     const dm = Math.min(raw, cap) * STEP_DT;
     s.distance += dm;
     if (this.tideAware) this.surgeFired = applySurgeStep(s, dm, this.events, this.surgeFired); else s.surgeWarn = 0;
-    // M4 穿越判定层：深度窗+高度带一次性判定（playerY=s.y），命中加分并推 cross 事件（渲染层爆点）
-    s.score += stepCrossings(this.crossings, s.distance, s.y, CROSSING_DEFAULTS, this.events) * CROSSING_DEFAULTS.scorePer;
     cullCrossings(this.crossings, s.distance, CULL_BEHIND_M); s.tideLevel = level(s.distance); // M4 潮位单源：全主题算（~4 op），潮汐主题消费其余忽略
 
     // 纵向漂移障碍（moveZ<0=向玩家冲来的冲撞体）：推进 worldZ，并把沿途同车道障碍撞开
-    for (const o of this.obstacles) {
-      if (!o.moveZ || o.done) continue;
-      o.worldZ += o.moveZ * STEP_DT;
-      if (o.moveZ < 0) smashAhead(this.obstacles, o, s.t);
-    }
+    advanceMovingObstacles(this.obstacles, this.gen.zones, s.t);
     // B-2/B-3 反重力上下文：zoneAt 纯查询（二分零分配）推导 flip/ceilH 写 state（渲染只读不反写）。
     // 单向门：flyT>0 / 滑翔 / 燃料耗尽过渡帧（flyWasActive）不翻转——按正常重力落地后才翻（brief §11.2 B-3）
     const zone = zoneAt(this.gen.zones, s.distance);
@@ -247,6 +245,7 @@ export class RunnerSim {
     this.gen.ensure(s.distance, GEN_AHEAD_M, this.obstacles, this.coinsArr, this.pickupsArr, this.crossings);
     this.collide();
     if (s.alive) {
+      this.bonusScore += stepCrossings(this.crossings, s.distance, s.y, CROSSING_DEFAULTS, this.events) * (this.SC.perCrossing ?? CROSSING_DEFAULTS.scorePer);
       collectCoins(this.collectDeps);
       collectPickups(this.collectDeps);
     }

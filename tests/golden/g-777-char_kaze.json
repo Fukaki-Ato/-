@@ -916,14 +916,12 @@
     "eventCounts": {
       "cast": 1,
       "coin": 44,
-      "cross": 2,
       "death": 1,
       "hit": 2,
       "protected": 1,
-      "revive": 1,
-      "surge": 1
+      "revive": 1
     },
-    "eventsSha256": "2e41b12b0766ce73d008e020cb1eadfce5873d54129dd213b8bd9fb1decf2d45",
+    "eventsSha256": "fef4f1ec12e7e6da77e487a4999eb587218e70b002ca32116a2412326b2e82cf",
     "inputsSha256": "ee264f1194473320ffa340792dd85c07566db4e98e45e5c01dc1991bce76f3ad"
   }
 }

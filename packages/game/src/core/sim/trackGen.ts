@@ -111,7 +111,7 @@ export class TrackGen {
     this.crossingFromM = typeof cr?.fromM === 'number' ? cr.fromM : 0; this.crossingY = [cr?.yMin ?? 0, cr?.yMax ?? 3];
     const ta = (content.obstacles as unknown as { tideAware?: TideAwareCfg }).tideAware;
     this.tideAware = ta && typeof ta.lowMax === 'number' && typeof ta.coinCount === 'number' ? ta : undefined;
-    this.nextCrossZ = this.crossingFromM;
+    this.nextCrossZ = Number.isFinite(this.crossingEveryM) ? this.crossingFromM : Infinity;
     const zapRaw = (ob as unknown as { zap?: { ref?: unknown; everyM?: unknown; fromM?: unknown } }).zap;
     this.zapRef = typeof zapRaw?.ref === 'string' ? zapRaw.ref : '';
     this.zapEveryM = typeof zapRaw?.everyM === 'number' && zapRaw.everyM > 0 ? zapRaw.everyM : 0;
