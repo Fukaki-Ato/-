@@ -59,7 +59,9 @@ test('removed basketball role falls back to 牢大 and starts with its audio ide
 });
 
 test('locked-role preview shows correct data, keeps start disabled, and forwards the preview to shop', t => {
-  const { root, byClass, find, calls, dispose } = setup(t, 'char_volt', content => { content.characters.items.find(item => item.id === 'char_ama').locked = true; });
+  const { root, byClass, find, calls, dispose } = setup(t, 'char_volt', content => {
+    Object.assign(content.characters.items.find(item => item.id === 'char_ama'), { locked: true, unlock: { type: 'coin', cost: 4500 } });
+  });
   byClass(root,'select-roster-card').find(card => card.dataset.charId === 'char_ama').click();
   assert.equal(find('select-name').textContent, '阿玛拉');
   assert.match(find('select-state').textContent, /锁定/);
@@ -123,6 +125,7 @@ test('shard synthesis is independently enabled and never repeats or bypasses con
   const { selectUnlockActions } = await import('../packages/game/dist/flow/unlock.js');
   const { grant, walletBalance } = await import('../packages/game/dist/flow/localEconomy.js');
   const fixture = fakeDom(t);
+  fixture.content.characters.items.find(role => role.id === 'char_ama').unlock = { type: 'coin', cost: 4500 };
   const map = new Map();
   const store = { get: k => map.get(k) ?? null, set: (k, v) => map.set(k, v) };
   grant(store, [{ item: 'shard_ama', n: 120 }]);

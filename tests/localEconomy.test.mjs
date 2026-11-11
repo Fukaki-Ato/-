@@ -35,6 +35,15 @@ function shopContent() {
   return c;
 }
 
+// 当前版本角色免费开放；显式构造门槛，继续验证以后恢复解锁时的扣价/合成规则。
+function gatedContent() {
+  const c = structuredClone(content);
+  c.characters.items.find(role => role.id === 'char_ama').unlock = { type: 'coin', cost: 4500 };
+  c.characters.items.find(role => role.id === 'char_mambo').unlock = { type: 'coin', cost: 7000 };
+  c.characters.items.find(role => role.id === 'char_bolt').unlock = { type: 'event', eventRef: 'event_thunder_beast_siege' };
+  return c;
+}
+
 test('钱包：grant 发货、spend all-or-nothing，coin 沿用旧计数键', () => {
   const s = store({ 'thunderrun:coins-total': '100' });
   assert.equal(walletBalance(s, 'coin'), 100, '旧金币键直接可见');
@@ -80,21 +89,22 @@ test('商店购买：perDay 用尽后当日拒绝、次日放行', () => {
 });
 
 test('角色解锁门槛：gated 判定 + coin 解锁扣价', () => {
+  const c = gatedContent();
   const s = store({ 'thunderrun:coins-total': '4500' });
-  assert.equal(isCharacterGated(content, 'char_volt', s), false, 'free 角色不受门槛');
-  assert.equal(isCharacterGated(content, 'char_ama', s), true, 'coin 型默认未解锁');
-  assert.match(canUnlockCharacter(s, content, 'char_mambo', AT).message, /7000金币/, '余额不足的角色给出价格');
-  const r = unlockCharacter(s, content, 'char_ama', AT);
+  assert.equal(isCharacterGated(c, 'char_volt', s), false, 'free 角色不受门槛');
+  assert.equal(isCharacterGated(c, 'char_ama', s), true, 'coin 型默认未解锁');
+  assert.match(canUnlockCharacter(s, c, 'char_mambo', AT).message, /7000金币/, '余额不足的角色给出价格');
+  const r = unlockCharacter(s, c, 'char_ama', AT);
   assert.deepEqual(r, { ok: true, message: '解锁成功' });
   assert.equal(walletBalance(s, 'coin'), 0);
   assert.ok(unlockedCharacterIds(s).has('char_ama'));
-  assert.equal(isCharacterGated(content, 'char_ama', s), false, '解锁后不再受门槛');
-  assert.equal(unlockCharacter(s, content, 'char_ama', AT).ok, false, '重复解锁拒绝');
+  assert.equal(isCharacterGated(c, 'char_ama', s), false, '解锁后不再受门槛');
+  assert.equal(unlockCharacter(s, c, 'char_ama', AT).ok, false, '重复解锁拒绝');
 });
 
 test('角色解锁门槛：余额不足拒绝且不扣款', () => {
   const s = store({ 'thunderrun:coins-total': '100' });
-  const r = unlockCharacter(s, content, 'char_ama', AT);
+  const r = unlockCharacter(s, gatedContent(), 'char_ama', AT);
   assert.equal(r.ok, false);
   assert.match(r.message, /4500金币/);
   assert.equal(walletBalance(s, 'coin'), 100, '拒绝不扣款');
@@ -102,26 +112,28 @@ test('角色解锁门槛：余额不足拒绝且不扣款', () => {
 });
 
 test('碎片合成：达标扣碎片解锁，不足给进度文案', () => {
+  const c = gatedContent();
   const shard = content.economy.params.shards.find(s => s.grants === 'char_ama');
   const need = shard.need['1'];
   const s = store();
   grant(s, [{ item: 'shard_ama', n: need - 1 }]);
-  const short = synthesizeCharacter(s, content, 'char_ama');
+  const short = synthesizeCharacter(s, c, 'char_ama');
   assert.equal(short.ok, false);
   assert.match(short.message, new RegExp(`${need - 1}/${need}`));
   grant(s, [{ item: 'shard_ama', n: 1 }]);
-  const ok = synthesizeCharacter(s, content, 'char_ama');
+  const ok = synthesizeCharacter(s, c, 'char_ama');
   assert.deepEqual(ok, { ok: true, message: '合成成功' });
   assert.equal(walletBalance(s, 'shard_ama'), 0, '合成扣碎片');
   assert.ok(unlockedCharacterIds(s).has('char_ama'));
 });
 
 test('活动型解锁：活动 draft 时拒绝并提示活动未开放', () => {
+  const c = gatedContent();
   const s = store({});
-  const r = canUnlockCharacter(s, content, 'char_bolt', AT);
+  const r = canUnlockCharacter(s, c, 'char_bolt', AT);
   assert.equal(r.ok, false);
   assert.match(r.message, /活动未开放/);
-  assert.equal(unlockCharacter(s, content, 'char_bolt', AT).ok, false);
+  assert.equal(unlockCharacter(s, c, 'char_bolt', AT).ok, false);
 });
 
 // ---------------- 登录签到（审查 M4-6） ----------------
