@@ -1,0 +1,254 @@
+TAP version 13
+# Subtest: golden 覆盖矩阵：5 条赛道 seed × 3 个角色，15 例齐全
+ok 1 - golden 覆盖矩阵：5 条赛道 seed × 3 个角色，15 例齐全
+  ---
+  duration_ms: 1.709914
+  type: 'test'
+  ...
+# Subtest: golden 基线文件本身是合法的重放格式 v1（parseReplay 严格校验）
+ok 2 - golden 基线文件本身是合法的重放格式 v1（parseReplay 严格校验）
+  ---
+  duration_ms: 24.332796
+  type: 'test'
+  ...
+# Subtest: golden 复跑一致：g-101-char_ama.json
+ok 3 - golden 复跑一致：g-101-char_ama.json
+  ---
+  duration_ms: 174.090759
+  type: 'test'
+  ...
+# Subtest: golden 复跑一致：g-101-char_kaze.json
+ok 4 - golden 复跑一致：g-101-char_kaze.json
+  ---
+  duration_ms: 92.849908
+  type: 'test'
+  ...
+# Subtest: golden 复跑一致：g-101-char_volt.json
+ok 5 - golden 复跑一致：g-101-char_volt.json
+  ---
+  duration_ms: 73.65216
+  type: 'test'
+  ...
+# Subtest: golden 复跑一致：g-20260922-char_ama.json
+ok 6 - golden 复跑一致：g-20260922-char_ama.json
+  ---
+  duration_ms: 37.510127
+  type: 'test'
+  ...
+# Subtest: golden 复跑一致：g-20260922-char_kaze.json
+ok 7 - golden 复跑一致：g-20260922-char_kaze.json
+  ---
+  duration_ms: 80.327736
+  type: 'test'
+  ...
+# Subtest: golden 复跑一致：g-20260922-char_volt.json
+ok 8 - golden 复跑一致：g-20260922-char_volt.json
+  ---
+  duration_ms: 34.227198
+  type: 'test'
+  ...
+# Subtest: golden 复跑一致：g-4242-char_ama.json
+ok 9 - golden 复跑一致：g-4242-char_ama.json
+  ---
+  duration_ms: 28.06229
+  type: 'test'
+  ...
+# Subtest: golden 复跑一致：g-4242-char_kaze.json
+ok 10 - golden 复跑一致：g-4242-char_kaze.json
+  ---
+  duration_ms: 50.856375
+  type: 'test'
+  ...
+# Subtest: golden 复跑一致：g-4242-char_volt.json
+ok 11 - golden 复跑一致：g-4242-char_volt.json
+  ---
+  duration_ms: 11.483295
+  type: 'test'
+  ...
+# Subtest: golden 复跑一致：g-65001-char_ama.json
+ok 12 - golden 复跑一致：g-65001-char_ama.json
+  ---
+  duration_ms: 79.159433
+  type: 'test'
+  ...
+# Subtest: golden 复跑一致：g-65001-char_kaze.json
+ok 13 - golden 复跑一致：g-65001-char_kaze.json
+  ---
+  duration_ms: 39.141491
+  type: 'test'
+  ...
+# Subtest: golden 复跑一致：g-65001-char_volt.json
+ok 14 - golden 复跑一致：g-65001-char_volt.json
+  ---
+  duration_ms: 31.812831
+  type: 'test'
+  ...
+# Subtest: golden 复跑一致：g-777-char_ama.json
+ok 15 - golden 复跑一致：g-777-char_ama.json
+  ---
+  duration_ms: 14.074684
+  type: 'test'
+  ...
+# Subtest: golden 复跑一致：g-777-char_kaze.json
+ok 16 - golden 复跑一致：g-777-char_kaze.json
+  ---
+  duration_ms: 18.601628
+  type: 'test'
+  ...
+# Subtest: golden 复跑一致：g-777-char_volt.json
+ok 17 - golden 复跑一致：g-777-char_volt.json
+  ---
+  duration_ms: 12.844096
+  type: 'test'
+  ...
+# Subtest: v1 still ignores context fields and default recorder output remains v1
+ok 18 - v1 still ignores context fields and default recorder output remains v1
+  ---
+  duration_ms: 69.718606
+  type: 'test'
+  ...
+# Subtest: v2 parsing preserves independent context values and validates their shapes
+ok 19 - v2 parsing preserves independent context values and validates their shapes
+  ---
+  duration_ms: 0.831534
+  type: 'test'
+  ...
+# Subtest: v2 actually replays the requested theme and initial equipment through RunnerSim
+not ok 20 - v2 actually replays the requested theme and initial equipment through RunnerSim
+  ---
+  duration_ms: 190.545582
+  type: 'test'
+  location: '/tmp/opencode/thunder-run-site-optimization-20261111/tests/replay-context.test.mjs:31:1'
+  failureType: 'testCodeFailure'
+  error: 'dropping initial equipment must produce a distinguishable replay, not just different metadata'
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: '2acb53840dcdce7c4a1612d026aa00e42c704dde897a61f92ed1e137fffb0a72'
+  actual: '2acb53840dcdce7c4a1612d026aa00e42c704dde897a61f92ed1e137fffb0a72'
+  operator: 'notStrictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///tmp/opencode/thunder-run-site-optimization-20261111/tests/replay-context.test.mjs:46:10)
+    Test.runInAsyncScope (node:async_hooks:214:14)
+    Test.run (node:internal/test_runner/test:1047:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:744:18)
+    Test.postRun (node:internal/test_runner/test:1173:19)
+    Test.run (node:internal/test_runner/test:1101:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: v2 missing context has identical default gameplay while explicitly reporting resolved context
+ok 21 - v2 missing context has identical default gameplay while explicitly reporting resolved context
+  ---
+  duration_ms: 2.743386
+  type: 'test'
+  ...
+# Subtest: recorder CLI emits v2 for context without changing the existing input RNG stream
+ok 22 - recorder CLI emits v2 for context without changing the existing input RNG stream
+  ---
+  duration_ms: 65.560025
+  type: 'test'
+  ...
+# Subtest: v2 example is loadable and reports its effective simulation context
+ok 23 - v2 example is loadable and reports its effective simulation context
+  ---
+  duration_ms: 15.531537
+  type: 'test'
+  ...
+# Subtest: 合法重放：解析通过并规范化（缺省 maxFrames 补默认值）
+ok 24 - 合法重放：解析通过并规范化（缺省 maxFrames 补默认值）
+  ---
+  duration_ms: 1.690697
+  type: 'test'
+  ...
+# Subtest: charId 空串合法（=默认装备）；未知顶层字段被忽略（v1 加法演进）
+ok 25 - charId 空串合法（=默认装备）；未知顶层字段被忽略（v1 加法演进）
+  ---
+  duration_ms: 0.332602
+  type: 'test'
+  ...
+# Subtest: payload 规范化：多余键被剥离，只留规范形状
+ok 26 - payload 规范化：多余键被剥离，只留规范形状
+  ---
+  duration_ms: 0.995274
+  type: 'test'
+  ...
+# Subtest: inputs 允许空数组（挂机重放）
+ok 27 - inputs 允许空数组（挂机重放）
+  ---
+  duration_ms: 0.201697
+  type: 'test'
+  ...
+# Subtest: 未知/非法版本一律拒绝（含数字字符串 "1" 与未来版本 3）
+ok 28 - 未知/非法版本一律拒绝（含数字字符串 "1" 与未来版本 3）
+  ---
+  duration_ms: 0.834412
+  type: 'test'
+  ...
+# Subtest: 非法 seed/charId/dtMs/maxFrames 拒绝
+ok 29 - 非法 seed/charId/dtMs/maxFrames 拒绝
+  ---
+  duration_ms: 0.607064
+  type: 'test'
+  ...
+# Subtest: 非法事件拒绝：frame 乱序/负数、未知 type、payload 形状错误
+ok 30 - 非法事件拒绝：frame 乱序/负数、未知 type、payload 形状错误
+  ---
+  duration_ms: 0.587708
+  type: 'test'
+  ...
+# Subtest: 映射表：手势/按键 → SimAction，tap 与未映射按键为 null
+ok 31 - 映射表：手势/按键 → SimAction，tap 与未映射按键为 null
+  ---
+  duration_ms: 0.418854
+  type: 'test'
+  ...
+# Subtest: tap 事件不改变 sim 结果：同 seed 下与无输入重放的推进/结算/事件哈希一致
+ok 32 - tap 事件不改变 sim 结果：同 seed 下与无输入重放的推进/结算/事件哈希一致
+  ---
+  duration_ms: 25.37999
+  type: 'test'
+  ...
+# Subtest: runner 确定性：同一重放跑两次，摘要逐字段一致（含两个 sha256）
+ok 33 - runner 确定性：同一重放跑两次，摘要逐字段一致（含两个 sha256）
+  ---
+  duration_ms: 42.039418
+  type: 'test'
+  ...
+# Subtest: 无输入重放必然出局（一条命 + 随机赛道），且死亡帧停机
+ok 34 - 无输入重放必然出局（一条命 + 随机赛道），且死亡帧停机
+  ---
+  duration_ms: 56.179677
+  type: 'test'
+  ...
+# Subtest: canonicalJson 键序稳定：同数据不同插入序 → 同哈希；改一个事件 → 哈希变化
+ok 35 - canonicalJson 键序稳定：同数据不同插入序 → 同哈希；改一个事件 → 哈希变化
+  ---
+  duration_ms: 0.585601
+  type: 'test'
+  ...
+# Subtest: recorder 确定性：同 (seed,charId) 两次编排逐字节一致，不同 seed 编排不同
+ok 36 - recorder 确定性：同 (seed,charId) 两次编排逐字节一致，不同 seed 编排不同
+  ---
+  duration_ms: 1.166676
+  type: 'test'
+  ...
+# Subtest: makeReplay 产物直接过 parseReplay 校验
+ok 37 - makeReplay 产物直接过 parseReplay 校验
+  ---
+  duration_ms: 0.219688
+  type: 'test'
+  ...
+# Subtest: 规范示例文件存在、可加载并可复跑
+ok 38 - 规范示例文件存在、可加载并可复跑
+  ---
+  duration_ms: 52.187972
+  type: 'test'
+  ...
+1..38
+# tests 38
+# suites 0
+# pass 37
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 1734.416935
