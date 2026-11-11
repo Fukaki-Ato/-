@@ -1,0 +1,21 @@
+{
+  "ok": true,
+  "captureScope": "cloud-local-render-only",
+  "isolationMode": "explicit-no-sandbox",
+  "additionalFontDirectoryUsed": true,
+  "targetOrigin": "http://127.0.0.1:34673",
+  "png": "/tmp/opencode/thunder-run-B03-verify-20261111/profile-before.png",
+  "viewport": {
+    "width": 320,
+    "height": 568
+  },
+  "load": "complete",
+  "resourceDiagnostics": {
+    "blockedRequests": 0,
+    "failedRequests": 0,
+    "httpErrorResponses": 0,
+    "blockedWebSockets": 0
+  },
+  "publicReachability": "not-verified",
+  "visualVerification": "not-verified"
+}
