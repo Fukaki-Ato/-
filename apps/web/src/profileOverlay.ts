@@ -1,14 +1,15 @@
 /**
  * 玩家档案 DOM 弹层（Web 壳）：大头像 + 10 枚候选头像（点击即换）、账号 ID、最高记录、
  * 点候选名改名（免费次数用完后扣钻石，余额在当前档案内同步显示）。
- * 数据全走 core/profile/playerProfile（与 canvas 版 buildProfileOverlay 同一份数据逻辑）；
+ * 规则走 core/profile/playerProfile，改名关联保存走 flow/localProfileActions（与 canvas 版共用）；
  * 入口位于设置页「玩家档案」，bootstrap 装配；关闭后回到设置页。
  */
 import type { GameContent } from '@tr/game/core/config/configTypes.js';
 import type { SyncStorage } from '@tr/framework/platform/platformAdapter.js';
 import { AVATAR_KEYS } from '@tr/game/ui/profileView.js';
-import { loadProfile, profileParamsFrom, saveProfile, tryRename } from '@tr/game/core/profile/playerProfile.js';
-import { DIAMOND_KEY, walletBalance } from '@tr/game/flow/localEconomy.js';
+import { loadProfile, profileParamsFrom, saveProfile, type RenameResult } from '@tr/game/core/profile/playerProfile.js';
+import { walletBalance } from '@tr/game/flow/localEconomy.js';
+import { renameLocalProfile } from '@tr/game/flow/localProfileActions.js';
 import { pageLifecycle, uiButton, uiText } from './mobileUi.js';
 import './profileOverlay.css';
 
@@ -78,7 +79,12 @@ export function openProfileOverlay(
   names.setAttribute('aria-label', '候选昵称');
   for (const candidate of params.nameCandidates) {
     names.append(uiButton(candidate, 'profile-name-pick', () => {
-      const r = tryRename(prof, params, candidate, walletBalance(storage, 'diamond'));
+      let r: RenameResult;
+      try { r = renameLocalProfile(storage, prof, params, candidate); }
+      catch (error) {
+        hintL.textContent = `改名未完成：${error instanceof Error ? error.message : String(error)}`;
+        return;
+      }
       if (!r.ok) {
         hintL.textContent = r.reason === 'need-diamonds'
           ? `改名需要 ${r.cost} 钻石，钻石不足`
@@ -86,8 +92,6 @@ export function openProfileOverlay(
         return;
       }
       prof = r.profile;
-      saveProfile(storage, prof);
-      storage.set(DIAMOND_KEY, String(r.diamondsLeft));
       nameL.textContent = prof.name;
       hintL.textContent = hint();
       inventory.replaceChildren(...Array.from(buildInventory(content, storage).children));

@@ -15,6 +15,13 @@ export interface EconomyStore {
   get(key: string): string | null;
   set(key: string, value: string): void;
   remove(key: string): void;
+  /** Optional capability supplied by the Web progress wallet; the callback is synchronous. */
+  transaction?<T>(operation: (draft: EconomyStore) => T): T;
+}
+
+/** Keep bare storage callers compatible; the actual Web wallet supplies the atomic commit. */
+export function withEconomyTransaction<T>(store: EconomyStore, operation: (draft: EconomyStore) => T): T {
+  return store.transaction ? store.transaction(operation) : operation(store);
 }
 
 export const COINS_KEY = 'thunderrun:coins-total';
@@ -86,9 +93,11 @@ export function canAfford(store: EconomyStore, price: Record<string, unknown>): 
 
 /** 扣价：任一不足则整体不动（all-or-nothing），返回是否成功 */
 export function spend(store: EconomyStore, price: Record<string, unknown>): boolean {
-  if (!canAfford(store, price)) return false;
-  for (const [id, n] of Object.entries(price)) addBalance(store, id, -(n as number));
-  return true;
+  return withEconomyTransaction(store, draft => {
+    if (!canAfford(draft, price)) return false;
+    for (const [id, n] of Object.entries(price)) addBalance(draft, id, -(n as number));
+    return true;
+  });
 }
 
 // Local shop limits retain their existing device-calendar semantics. Mission periods are server-owned.
@@ -113,6 +122,10 @@ export interface BuyResult { ok: boolean; message: string }
 
 /** 商店购买：开放性（requiresEvent）→ 限购（once/perDay）→ 余额 → 扣价 + 发货 + 记限购 */
 export function buyOffer(store: EconomyStore, content: GameContent, offerId: string, now: Date): BuyResult {
+  return withEconomyTransaction(store, draft => buyOfferInStore(draft, content, offerId, now));
+}
+
+function buyOfferInStore(store: EconomyStore, content: GameContent, offerId: string, now: Date): BuyResult {
   const offers = ((content.economy.params?.shop as { offers?: Entry[] } | undefined)?.offers) ?? [];
   const offer = offers.find(o => o.id === offerId);
   if (!offer) return { ok: false, message: '商品不存在' };
@@ -138,10 +151,11 @@ export function buyOffer(store: EconomyStore, content: GameContent, offerId: str
   }
   grant(store, rewards);
   // 可装备道具（items.json 有 effects 的 item_*）自动进装备清单，下一局生效
+  let equipped = false;
   for (const g of rewards) {
-    if (typeof g.item === 'string' && g.item.startsWith('item_')) equipItem(store, g.item);
+    if (typeof g.item === 'string' && g.item.startsWith('item_') && equipItem(store, g.item)) equipped = true;
   }
-  return { ok: true, message: '购买成功，已装备到下一局' };
+  return { ok: true, message: equipped ? '购买成功，已装备到下一局' : '购买成功，已存入背包' };
 }
 
 // ---------------- 场景动作装配（mainFlow 用；集中在此保持 mainFlow 行数预算） ----------------
@@ -155,6 +169,9 @@ export function shopActions(store: EconomyStore, content: GameContent, onBack: (
       keys: walletBalance(store, 'key'),
       diamonds: walletBalance(store, 'diamond'),
     }),
-    onBuy: offerId => buyOffer(store, content, offerId, new Date()),
+    onBuy: offerId => {
+      try { return buyOffer(store, content, offerId, new Date()); }
+      catch (error) { return { ok: false, message: `购买未完成：${error instanceof Error ? error.message : String(error)}` }; }
+    },
   };
 }

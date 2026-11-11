@@ -2,7 +2,7 @@
  * 玩家档案半屏弹层：大厅点左上角头像 → 面板从顶边滑下（占屏高 params.profile.panelHeightPct）；
  * 点面板下方的空白区收回。内容＝头像（点大头像/点候选行均可换）、账号 ID、昵称（点候选改名）、最高记录。
  *
- * 数据读写全在 core/profile/playerProfile（本文件只负责摆放与点击派发）；
+ * 规则来自 core/profile/playerProfile，改名关联保存由 flow/localProfileActions 负责；
  * 头像贴图在 assets/ui/badges/{normal,glow}/ava_01..10.png，加/换头像只改 AVATAR_KEYS 这张表。
  */
 import { Box, Button, Label, type Widget } from '@tr/framework/ui/index.js';
@@ -11,10 +11,11 @@ import type { SyncStorage } from '@tr/framework/platform/platformAdapter.js';
 import { SlideBox, tapCatcher } from './slideOverlay.js';
 import { badgeButton, type BadgeName, type BadgeSet } from './badges.js';
 import {
-  loadProfile, saveProfile, tryRename, withAvatar,
-  type ProfileParams, type RenameFail,
+  loadProfile, saveProfile, withAvatar,
+  type ProfileParams, type RenameFail, type RenameResult,
 } from '../core/profile/playerProfile.js';
 import { BEST_KEY, DIAMOND_KEY } from '../flow/mainFlow.js';
+import { renameLocalProfile } from '../flow/localProfileActions.js';
 
 /**
  * 候选头像＝档案专用的一批二次元头像（5 女 5 男，金圆框与参考图的 avatar 同一套风格）。
@@ -133,14 +134,14 @@ export function buildProfileOverlay(host: UiHost, d: ProfileOverlayDeps): Profil
   };
 
   const applyName = (candidate: string): void => {
-    const r = tryRename(prof, p, candidate, readCount(d.storage, DIAMOND_KEY));
+    let r: RenameResult;
+    try { r = renameLocalProfile(d.storage, prof, p, candidate); }
+    catch (error) { host.toast(`改名未完成：${error instanceof Error ? error.message : String(error)}`); return; }
     if (!r.ok) {
       host.toast(failText(r.reason, r.cost));
       return;
     }
     prof = r.profile;
-    saveProfile(d.storage, prof);
-    d.storage.set(DIAMOND_KEY, String(r.diamondsLeft)); // 余额回落盘，顶栏数字同步
     d.onDiamonds(r.diamondsLeft);
     nameL.setText(prof.name);
     hintL.setText(hintText());

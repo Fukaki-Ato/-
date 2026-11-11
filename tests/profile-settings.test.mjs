@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { fakeDom, importWebModule } from './dom-fixture.mjs';
+import { createRewardWalletStore, REWARD_WALLET_KEY } from '@tr/game/flow/missionRewardWallet.js';
 
 const { createMobileSettings } = await importWebModule('../apps/web/src/mobilePanels.ts');
 const { openProfileOverlay } = await importWebModule('../apps/web/src/profileOverlay.ts');
@@ -128,4 +129,29 @@ test('档案 Tab 首尾循环且背景 inert，关闭后恢复原状态及入口
   assert.equal(other.inert, true, '不能解除已有的背景隔离状态');
   assert.equal(document.activeElement, f.entry);
   f.dispose();
+});
+
+test('实际钱包保存失败时档案保留名字与余额，修复后同一候选可以重试', t => {
+  const f = fakeDom(t);
+  const values = new Map([['thunderrun:player-id', '1234567890'], ['thunderrun:player-name', '小跑者'],
+    ['thunderrun:player-renames', '1'], ['thunderrun:diamonds-total', '60']]);
+  let failure = true;
+  const storage = { get: key => values.get(key) ?? null, remove: key => values.delete(key), set(key, value) {
+    if (failure && key === REWARD_WALLET_KEY) return;
+    values.set(key, value);
+  } };
+  const wallet = createRewardWalletStore(storage);
+  const dispose = openProfileOverlay(f.content, wallet);
+  const node = name => f.byClass(f.body, name)[0];
+  const candidate = f.byClass(f.body, 'profile-name-pick').find(button => button.textContent === '闪电少年');
+  candidate.click();
+  assert.match(node('profile-hint').textContent, /改名未完成.*保存失败/);
+  assert.equal(node('profile-name').textContent, '小跑者');
+  assert.equal(wallet.get('thunderrun:diamonds-total'), '60');
+  assert.equal(wallet.get('thunderrun:player-renames'), '1');
+  failure = false; candidate.click();
+  assert.equal(node('profile-name').textContent, '闪电少年');
+  assert.equal(wallet.get('thunderrun:diamonds-total'), '40');
+  assert.match(node('profile-hint').textContent, /余额 40/);
+  dispose();
 });
