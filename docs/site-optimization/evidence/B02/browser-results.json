@@ -1,0 +1,71 @@
+{
+  "scope": "candidate production bundle; isolated synthetic mission API; fresh local profile; no production writes",
+  "checks": [
+    {
+      "task": "VAL-03",
+      "result": "pass",
+      "storageFailure": "native adapter swallows synthetic quota; canonical readback detects it",
+      "failedRenameUnchanged": true,
+      "retryDiamondBalance": 40,
+      "retryRenames": 2
+    },
+    {
+      "task": "UX-01/02",
+      "result": "pass",
+      "score": 12345,
+      "diamondsBefore": 60,
+      "diamondsAfter": 40
+    },
+    {
+      "task": "UX-03",
+      "result": "pass",
+      "keys": [
+        "Shift+Tab",
+        "Tab",
+        "Escape"
+      ],
+      "backgroundFocusBlocked": true,
+      "returnFocus": "打开玩家档案",
+      "viewports": [
+        "390x844",
+        "320x568"
+      ]
+    },
+    {
+      "task": "VAL-02",
+      "result": "pass",
+      "failedPurchaseUnchanged": true,
+      "retry": {
+        "coin": 1900,
+        "key": 0,
+        "diamond": 40,
+        "dailyLimit": 1
+      },
+      "fixtureApi": true
+    },
+    {
+      "task": "UX-04",
+      "result": "pass",
+      "successFocus": "mission-card",
+      "movedFocusRetained": "mission-refresh",
+      "fixtureApi": true
+    },
+    {
+      "task": "UX-05",
+      "result": "pass",
+      "fixtureApi": true,
+      "controlledBrowserClock": true,
+      "reloadsAfterBusyExpiry": 1,
+      "newPeriodFocus": "mission-tab-daily"
+    },
+    {
+      "task": "VAL-04",
+      "result": "pass",
+      "originalImportRetained": true,
+      "newRewardDelta": 10,
+      "coinAfterSpendingAndNewReward": 1910,
+      "localRenamePreserved": true
+    }
+  ],
+  "errors": []
+}

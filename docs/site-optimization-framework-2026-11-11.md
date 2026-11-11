@@ -2,7 +2,7 @@
 
 **审查日期：2026-11-11｜文档性质：方向性审查框架**
 
-**后续执行入口**：[长任务工作流](site-optimization-workflow-2026-11-11.md) · [任务账本](site-optimization-tasks-2026-11-11.md) · [B01 验收记录](site-optimization/records/B01.md)。下文保留原审查基线与事实；当前已开始优化执行，首批五项在独立候选代码验收，尚未正式发布。
+**后续执行入口**：[长任务工作流](site-optimization-workflow-2026-11-11.md) · [任务账本](site-optimization-tasks-2026-11-11.md) · [B01](site-optimization/records/B01.md) · [B02](site-optimization/records/B02.md)。下文保留原审查基线与事实；交互及消费一致性结果已在独立本地候选验收，尚未正式发布。
 
 ## 1. 文档目标与审查边界
 
