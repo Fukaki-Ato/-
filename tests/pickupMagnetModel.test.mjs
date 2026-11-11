@@ -25,6 +25,7 @@ if (typeof URL.revokeObjectURL !== 'function') URL.revokeObjectURL = () => {};
 const { createPickupModelLoader } = await import('../packages/game/dist/render/pickupModels.js');
 const { createPickupLayer } = await import('../packages/game/dist/render/pickupLayer.js');
 const { PICKUP_CENTER_Y } = await import('../packages/game/dist/core/sim/collect.js');
+const { uBendX, uBendY } = await import('../packages/game/dist/render/stormspire/worldBend.js');
 
 const root = join(fileURLToPath(import.meta.url), '..', '..');
 const NAMES = ['game', 'characters', 'skills', 'items', 'obstacles', 'themes', 'events', 'economy'];
@@ -62,13 +63,17 @@ test('加载器：磁铁 GLB 加载成功（居中/规格带/多部件/自转口
     const mat = o.material;
     assert.ok(mat.emissive.getHexString() !== '000000', '加载后应补了 emissive');
     assert.ok(Math.abs(mat.emissiveIntensity - 0.18) < 1e-6, 'emissive 强度 0.18');
+    const shader = { uniforms: {}, vertexShader: '#include <project_vertex>' };
+    mat.onBeforeCompile(shader);
+    assert.equal(shader.uniforms.uBendX, uBendX, '近距模型与箱、光圈共用弯道');
+    assert.equal(shader.uniforms.uBendY, uBendY);
   });
   assert.equal(loader.model('item_magnet'), m, '重复取应返回同一实例（不重复加载）');
 });
 
-test('加载器：九件新 GLB 全部加载成功（居中/规格带），异常路径仍回 null', async () => {
+test('加载器：十件 GLB 全部加载成功（居中/规格带），异常路径仍回 null', async () => {
   const ok = createPickupModelLoader(content, realAdapter);
-  const ids = ['item_shield', 'item_jetpack', 'item_coin', 'item_key', 'item_boots', 'item_helmet', 'item_board', 'item_multiplier', 'item_magnet'];
+  const ids = ['item_shield', 'item_jetpack', 'item_coin', 'item_key', 'item_boots', 'item_helmet', 'item_board', 'item_multiplier', 'item_magnet', 'item_xp_card'];
   for (const id of ids) {
     assert.equal(ok.hasPrefab(id), true, `${id} 配了 prefab`);
     ok.model(id); // 触发异步加载（首帧同步返回 null 是契约）

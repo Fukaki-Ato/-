@@ -6,11 +6,12 @@
  * 无强体积光、无厚雾；bloom 阈值 0.82 只让金币/金线/灯头/电弧这类自发光溢光，
  * 石灰岩建筑的漫反射亮度够不到阈值——柱子不泛光，画面不发灰。
  * 降级门（任一不满足 → composer=null，update/resize/dispose 全 no-op，调用方继续裸 renderer.render）：
- *   1) 微信小游戏端（wx 全局存在）永远降级：多 pass 填充率开销在小游戏机不划算（wx 路径零额外开销）；
+ *   1) 平台适配层声明 wx 时永远降级：多 pass 填充率开销在小游戏机不划算（wx 路径零额外开销）；
  *   2) renderer.capabilities.isWebGL2（three r163+ 恒真，保留显式口径防运行时回退）；
  *   3) 后处理模块构造可用（选型理由见 try 块内注释）。
  */
 import * as THREE from 'three';
+import type { PlatformAdapter } from '@tr/framework/platform/platformAdapter.js';
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
@@ -115,6 +116,7 @@ export interface PostFx {
 
 export function createPostFx(
   renderer: THREE.WebGLRenderer, scene: THREE.Scene, camera: THREE.PerspectiveCamera,
+  env: PlatformAdapter['env'],
   /** 主题 grade 覆盖（runTheme 从 theme.grade 派生；不传=雨夜口径常量） */
   grade?: GradeOverride,
 ): PostFx {
@@ -128,16 +130,16 @@ export function createPostFx(
   let composer: EffectComposer | null = null;
   let bloomPass: UnrealBloomPass | null = null;
   let gradePass: ShaderPass | null = null;
-  // 微信端判定：globalThis.wx 只做存在性探测（架构禁令只禁 wx. 调用；wx API 一律走 adapter）
+  // 平台判定来自 adapter.env，共享渲染层不探测宿主全局。
   let enabled = false;
   let viewSize = new THREE.Vector2(1, 1);
   try {
-    enabled = typeof (globalThis as { wx?: unknown }).wx === 'undefined'
+    enabled = env === 'web'
       // getSize 探针：EffectComposer 构造即依赖它；测试桩/残缺 renderer（headless:three）在此降级
       && typeof renderer.getSize === 'function'
       && renderer.capabilities.isWebGL2 === true;
     if (enabled) viewSize = renderer.getSize(new THREE.Vector2());
-  } catch { enabled = false; } // globalThis 不可用的极端运行时：视同降级
+  } catch { enabled = false; }
 
   if (enabled) {
     try {

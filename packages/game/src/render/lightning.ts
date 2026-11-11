@@ -136,7 +136,7 @@ export function createLightningFx(scene: THREE.Scene): LightningFx {
       for (const b of bolts) {
         if (b.life <= 0) continue;
         b.life -= dt;
-        const z = b.worldZ - dist;
+        const z = dist - b.worldZ;
         b.group.position.z = z; // 雷电锚定闪电圈：随赛道滚动，不飘在身后
         if (b.life <= 0) {
           b.group.visible = false;
@@ -158,7 +158,7 @@ export function createLightningFx(scene: THREE.Scene): LightningFx {
       if (anyAlive) {
         impactLight.intensity = IMPACT_LIGHT_PEAK * Math.max(flash, 0.25);
         const newest = bolts.reduce((a, b) => (b.life > a.life ? b : a));
-        impactLight.position.set(newest.x, 0.4, newest.worldZ - dist);
+        impactLight.position.set(newest.x, 0.4, dist - newest.worldZ);
       }
       return flash;
     },

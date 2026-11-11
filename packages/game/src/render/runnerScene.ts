@@ -98,7 +98,7 @@ export function createRunnerScene(
   // 喷发管线（方案 B）：forgeheart 挂 eruption（LightningFx 同构，自排程 1s 预警+喷柱），flash 并入现有管线
   const eruption = scenery === 'forgeheart' ? createEruption(scene) : null;
   // 后处理全主题启用（bloom 阈值 0.82 下非自发光几乎无泛光；grade 由 theme.grade 覆盖）；wx/非 WebGL2 降级
-  const postfx = createPostFx(renderer, scene, camera, grade);
+  const postfx = createPostFx(renderer, scene, camera, adapter.env, grade);
 
   const track = createTrackVisuals(scene, laneWidth, {
     baseColor: sky.baseColor, flashColor: sky.flashColor, tint, groundColor,
@@ -272,8 +272,6 @@ export function createRunnerScene(
 
   if (cb.debug) installRunProbe(sim, () => ({ x: +camX.toFixed(2), y: +camY.toFixed(2) }), bursts,
     () => ({ calls: renderer.info.render.calls, triangles: renderer.info.render.triangles }), coinField);
-  // 斜板定位临时钩子，修完删（二分法用：控制台经 window.__trScene 逐组 visible 开关）
-  if (cb.debug) (globalThis as any).__trScene = scene;
 
   // 只销毁本局资源：不销毁主画布/GL 上下文（wx 屏幕画布不可重建，S10 D1 跨局复用）。
   function dispose() {

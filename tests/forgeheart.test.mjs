@@ -82,6 +82,21 @@ test('喷发管线：进入喷发段触发全场闪橙尖峰，段外 flash 归�
   eruption.dispose();
 });
 
+test('喷发落点与赛道坐标对齐：前方 -Z，经过后 +Z，灯光跟随几何', () => {
+  const scene = new THREE.Scene();
+  const eruption = createEruption(scene);
+  eruption.strike(0, 200, 2.2);
+  eruption.update(1 / 60, 190);
+  const jet = scene.children.find(o => o.isGroup && o.visible);
+  const light = scene.children.find(o => o.isPointLight);
+  assert.equal(jet.position.z, -10);
+  assert.equal(light.position.z, -10);
+  eruption.update(1 / 60, 203);
+  assert.equal(jet.position.z, 3);
+  assert.equal(light.position.z, 3);
+  eruption.dispose();
+});
+
 test('喷发判定化：sim 进喷发段一次性 surge 事件 + 1s 预警窗先于事件出现', async () => {
   const { RunnerSim } = await import('../packages/game/dist/core/sim/runnerSim.js');
   const { loadContent } = await import('../tools/replay/runner.mjs');

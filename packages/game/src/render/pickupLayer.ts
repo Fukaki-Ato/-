@@ -25,7 +25,7 @@ export function createPickupLayer(scene: THREE.Scene, laneWidth: number, models?
   for (let i = 0; i < PICKUP_MAX; i++) {
     const m = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ roughness: 0.35, emissiveIntensity: 0.5 }));
     // world-bend 注入（幂等）：弯道量全局恒零时=恒等变换，仅雷脊驱动非零——道具箱要与弯带路面同弯，
-    // 否则远处分家（见 stormspire/worldBend.ts）。GLB 模型槽在近场恒直区，不注入。
+    // 否则远处分家（见 stormspire/worldBend.ts）。GLB 材质在 pickupModels 加载时同样注入。
     applyWorldBend(m.material as THREE.MeshStandardMaterial);
     m.visible = false; scene.add(m); meshes.push(m);
   }

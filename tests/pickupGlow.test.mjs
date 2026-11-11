@@ -11,6 +11,7 @@ import * as THREE from 'three';
 
 const { createPickupGlow } = await import('../packages/game/dist/render/pickupGlow.js');
 const { createPickupLayer } = await import('../packages/game/dist/render/pickupLayer.js');
+const { setWorldBend, uBendX, uBendY } = await import('../packages/game/dist/render/stormspire/worldBend.js');
 
 const glowPlanes = (scene) => scene.children.filter(c => c.isMesh && c.geometry?.type === 'PlaneGeometry');
 const pickup = (itemRef, worldZ, lane = 0, taken = false) => ({ itemRef, worldZ, lane, taken });
@@ -59,4 +60,22 @@ test('光圈：接入 pickupLayer 后箱/模型两态都亮、道具消失即收
   layer.update([pickup('item_magnet', 100)], 0, 1.3);
   layer.update([pickup('item_magnet', 500)], 0, 1.4);
   assert.equal(glowPlanes(scene).filter(p => p.visible).length, 0, '视野深度外不亮');
+});
+
+test('光圈与贴图箱共享道路弯曲 shader 及动态 uniforms，不悬空或埋地', () => {
+  const scene = new THREE.Scene();
+  createPickupLayer(scene, 2.2);
+  const glow = glowPlanes(scene)[0].material;
+  const box = scene.children.find(o => o.geometry?.type === 'BoxGeometry').material;
+  const shaders = [glow, box].map(material => {
+    const shader = { uniforms: {}, vertexShader: material.vertexShader ?? '#include <project_vertex>' };
+    material.onBeforeCompile(shader);
+    assert.equal(shader.uniforms.uBendX, uBendX);
+    assert.equal(shader.uniforms.uBendY, uBendY);
+    assert.match(shader.vertexShader, /spWorld\.y \+= uBendY/);
+    assert.doesNotMatch(shader.vertexShader, /#include <project_vertex>/);
+    return shader;
+  });
+  setWorldBend(10);
+  assert.ok(shaders.every(shader => shader.uniforms.uBendY.value > 0));
 });

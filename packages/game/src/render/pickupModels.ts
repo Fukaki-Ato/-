@@ -8,6 +8,7 @@
  * 加载是异步的：未就绪前同样返回 null（箱先显示，模型就绪后自然换上，不阻塞开局）。
  */
 import * as THREE from 'three';
+import { applyWorldBend } from './stormspire/worldBend.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import type { GameContent } from '@tr/game/core/config/configTypes.js';
 import type { PlatformAdapter } from '@tr/framework/platform/platformAdapter.js';
@@ -62,6 +63,7 @@ export function createPickupModelLoader(content: GameContent, adapter?: Platform
           if (!mesh.isMesh) return;
           const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
           for (const mat of mats) {
+            applyWorldBend(mat); // 近距换模窗仍含 18–40m 弯道段，必须与贴图箱沿同一路面。
             const std = mat as THREE.MeshStandardMaterial;
             if (std && std.emissive && std.color) { std.emissive.copy(std.color); std.emissiveIntensity = MODEL_EMISSIVE; }
           }

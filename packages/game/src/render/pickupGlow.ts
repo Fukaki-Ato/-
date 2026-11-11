@@ -6,6 +6,7 @@
  * 远处靠 shader 里的视距淡出收掉，不额外做可见性剔除。
  */
 import * as THREE from 'three';
+import { applyWorldBend } from './stormspire/worldBend.js';
 
 /** 每道具光圈色（徽标主色的亮部；加色混合下偏亮才压得住路面）；未登记 id 走兜底暖白 */
 const GLOW_COLOR: Record<string, number> = {
@@ -34,9 +35,9 @@ const VERT = [
   'varying vec2 vUv; varying float vD;',
   'void main() {',
   '  vUv = uv;',
-  '  vec4 mv = modelViewMatrix * vec4(position, 1.0);',
-  '  vD = -mv.z;',
-  '  gl_Position = projectionMatrix * mv;',
+  '  vec3 transformed = position;',
+  '  #include <project_vertex>',
+  '  vD = -mvPosition.z;',
   '}',
 ].join('\n');
 
@@ -78,6 +79,7 @@ export function createPickupGlow(scene: THREE.Scene): PickupGlow {
       },
       vertexShader: VERT, fragmentShader: FRAG,
     });
+    applyWorldBend(mat); // 光圈和道路共用变形，弯道上仍贴地；普通主题 uniforms 为零。
     const mesh = new THREE.Mesh(geo, mat);
     mesh.visible = false;
     mesh.position.y = 0.03; // 高于车道虚线（0.014），贴住路面

@@ -77,7 +77,7 @@ export function createEruption(scene: THREE.Scene): EruptionFx {
     glows: THREE.Mesh[];
     coreMat: THREE.MeshBasicMaterial;
     glowMat: THREE.MeshBasicMaterial;
-    /** 喷柱锚点：x=世界横坐标（侧柱区/zap 圈车道），worldZ=赛道深度（渲染 z=worldZ-dist 逐帧滚动） */
+    /** 喷柱锚点：x=世界横坐标（侧柱区/zap 圈车道），worldZ=赛道深度（渲染 z=dist-worldZ 逐帧滚动） */
     x: number; worldZ: number;
     /** 剩余寿命（<=0 = 空闲）/ 已存活（频闪相位量化用） */
     life: number; age: number;
@@ -160,7 +160,7 @@ export function createEruption(scene: THREE.Scene): EruptionFx {
         if (b.life <= 0) continue;
         anyAlive = true;
         b.life -= dt; b.age += dt;
-        b.group.position.z = b.worldZ - dist; // 喷柱锚定喷发段：随赛道滚动，不飘在身后
+        b.group.position.z = dist - b.worldZ; // 与障碍/金币同向：前方为 -Z，经过玩家后向 +Z 滚动
         if (b.life <= 0) {
           b.group.visible = false;
           for (let s = 0; s < SEGS; s++) { b.segs[s]!.visible = false; b.glows[s]!.visible = false; }
@@ -183,7 +183,7 @@ export function createEruption(scene: THREE.Scene): EruptionFx {
       if (anyAlive && newest >= 0) {
         const b = jets[newest]!;
         impactLight.intensity = IMPACT_LIGHT_PEAK * Math.max(flash, 0.25);
-        impactLight.position.set(b.x, 0.6, b.worldZ - dist);
+        impactLight.position.set(b.x, 0.6, dist - b.worldZ);
       }
       return flash;
     },
