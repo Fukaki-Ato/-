@@ -9,6 +9,7 @@ import * as THREE from 'three';
 import type { PickupEntity } from '@tr/game/core/sim/trackGen.js';
 import { PICKUP_CENTER_Y } from '@tr/game/core/sim/collect.js';
 import { pickupTileFor } from './pickupTiles.js';
+import { createPickupGlow } from './pickupGlow.js';
 import { createPickupModelSlots, type PickupModelLoader } from './pickupModels.js';
 import { applyWorldBend } from './stormspire/worldBend.js';
 
@@ -30,6 +31,8 @@ export function createPickupLayer(scene: THREE.Scene, laneWidth: number, models?
   }
   // 3D 模型槽位（与箱槽位分离：近距道具占模型槽、远的占箱槽）
   const modelSlots = models ? createPickupModelSlots(scene, PICKUP_MAX, models) : null;
+  // 地面光圈：箱与 3D 模型两态都亮（在道具正下方地面上，色随道具徽标主色）
+  const glow = createPickupGlow(scene);
 
   return {
     update(list: PickupEntity[], dist: number, t: number) {
@@ -38,6 +41,7 @@ export function createPickupLayer(scene: THREE.Scene, laneWidth: number, models?
         if (p.taken) continue;
         const z = dist - p.worldZ;
         if (z < PICKUP_FAR || z > PICKUP_NEAR) continue;
+        glow.show(p.lane * laneWidth, z, p.itemRef, p.worldZ, t); // 光圈贴地，随箱/模型一起浮动呼吸
         // 近距换模：占上模型槽就跳过箱（滞回/spin/回退全在 pickupModels 里）
         if (modelSlots && modelSlots.show(p.itemRef, p.worldZ, p.lane * laneWidth, PICKUP_CENTER_Y + Math.sin(t * 2 + p.worldZ) * 0.09, z, t)) continue;
         if (bi >= PICKUP_MAX) continue;
@@ -54,6 +58,7 @@ export function createPickupLayer(scene: THREE.Scene, laneWidth: number, models?
       }
       for (; bi < PICKUP_MAX; bi++) meshes[bi].visible = false;
       modelSlots?.hideRest();
+      glow.hideRest();
     },
   };
 }
