@@ -155,3 +155,13 @@ test('实际钱包保存失败时档案保留名字与余额，修复后同一�
   assert.match(node('profile-hint').textContent, /余额 40/);
   dispose();
 });
+
+test('档案明确本机身份、存储边界及独立榜单游客名，不伪装成统一账号', t => {
+  const f = setup(t, [['thunderrun:player-id', '1234567890']]);
+  f.entry.click();
+  assert.equal(f.find('profile-id').textContent, '本机档案 ID：1234567890');
+  assert.match(f.find('profile-scope').textContent, /当前浏览器.*清除网站数据.*本机余额/);
+  assert.match(f.find('profile-scope').textContent, /改名不影响榜单游客名/);
+  assert.match(f.find('profile-scope').textContent, /旧页面.*刷新.*不要清除存档/);
+  f.dispose();
+});

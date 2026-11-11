@@ -8,7 +8,7 @@ import { COINS_KEY, DIAMOND_KEY, KEYS_KEY, SHARD_PREFIX, ITEM_PREFIX, type Econo
 import { PLAYER_NAME_KEY, PLAYER_RENAMES_KEY } from '../core/profile/playerProfile.js';
 
 export const REWARD_WALLET_KEY = 'thunderrun:reward-wallet-v1';
-type State = { version: 1; values: Record<string, string | null>; ledgers: Record<string, Record<string, number>>;
+type State = { version: 1 | 2; values: Record<string, string | null>; ledgers: Record<string, Record<string, number>>;
   local?: Record<string, string | null> };
 export interface RewardWalletStore extends EconomyStore {
   transaction<T>(operation: (draft: EconomyStore) => T): T;
@@ -30,7 +30,7 @@ export function createRewardWalletStore(storage: EconomyStore): RewardWalletStor
     // Fail closed: treating a corrupt cursor as empty would mint already-spent rewards again.
     try {
       const state = JSON.parse(raw) as State;
-      if (state.version !== 1 || !record(state.values) || !record(state.ledgers)
+      if ((state.version !== 1 && state.version !== 2) || !record(state.values) || !record(state.ledgers)
         || Object.entries(state.values).some(([k, v]) => !isWalletKey(k) || (v !== null && typeof v !== 'string'))
         || (state.local !== undefined && (!record(state.local)
           || Object.entries(state.local).some(([k, v]) => !isLocalKey(k) || (v !== null && typeof v !== 'string'))))
@@ -44,6 +44,9 @@ export function createRewardWalletStore(storage: EconomyStore): RewardWalletStor
     return values && Object.prototype.hasOwnProperty.call(values, key) ? values[key]! : storage.get(key);
   };
   const write = (state: State): void => {
+    // Keep the same key: published v1 readers must reject metadata they cannot safely update,
+    // rather than missing a renamed key and reviving legacy balances/profile counters.
+    if (state.local !== undefined) state.version = 2;
     const raw = JSON.stringify(state);
     storage.set(REWARD_WALLET_KEY, raw);
     // Some platform adapters swallow storage failures. Never report those as successful grants.

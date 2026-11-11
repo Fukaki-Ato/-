@@ -109,7 +109,7 @@ export function buildProfileOverlay(host: UiHost, d: ProfileOverlayDeps): Profil
 
   const keyOf = (i: number): BadgeName => AVATAR_KEYS[i] ?? AVATAR_KEYS[0];
   /** 文案先算成函数：构造期只能进 Label 构造函数（setText 要求控件已入视图），开面板时才允许回写 */
-  const bestText = (): string => `最高记录：${readCount(d.storage, BEST_KEY)} 米`;
+  const bestText = (): string => `最高得分：${readCount(d.storage, BEST_KEY)} 分`;
   /** 免费次数与价格都读自 config，文案跟着档案状态走，别写死；提示与标题合并成一行省高度 */
   const hintText = (): string => {
     const freeLeft = Math.max(0, p.freeRenames - prof.renames);
@@ -118,7 +118,7 @@ export function buildProfileOverlay(host: UiHost, d: ProfileOverlayDeps): Profil
       : `点名字改一个 · 每次 ${p.renameCostDiamonds} 钻（余额 ${readCount(d.storage, DIAMOND_KEY)}）`;
   };
   const nameL = new Label({ text: prof.name, fontSizePx: 20, color: c.gold });
-  const idL = new Label({ text: `账号 ID：${prof.id}`, fontSizePx: 13, color: TEXT_ON_PANEL });
+  const idL = new Label({ text: `本机档案 ID：${prof.id}`, fontSizePx: 13, color: TEXT_ON_PANEL });
   const bestL = new Label({ text: bestText(), fontSizePx: 13, color: TEXT_ON_PANEL });
   const hintL = new Label({ text: hintText(), fontSizePx: 11, color: MUTED_ON_PANEL });
 

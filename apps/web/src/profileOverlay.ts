@@ -46,8 +46,9 @@ export function openProfileOverlay(
   big.alt = '当前头像';
   const paint = (): void => { big.src = avatarUrl(AVATAR_KEYS[prof.avatar] ?? AVATAR_KEYS[0]!); };
   const nameL = uiText('strong', prof.name, 'profile-name');
-  const idL = uiText('p', `账号 ID：${prof.id}`, 'profile-id');
+  const idL = uiText('p', `本机档案 ID：${prof.id}`, 'profile-id');
   const bestL = uiText('p', `最高得分：${readCount(storage, BEST_KEY)} 分`, 'profile-best');
+  const scope = uiText('p', '仅保存在当前浏览器，清除网站数据可能丢失档案与本机余额。改名不影响榜单游客名。旧页面提示存档异常时请刷新，不要清除存档。', 'profile-scope');
   const hintL = uiText('p', '', 'profile-hint');
   const hint = (): string => {
     const freeLeft = Math.max(0, params.freeRenames - prof.renames);
@@ -99,7 +100,7 @@ export function openProfileOverlay(
     }));
   }
 
-  panel.append(big, nameL, idL, bestL, hintL, pickers, names, inventory);
+  panel.append(big, nameL, idL, bestL, scope, hintL, pickers, names, inventory);
 
   function buildInventory(c: GameContent, s: SyncStorage): HTMLElement {
     // 仓库 MVP（审查 M4-6）：档案内直接列钱包库存——货币 + 碎片 + 持有道具；正式独立页待元游戏扩展
@@ -133,9 +134,9 @@ export function openProfileOverlay(
     const buttons = Array.from(root.querySelectorAll<HTMLButtonElement>('button:not([disabled])'));
     const index = buttons.indexOf(document.activeElement as HTMLButtonElement);
     if (event.shiftKey && index <= 0) {
-      event.preventDefault(); buttons[buttons.length - 1]!.focus({ preventScroll: true });
+      event.preventDefault(); buttons[buttons.length - 1]!.focus();
     } else if (!event.shiftKey && (index < 0 || index === buttons.length - 1)) {
-      event.preventDefault(); buttons[0]!.focus({ preventScroll: true });
+      event.preventDefault(); buttons[0]!.focus();
     }
   });
   document.body.append(root);

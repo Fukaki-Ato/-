@@ -7,11 +7,14 @@
   align-items: flex-start;
   justify-content: center;
   background: rgba(8, 22, 38, 0.55);
-  padding: 4vh 12px 0;
+  padding: 4dvh 12px 16px;
 }
 
 .profile-panel {
+  box-sizing: border-box;
   width: min(420px, 100%);
+  max-height: calc(96dvh - 16px);
+  overflow-y: auto;
   background: #5e4b3a;
   border-radius: 14px 14px 18px 18px;
   padding: 14px 16px 18px;
@@ -65,6 +68,13 @@
   font-size: 12px;
   color: #d8c3a0;
   min-height: 1.4em;
+}
+
+.profile-scope {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #d8c3a0;
 }
 
 .profile-avatars,

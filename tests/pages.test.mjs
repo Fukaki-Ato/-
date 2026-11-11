@@ -354,7 +354,7 @@ function tapBelowPanel(host, panelBottom) {
 
 const cellOf = (text) => (w) => w instanceof Box && w.children.some(ch => ch instanceof Label && ch.getText() === text);
 
-test('档案弹层：toggle 从顶边滑下，含 ID/最高记录/两组候选，点下方空白收回', async () => {
+test('档案弹层：toggle 从顶边滑下，含本机 ID/最高得分/两组候选，点下方空白收回', async () => {
   const { host, adapter } = hostFixture();
   const report = await loadContent();
   adapter.storage.set(BEST_KEY, '1234');
@@ -370,8 +370,9 @@ test('档案弹层：toggle 从顶边滑下，含 ID/最高记录/两组候选�
   assert.equal(box.rect.h, Math.round(H * 55 / 100), '面板高 = params.profile.panelHeightPct');
   assert.ok(box.rect.y >= 0 && box.rect.y <= 8, `滑到位贴屏幕上沿，实得 y=${box.rect.y}`);
   const t = texts(host);
-  assert.ok(t.some(x => x.startsWith('账号 ID：') && /^[1-9]\d{9}$/.test(x.slice(6))), `10 位账号 ID 可见，实得 ${JSON.stringify(t)}`);
-  assert.ok(t.includes('最高记录：1234 米'), '最高记录读自 BEST_KEY');
+  const idPrefix = '本机档案 ID：';
+  assert.ok(t.some(x => x.startsWith(idPrefix) && /^[1-9]\d{9}$/.test(x.slice(idPrefix.length))), `10 位本机档案 ID 可见，实得 ${JSON.stringify(t)}`);
+  assert.ok(t.includes('最高得分：1234 分'), 'BEST_KEY 的分数不能标成距离');
   assert.ok(t.some(x => x.includes('点头像换一个')) && t.some(x => x.includes('点名字改一个')), '头像/昵称两组候选');
   assert.ok(allButtons(host).includes('闪电少年'), '昵称候选以按钮呈现');
   assert.ok(t.includes('点击下方空白处返回'), '返回提示');
@@ -427,10 +428,10 @@ test('档案弹层：候选头像写本机，改名先免费后扣钻、余额�
   assert.equal(adapter.storage.get(PLAYER_RENAMES_KEY), '2');
 
   // 6) 关掉再开：档案与 ID 都还在（本机记忆，不是每次重新发号）
-  const idShown = texts(host).find(x => x.startsWith('账号 ID：'));
+  const idShown = texts(host).find(x => x.startsWith('本机档案 ID：'));
   tapBelowPanel(host, findBox(host.overlay.current.relayout(), slide.id).rect.h);
   openProfile(host, ov);
-  assert.equal(texts(host).find(x => x.startsWith('账号 ID：')), idShown, '重开面板 ID 不变');
+  assert.equal(texts(host).find(x => x.startsWith('本机档案 ID：')), idShown, '重开面板 ID 不变');
   assert.equal(texts(host).includes('椰子骑士'), true, '重开面板名字读回本机记忆');
 });
 
