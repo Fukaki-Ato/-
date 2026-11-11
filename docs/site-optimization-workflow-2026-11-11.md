@@ -1,8 +1,8 @@
 # 全站优化：长任务工作流设计
 
-**版本：设计 v1｜更新：2026-11-11｜执行状态：B01–B03 本地候选已验收，完整工作流进行中**
+**版本：设计 v1｜更新：2026-11-11｜执行状态：B01–B04 本地候选已验收，完整工作流进行中**
 
-本文件最初交付工作流设计与静态任务定义；随后用户授权执行完整工作流，现已进入运行阶段。实际范围、提交与验收见 [B01](site-optimization/records/B01.md)、[B02](site-optimization/records/B02.md)、[B03](site-optimization/records/B03.md)及[任务账本](site-optimization-tasks-2026-11-11.md)。现有微信在制工作仍独立归属；候选未发布正式站。
+本文件最初交付工作流设计与静态任务定义；随后用户授权执行完整工作流，现已进入运行阶段。实际范围、提交与验收见 [B01](site-optimization/records/B01.md)、[B02](site-optimization/records/B02.md)、[B03](site-optimization/records/B03.md)、[B04](site-optimization/records/B04.md)及[任务账本](site-optimization-tasks-2026-11-11.md)。现有微信在制工作仍独立归属；候选未发布正式站。
 
 ## 1. 三份文档各自负责什么
 
@@ -25,7 +25,7 @@
 
 - 保留当前全角色免费、手机优先、轻快卡通及角色个体差异；改变这些选择需要对应的产品决定。
 - 局部事实修正无需等待全站改版。未证实的性能、容量、动画与听感问题先采证，可以得出“保留现状”的结论。
-- 依赖方向、300 行 TS 源文件约束、配置/golden 规则和评审归属沿用执行环境的 `AGENTS.md` 与 [CONTRIBUTING.md](../CONTRIBUTING.md)，不在此另设一套；不将只存在于 B 的入口文件链接伪装为候选 A 已包含的文件。
+- 依赖方向、300 行源文件约束、配置/golden 规则和评审归属沿用执行环境的 `AGENTS.md` 与 [CONTRIBUTING.md](../CONTRIBUTING.md)；以项目检查的实际覆盖为准（也包括服务端 MJS）。不将只存在于 B 的入口文件链接伪装为候选 A 已包含的文件。
 - 运行权限、凭据、付费调用、真实 Cloud、生产数据变更、推送与发布按届时已有授权处理；计划条目本身不扩大授权。明确的“推送”按[项目约定](collaboration.md)处理。
 
 ## 2. 分解方式：主线 → 对象 → 一个可验收结果
