@@ -41,16 +41,13 @@ async function main(): Promise<void> {
     host: shell.host, badges: shell.badges, backdrop: shell.backdrop,
     onLobbyVisible: v => shell.setBackgroundVisible(v), // 背景视频只在大厅解码
     selectRenderer: (content, actions, currentCharId, entry) =>
-      createCharacterSelectOverlay(content, actions, currentCharId, entry, shell.fonts, () =>
-        // 档案弹层（M4-5）：改名扣钻后即时回写大厅顶栏钻石数字
-        openProfileOverlay(content, adapter.storage, left => {
-          document.querySelectorAll<HTMLElement>('.lobby-diamond-amount')
-            .forEach(el => { el.textContent = left.toLocaleString(); });
-        })),
+      createCharacterSelectOverlay(content, actions, currentCharId, entry, shell.fonts),
     shopRenderer: (content, actions) => createShopOverlay(content, actions, shell.fonts),
     eventsRenderer: (content, actions) => createEventsOverlay(content, actions, shell.fonts),
     lobbyRenderer: missions.lobbyRenderer,
-    settingsRenderer: createMobileSettings,
+    settingsRenderer: (content, actions, currentThemeId, volumes) =>
+      createMobileSettings(content, actions, currentThemeId, volumes,
+        () => openProfileOverlay(content, adapter.storage)),
     resultRenderer: createMobileResult,
     hudRenderer: createMobileHud,
     leaderboardRenderer: createMobileLeaderboard,

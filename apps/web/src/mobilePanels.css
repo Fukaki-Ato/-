@@ -1,4 +1,7 @@
 .mobile-settings, .mobile-result { background: radial-gradient(ellipse at top right, #d2eee4, transparent 60%), #eff2e7; }
+.settings-profile { display: flex; align-items: center; justify-content: space-between; width: 100%; min-height: 56px; padding: 16px 20px; border: 0; color: var(--ui-ink); font: inherit; text-align: left; cursor: pointer; }
+.settings-profile strong { font-size: 16px; }
+.settings-profile > span { color: var(--ui-teal); font-size: 24px; line-height: 1; }
 .settings-panel { padding: 24px 20px; }
 .settings-panel h2 { margin: 0; font-size: 20px; line-height: 1.4; }
 .settings-panel > .ui-muted { margin: 6px 0 22px; }

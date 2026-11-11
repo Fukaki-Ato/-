@@ -1,8 +1,8 @@
 /**
  * 玩家档案 DOM 弹层（Web 壳）：大头像 + 10 枚候选头像（点击即换）、账号 ID、最高记录、
- * 点候选名改名（免费次数用完后扣钻石，余额即时回写大厅顶栏）。
+ * 点候选名改名（免费次数用完后扣钻石，余额保存后由返回的大厅重新读取）。
  * 数据全走 core/profile/playerProfile（与 canvas 版 buildProfileOverlay 同一份数据逻辑）；
- * 入口挂选角页底栏「档案」（docs/main-menu-handoff.md 建议的位置），bootstrap 装配。
+ * 入口位于设置页「玩家档案」，bootstrap 装配；关闭后回到设置页。
  */
 import type { GameContent } from '@tr/game/core/config/configTypes.js';
 import type { SyncStorage } from '@tr/framework/platform/platformAdapter.js';
@@ -121,6 +121,7 @@ export function openProfileOverlay(
   }
   root.append(panel);
   root.addEventListener('click', e => { if (e.target === root) dismiss(); });
+  root.addEventListener('keydown', e => { if (e.key === 'Escape') e.stopPropagation(); });
   document.body.append(root);
   disposeBox.dispose = pageLifecycle(root, dismiss);
   paint();

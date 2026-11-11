@@ -16,7 +16,6 @@ export function createCharacterSelectOverlay(
   currentCharId: string,
   _entry: EntryMethod | null,
   _fonts: FontSet,
-  onProfile?: () => void,
 ): () => void {
   const items = playableCharacters(content).map(character => ({
     entry: character, loadout: buildLoadout(content, character.id),
@@ -108,12 +107,6 @@ export function createCharacterSelectOverlay(
   const actionRow = uiText('div', '', 'select-action-row');
   const shopButton = uiButton('商店', 'select-shop-button');
   shopButton.setAttribute('aria-label', '打开商店');
-  // 档案入口（docs/main-menu-handoff.md 建议挂「角色」面板内）：bootstrap 注入 DOM 弹层
-  if (onProfile) {
-    const profileButton = uiButton('档案', 'select-profile-button', onProfile);
-    profileButton.setAttribute('aria-label', '打开玩家档案');
-    actionRow.append(profileButton);
-  }
   function acquire(synthesize: boolean): void {
     const item = items.find(candidate => candidate.loadout.charId === chosen);
     if (!item?.gated || isCharacterLocked(item.entry)) return;

@@ -26,6 +26,7 @@ test('selection showcase uses portrait cutouts and page-scoped keyboard/cycle co
   assert.equal(all(root).filter(node => node.classList.contains('select-roster-card')).length, 10);
   assert.equal(all(root).some(node => node.dataset.charId === 'char_bball'), false);
   assert.equal(all(root).filter(node => node.tagName === 'canvas').length, 0, 'selection does not start another mobile renderer');
+  assert.equal(find('select-profile-button'), undefined, '档案入口已移至设置页');
   find('select-next').click();
   assert.equal(find('select-name').textContent, '阿玛拉');
   assert.equal(calls.at(-1)[1], 'char_ama');
@@ -165,10 +166,10 @@ test('selection actions reserve a full-width start row with or without unlock ac
       onSelect() {}, onStartRun() {}, onShop() {}, onBack() {},
       isGated: () => gated, canUnlock: () => false, canSynthesize: () => false,
       onUnlock: () => ({ ok: false, message: '' }), onSynthesize: () => ({ ok: false, message: '' }),
-    }, 'char_ama', 'guest', {}, () => {});
+    }, 'char_ama', 'guest', {});
     const row = fixture.byClass(fixture.body.children[0], 'select-action-row')[0];
     const visible = row.children.filter(child => child.style.display !== 'none');
-    assert.equal(visible.length, gated ? 5 : 3);
+    assert.equal(visible.length, gated ? 4 : 2);
     assert.equal(visible.at(-1).classList.contains('select-start-button'), true);
     dispose();
   }
