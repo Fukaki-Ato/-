@@ -43,5 +43,8 @@ export function buildObstacleEntity(def: NamedEntry, lane: number, worldZ: numbe
   if (def.rideTop === true) e.rideTop = true;
   if (typeof def.moveZ === 'number' && Number.isFinite(def.moveZ) && def.moveZ !== 0) e.moveZ = def.moveZ;
   if (def.zap === true) e.zap = true;
+  const mo = def.motion as Record<string, unknown> | undefined;
+  if (mo && typeof mo.xSweepM === 'number' && typeof mo.periodS === 'number' && mo.periodS > 0)
+    e.motion = { xSweepM: mo.xSweepM, periodS: mo.periodS, hoverY: typeof mo.hoverY === 'number' ? mo.hoverY : 0, bobAmp: typeof mo.bobAmp === 'number' ? mo.bobAmp : 0 };
   return e;
 }

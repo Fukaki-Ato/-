@@ -22,9 +22,13 @@ export function relZ(o: ObstacleEntity, distance: number): number {
  *  防呆：swing 字段非法（NaN/非正周期）或角色时间异常时按车道中心处理，绝不返回 NaN。 */
 export function obstacleX(o: ObstacleEntity, t: number, laneWidth: number): number {
   const center = o.lane * laneWidth;
+  const mo = o.motion;
   const sw = o.swing;
   let x = center;
-  if (sw) {
+  if (mo && mo.periodS > 0) {
+    // M4 场景专属横扫（十字路口车/魟鱼扫道）：与 swing 同公式但适用于任意 cls
+    x = center + Math.sin(t * Math.PI * 2 / mo.periodS) * mo.xSweepM * 0.5;
+  } else if (sw) {
     const amp = Number.isFinite(sw.ampM) ? sw.ampM : 0;
     const period = Number.isFinite(sw.periodS) && sw.periodS > 0 ? sw.periodS : 0;
     if (period > 0) {

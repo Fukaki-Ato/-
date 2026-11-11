@@ -2,7 +2,7 @@
   "$schema": "../schema/config.schema.json#/obstacles",
   "configVersion": "2.0.0",
   "minEngineVersion": "1.0.0",
-  "updatedAt": "2026-11-11",
+  "updatedAt": "2026-11-10",
   "defs": [
     {
       "id": "obs_box",
@@ -377,6 +377,121 @@
           "ver": "1.7.0",
           "date": "2026-09-29",
           "change": "新增：闪电圈（每 200m；先电掉头盔/护盾等护具，无护具第二次直接致死）"
+        }
+      ]
+    },
+    {
+      "id": "obs_cross_kcar",
+      "class": "vehicle",
+      "status": "live",
+      "size": [
+        2,
+        1.7,
+        3.4
+      ],
+      "motion": {
+        "xSweepM": 5.2,
+        "periodS": 3.6
+      },
+      "hitVfx": "vfx_spark_big",
+      "versions": [
+        {
+          "ver": "1.0.0",
+          "date": "2026-11-10",
+          "change": "十字路口横穿车：xSweep 全车道扫过"
+        }
+      ]
+    },
+    {
+      "id": "obs_flybeast",
+      "class": "vehicle",
+      "status": "live",
+      "size": [
+        2.2,
+        2.2,
+        2.4
+      ],
+      "moveZ": -4,
+      "motion": {
+        "xSweepM": 0,
+        "periodS": 3,
+        "hoverY": 2.2,
+        "bobAmp": 0.5
+      },
+      "hitVfx": "vfx_spark_big",
+      "versions": [
+        {
+          "ver": "1.0.0",
+          "date": "2026-11-10",
+          "change": "飞兽贴头俯冲：moveZ 冲来+hoverY 悬停+bob 浮动"
+        }
+      ]
+    },
+    {
+      "id": "obs_arrow_volley",
+      "class": "low",
+      "status": "live",
+      "size": [
+        2.6,
+        1.3,
+        0.3
+      ],
+      "moveZ": -9,
+      "hitVfx": "vfx_spark_small",
+      "versions": [
+        {
+          "ver": "1.0.0",
+          "date": "2026-11-10",
+          "change": "弑神箭雨贴地飞行：moveZ -9 快速冲来，跳过"
+        }
+      ]
+    },
+    {
+      "id": "obs_page_tornado",
+      "class": "low",
+      "status": "live",
+      "size": [
+        1.4,
+        1.2,
+        1.4
+      ],
+      "motion": {
+        "xSweepM": 3.5,
+        "periodS": 2.2,
+        "hoverY": 0.8,
+        "bobAmp": 0.3
+      },
+      "hitVfx": "vfx_spark_small",
+      "versions": [
+        {
+          "ver": "1.0.0",
+          "date": "2026-11-10",
+          "change": "书页龙卷低空横扫：xSweep+hoverY 浮动，跳过"
+        }
+      ]
+    },
+    {
+      "id": "obs_ray_dive",
+      "class": "vehicle",
+      "status": "live",
+      "size": [
+        2,
+        1.8,
+        2.2
+      ],
+      "moveZ": -5,
+      "motion": {
+        "xSweepM": 0,
+        "periodS": 3,
+        "hoverY": 1.8,
+        "bobAmp": 0.4
+      },
+      "hitVfx": "vfx_spark_big",
+      "versions": [
+        {
+          "ver": "1.0.0",
+          "date": "2026-11-10",
+          "change": "风暴魟俯冲扫道：moveZ 冲来+hoverY 悬停+bob 浮动"
         }
       ]
     }
@@ -1136,6 +1251,108 @@
           1
         ]
       }
+    },
+    {
+      "id": "pat_cross_kcar",
+      "minDifficulty": 3,
+      "weight": 14,
+      "lengthSegments": 2,
+      "cells": [
+        {
+          "segment": 0,
+          "lane": 0,
+          "offsetM": 8,
+          "obsRef": "obs_cross_kcar"
+        },
+        {
+          "segment": 0,
+          "lane": 1,
+          "offsetM": 4,
+          "coins": 6
+        },
+        {
+          "segment": 1,
+          "lane": -1,
+          "offsetM": 8,
+          "obsRef": "obs_cross_kcar"
+        }
+      ],
+      "guarantee": {
+        "safeLanePattern": [
+          1,
+          0
+        ]
+      }
+    },
+    {
+      "id": "pat_flybeast_dive",
+      "minDifficulty": 5,
+      "weight": 14,
+      "lengthSegments": 2,
+      "cells": [
+        {
+          "segment": 0,
+          "lane": 0,
+          "offsetM": 6,
+          "obsRef": "obs_flybeast"
+        },
+        {
+          "segment": 0,
+          "lane": -1,
+          "offsetM": 14,
+          "coins": 6
+        },
+        {
+          "segment": 1,
+          "lane": 1,
+          "offsetM": 6,
+          "obsRef": "obs_flybeast"
+        }
+      ],
+      "guarantee": {
+        "safeLanePattern": [
+          1,
+          -1
+        ]
+      }
+    },
+    {
+      "id": "pat_scene_sig",
+      "minDifficulty": 5,
+      "weight": 12,
+      "lengthSegments": 2,
+      "cells": [
+        {
+          "segment": 0,
+          "lane": 0,
+          "offsetM": 6,
+          "obsRef": "obs_arrow_volley"
+        },
+        {
+          "segment": 0,
+          "lane": 0,
+          "offsetM": 14,
+          "obsRef": "obs_page_tornado"
+        },
+        {
+          "segment": 0,
+          "lane": 0,
+          "offsetM": 22,
+          "obsRef": "obs_ray_dive"
+        },
+        {
+          "segment": 1,
+          "lane": -1,
+          "offsetM": 8,
+          "coins": 6
+        }
+      ],
+      "guarantee": {
+        "safeLanePattern": [
+          0,
+          -1
+        ]
+      }
     }
   ],
   "difficultyCurve": [
@@ -1185,7 +1402,9 @@
         "pat_easy_cube_charge": 12,
         "pat_mid_rusher": 12,
         "pat_breather_coins": 14,
-        "pat_breather_slalom": 12
+        "pat_breather_slalom": 12,
+        "pat_cross_kcar": 14,
+        "pat_flybeast_dive": 10
       },
       "coinDensity": 1.15,
       "pickupRate": 1
@@ -1205,7 +1424,10 @@
         "pat_combo_wall_zap": 11,
         "pat_breather_coins": 14,
         "pat_breather_slalom": 12,
-        "pat_breather_empty": 12
+        "pat_breather_empty": 12,
+        "pat_flybeast_dive": 12,
+        "pat_scene_sig": 12,
+        "pat_cross_kcar": 10
       },
       "coinDensity": 1.2,
       "pickupRate": 1.1
@@ -1226,7 +1448,9 @@
         "pat_combo_pendulum_gauntlet": 11,
         "pat_breather_coins": 14,
         "pat_breather_slalom": 12,
-        "pat_breather_empty": 12
+        "pat_breather_empty": 12,
+        "pat_scene_sig": 10,
+        "pat_cross_kcar": 10
       },
       "coinDensity": 1.25,
       "pickupRate": 1.15
@@ -1281,7 +1505,12 @@
     "coinCount": 6
   },
   "crossings": {
-    "ring": { "everyM": 100, "fromM": 150, "yMin": 0, "yMax": 3 }
+    "ring": {
+      "everyM": 100,
+      "fromM": 150,
+      "yMin": 0,
+      "yMax": 3
+    }
   },
   "zap": {
     "ref": "obs_lightning_circle",

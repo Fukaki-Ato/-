@@ -1,7 +1,5 @@
 /**
- * 赛道程序化生成器（core/sim 层，纯逻辑、确定性） 对应文档：docs/01 §4（赛道与障碍）、docs/09 T1.3。
- * 规则： 1. 以 obstacles.json 的布局模板(pattern)为单位向前拼接，难度随距离升档； 2. 金币链铺在模板声明的安全线上（docs/01：金币即教学）； 3. 所有随机来自注入的 RunRng（同 seed 必同赛道，支撑每日挑战/回放校验）。
- * 坐标约定：entity.worldZ = 生成时固定在「前方多少米」； 渲染/判定时 rel = distance - worldZ（负=还在前方，0=到达角色面，正=已掠过）。
+ * 赛道程序化生成器（core/sim 层，纯逻辑、确定性） 对应 docs/01 §4、docs/09 T1.3；坐标：worldZ=前方米数，rel=distance−worldZ。
  */
 import type { RunRng } from '../rng.js'; import type { GameContent, NamedEntry } from '../config/configTypes.js';
 import { BLOCKING_CLASSES, buildObstacleEntity, type SwingSpec } from './trackDefs.js';
@@ -27,6 +25,7 @@ export interface ObstacleEntity {
   clearT?: number;      // 软清除时刻（渲染下沉动画；配合 done 防重复判负）
   done?: boolean;      // 已命中（避免同一障碍重复判负）
   passed?: boolean;    // 已掠过角色面（近失判定一次性）
+  motion?: { xSweepM: number; periodS: number; hoverY: number; bobAmp: number }; // M4 场景专属运动
 }
 
 export interface CoinEntity { lane: number; worldZ: number; y?: number; flight?: true; taken?: boolean; passed?: boolean; chain?: number; takenAt?: number }
