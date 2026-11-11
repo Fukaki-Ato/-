@@ -15,7 +15,7 @@ export interface LeaderboardData {
 }
 export interface LeaderboardService {
   list(): Promise<LeaderboardData>;
-  begin(charId: string, rulesId: string): Promise<RankedTicket>;
+  begin(charId: string, rulesId: string, themeId?: string): Promise<RankedTicket>;
   submit(replay: RankedReplay): Promise<{ accepted: boolean }>;
   cancel?(runId: string): Promise<void>;
 }
@@ -32,6 +32,6 @@ export function leaderboardRulesId(content: GameContent): string {
     const object = value as Record<string, unknown>;
     return `{${Object.keys(object).sort().map(k => `${JSON.stringify(k)}:${canonical(object[k])}`).join(',')}}`;
   };
-  const { game, characters, skills, items, obstacles } = content;
-  return `first-coin-v2-${hashSeed(canonical({ game, characters, skills, items, obstacles })).toString(16)}`;
+  const { game, characters, skills, items, obstacles, themes } = content;
+  return `first-coin-v2-${hashSeed(canonical({ game, characters, skills, items, obstacles, themes })).toString(16)}`;
 }

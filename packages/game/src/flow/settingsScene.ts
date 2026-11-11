@@ -24,7 +24,7 @@ type Entry = Record<string, unknown>;
 
 /** 配置里的主题条目（顺序即设置页展示顺序） */
 function themeEntries(content: GameContent | null): Entry[] {
-  return content ? ((content.themes.items ?? []) as Entry[]) : [];
+  return content ? ((content.themes.items ?? []) as Entry[]).filter(t => t['status'] === 'live' || t['status'] === 'draft') : [];
 }
 
 /** 主题显示名（name.zh-CN；缺省回 id——提示文案不硬编码，主题改名不漏改） */

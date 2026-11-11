@@ -183,9 +183,10 @@ export function isObject(value) {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
-export function exactKeys(value, keys) {
+export function exactKeys(value, keys, optional = []) {
   const actual = Object.keys(value);
-  return actual.length === keys.length && keys.every(key => Object.hasOwn(value, key));
+  return keys.every(key => Object.hasOwn(value, key))
+    && actual.every(key => keys.includes(key) || optional.includes(key));
 }
 
 export function validateSubmitBody(body, maxFrames, maxInputs) {

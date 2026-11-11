@@ -4,6 +4,7 @@ import { ApiError } from './errors.mjs';
 import { replayRun, STEP_DT } from './replay.mjs';
 import { DEFAULT_LIMITS } from './limits.mjs';
 import { playableCharacters, isCharacterLocked, itemEffects } from '@tr/game/core/sim/character.js';
+import { resolveRunThemeId } from '@tr/game/core/sim/themeRules.js';
 
 const SUPPORTED_METRICS = new Set([
   'distanceM', 'coins', 'slides', 'runs', 'skillCasts', 'nearMiss', 'cleanRuns', 'score',
@@ -167,13 +168,15 @@ export class MissionService {
     return [...seen];
   }
 
-  startRun(userId, { seed, charId, items }) {
+  startRun(userId, { seed, charId, items, themeId }) {
     if (!Number.isInteger(seed) || seed < 0 || seed > 0xffffffff) throw new ApiError(400, 'seed 必须是 32 位无符号整数');
     const equip = this.validateItems(items);
     if (typeof charId !== 'string' || charId.length > 96) throw new ApiError(400, 'charId 必须是有效角色 ID');
     if (charId && !playableCharacters(this.content).some(character => character.id === charId && !isCharacterLocked(character))) {
       throw new ApiError(400, '所选角色不存在或不可使用');
     }
+    if (themeId !== undefined && (typeof themeId !== 'string' || !(this.content.themes.items ?? [])
+      .some(theme => theme.id === themeId && ['live', 'draft'].includes(theme.status)))) throw new ApiError(400, '所选主题不存在或不可使用');
     const startedAt = this.now();
     const periods = getMissionPeriods(startedAt);
     this.ensurePeriod(userId, 'daily', periods.daily.periodId);
@@ -183,7 +186,8 @@ export class MissionService {
       throw new ApiError(429, '已有过多进行中的跑酷记录，请先完成或等待过期');
     }
     const id = randomUUID();
-    this.store.createRun({ id, userId, startedAt, dailyId: periods.daily.periodId, weeklyId: periods.weekly.periodId, seed, charId, items: equip });
+    this.store.createRun({ id, userId, startedAt, dailyId: periods.daily.periodId, weeklyId: periods.weekly.periodId,
+      seed, charId, items: equip, themeId: resolveRunThemeId(this.content, themeId) });
     return { runId: id };
   }
 

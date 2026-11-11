@@ -48,7 +48,7 @@ export function createRunSession(d: RunSessionDeps): { dispose(): void } {
     const seed = ticket?.seed ?? hashSeed('run-' + Date.now());
     d.onSeed(seed);
     const items = ticket ? [] : d.consumeItems?.() ?? [];
-    const sim = new RunnerSim(d.content, seed, d.charId, !!ticket, items);
+    const sim = new RunnerSim(d.content, seed, d.charId, !!ticket, items, d.themeId);
     finishTracking = d.trackRun?.(sim, seed);
     const host = { canvas: d.adapter.canvas.mainCanvas(), size: d.adapter.canvas.windowSize() };
     hud = d.views.mountHud();
@@ -74,7 +74,7 @@ export function createRunSession(d: RunSessionDeps): { dispose(): void } {
       },
       onDeath: d.onDeath, onCast: d.onCast, onPickup: d.onPickup,
       onIntro: stage => d.onIntro?.(stage), debug: d.debug,
-    }, { themeId: d.themeId });
+    }, { themeId: sim.themeId });
     if (d.test) installTestApi(sim, d.content);
   };
   if (eligibleMode) {
@@ -83,7 +83,7 @@ export function createRunSession(d: RunSessionDeps): { dispose(): void } {
     const fallback = (): void => {
       if (!cancelled) { ranking.set('排行榜服务不可用，本局不入榜'); start(); }
     };
-    void d.service!.begin(d.charId, rulesId).then(ticket => {
+    void d.service!.begin(d.charId, rulesId, d.themeId).then(ticket => {
       if (ticket.rulesId !== rulesId) { release(ticket); fallback(); return; }
       start(ticket);
     }, fallback);

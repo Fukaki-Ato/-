@@ -15,19 +15,18 @@ import {
 } from './http-protocol.mjs';
 
 export { API_PATH };
-
 const MAX_ACTIVE_CHALLENGES = 5000;
 const MAX_CHALLENGES_PER_PLAYER = 5;
 const RUN_TTL_MS = (1800 + 60) * 1000;
 const UPLOAD_CLOCK_SLOP_MS = 2000;
 const DEFAULT_ORIGINS = ['http://localhost:8767', 'http://127.0.0.1:8767'];
-
 export async function createLeaderboardServer(options = {}) {
-  const [{ loadContent, repoRoot }, { playableCharacters, isCharacterLocked }, rules, { debugQueryFlags }] = await Promise.all([
+  const [{ loadContent, repoRoot }, { playableCharacters, isCharacterLocked }, rules, { debugQueryFlags }, { resolveRunThemeId }] = await Promise.all([
     import('../tools/replay/runner.mjs'),
     import('../packages/game/dist/core/sim/character.js'),
     import('../packages/game/dist/flow/leaderboard.js'),
     import('../packages/game/dist/core/debugMode.js'),
+    import('../packages/game/dist/core/sim/themeRules.js'),
   ]);
   const content = options.content ?? loadContent();
   const allowedOrigins = normalizeOrigins(options.origins
@@ -121,13 +120,15 @@ export async function createLeaderboardServer(options = {}) {
       if (!allowedOrigins.has(req.headers.origin)) throw httpError(403, 'origin_denied');
       if (!limiter.allow(ip, 'begin', 15, 60_000)) throw httpError(429, 'rate_limited');
       const body = await readJson(req);
-      if (!isObject(body) || !exactKeys(body, ['charId', 'rulesId', 'pageId'])
+      if (!isObject(body) || !exactKeys(body, ['charId', 'rulesId', 'pageId'], ['themeId'])
         || typeof body.charId !== 'string' || body.charId.length > 64
         || typeof body.rulesId !== 'string') {
         throw httpError(400, 'invalid_request');
       }
       if (body.rulesId !== expectedRulesId) throw httpError(409, 'rules_mismatch');
       if (!liveCharacters.has(body.charId)) throw httpError(400, 'invalid_character');
+      if (body.themeId !== undefined && (typeof body.themeId !== 'string' || !(content.themes.items ?? [])
+        .some(theme => theme.id === body.themeId && ['live', 'draft'].includes(theme.status)))) throw httpError(400, 'invalid_theme');
       const pageAuth = pageSessions.authorize(req.headers.cookie, body.pageId);
       if (!pageAuth) throw httpError(403, 'rank_page_required');
       cleanupChallenges();
@@ -143,6 +144,7 @@ export async function createLeaderboardServer(options = {}) {
       challenges.set(runId, {
         tokenHash: identity.tokenHash,
         charId: body.charId,
+        themeId: resolveRunThemeId(content, body.themeId),
         seed,
         rulesId: expectedRulesId,
         pageAuth: { sessionHash: pageAuth.sessionHash, pageHash: pageAuth.pageHash },
@@ -180,6 +182,7 @@ export async function createLeaderboardServer(options = {}) {
         result = await workerPool.run({
           seed: challenge.seed,
           charId: challenge.charId,
+          themeId: challenge.themeId,
           frames: replay.frames,
           inputs: replay.inputs,
         });

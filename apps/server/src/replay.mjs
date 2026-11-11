@@ -13,7 +13,7 @@ export class ReplayTimeoutError extends Error {
  *  timeoutMs：墙钟护栏（每 600 帧让步时检查）——不设上限时单账号可用超长局占满并发槽（审查 S-2）。 */
 export async function replayRun(content, run, frames, actions, timeoutMs = Number.POSITIVE_INFINITY, items = []) {
   const startedAt = performance.now();
-  const sim = new RunnerSim(content, run.seed, run.char_id || undefined, false, items);
+  const sim = new RunnerSim(content, run.seed, run.char_id || undefined, false, items, run.theme_id ?? undefined);
   let cursor = 0;
   let completedFrames = 0;
   for (let frame = 0; frame < frames; frame++) {

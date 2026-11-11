@@ -18,7 +18,7 @@ export function createLeaderboardClient(base: string, request: typeof fetch = fe
   };
   return {
     list: () => call<LeaderboardData>('leaderboard'),
-    begin: (charId, rulesId) => call<RankedTicket>('runs', { charId, rulesId, pageId }),
+    begin: (charId, rulesId, themeId) => call<RankedTicket>('runs', { charId, rulesId, pageId, themeId }),
     submit: (replay: RankedReplay) => call<{ accepted: boolean }>('runs/submit', { ...replay, pageId }),
     cancel: async runId => { await call('runs/cancel', { runId }); },
   };

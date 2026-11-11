@@ -26,13 +26,15 @@ location /api/missions {
 
 SQLite 启用 WAL 和外键，适用于**单个服务进程/实例**。使用本地持久盘并纳入备份；不要将同一 SQLite 文件用于多主机写入或横向扩容。进程重启会保留用户、周期任务、进度、领取记录、钱包和 run ticket。
 
+主题回放升级为 `runs` 添加可空 `theme_id`，旧行保留 NULL 并按默认主题回放；启动迁移保留原记录。正式升级前使用 SQLite backup API 制作一致性备份，并同步部署客户端、排行榜和任务后端。
+
 ## API
 
 所有写请求必须包含与 `PUBLIC_ORIGIN` 完全相同的 `Origin`；未设置时，与请求 `Host` 做 host 比较。缺失或不匹配返回 `{"error":"..."}`。服务不开放 CORS。游客会话使用服务端随机 token，数据库只保存 SHA-256 摘要；cookie 为 `HttpOnly; SameSite=Lax; Path=/`，浏览器需以同源凭据调用。未建立/无效会话的受保护 API 返回 401。错误响应统一为 JSON `{"error":"用户可读文本"}`。
 
 - `POST /api/missions/session`：建立游客会话并设置 cookie；成功返回 `{"ok":true}`。可不带 body。
 - `GET /api/missions`：返回 `MissionSnapshot`：`serverTime`、`daily`、`weekly`、`wallet`、`rewardLedgerId`。时间戳是 Unix 毫秒；每组含 `periodId`、`resetsAt` 和任务视图。wallet 是该 rewardLedgerId 对应的累计已领取奖励账本，不是可消费余额；rewardLedgerId 使用持久游客用户 ID，会话续期不改变它。客户端按币种累计高水位只导入增量到本机钱包，不回写服务端余额。
-- `POST /api/missions/runs`：JSON `{"seed":uint32,"charId":"char_volt"}`（空串表示默认装备），返回 `{"runId":"..."}`。每张 ticket 服务端记录 seed、角色、开始时间和当时周期。
+- `POST /api/missions/runs`：JSON `{"seed":uint32,"charId":"char_volt"}`（空串表示默认装备），可选 `items`（最多三个有效道具 ID）与 `themeId`（配置中 live/draft 主题，省略取默认）。返回 `{"runId":"..."}`；服务端持久记录种子、角色、装备、主题、开始时间和当时周期，结算时按票据回放，不接受临时替换主题。
 - `POST /api/missions/runs/:id/finish`：JSON `{"frames":正整数,"actions":[{"frame":0,"action":"jump|slide|laneL|laneR|skill"}]}`，返回最新 `MissionSnapshot`。frame 从 0 开始；同一帧动作按数组顺序执行，并在该帧 `step()` 前应用。帧数表示总模拟 step 次数，动作需按 frame 非降序排列且 `0 <= frame < frames`。死亡帧必须是最后一帧；仍存活时允许玩家主动结束。客户端不得提交 summary。相同 ticket + 完全相同回放重试是幂等的；更换回放内容返回 409。
 - `POST /api/missions/claim`：JSON `{"period":"daily|weekly","periodId":"...","missionId":"..."}`。任务完成且周期仍当前时才领取；SQLite 事务原子更新 claimed 与 wallet，重复领取不会重复入账。
 

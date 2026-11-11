@@ -39,8 +39,10 @@ export class MissionStore {
       );
       CREATE INDEX IF NOT EXISTS runs_by_user ON runs(user_id, started_at);
     `);
-    // 旧库迁移：items_json 存开局装备道具清单（重放注入用）；已存在则忽略
-    try { this.db.exec('ALTER TABLE runs ADD COLUMN items_json TEXT'); } catch { /* 列已存在 */ }
+    // 旧行保留 NULL：无装备、主题走默认；迁移失败需在启动时暴露。
+    const columns = new Set(this.db.prepare('PRAGMA table_info(runs)').all().map(column => column.name));
+    if (!columns.has('items_json')) this.db.exec('ALTER TABLE runs ADD COLUMN items_json TEXT');
+    if (!columns.has('theme_id')) this.db.exec('ALTER TABLE runs ADD COLUMN theme_id TEXT');
     this.statements = {
       user: this.db.prepare('SELECT id FROM users WHERE id = ?'),
       createUser: this.db.prepare('INSERT INTO users(id, created_at) VALUES(?, ?)'),
@@ -58,8 +60,8 @@ export class MissionStore {
       wallet: this.db.prepare('SELECT item, amount FROM wallets WHERE user_id = ? ORDER BY item'),
       addWallet: this.db.prepare(`INSERT INTO wallets(user_id, item, amount) VALUES(?, ?, ?)
         ON CONFLICT(user_id, item) DO UPDATE SET amount = amount + excluded.amount`),
-      addRun: this.db.prepare(`INSERT INTO runs(id, user_id, started_at, daily_id, weekly_id, seed, char_id, items_json)
-        VALUES(?, ?, ?, ?, ?, ?, ?, ?)`),
+      addRun: this.db.prepare(`INSERT INTO runs(id, user_id, started_at, daily_id, weekly_id, seed, char_id, items_json, theme_id)
+        VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)`),
       countOpen: this.db.prepare(`SELECT COUNT(*) AS count FROM runs WHERE user_id = ? AND status = 'open' AND started_at >= ?`),
       run: this.db.prepare('SELECT * FROM runs WHERE id = ? AND user_id = ?'),
       finishRun: this.db.prepare(`UPDATE runs SET status = 'finished', finished_at = ?,
@@ -123,7 +125,7 @@ export class MissionStore {
   addWallet(userId, item, amount) { this.statements.addWallet.run(userId, item, amount); }
   createRun(run) {
     this.statements.addRun.run(run.id, run.userId, run.startedAt, run.dailyId, run.weeklyId, run.seed, run.charId,
-      run.items?.length ? JSON.stringify(run.items) : null);
+      run.items?.length ? JSON.stringify(run.items) : null, run.themeId ?? null);
   }
   getRun(runId, userId) { return this.statements.run.get(runId, userId) ?? null; }
   countOpenRuns(userId, earliestStartedAt = Number.MIN_SAFE_INTEGER) {

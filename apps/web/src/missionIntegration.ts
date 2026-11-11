@@ -31,7 +31,7 @@ export function createMissionIntegration(testMode: boolean, wallet?: RewardWalle
   const trackRun: NonNullable<GameFlowDeps['trackRun']> = (sim, seed) => {
     if (testMode) { api.feedback = '调试模式不计任务，请退出调试模式后正常开局'; return () => undefined; }
     api.feedback = '';
-    const ticket = api.start(seed, sim.loadout.charId, sim.initialItems).catch((error: Error) => {
+    const ticket = api.start(seed, sim.loadout.charId, sim.initialItems, sim.themeId).catch((error: Error) => {
       api.feedback = `本局未连接任务服务：${error.message}`; return null;
     });
     const finishRecording = recordMissionRun(sim);

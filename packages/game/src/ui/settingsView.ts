@@ -37,7 +37,7 @@ export function themeOptions(content: GameContent): ThemeOption[] {
   const items = (content.themes.items ?? []) as Record<string, unknown>[];
   return items.flatMap(item => {
     const id = typeof item['id'] === 'string' ? item['id'] : '';
-    if (!id) return [];
+    if (!id || (item['status'] !== 'live' && item['status'] !== 'draft')) return [];
     const name = (item['name'] as Record<string, string> | undefined)?.['zh-CN'];
     const sky = (item['sky'] as Record<string, string> | undefined)?.['baseColor'];
     return [{

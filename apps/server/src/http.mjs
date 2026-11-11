@@ -195,7 +195,7 @@ export function createMissionHttpServer(options = {}) {
       if (pathname === '/api/missions/runs' && request.method === 'POST') {
         const userId = authenticate(request);
         const body = await readJson(request, limits.bodyBytes);
-        assertKeys(body, ['seed', 'charId', 'items']);
+        assertKeys(body, ['seed', 'charId', 'items', 'themeId']);
         sendJson(response, 201, service.startRun(userId, body));
         return;
       }
