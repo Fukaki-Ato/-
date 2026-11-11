@@ -1,6 +1,5 @@
 /**
- * 赛道实体表现层：障碍池 / 云团池（docs/02 §8 对象池，每帧零分配）——只把 sim 的实体数组映射到预建的 Mesh 槽位上，不做任何玩法判定。道具表现层已拆到 pickupLayer.ts；
- * 障碍皮肤走 SKIN_BY_SCENERY 表（stormspire/titan/forgeheart/library），zap/step 默认盘；整层挂根组随 B-7 反重力镜像（皮肤 emit 与 zap/step 默认盘统一 y'=ceilH−y）。
+ * 赛道实体表现层：障碍池/云团池（对象池每帧零分配）——只把 sim 实体数组映射到预建 Mesh 槽位；皮肤走 SKIN_BY_SCENERY 表；整层挂根组随 B-7 反重力镜像（y'=ceilH−y）。
  */
 import * as THREE from 'three';
 import type { CloudEntity, ObstacleEntity } from '@tr/game/core/sim/trackGen.js';
@@ -98,8 +97,7 @@ export function createObstacleLayer(scene: THREE.Scene, laneWidth: number, scene
       color: 0xb48cff, transparent: true, opacity: 0.3, blending: THREE.AdditiveBlending, depthWrite: false,
     }));
     band.visible = false; root.add(band);
-    // 黑盘减淡（2026-11-11 用户反馈「贴地影过重」）：0.96 近乎实心黑、在暗色路面上读成
-    // 一坨影子；降到 0.55 让路面纹理透出，闪电标志仍负责辨识（zap 盘本体位置不变）
+    // 黑盘减淡（2026-11-11 用户反馈「贴地影过重」）：0.96 近乎实心黑读成影子，降到 0.55 透出路面，闪电标志仍负责辨识
     const disc = new THREE.Mesh(zapDiscGeo, new THREE.MeshBasicMaterial({ color: ZAP_DISC_COLOR, transparent: true, opacity: 0.55 }));
     disc.visible = false; root.add(disc);
     const bolt = new THREE.Mesh(boltGeo, new THREE.MeshBasicMaterial({

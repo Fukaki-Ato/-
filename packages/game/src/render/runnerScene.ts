@@ -97,7 +97,7 @@ export function createRunnerScene(
   if (runEnv) scene.environment = runEnv;
   // 喷发管线（方案 B）：forgeheart 挂 eruption（LightningFx 同构，自排程 1s 预警+喷柱），flash 并入现有管线
   const eruption = scenery === 'forgeheart' ? createEruption(scene) : null;
-  // 后处理全主题启用（bloom 阈值 0.82 下非自发光场景几乎无泛光，参数不分主题；画面 grade 由 theme.grade 覆盖，coast 晴天档）；wx/非 WebGL2 自动降级
+  // 后处理全主题启用（bloom 阈值 0.82 下非自发光几乎无泛光；grade 由 theme.grade 覆盖）；wx/非 WebGL2 降级
   const postfx = createPostFx(renderer, scene, camera, grade);
 
   const track = createTrackVisuals(scene, laneWidth, {
@@ -108,8 +108,7 @@ export function createRunnerScene(
   const coinField = createCoinField(scene, laneWidth, { envMap: runEnv, scenery });
   // scenery 来源与 createTrackVisuals 同款（themes.json 的 scenery 字段）：stormspire 时障碍层换雷脊废墟皮
   const obstacleLayer = createObstacleLayer(scene, laneWidth, scenery);
-  // 道具 3D 模型（items.json model.prefab/spin）：磁铁有文件→近距换 3D，其余预留路径
-  // 文件缺失→加载器返回 null，保持贴图箱（wx 无 extras.readBinary 同理），捞取判定不受影响
+  // 道具 3D 模型（items.json model.prefab/spin）：磁铁有文件→近距换 3D；文件缺失→null 回贴图箱，捞取判定不受影响
   const pickupLayer = createPickupLayer(scene, laneWidth, createPickupModelLoader(content, adapter));
   const cloudLayer = createCloudLayer(scene);
   const bursts = createBurstPool(scene);
@@ -184,10 +183,7 @@ export function createRunnerScene(
       (x, y, z) => bursts.fireAt(x, y, z, CLOUD_BURST_COLOR));
     track.update(dist, s.t);
 
-    // 相机：水平跟随人物，垂直按地面/空中两套目标平滑随动，注视点前探 9.5m。
-    // 目标全部由 cameraRig 派生：地面 s.y*0.5+4.6、camZ 9.2（俯角 12.8°，四轮「高度够了但远」收距后的口径）；
-    // 空中（飞行/滑翔）机位抬到 s.y*0.75+5.3、后拉 z=11.4、注视点压回 s.y*0.28+0.8、
-    // FOV 68°——同帧装下地面障碍、角色与空中金币带，且与地面机位差 1.85m/2.2m/13° 肉眼可辨。
+    // 相机：水平跟随人物、垂直按地面/空中两套目标平滑随动（cameraRig 派生：地面 y*0.5+4.6/z 9.2，空中 y*0.75+5.3/z 11.4/FOV 68°）
     shakeT = Math.max(0, shakeT - SHAKE_DECAY);
     const sk = shakeT > 0 ? (Math.random() - 0.5) * SHAKE_AMP : 0;
     const airborne = fx.flyT > 0 || s.gliding;
