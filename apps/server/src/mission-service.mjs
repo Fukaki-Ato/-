@@ -1,7 +1,8 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { getMissionPeriods } from './periods.mjs';
 import { ApiError } from './errors.mjs';
-import { replayRun, STEP_DT } from './replay.mjs';
+import { createRuleset, readReplaySource, readLegacyRuleset, verifyRuleset, readBoundRuleset, loadReplayRuntime, replaySourceHash } from './rules.mjs';
+import { canonicalReplayPayload, parseItemsJson } from './run-payload.mjs';
 import { DEFAULT_LIMITS } from './limits.mjs';
 import { playableCharacters, isCharacterLocked, itemEffects } from '@tr/game/core/sim/character.js';
 import { resolveRunThemeId } from '@tr/game/core/sim/themeRules.js';
@@ -47,14 +48,6 @@ function validateMissionConfig(missions) {
   }
 }
 
-function parseItemsJson(raw) {
-  if (!raw) return [];
-  try {
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed.filter(x => typeof x === 'string') : [];
-  } catch { return []; }
-}
-
 function stableIndex(userId, periodId, tier, count) {
   const digest = createHash('sha256').update(`${userId}:${periodId}:${tier}`).digest();
   return digest.readUInt32BE(0) % count;
@@ -98,7 +91,7 @@ function updatePeriodProgress(store, userId, period, periodId, metrics, characte
 }
 
 export class MissionService {
-  constructor({ store, content, now = Date.now, limits = {}, minRunSeconds }) {
+  constructor({ store, content, now = Date.now, limits = {}, minRunSeconds, replaySource, legacyRuleset, trustedReplayRuntimeHashes = [] }) {
     this.store = store;
     this.content = content;
     this.now = now;
@@ -109,6 +102,23 @@ export class MissionService {
     const configuredMinimum = minRunSeconds ?? config.minRunSeconds ?? 10;
     if (!Number.isFinite(configuredMinimum) || configuredMinimum < 0 || configuredMinimum > 600) throw new Error('missions.minRunSeconds must be between 0 and 600');
     this.minRunSeconds = configuredMinimum;
+    this.replaySource = replaySource ?? readReplaySource();
+    const baseline = legacyRuleset ?? readLegacyRuleset();
+    verifyRuleset(baseline);
+    if (!Array.isArray(trustedReplayRuntimeHashes) || trustedReplayRuntimeHashes.some(hash => typeof hash !== 'string' || !/^[0-9a-f]{64}$/i.test(hash))) {
+      throw new Error('trusted replay runtime hashes must be SHA-256 hex strings');
+    }
+    this.trustedRuntimeHashes = new Set([replaySourceHash(this.replaySource), replaySourceHash(baseline.definition.runtimeSource),
+      ...trustedReplayRuntimeHashes.map(hash => hash.toLowerCase())]);
+    this.captureRules();
+    this.legacyBinding = this.store.adoptLegacyRules(baseline);
+  }
+
+  captureRules() {
+    const current = createRuleset({ content: this.content, minRunSeconds: this.minRunSeconds,
+      limits: this.limits, runtimeSource: this.replaySource });
+    this.store.addRuleset(current);
+    return this.rulesId = current.id;
   }
 
   ensurePeriod(userId, period, periodId) {
@@ -186,27 +196,19 @@ export class MissionService {
       throw new ApiError(429, '已有过多进行中的跑酷记录，请先完成或等待过期');
     }
     const id = randomUUID();
+    const rulesId = this.captureRules();
     this.store.createRun({ id, userId, startedAt, dailyId: periods.daily.periodId, weeklyId: periods.weekly.periodId,
-      seed, charId, items: equip, themeId: resolveRunThemeId(this.content, themeId) });
+      seed, charId, items: equip, themeId: resolveRunThemeId(this.content, themeId), rulesId });
     return { runId: id };
   }
 
   async finishRun(userId, runId, { frames, actions }) {
-    if (!Number.isInteger(frames) || frames <= 0 || frames > this.limits.maxFrames) {
-      throw new ApiError(400, `frames 必须是 1 到 ${this.limits.maxFrames} 的整数`);
-    }
-    if (!Array.isArray(actions) || actions.length > this.limits.maxActions) throw new ApiError(400, 'actions 数量超出限制');
-    let previousFrame = -1;
-    for (const action of actions) {
-      if (!action || typeof action !== 'object' || Array.isArray(action) || Object.keys(action).some(key => !['frame', 'action'].includes(key)) || !Number.isInteger(action.frame) || action.frame < 0 || action.frame >= frames || action.frame < previousFrame || !['laneL', 'laneR', 'jump', 'slide', 'skill'].includes(action.action)) {
-        throw new ApiError(400, 'actions 必须按帧排序，且包含有效 frame/action');
-      }
-      previousFrame = action.frame;
-    }
-    const canonicalPayload = JSON.stringify({ frames, actions: actions.map(({ frame, action }) => ({ frame, action })) });
-    const payloadHash = createHash('sha256').update(canonicalPayload).digest('hex');
     const run = this.store.getRun(runId, userId);
     if (!run) throw new ApiError(404, '找不到这场跑酷记录');
+    // Finished legacy rows need only their stored payload hash, not a reconstructable old engine.
+    const definition = run.status === 'finished' ? null : readBoundRuleset(this.store, run.rules_id);
+    const canonicalPayload = canonicalReplayPayload(frames, actions, definition);
+    const payloadHash = createHash('sha256').update(canonicalPayload).digest('hex');
     if (run.status === 'finished') {
       if (run.payload_hash !== payloadHash) throw new ApiError(409, '这场记录已结算，不能更换回放内容');
       return this.snapshot(userId);
@@ -216,13 +218,16 @@ export class MissionService {
     const finishStartedAt = this.now();
     const elapsedMs = finishStartedAt - startedAt;
     if (elapsedMs < 0 || elapsedMs > this.limits.runTicketTtlMs) throw new ApiError(410, '跑酷记录已过期，请重新开始');
-    const minimumElapsed = Math.max(0, frames * STEP_DT * 1000 - this.limits.replayTimeAllowanceMs);
-    if (elapsedMs < minimumElapsed) throw new ApiError(425, '结算时间过快，请稍后重试');
 
     if (this.activeReplays >= this.limits.maxConcurrentReplays) throw new ApiError(429, '结算繁忙，请稍后重试');
     this.activeReplays++;
     let replay;
-    try { replay = await replayRun(this.content, run, frames, actions, this.limits.replayWallClockMs, parseItemsJson(run.items_json)); }
+    try {
+      const runtime = await loadReplayRuntime(definition, this.trustedRuntimeHashes);
+      const minimumElapsed = Math.max(0, frames * runtime.STEP_DT * 1000 - this.limits.replayTimeAllowanceMs);
+      if (elapsedMs < minimumElapsed) throw new ApiError(425, '结算时间过快，请稍后重试');
+      replay = await runtime.replayRun(definition.content, run, frames, actions, this.limits.replayWallClockMs, parseItemsJson(run.items_json));
+    }
     catch (error) {
       // 墙钟超时：run 保持 open 可重试；不是客户端的 payload 问题，返回 408 而非 4xx 语义混淆
       if (error?.code === 'REPLAY_TIMEOUT') throw new ApiError(408, '回放超时，请稍后重试');
@@ -232,7 +237,7 @@ export class MissionService {
     if (replay.frames !== frames) throw new ApiError(400, '回放包含死亡后的额外帧，请按死亡帧结束');
     // 与排行榜 replay-worker 同口径：有效局必须以死亡帧收尾（endless runner 只有一种终局）。
     // 不校验 alive 时，脚本可提交任意 ≥minRunSeconds 的存活截断局刷 mruns/mnohit（审查 S-1）。
-    const validRun = replay.elapsedSeconds + 1e-9 >= this.minRunSeconds && replay.summary.alive === false;
+    const validRun = replay.elapsedSeconds + 1e-9 >= definition.minRunSeconds && replay.summary.alive === false;
     const finishedAt = this.now();
     const metrics = {
       distanceM: replay.summary.distance, coins: replay.summary.coins,

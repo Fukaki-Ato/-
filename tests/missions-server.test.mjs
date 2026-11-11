@@ -233,6 +233,8 @@ test('invalid inputs, forged summaries, CSRF, stale claims, and body caps fail a
     assert.equal((await state.startRun(api, 'char_volt', { seed: -1 })).response.status, 400);
     assert.equal((await state.startRun(api, 'not_a_character')).response.status, 400);
     assert.equal((await state.startRun(api, 'skin_volt_default')).response.status, 400);
+    assert.equal((await state.startRun(api, 'char_volt', { runtimeSource: 'x' })).response.status, 400);
+    assert.equal((await state.startRun(api, 'char_volt', { rulesId: 'forged' })).response.status, 400);
     const locked = state.content.characters.items.find(item => item.id === 'char_ama');
     locked.locked = true;
     assert.equal((await state.startRun(api, 'char_ama')).response.status, 400);

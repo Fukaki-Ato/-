@@ -32,7 +32,7 @@ npm run dev
 
 Useful commands:
 
-- `npm run build`: compile all project references.
+- `npm run build`: compile all project references and build the self-contained mission replay artifact under `apps/server/dist`.
 - `npm test`: run deterministic simulation, UI, replay, and platform tests.
 - `npm run build:web`: create the Web bundle in `apps/web/dist`.
 - `npm run dev:server`: build shared code and start the mission API on port 8768 (separate terminal from Web).

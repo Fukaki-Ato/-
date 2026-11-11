@@ -17,6 +17,7 @@ if (!existsSync(join(root, 'node_modules/typescript/bin/tsc'))) {
 
 const STEPS = [
   ['编译 TypeScript（tsc -b）', ['node_modules/typescript/bin/tsc', '-b']],
+  ['构建可持久化回放包', ['tools/build-replay-runtime.mjs']],
   // 构建侧源码（vite.config / rankPageGateway）不在任何 tsc -b project 里，单独 noEmit 检查（审查 W-3）：
   // rankPageGateway 是正式站安全链路，腐化必须在这里红而不是线上运行时炸
   ['构建侧类型检查（tsc --noEmit）', ['node_modules/typescript/bin/tsc', '-p', 'apps/web/tsconfig.node.json']],

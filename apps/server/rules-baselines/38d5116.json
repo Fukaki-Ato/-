@@ -1,0 +1,4386 @@
+{
+  "id": "cf208d8372846afee6104249e8a794a0a08d7d5c4d5ce0ee8219aa238b00deaa",
+  "definition": {
+    "abi": 1,
+    "runtimeSource": "function Xt(s){let t=s>>>0;return function(){t=t+1831565813>>>0;let e=t;return e=Math.imul(e^e>>>15,e|1),e^=e+Math.imul(e^e>>>7,e|61),((e^e>>>14)>>>0)/4294967296}}var Z=class{constructor(t){this.seed=t,this.next01=Xt(t)}next(){return this.next01()}range(t,e){return t+(e-t)*this.next01()}int(t,e){return Math.floor(this.range(t,e+1))}pick(t){return t[this.int(0,t.length-1)]}shuffle(t){for(let e=t.length-1;e>0;e--){let i=this.int(0,e);[t[e],t[i]]=[t[i],t[e]]}}weighted(t,e){let i=0;for(let o of t)i+=Math.max(0,e(o));if(i<=0)return t[0];let n=this.next()*i;for(let o of t)if(n-=Math.max(0,e(o)),n<0)return o;return t[t.length-1]}};var st=2e4;function R(){return{magnetT:0,magnetRadius:0,bootsT:0,jumpMul:1,flyT:0,helmetT:0,shieldLayers:0,shieldT:0,boardT:0,invincible:!1,speedMul:1,timeSlowMul:1,avoidLookahead:0,coinPct:0,slideAddS:0,buffPct:0,cooldownMul:1,pickupAllT:0,slideGuardCharges:0,duckPass:!1,buffAddS:0}}var I={invincible:{kind:\"timed\"},speedMul:{kind:\"timed\"},magnet:{kind:\"timed\"},fly:{kind:\"timed\"},lifeAdd:{kind:\"timed\"},jumpBoost:{kind:\"timed\"},dash:{kind:\"instant\"},blink:{kind:\"instant\"},timeSlow:{kind:\"timed\"},shieldAdd:{kind:\"timed\"},buffDurationAdd:{kind:\"timed\"},coinValueAdd:{kind:\"timed\"},scoreAdd:{kind:\"instant\"},spawnCoinsRow:{kind:\"instant\"},laneAutoAvoid:{kind:\"timed\"},pickupAll:{kind:\"timed\"},slideExtend:{kind:\"timed\"},cooldownMul:{kind:\"timed\"},boardArmor:{kind:\"timed\"},buffDurationFlat:{kind:\"timed\"},slideGuard:{kind:\"timed\"},duckPass:{kind:\"timed\"},smashAhead:{kind:\"instant\"},periodic:{kind:\"cyclic\"},xpMul:{kind:\"timed\"}},Pe=Object.keys(I);var nt=24,ot=3600*1.5,m=(s,t,e)=>typeof s[t]==\"number\"&&Number.isFinite(s[t])?s[t]:e,K=s=>Math.max(1,Math.round(m(s,\"layers\",m(s,\"charges\",1))));function rt(s){if(!Array.isArray(s))return[];let t=[];for(let e of s){if(e===null||typeof e!=\"object\"||Array.isArray(e))continue;let{primitive:i,...n}=e;if(typeof i!=\"string\")continue;let o=I[i];!o||o.kind===\"cyclic\"||t.push({primitive:i,params:n})}return t}var L=class{constructor(t){this.world=t,this.fx=R(),this.slots=[]}list(t){t.length=0;for(let e of this.slots)t.push({primitive:e.primitive,label:e.label,left:e.left});return t}left(t){let e=0;for(let i of this.slots)i.primitive===t&&i.left>e&&(e=i.left);return e}add(t,e,i,n,o=\"refresh\"){let r=I[t];if(!r)return;if(r.kind===\"instant\"){this.castInstant(t,e,n);return}if(r.kind===\"cyclic\"){this.addCycle(e,i);return}let a=m(e,\"durationS\",Number.POSITIVE_INFINITY),l=Number.isFinite(a)?a*(1+this.durationBonus()/100)+this.durationFlat():Number.POSITIVE_INFINITY,c=Number.isFinite(l)?Math.min(Math.max(0,l),ot):l,f=m(e,\"distanceM\",0),p=f>0?n.distance+f:void 0;if(c<=0&&p===void 0)return;t===\"fly\"&&(this.left(\"fly\")<=0?this.world.startFlight(c,typeof e.heightM==\"number\"?e.heightM:void 0):this.world.extendFlight(c));let h=this.slots.find(y=>y.primitive===t);h&&o===\"stack\"?(h.layers+=K(e),h.params=e,h.label=i,h.left=Math.max(h.left,c),p!==void 0&&(h.endAt=Math.max(h.endAt??0,p))):h&&o===\"replace\"?(this.slots.splice(this.slots.indexOf(h),1),this.push(t,e,i,c,p)):h?(h.params=e,h.label=i,h.left=c,h.endAt=p):this.push(t,e,i,c,p),this.recompute()}push(t,e,i,n,o){this.enqueue({primitive:t,label:i,params:e,left:n,endAt:o,layers:K(e)})}addCycle(t,e){let i=m(t,\"everyS\",0),n=rt(t.effects);if(!(i>0)||n.length===0)return;let o=this.slots.find(r=>r.primitive===\"periodic\"&&r.label===e);if(o){o.params=t,o.children=n,o.nextAt=0;return}this.enqueue({primitive:\"periodic\",label:e,params:t,left:Number.POSITIVE_INFINITY,layers:1,nextAt:0,children:n})}enqueue(t){this.slots.length>=nt&&this.evictLeastRemaining(),this.slots.push(t)}consumeShield(){let t=this.slots.find(e=>e.primitive===\"shieldAdd\");return!t||t.layers<=0?0:(t.layers-=1,t.layers<=0?this.remove(\"shieldAdd\"):this.recompute(),t.layers)}consumeSlideGuard(){let t=this.slots.find(e=>e.primitive===\"slideGuard\");return!t||t.layers<=0?0:(t.layers-=1,t.layers<=0?this.remove(\"slideGuard\"):this.recompute(),t.layers)}remove(t){let e=this.slots.findIndex(i=>i.primitive===t);e>=0&&this.slots.splice(e,1),this.recompute()}clear(){this.slots.length=0,Object.assign(this.fx,R())}tick(t,e){for(let i=this.slots.length-1;i>=0;i--){let n=this.slots[i];if(n.endAt!==void 0&&e.distance>=n.endAt){this.slots.splice(i,1);continue}if(n.children){this.runCycle(n,t,e);continue}Number.isFinite(n.left)&&(n.left-=t,n.left<=0&&this.slots.splice(i,1))}this.recompute()}runCycle(t,e,i){if(t.nextAt===void 0||(t.nextAt-=e,t.nextAt>0))return;let n=Math.max(.1,m(t.params,\"everyS\",10));t.nextAt+=n,t.nextAt<=0&&(t.nextAt=n);for(let o of t.children??[])this.add(o.primitive,o.params,t.label,i)}durationBonus(){let t=0;for(let e of this.slots)e.primitive===\"buffDurationAdd\"&&(t+=m(e.params,\"pct\",0));return t}durationFlat(){let t=0;for(let e of this.slots)e.primitive===\"buffDurationFlat\"&&(t+=m(e.params,\"addS\",0));return t}evictLeastRemaining(){let t=-1,e=Number.POSITIVE_INFINITY;for(let i=0;i<this.slots.length;i++)this.slots[i].left<e&&(e=this.slots[i].left,t=i);t>=0&&this.slots.splice(t,1)}recompute(){let t=R();for(let e of this.slots){let i=e.params;switch(e.primitive){case\"magnet\":t.magnetT=Math.max(t.magnetT,e.left),t.magnetRadius=Math.max(t.magnetRadius,m(i,\"radiusM\",3));break;case\"jumpBoost\":t.bootsT=Math.max(t.bootsT,e.left),t.jumpMul=Math.max(t.jumpMul,m(i,\"mul\",1.25));break;case\"fly\":t.flyT=Math.max(t.flyT,e.left);break;case\"lifeAdd\":t.helmetT=Math.max(t.helmetT,e.left);break;case\"shieldAdd\":t.shieldLayers+=e.layers,t.shieldT=Math.max(t.shieldT,e.left);break;case\"boardArmor\":t.boardT=Math.max(t.boardT,e.left);break;case\"invincible\":t.invincible=!0;break;case\"speedMul\":t.speedMul*=m(i,\"mul\",1);break;case\"timeSlow\":t.timeSlowMul*=m(i,\"worldMul\",1);break;case\"laneAutoAvoid\":t.avoidLookahead=Math.max(t.avoidLookahead,m(i,\"lookaheadM\",12));break;case\"coinValueAdd\":t.coinPct+=m(i,\"pct\",0);break;case\"slideExtend\":t.slideAddS+=m(i,\"addS\",0);break;case\"buffDurationAdd\":t.buffPct+=m(i,\"pct\",0);break;case\"cooldownMul\":t.cooldownMul*=m(i,\"mul\",1);break;case\"pickupAll\":t.pickupAllT=Math.max(t.pickupAllT,e.left);break;case\"slideGuard\":t.slideGuardCharges+=e.layers;break;case\"duckPass\":t.duckPass=!0;break;case\"buffDurationFlat\":t.buffAddS+=m(i,\"addS\",0);break;default:break}}Object.assign(this.fx,t)}castInstant(t,e,i){let n=this.world;if(t===\"scoreAdd\"){n.addBonusScore(Math.max(0,m(e,\"flat\",0)));return}if(t===\"smashAhead\"){let r=Math.max(0,m(e,\"aheadM\",0));r>0&&n.smashObstacles(i.distance,i.distance+r);return}if(t===\"spawnCoinsRow\"){let r=Array.isArray(e.lanes)?e.lanes.map(Number).filter(a=>a>=-1&&a<=1):[];n.grantCoinRow(r.length?r:[0],m(e,\"startM\",6),m(e,\"lengthM\",12),m(e,\"spacingM\",1.5),m(e,\"y\",.65));return}let o=Math.max(0,m(e,\"distanceM\",0));if(!(o<=0)){if(t===\"dash\"){n.destroyObstacles(i.lane,i.distance,i.distance+o),n.advance(o);return}if(t===\"blink\"){let a=e.phase===!0||m(e,\"phase\",0)===1?i.distance+o:n.firstBlocker(i.lane,i.distance,i.distance+o)??i.distance+o;e.collectCoins===!0&&n.collectCoinsAlong(i.distance,a),n.advance(Math.max(0,a-i.distance))}}}};var b=.016666666666666666,E=34,at=1.2,_=1.7,lt=.7,q=7,ct=60,ht={charId:\"\",name:\"\\u8DD1\\u8005\",tagline:\"\",tint:\"#7FD1FF\",rarity:\"R\",skill:null,passive:[],talentLabel:\"\",talentDesc:\"\",skinId:\"\",bodyTint:\"#F2F4F8\",emissive:\"#7FD1FF\",modelScale:1,clearance:_};function ft(){return{t:0,distance:0,prevDistance:0,lane:0,x:0,y:0,vy:0,sliding:!1,slideT:0,stunT:0,invulnT:0,hits:0,alive:!0,topple:0,shocks:0,revivesUsed:0,coins:0,nearMiss:0,score:0,gliding:!1,skillCd:0,slideCount:0,casts:0,tideLevel:0,surgeWarn:0,supportY:0,flip:1,ceilH:0}}function Jt(s){return(s.characters.items??[]).filter(t=>String(t.id).startsWith(\"char_\")&&t.status!==\"draft\"&&t.status!==\"retired\")}var A=(s,t=\"\")=>{if(typeof s==\"string\")return s;if(s&&typeof s==\"object\"){let e=s;return e[\"zh-CN\"]??e[\"en-US\"]??t}return t},C=(s,t)=>typeof s==\"number\"&&Number.isFinite(s)?s:t;function X(s,t,e=!1){let i=s?.effects??[],n=A(s?.name);return i.filter(o=>typeof o.primitive==\"string\").map(o=>{let{primitive:r,durationS:a,...l}=o;return{primitive:r,params:e?l:{durationS:a,...l},label:n,stackRule:t}})}function ut(s,t){return typeof t!=\"string\"||!t?void 0:(s.skills.items??[]).find(i=>i.id===t)??(s.characters.items??[]).find(i=>i.id===t)}function dt(s,t){let e=Jt(s),i=e.find(k=>k.id===t)??e[0],n={charId:i?.id??\"\",name:A(i?.name,\"\\u8DD1\\u8005\"),tagline:A(i?.tagline),tint:A(i?.tint,\"#7FD1FF\"),rarity:String(i?.rarity??\"R\"),skill:null,passive:[],talentLabel:\"\",talentDesc:\"\",skinId:\"\",bodyTint:A(i?.tint,\"#7FD1FF\"),emissive:A(i?.tint,\"#7FD1FF\"),modelScale:1,clearance:C(i?.clearance,_)};if(!i)return n;let o=i.model??{};typeof o.scale==\"number\"&&o.scale>0&&(n.modelScale=o.scale),typeof o.fallbackScale==\"number\"&&Number.isFinite(o.fallbackScale)&&o.fallbackScale>0&&(n.fallbackModelScale=o.fallbackScale);let r=(i.skins??[])[0]??\"\",a=(s.characters.items??[]).find(k=>k.id===r),l=a?.materialOverrides??{};n.skinId=r,n.bodyTint=A(l.bodyTint,n.tint),n.emissive=A(l.emissive,n.tint);let c=(a?.model??{}).prefab,f=[o.prefab,c].find(k=>typeof k==\"string\"&&k.length>0);typeof f==\"string\"&&(n.prefab=f);let p=i.intro??{};typeof p.video==\"string\"&&p.video!==\"\"&&(n.intro={video:p.video,durationS:Math.max(0,C(p.durationS,3)),widthM:Math.max(.1,C(p.widthM,3)),heightM:Math.max(.1,C(p.heightM,1.7)),distanceM:Math.max(.5,C(p.distanceM,4))});let h=ut(s,i.skillRef);if(h&&h.kind===\"active\"){let k=h.charge??{};n.skill={id:h.id,label:A(h.name,h.id),desc:A(h.desc),cooldownS:Math.max(0,C(h.cooldownS,18)),chargeSlides:k.type===\"slideCount\"?Math.max(0,Math.round(C(k.slides,0))):0,trigger:String(h.trigger??\"double_tap\"),effects:X(h,\"refresh\")}}let y=ut(s,i.talentRef);return y&&y.kind===\"passive\"&&(n.passive=X(y,\"refresh\",!0),n.talentLabel=A(y.name,y.id),n.talentDesc=A(y.desc)),n}function F(s,t){let e=(s.items.items??[]).find(n=>n.id===t);if(!e)return[];let i=String(e.stackRule??\"refresh\");return X(e,i===\"stack\"||i===\"replace\"?i:\"refresh\")}var mt=1.3,gt=mt-.9+.65,$t=.9,Qt=1,te=1.4,ee=1.15;function Mt(s){let{state:t,fx:e,coins:i,coinFront:n,laneWidth:o}=s;for(let r of i){if(r.taken)continue;let a=t.distance-r.worldZ,l=Math.abs(t.y+t.flip*.9-(r.y??.65))<mt;if(e.magnetT>0&&l&&a<=n&&a>=-e.magnetRadius){pt(s,r);continue}a>=n&&!r.passed&&(r.passed=!0,Math.abs(r.lane*o-t.x)<$t&&l&&pt(s,r))}}function pt(s,t){t.taken=!0,t.takenAt=s.state.t,s.creditCoin(),s.events.push({type:\"coin\"})}function yt(s){let{state:t,fx:e,pickups:i,laneWidth:n}=s;for(let o of i){if(o.taken)continue;let r=t.distance-o.worldZ,a=e.pickupAllT>0&&r>-ct&&r<3;if(!(r>=0&&!o.passed||a))continue;o.passed=!0;let l=a||Math.abs(o.lane*n-t.x)<Qt,c=a||Math.abs(t.y+.9-ee)<te;!l||!c||(o.taken=!0,s.grantItem(o.itemRef),s.events.push({type:\"pickup\",itemRef:o.itemRef}))}}var bt=.8,St=.4,ie=.55;function O(s,t){return t-s.worldZ}function se(s,t,e){let i=s.lane*e,n=s.swing,o=i;if(n){let a=Number.isFinite(n.ampM)?n.ampM:0,l=Number.isFinite(n.periodS)&&n.periodS>0?n.periodS:0;l>0&&(o=i+Math.sin(t*Math.PI*2/l)*a*.5)}let r=(3*e+1.2)/2-(s.w+bt)/2;return Number.isFinite(r)&&r>0&&(o=Math.max(-r,Math.min(r,o))),Number.isFinite(o)?o:0}function N(s,t){return t>=-s.d/2-St&&t<=s.d/2+St}function D(s,t,e){let i=Math.abs(se(s,t.t,e)-t.x)-(s.w+bt)/2;return Number.isFinite(i)?i:Number.POSITIVE_INFINITY}function vt(s,t,e){let i=D(s,t,e);return i>0&&i<ie}var ne=.15,J=.3,xt=.8;function kt(s,t,e,i=_,n){if(D(s,t,e)>0)return!1;let o=Number.isFinite(i)&&i>0?i:_,r=t.sliding?lt:o,a=n&&n.flip===-1?n.ceilH-t.y:t.y;return s.cls===\"low\"?a<s.h*.75:s.cls===\"step\"?!1:s.cls===\"high\"?a<s.h&&a+r>at:s.cls===\"hazard\"?a<ne:s.cls===\"moving\"?s.jumpable?a<s.h*.75:!0:s.cls===\"vehicle\"?!(s.rideTop===!0&&a>=s.h-J):!0}var oe=.5;function wt(s,t,e){let i=r=>{let a=0;for(let l of s){if(l.done||l.lane!==r)continue;let c=l.worldZ-t.distance;c>oe&&c<e&&a++}return a},n=t.lane,o=i(t.lane);for(let r of[-1,0,1]){if(r===t.lane)continue;let a=i(r);a<o&&(o=a,n=r)}return n}function At(s){for(let t=s.length-1;t>=0;t--)s[t].flight===!0&&(s[t]=s[s.length-1],s.pop())}var Tt=s=>{let t=s<0?0:s>1?1:s;return t*t*(3-2*t)},re=.016666666666666666;function Ct(s,t,e,i){let n=ae(s.distance);n&&!i&&(i=!0,e.push({type:\"surge\",lane:0,worldZ:s.distance})),n||(i=!1);let o=Math.max(12,Math.min(26,t/re)),r=le(s.distance)-s.distance;return s.surgeWarn=!n&&r>0&&r<=o*1?r/o:0,i}function W(s){let t=s-Math.floor(s/144)*144;return t<40?0:t<72?Tt((t-40)/32):t<108?1:1-Tt((t-108)/36)}function ae(s){let t=Math.floor(s/144);if((t%2+2)%2!==1)return!1;let e=s-t*144;return e>=72&&e<108}function le(s){let t=Math.floor(s/144),e=s-t*144,i=(t%2+2)%2===1;return i&&e<108?t*144+72:(i?t+2:t+1)*144+72}function _t(s,t,e,i,n,o,r,a){if(!s||!(W(i)<=s.lowMax&&W(n)<=s.lowMax))return 0;let l=Math.min(s.coinCount,Math.floor(r/o)),c=a();for(let f=0;f<l;f++)t.push({lane:e,worldZ:i+(f+1)*o,y:.65,chain:c});return l}var $={halfM:1.2,scorePer:50};function Pt(s,t,e,i,n){let o=0;for(let r of s){if(r.done)continue;let a=r.worldZ-t;if(a<-i.halfM){r.done=!0;continue}if(a>i.halfM)break;r.done=!0,e>=r.yMin&&e<=r.yMax&&(o++,n.push({type:\"cross\",kind:r.kind,lane:r.lane,worldZ:r.worldZ}))}return o}function ce(s,t){let e=s.length;for(;e>0&&s[e-1].worldZ>t.worldZ;)e--;s.splice(e,0,t)}function Zt(s,t,e){let i=0;for(let n of s)n.done&&n.worldZ<t-e||(s[i++]=n);s.length=i}function Rt(s,t,e,i,n,o,r){let a=Math.max(e,n);for(;a<t;)ce(s,{kind:\"ring\",lane:0,worldZ:a,yMin:o,yMax:r}),a+=i;return Math.max(a,n)}var It=-20,he=3.2,fe=.2,B=class{constructor(t,e,i){this.P=t,this.fly=e,this.obstacles=i,this.slideCd=0,this.totalSlides=0,this.pendingJump=0,this.pendingSlide=0,this.flyWasActive=!1,this.landedThisStep=!1,this.floorY=0}jumpInput(t,e){t.sliding?(this.cancelSlide(t),this.jump(t,e)):t.y<=0||Math.abs(t.y-this.supportHeight(t))<.05?this.jump(t,e):this.pendingJump=q}slideInput(t,e){(t.flip===-1?t.y<t.ceilH-.05:t.y>this.supportHeight(t)+.05)?(t.vy=t.flip===-1?Math.max(t.vy,-It):Math.min(t.vy,It),this.pendingSlide=q):this.slide(t,e)}jump(t,e){t.vy=this.P.jumpVelocity*(e.bootsT>0?e.jumpMul:1)*t.flip,t.y<=0&&(t.y=.001)}slide(t,e){t.sliding||this.slideCd>0||(t.slideT=this.P.slideS+e.slideAddS,t.sliding=!0,t.slideCount++,this.totalSlides++)}cancelSlide(t){t.sliding=!1,t.slideT=0,this.slideCd=this.P.slideCooldownS}advanceLateral(t,e){let i=this.P.laneWidth/this.P.laneChangeS,n=t.lane*this.P.laneWidth-t.x;t.x+=Math.sign(n)*Math.min(Math.abs(n),i*e)}decayPending(){this.pendingJump>0&&this.pendingJump--,this.pendingSlide>0&&this.pendingSlide--}advanceVertical(t,e,i){if(this.landedThisStep=!1,e.flyT>0){this.flyWasActive=!0,this.decayPending(),t.vy=0,t.y+=(this.fly.heightM-t.y)*Math.min(1,i*he),t.supportY=this.supportHeight(t),t.sliding&&this.cancelSlide(t);return}if(this.flyWasActive&&(this.flyWasActive=!1,t.y>fe&&(t.gliding=!0)),t.gliding){this.decayPending();let n=this.supportHeight(t);if(t.supportY=n,t.y<=n+1e-4){t.y=n,t.vy=0,t.gliding=!1,this.landedThisStep=!0;return}t.y-=this.fly.heightM/this.fly.glideS*i;let o=t.y<=0;o&&(t.y=0,t.gliding=!1,this.landedThisStep=!0);return}this.pendingJump>0&&(this.pendingJump--,this.atRest(t)&&(this.jump(t,e),this.pendingJump=0)),this.pendingSlide>0&&(this.pendingSlide--,this.atRest(t)&&(this.slide(t,e),this.pendingSlide=0)),this.floorY=this.supportHeight(t),t.supportY=this.floorY,(t.y>0||t.vy>0||this.floorY>t.y)&&(t.vy+=this.P.gravity*t.flip*i,t.y+=t.vy*i,t.flip===-1?t.y>=t.ceilH&&(t.y=t.ceilH,t.vy=0):t.y<=this.floorY&&(t.y=this.floorY,t.vy=0)),t.sliding&&(t.slideT-=i,t.slideT<=0&&this.cancelSlide(t))}atRest(t){return t.flip===-1?t.y>=t.ceilH-.05:t.y<=this.floorY+.05}supportHeight(t){if(t.flip===-1)return t.ceilH;let e=0;for(let i of this.obstacles)if(!i.done&&N(i,t.distance-i.worldZ)&&!(D(i,t,this.P.laneWidth)>0)){if(i.rideTop===!0)t.y>=i.h-J&&(e=Math.max(e,i.h));else if(i.cls===\"step\"){let n=Math.max(.1,i.d-xt),o=(t.distance-i.worldZ+i.d/2)/n;e=Math.max(e,i.h*Math.min(1,Math.max(0,o)))}}return e}};function Lt(s){let t=Math.max(0,Math.floor(s.maxPerRun??0)),e=Math.max(0,Math.floor(s.webFreeRevivePerRun??0));return{left:Math.min(t,e),invincibleS:s.invincibleS??3}}function Et(s,t,e,i,n){if(s.left<=0)return s;let o={...s,left:s.left-1};return t.alive=!0,t.hits=0,t.shocks=0,t.stunT=0,t.invulnT=s.invincibleS,t.topple=0,e.softClearObstacles(i,t.distance-12,t.distance+14,t.t),t.revivesUsed++,n[n.length-1]?.type===\"death\"&&n.pop(),n.push({type:\"revive\",left:o.left}),o}function Ft(s,t){let{s:e,fx:i,buffs:n,events:o}=t;if(s.done=!0,!(e.invulnT>0||i.invincible)&&!(i.duckPass&&s.cls===\"high\")){if(e.sliding&&i.slideGuardCharges>0&&s.cls===\"low\"){o.push({type:\"slideGuard\",charges:n.consumeSlideGuard()}),e.invulnT=t.invulnS;return}if(e.t<t.tutorial.protectionS&&t.tutorial.take()){e.invulnT=t.invulnS,o.push({type:\"protected\"});return}if(s.zap===!0){ue(s,t);return}if(i.shieldLayers>0){o.push({type:\"shieldBreak\",layers:n.consumeShield()}),e.invulnT=t.invulnS;return}if(i.boardT>0){n.remove(\"boardArmor\"),o.push({type:\"boardBreak\"}),e.invulnT=t.invulnS;return}if(e.hits++,e.stunT=t.hitStunS,e.invulnT=t.invulnS,o.push({type:\"hit\"}),e.hits>=t.lives){if(i.helmetT>0){n.remove(\"lifeAdd\"),e.hits--,e.stunT=0,e.invulnT=t.invulnS+.2,o.push({type:\"helmetSave\"});return}e.alive=!1,o.push({type:\"death\"})}}}function ue(s,t){let{s:e,fx:i,buffs:n,events:o}=t,r={lane:s.lane,worldZ:s.worldZ},a=l=>{e.stunT=t.hitStunS,e.invulnT=t.invulnS,o.push({type:\"zap\",gear:l,...r})};if(i.shieldLayers>0){o.push({type:\"shieldBreak\",layers:n.consumeShield()}),a(\"shield\");return}if(i.boardT>0){n.remove(\"boardArmor\"),o.push({type:\"boardBreak\"}),a(\"board\");return}if(i.helmetT>0){n.remove(\"lifeAdd\"),a(\"helmet\");return}if(e.shocks>=1){e.hits++,e.alive=!1,o.push({type:\"death\",...r});return}e.shocks++,a(null)}var Ot=new Set([\"full\",\"vehicle\",\"moving\"]);function de(s){if(!s||typeof s!=\"object\")return;let t=s,e=t.ampM??t.amplitudeM,i=t.periodS;if(!(typeof e!=\"number\"||!Number.isFinite(e))&&!(typeof i!=\"number\"||!Number.isFinite(i)||i<=0))return{ampM:e,periodS:i}}function Q(s,t,e){let i=s.size??[2,1.2,1.2],n={obsRef:s.id,cls:s.class??\"full\",w:i[0]??2,h:i[1]??1.2,d:i[2]??1.2,lane:t,worldZ:e,swing:de(s.swing)};return s.jumpable===!0&&(n.jumpable=!0),s.rideTop===!0&&(n.rideTop=!0),typeof s.moveZ==\"number\"&&Number.isFinite(s.moveZ)&&s.moveZ!==0&&(n.moveZ=s.moveZ),s.zap===!0&&(n.zap=!0),n}function Nt(s){let t=s.rng.weighted([1,2,3],u=>s.laneWeights[u]??0),e=[-1,0,1].filter(u=>u!==s.safeLane);s.rng.shuffle(e);let i=[s.safeLane,...e.slice(0,t-1)];for(let u of[-1,0,1])!i.includes(u)&&s.winStart-s.lastCoinZ[u]>s.laneGapM&&i.push(u);let n=(u,d,g)=>{let S=[];for(let v of s.obstacles){if(v.lane!==u)continue;let w=Math.max(d,v.worldZ-v.d/2-.8),T=Math.min(g,v.worldZ+v.d/2+.8);T>d&&w<g&&S.push([w,T])}S.sort((v,w)=>v[0]-w[0]);let M=[],x=d;for(let[v,w]of S)v>x+.01&&M.push([x,v]),x=Math.max(x,w);return x<g-.01&&M.push([x,g]),M},o=s.rng.weighted(s.chainBuckets,u=>u.weight),r=s.rng.int(o.min,o.max),a=Math.min(...s.chainBuckets.map(u=>u.min)),l=[[s.winStart+3,s.winEnd-14]],c=[];for(let u of i){let d=n(u,s.winStart+3,s.winEnd-14),g=[];for(let[S,M]of l)for(let[x,v]of d){let w=Math.max(S,x),T=Math.min(M,v);T-w>=(a-1)*s.spacing&&g.push([w,T])}g.length&&(l=g,c.push(u))}if(!c.length)return;let f=l.reduce((u,d)=>d[1]-d[0]>u[1]-u[0]?d:u),p=Math.min(f[1]-f[0],s.maxSpanM??1/0),h=Math.min(r,Math.floor(p/s.spacing)+1);if(h<a)return;let y=s.rng.range(f[0],f[1]-(h-1)*s.spacing),k=s.seq();for(let u of c){for(let d=0;d<h;d++)s.coins.push({lane:u,worldZ:y+d*s.spacing,chain:k});s.lastCoinZ[u]=y+(h-1)*s.spacing}}function Dt(s){let t=Math.min(...s.chainBuckets.map(i=>i.min)),e=Math.max(...s.chainBuckets.map(i=>i.max));for(let i of s.cells){if(!i.coins||i.obsRef)continue;let n=s.genZ+i.segment*s.segLen+i.offsetM,o=s.seq(),r=Math.floor(s.maxSpanM/s.coinSpacing)+1;for(let a=0;a<Math.min(Math.max(i.coins,t),e,r);a++){let l=n+a*s.coinSpacing,c=i.surface===\"trainTop\"?s.obstacles.find(f=>f.rideTop===!0&&f.lane===i.lane&&Math.abs(l-f.worldZ)<=f.d/2+.6):void 0;!c&&s.obstacles.some(f=>f.lane===i.lane&&!f.done&&Math.abs(l-f.worldZ)<f.d/2+.5)||s.coins.push({lane:i.lane,worldZ:l,chain:o,...c?{y:c.h+.65}:{}})}}}function Wt(s){let t=new Set;for(let e=s.coinStart;e<s.coins.length;e++){let i=s.coins[e];if(i.chain!=null){for(let n of s.newObs)if(n.lane===i.lane&&Math.abs(i.worldZ-n.worldZ)<n.d/2+.8){t.add(i.chain);break}}}if(t.size)for(let e=s.coins.length-1;e>=s.coinStart;e--)s.coins[e].chain!=null&&t.has(s.coins[e].chain)&&s.coins.splice(e,1);for(let e=s.coins.length-1;e>=0;e--){let i=s.coins[e];if(!((i.y??0)>0)){for(let n of s.newObs)if(n.lane===i.lane&&Math.abs(i.worldZ-n.worldZ)<n.d/2+.3){s.coins.splice(e,1);break}}}}function Bt(s){let t=s.spacing*.65,e=s.fromZ+8+s.rng.range(0,10);for(;e<s.toZ-8;){let i=s.rng.weighted([1,2,3],l=>s.laneWeights[l]??0),n=[-1,0,1];s.rng.shuffle(n);let o=s.rng.weighted(s.chainBuckets,l=>l.weight),r=s.rng.int(o.min,o.max),a=s.seq();for(let l of n.slice(0,i))for(let c=0;c<r;c++){let f=e+c*t;f<s.toZ-4&&s.coins.push({lane:l,worldZ:f,y:s.skyY,flight:!0,chain:a})}e+=r*t+s.rng.range(10,18)}for(let i=s.fromZ+12;i<s.toZ-6;i+=s.rng.range(30,46))s.clouds.push({worldZ:i,x:s.rng.pick([-1,0,1])*s.laneWidth+s.rng.range(-.6,.6),y:s.rng.range(s.skyY-.5,s.skyY+.9)})}function Ht(s,t,e){let i=.001,n=s.jumpVelocity??15.2,o=0,r=s.gravity??-38;if(r>=0||n<=0)return 0;for(let a=0;a<600&&(n+=r*b,i+=n*b,i>=gt&&o++,!(i<=0));a++);return Math.max(0,o-1)*b*t*e}var pe=new Set([\"vehicle\",\"moving\",\"step\"]);function Gt(s){let t=s?.antigrav,e=i=>typeof i==\"number\"&&Number.isFinite(i)&&i>0;return!t||!e(t.lengthM)||!e(t.everyM)||!e(t.fromM)||!e(t.ceilingH)?null:{lengthM:t.lengthM,everyM:t.everyM,fromM:t.fromM,ceilingH:t.ceilingH}}function H(s,t){let e=0,i=s.length-1;for(;e<=i;){let n=e+i>>1,o=s[n];if(t<o.startM)i=n-1;else if(t>=o.endM)e=n+1;else return o}return null}function me(s,t){return t>=s.startM-12&&t<s.startM||t>=s.endM&&t<=s.endM+12}function G(s,t,e){let i=0,n=s.length;for(;i<n;){let r=i+n>>1;s[r].endM+12<t?i=r+1:n=r}let o=!1;for(let r=i;r<s.length&&s[r].startM-12<=t;r++){let a=s[r];if(me(a,t))return!0;t>=a.startM&&t<a.endM&&(o=!0)}return o&&pe.has(e)}function jt(s,t,e,i){if(!i)return t;let n=Math.max(t,i.fromM);for(;n<=e+96;)s.push({startM:n,endM:n+i.lengthM,ceilH:i.ceilingH}),n+=i.everyM;return n}var j=class{constructor(t,e){this.rng=e,this.genZ=60,this.defs=new Map,this.lastCoinZ={[-1]:0,0:0,1:0},this.nextCrossZ=1/0,this.zones=[],this.nextZoneZ=0,this.nextPickupSeg=200,this.chainSeq=0,this.lastPatternId=\"\";let i=t.obstacles;this.segLen=t.game.params.track?.segmentLengthM??24;let n=t.game.params.track?.restGapM;this.restGapM=n??[6,14],this.laneWidthRef=(t.game.params.runner??{}).laneWidth??2.2;for(let y of i.defs)this.defs.set(y.id,y);this.patterns=i.patterns,this.curve=i.difficultyCurve;let o=t.game.params.coins??{};this.runner=t.game.params.runner??{},this.jumpSpanRatio=o.jumpSpanRatio??.9;let r=o.chainBuckets??[{min:5,max:10,weight:75}];this.chainBuckets=r.length?r:[{min:5,max:10,weight:75}],this.coinSpacing=o.spacingM??1.5;let a=o.laneGroupWeights??{1:70,2:25,3:5};this.laneWeights={1:a[1]??70,2:a[2]??25,3:a[3]??5},this.laneGapM=o.laneGapM??120;let l=t.obstacles.dropTable;this.dropWeights=l?.weights??{},this.pickupSegmentM=l?.segmentM??200,this.pickupCountWeights={1:l?.countWeights?.[\"1\"]??50,2:l?.countWeights?.[\"2\"]??30,3:l?.countWeights?.[\"3\"]??20},this.pickupEdgeM=l?.edgeMarginM??8,this.pickupMinGapM=l?.minBoxGapM??30;let c=t.obstacles.laneBlock;this.blockFromDiff=c?.fromDifficulty??3,this.blockWeights={1:c?.weights?.[\"1\"]??80,2:c?.weights?.[\"2\"]??20};let f=t.obstacles.crossings?.ring;this.crossingEveryM=typeof f?.everyM==\"number\"&&f.everyM>0?f.everyM:1/0,this.crossingFromM=typeof f?.fromM==\"number\"?f.fromM:0,this.crossingY=[f?.yMin??0,f?.yMax??3];let p=t.obstacles.tideAware;this.tideAware=p&&typeof p.lowMax==\"number\"&&typeof p.coinCount==\"number\"?p:void 0,this.nextCrossZ=Number.isFinite(this.crossingEveryM)?this.crossingFromM:1/0;let h=i.zap;this.zapRef=typeof h?.ref==\"string\"?h.ref:\"\",this.zapEveryM=typeof h?.everyM==\"number\"&&h.everyM>0?h.everyM:0,this.nextZapZ=typeof h?.fromM==\"number\"&&h.fromM>0?h.fromM:this.zapEveryM,this.zoneCfg=Gt(i)}difficulty(t){return Math.floor(t/300)}spawnSky(t,e,i,n,o){Bt({rng:this.rng,chainBuckets:this.chainBuckets,spacing:this.coinSpacing,laneWeights:this.laneWeights,laneWidth:this.laneWidthRef,fromZ:t,toZ:e,skyY:i,coins:n,clouds:o,seq:()=>++this.chainSeq})}ensure(t,e,i,n,o=[],r=[]){let a=t+e;for(this.nextCrossZ=Rt(r,a,this.nextCrossZ,this.crossingEveryM,this.crossingFromM,this.crossingY[0],this.crossingY[1]),this.nextZoneZ=jt(this.zones,this.nextZoneZ,a,this.zoneCfg);this.genZ<a;){let l=this.pickPattern(this.difficulty(this.genZ)),c=i.length;for(let u of l.cells){let d=this.genZ+u.segment*this.segLen+u.offsetM;if(!G(this.zones,d,u.obsRef?String(this.defs.get(u.obsRef)?.class??\"\"):\"\")&&u.obsRef){let g=this.defs.get(u.obsRef);if(!g)continue;i.push(Q(g,u.lane,d))}}let f=Ht(this.runner,Math.min(this.runner.maxSpeed??26,(this.runner.baseSpeed??12)+(this.runner.speedRampPer100M??.18)*this.genZ/100),this.jumpSpanRatio),p=n.length;Dt({cells:l.cells,genZ:this.genZ,segLen:this.segLen,coinSpacing:this.coinSpacing,chainBuckets:this.chainBuckets,obstacles:i,coins:n,maxSpanM:f,seq:()=>++this.chainSeq});let h=l.guarantee?.safeLanePattern?.[0]??0,y=i.slice(c),k=n.length;if(Nt({rng:this.rng,obstacles:i,coins:n,winStart:this.genZ,winEnd:this.genZ+l.lengthSegments*this.segLen,safeLane:h,laneWeights:this.laneWeights,chainBuckets:this.chainBuckets,spacing:this.coinSpacing,laneGapM:this.laneGapM,lastCoinZ:this.lastCoinZ,maxSpanM:f,seq:()=>++this.chainSeq}),_t(this.tideAware,n,h,this.genZ,this.genZ+l.lengthSegments*this.segLen,this.coinSpacing,Math.min(l.lengthSegments*this.segLen,f*.9),()=>++this.chainSeq),y.length){Wt({coins:n,coinStart:k,newObs:y});for(let u=o.length-1;u>=0;u--){let d=o[u];if(!y.some(S=>S.lane===d.lane&&Math.abs(d.worldZ-S.worldZ)<S.d/2+1.2))continue;let g=[-1,0,1].find(S=>S!==d.lane&&!i.some(M=>M.lane===S&&Math.abs(d.worldZ-M.worldZ)<M.d/2+1.2));g!==void 0?d.lane=g:o.splice(u,1)}}for(;this.nextPickupSeg+this.pickupSegmentM+14<=this.genZ;){let u=this.nextPickupSeg,d=this.rng.weighted([1,2,3],x=>this.pickupCountWeights[x]??0),g=this.pickupSegmentM-2*this.pickupEdgeM,S=Math.max(0,(g-(d-1)*this.pickupMinGapM)/d),M=Object.keys(this.dropWeights);for(let x=0;x<d&&M.length;x++){let v=u+this.pickupEdgeM+x*(this.pickupMinGapM+S)+this.rng.range(0,S),w=[-1,0,1].filter(T=>!i.some(V=>V.lane===T&&Math.abs(v-V.worldZ)<V.d/2+1.2));w.length&&o.push({itemRef:this.rng.weighted(M,T=>this.dropWeights[T]??0),lane:this.rng.pick(w),worldZ:v})}this.nextPickupSeg+=this.pickupSegmentM}for(;this.zapEveryM>0&&this.zapRef&&this.nextZapZ+14<=this.genZ;){let u=this.defs.get(this.zapRef);if(u){let d=[-1,0,1];this.rng.shuffle(d);let g=d.find(S=>!i.some(M=>M.lane===S&&Math.abs(M.worldZ-this.nextZapZ)<M.d/2+1.6)&&!n.some(M=>M.lane===S&&Math.abs(M.worldZ-this.nextZapZ)<2));g!==void 0&&i.push(Q(u,g,this.nextZapZ))}this.nextZapZ+=this.zapEveryM}for(let u=p;u<n.length;u++){let d=n[u];if(d.flight)continue;let g=H(this.zones,d.worldZ);g&&(d.y=g.ceilH-.65)}this.genZ+=l.lengthSegments*this.segLen+this.rng.range(this.restGapM[0],this.restGapM[1])}}pickPattern(t){let e=this.curve[0];for(let r of this.curve)r.by<=t&&(e=r);let i=this.patterns.filter(r=>r.minDifficulty<=t&&(e.poolWeights[r.id]??0)>0);i.length||(i=this.patterns.filter(r=>r.minDifficulty<=t)),i.length||(i=this.patterns);let n=i;if(n.length>1&&this.lastPatternId){let r=n.filter(a=>a.id!==this.lastPatternId);r.length&&(n=r)}if(t>=this.blockFromDiff&&(this.blockWeights[1]??0)+(this.blockWeights[2]??0)>0){let r=this.rng.weighted([0,1,2],l=>this.blockWeights[l]??0),a=r===0?n.filter(l=>this.maxBlockedLanes(l)===0):n.filter(l=>this.maxBlockedLanes(l)===r);a.length&&(n=a)}if(!n.length)throw new Error(\"TrackGen.pickPattern: \\u6A21\\u677F\\u6C60\\u4E3A\\u7A7A\\uFF08configValidator \\u5E94\\u5DF2\\u62E6\\u622A\\uFF09\");let o=this.rng.weighted(n,r=>e.poolWeights[r.id]??0);return this.lastPatternId=o.id,o}maxBlockedLanes(t){let e=new Map;for(let n of t.cells){if(!n.obsRef)continue;let o=String(this.defs.get(n.obsRef)?.class??\"\");Ot.has(o)&&(e.has(n.segment)||e.set(n.segment,new Set),e.get(n.segment).add(n.lane))}let i=0;for(let n of e.values())i=Math.max(i,n.size);return i}clearObstacles(t,e,i,n){let o=0;for(let r=t.length-1;r>=0;r--){let a=t[r];n!==void 0&&a.lane!==n||a.worldZ+a.d/2<e||a.worldZ-a.d/2>i||(t[r]=t[t.length-1],t.pop(),o++)}return o}softClearObstacles(t,e,i,n){let o=0;for(let r=t.length-1;r>=0;r--){let a=t[r];a.done||a.worldZ+a.d/2<e||a.worldZ-a.d/2>i||(a.done=!0,a.passed=!0,a.clearT=n,o++)}return o}};function tt(s,t){let e=(s.themes?.items??[]).filter(i=>i.status===\"live\"||i.status===\"draft\");return(e.find(i=>i.id===t)??e.find(i=>i.status===\"live\")??e[0])?.id}function Yt(s,t){let e=tt(s,t),i=(s.themes?.items??[]).find(o=>o.id===e)?.scenery,n={...s.obstacles};return i!==\"library\"&&delete n.antigrav,i!==\"forgeheart\"&&delete n.tideAware,i!==\"stormspire\"&&delete n.crossings,{...s,obstacles:n}}var Ut=E,zt=70,ge=12,Me=2;function Vt(s){let t=0,e=0;return{advance:i=>{s.state.distance+=Math.max(0,i)},destroyObstacles:(i,n,o)=>{let r=0;for(let a of s.obstacles)a.done||a.lane!==i||a.worldZ+a.d/2<n||a.worldZ-a.d/2>o||(a.done=!0,a.passed=!0,s.state.nearMiss++,s.events.push({type:\"nearMiss\"}),r++);return r},firstBlocker:(i,n,o)=>{let r=null;for(let a of s.obstacles){if(a.done||a.lane!==i)continue;let l=a.worldZ-a.d/2;l<n||l>o||(r===null||l<r)&&(r=l)}return r},collectCoinsAlong:(i,n)=>{let o=0;for(let r of s.coins)r.taken||r.worldZ<i||r.worldZ>n||(r.taken=!0,r.takenAt=s.state.t,o++);return o>0&&s.creditCoins(o),o},smashObstacles:(i,n)=>s.gen.clearObstacles(s.obstacles,i,n),grantCoinRow:(i,n,o,r,a)=>{let l=r>0?r:s.coinSpacing,c=Math.max(0,Math.floor(o/l)),f=++t;for(let p of i)for(let h=0;h<c;h++)s.coins.push({lane:p,worldZ:s.state.distance+n+h*l,y:a,chain:f})},addBonusScore:i=>{s.addBonus(Math.max(0,i))},startFlight:(i,n)=>{let o=s.state;o.gliding=!1,s.onFlightStart();let r=n??s.fly.heightM,a=o.distance+8,l=o.distance+i*Ut+zt;s.gen.spawnSky(a,l,r,s.coins,s.clouds),s.gen.clearObstacles(s.obstacles,o.distance-Me,o.distance+ge,o.lane),e=l},extendFlight:i=>{let n=s.state.distance+i*Ut+zt;n<=e+8||(s.gen.spawnSky(e,n,s.fly.heightM,s.coins,s.clouds),e=n)}}}function et(s,t,e){return Math.floor(s.distance)*(t.perMeter??10)+s.coins*(t.perCoin??5)+s.nearMiss*(t.perNearMiss??25)+e}var Y=class{constructor(){this.first=null}capture(t,e){this.first===null&&(this.first={distance:+t.toFixed(2),score:e,stoppedByCoin:!0})}snapshot(t){return this.first?{...this.first}:{distance:t.distance,score:t.score,stoppedByCoin:!1}}};function Kt(s,t,e){for(let i of s)if(!(!i.moveZ||i.done)){if(i.worldZ+=i.moveZ*b,G(t,i.worldZ,i.cls)){i.done=!0,i.passed=!0,i.clearT=e;continue}i.moveZ<0&&ye(s,i,e)}}function qt(s,t,e){for(let i=s.length-1;i>=0;i--)O(s[i],t)<=e||(s[i]=s[s.length-1],s.pop())}function U(s,t,e){for(let i=s.length-1;i>=0;i--)t-s[i].worldZ<=e||(s[i]=s[s.length-1],s.pop())}function ye(s,t,e){for(let i of s)i===t||i.done||i.rideTop!==!0&&i.lane===t.lane&&(Math.abs(i.worldZ-t.worldZ)>=(t.d+i.d)/2+.2||(i.done=!0,i.passed=!0,i.clearT=e))}var Se=320,P=14,be=.6,ve=2.2,xe=1.4,z=class{get missionStats(){return{slides:this.mv.totalSlides,itemPickups:this.itemPickups}}constructor(t,e,i,n=!1,o,r){this.content=t,this.recordReplay=n,this.obstacles=[],this.coinsArr=[],this.pickupsArr=[],this.cloudsArr=[],this.crossings=[],this.events=[],this.surgeFired=!1,this.hudBuffs=[],this.usedProtection=!1,this.revive={left:0,invincibleS:3},this.flipCtx={flip:1,ceilH:0},this.coinCarry=0,this.buffCtx={distance:0,lane:0},this.bonusScore=0,this.itemPickups=0,this.collectedCoins=0,this.firstCoinRecord=new Y,this.replayFrames=0,this.replayInputs=[],this.replayOverflow=!1,this.themeId=tt(t,r),t=Yt(t,this.themeId),this.tideAware=!!t.obstacles.tideAware;let a=t.game.params;this.R=a.runner??{},this.SC=a.score??{},this.laneWidth=this.R.laneWidth??2.2,this.lives=this.R.lives??1,this.invulnS=this.R.invulnS??1.4,this.coinFront=-(this.R.coinCollectM??1.1),this.protectionS=a.tutorial?.protectionS??15,this.revive=Lt(a.revive??{});let l=a.flight??{};this.fly={heightM:l.heightM??4.6,speedMul:l.speedMul??2.5,glideSpeedMul:l.glideSpeedMul??1.6,glideS:l.glideS??1.8},this.state=ft(),this.gen=new j(t,new Z(e)),this.mv=new B({laneWidth:this.laneWidth,gravity:this.R.gravity??-38,jumpVelocity:this.R.jumpVelocity??15.2,slideS:this.R.slideS??.6,slideCooldownS:this.R.slideCooldownS??.3,laneChangeS:this.R.laneChangeS??.18},{heightM:this.fly.heightM,glideS:this.fly.glideS},this.obstacles),this.buffs=new L(Vt({state:this.state,obstacles:this.obstacles,coins:this.coinsArr,pickups:this.pickupsArr,clouds:this.cloudsArr,events:this.events,gen:this.gen,fly:this.fly,coinSpacing:(a.coins??{}).spacingM??1.5,addBonus:c=>{this.bonusScore+=c},creditCoins:c=>this.creditCoinsBulk(c),onFlightStart:()=>{this.mv.flyWasActive=!0}})),this.loadout=i?dt(t,i):ht,this.collectDeps={state:this.state,coins:this.coinsArr,pickups:this.pickupsArr,fx:this.buffs.fx,events:this.events,laneWidth:this.laneWidth,coinFront:this.coinFront,creditCoin:()=>this.creditCoin(),grantItem:c=>this.grantItem(c)},this.hitCtx={s:this.state,fx:this.buffs.fx,buffs:this.buffs,events:this.events,lives:this.lives,invulnS:this.invulnS,hitStunS:this.R.hitStunS??.8,tutorial:{protectionS:this.protectionS,take:()=>this.usedProtection?!1:(this.usedProtection=!0,!0)}},this.applyPassive(),this.initialItems=(o??[]).filter(c=>F(t,c).length>0).slice(0,3);for(let c of this.initialItems)this.applyEffects(F(t,c),c)}get fx(){return this.buffs.fx}buffList(){return this.buffs.list(this.hudBuffs)}drainEvents(){if(!this.events.length)return this.events;let t=this.events.slice();return this.events.length=0,t}applyAction(t){let e=this.state;if(e.alive)if(this.recordReplay&&(this.replayInputs.length<st?this.replayInputs.push({frame:this.replayFrames,action:t}):this.replayOverflow=!0),t===\"laneL\")e.lane=Math.max(-1,e.lane-1);else if(t===\"laneR\")e.lane=Math.min(1,e.lane+1);else if(t===\"skill\")this.castSkill();else{if(this.fx.flyT>0||e.gliding)return;t===\"jump\"?this.mv.jumpInput(e,this.fx):t===\"slide\"&&this.mv.slideInput(e,this.fx)}}canCastSkill(){let t=this.loadout.skill,e=this.state;return!t||!e.alive||e.skillCd>0?!1:t.chargeSlides<=0||e.slideCount>=t.chargeSlides}castSkill(){let t=this.loadout.skill;if(!t||!this.canCastSkill())return;let e=this.state;t.chargeSlides>0&&(e.slideCount=0),e.skillCd=t.cooldownS*this.fx.cooldownMul,e.casts++,this.applyEffects(t.effects,t.label),this.bonusScore+=Math.max(0,this.SC.perSkillCast??0),this.events.push({type:\"cast\",skillRef:t.id})}applyPassive(){this.loadout.passive.length&&this.applyEffects(this.loadout.passive,this.loadout.talentLabel)}applyEffects(t,e){let i=this.state;this.buffCtx.distance=i.distance,this.buffCtx.lane=i.lane;for(let n of t)this.buffs.add(n.primitive,n.params,n.label||e,this.buffCtx,n.stackRule)}grantItem(t){this.itemPickups++,this.applyEffects(F(this.content,t),t)}creditCoin(){this.firstCoinRecord.capture(this.state.distance,et(this.state,this.SC,this.bonusScore)),this.collectedCoins++,this.coinCarry+=1*(1+this.fx.coinPct/100);let t=Math.floor(this.coinCarry);this.state.coins+=t,this.coinCarry-=t}creditCoinsBulk(t){for(let e=0;e<t;e++)this.creditCoin();t>0&&this.events.push({type:\"coin\"})}step(){let t=this.state;if(t.prevDistance=t.distance,!t.alive){t.topple=Math.min(t.topple+b*ve,xe);return}this.replayFrames++,t.t+=b,this.buffCtx.distance=t.distance,this.buffCtx.lane=t.lane,this.buffs.tick(b,this.buffCtx);let e=this.fx;t.stunT=Math.max(0,t.stunT-b),t.invulnT=Math.max(0,t.invulnT-b),t.skillCd=Math.max(0,t.skillCd-b),this.mv.slideCd=Math.max(0,this.mv.slideCd-b);let i=this.R.baseSpeed??12,n=this.R.maxSpeed??26,o=this.R.speedRampPer100M??.18,r=e.flyT>0?this.fly.speedMul:t.gliding?this.fly.glideSpeedMul:t.stunT>0?be:1,a=Math.min(n,i+o*t.distance/100)*r*e.speedMul*e.timeSlowMul,l=e.flyT>0||t.gliding?E:n,c=Math.min(a,l)*b;t.distance+=c,this.tideAware?this.surgeFired=Ct(t,c,this.events,this.surgeFired):t.surgeWarn=0,Zt(this.crossings,t.distance,P),t.tideLevel=W(t.distance),Kt(this.obstacles,this.gen.zones,t.t);let f=H(this.gen.zones,t.distance),p=f&&e.flyT<=0&&!t.gliding&&!this.mv.flyWasActive?-1:1,h=f?f.ceilH:0;p!==t.flip?(t.flip=p,t.ceilH=h,this.events.push({type:\"flip\",flip:p,ceilH:h})):h!==t.ceilH&&(t.ceilH=h),e.avoidLookahead>0&&(t.lane=wt(this.obstacles,t,e.avoidLookahead)),this.mv.advanceLateral(t,b),this.mv.advanceVertical(t,e,b),this.mv.landedThisStep&&At(this.coinsArr),this.gen.ensure(t.distance,Se,this.obstacles,this.coinsArr,this.pickupsArr,this.crossings),this.collide(),t.alive&&(this.bonusScore+=Pt(this.crossings,t.distance,t.y,$,this.events)*(this.SC.perCrossing??$.scorePer),Mt(this.collectDeps),yt(this.collectDeps)),this.cull(),t.alive&&(t.score=et(t,this.SC,this.bonusScore))}collide(){let t=this.state;if(!(this.fx.flyT>0||t.gliding)){this.flipCtx.flip=t.flip,this.flipCtx.ceilH=t.ceilH;for(let e of this.obstacles){if(e.done)continue;let i=O(e,t.distance);if(e.cls===\"hazard\"&&e.zap!==!0){if(Math.abs(i)>e.d/2)continue}else if(!N(e,i))continue;if(e.passed||(e.passed=!0,vt(e,t,this.laneWidth)&&(t.nearMiss++,this.events.push({type:\"nearMiss\"}))),kt(e,t,this.laneWidth,this.loadout.clearance,this.flipCtx)&&(Ft(e,this.hitCtx),t.alive||(this.revive=Et(this.revive,t,this.gen,this.obstacles,this.events)),!t.alive))return}}}cull(){let t=this.state;qt(this.obstacles,t.distance,P),U(this.coinsArr,t.distance,P),U(this.pickupsArr,t.distance,P),U(this.cloudsArr,t.distance,P)}summary(){let t=this.state;return{t:+t.t.toFixed(2),distance:+t.distance.toFixed(2),coins:t.coins,nearMiss:t.nearMiss,hits:t.hits,score:t.score,alive:t.alive,casts:t.casts,charId:this.loadout.charId,revives:t.revivesUsed}}};import{setImmediate as ke}from\"node:timers/promises\";var it=class extends Error{constructor(){super(\"\\u56DE\\u653E\\u8D85\\u51FA\\u5899\\u949F\\u4E0A\\u9650\"),this.code=\"REPLAY_TIMEOUT\"}};async function Ui(s,t,e,i,n=Number.POSITIVE_INFINITY,o=[]){let r=performance.now(),a=new z(s,t.seed,t.char_id||void 0,!1,o,t.theme_id??void 0),l=0,c=0;for(let f=0;f<e;f++){for(;l<i.length&&i[l].frame===f;)a.applyAction(i[l].action),l++;if(a.step(),a.drainEvents(),c++,!a.state.alive)break;if(c%600===0&&(await ke(),performance.now()-r>n))throw new it}return{frames:c,summary:a.summary(),elapsedSeconds:a.state.t,missionStats:a.missionStats??{slides:0,itemPickups:0}}}export{it as ReplayTimeoutError,b as STEP_DT,Ui as replayRun};\n",
+    "content": {
+      "game": {
+        "$schema": "../schema/config.schema.json#/game",
+        "configVersion": "1.0.2",
+        "minEngineVersion": "1.0.0",
+        "updatedAt": "2026-10-12",
+        "params": {
+          "runner": {
+            "baseSpeed": 12,
+            "maxSpeed": 26,
+            "speedRampPer100M": 0.18,
+            "gravity": -38,
+            "jumpVelocity": 13.5,
+            "holdJumpMaxMs": 350,
+            "slideS": 0.6,
+            "slideCooldownS": 0.3,
+            "lives": 1,
+            "laneWidth": 2.2,
+            "laneChangeS": 0.18,
+            "hitStunS": 0.8,
+            "invulnS": 1.4,
+            "spawnGraceS": 15,
+            "coinCollectM": 1.1
+          },
+          "input": {
+            "bufferMs": 120,
+            "doubleTapWindowMs": 280,
+            "doubleTapMaxDistPx": 40
+          },
+          "score": {
+            "perMeter": 10,
+            "perCoin": 5,
+            "perSkillCast": 150,
+            "perNearMiss": 25,
+            "perCrossing": 50
+          },
+          "profile": {
+            "idDigits": 10,
+            "nameMaxChars": 6,
+            "freeRenames": 1,
+            "renameCostDiamonds": 20,
+            "panelHeightPct": 55,
+            "slideDurationMs": 240,
+            "nameCandidates": [
+              "小跑者",
+              "闪电少年",
+              "海滨酷跑王",
+              "椰子骑士",
+              "风驰电掣",
+              "钻石收藏家"
+            ]
+          },
+          "ui": {
+            "scroll": {
+              "frictionPerS": 4.2,
+              "minVelocityPxS": 12,
+              "flingMaxPxS": 6000,
+              "overscrollResist": 0.35,
+              "bounceStiffness": 170,
+              "bounceDamping": 26,
+              "settleEpsPx": 0.5,
+              "settleEpsPxS": 8
+            },
+            "press": {
+              "slopPx": 8,
+              "tapMaxMs": 350
+            },
+            "doubleTap": {
+              "windowMs": 280,
+              "maxDistPx": 40
+            },
+            "text": {
+              "fontSizePx": 16,
+              "lineHeightMul": 1.2
+            }
+          },
+          "revive": {
+            "maxPerRun": 2,
+            "invincibleS": 3,
+            "webFreeRevivePerRun": 1
+          },
+          "beast": {
+            "baseGap": 3,
+            "hitLossGap": 1,
+            "catchGap": 0,
+            "speedRecoverS": 6
+          },
+          "track": {
+            "segmentLengthM": 24,
+            "coinMinGapM": 1.4,
+            "pickupMinGapM": 36,
+            "forkEveryM": [
+              900,
+              1400
+            ],
+            "restGapM": [
+              6,
+              14
+            ]
+          },
+          "coins": {
+            "chainBuckets": [
+              {
+                "min": 3,
+                "max": 4,
+                "weight": 75
+              },
+              {
+                "min": 5,
+                "max": 6,
+                "weight": 20
+              },
+              {
+                "min": 7,
+                "max": 8,
+                "weight": 5
+              }
+            ],
+            "spacingM": 1.5,
+            "jumpSpanRatio": 0.9,
+            "spawnEveryM": 26,
+            "laneGroupWeights": {
+              "1": 50,
+              "2": 20,
+              "3": 30
+            },
+            "laneGapM": 90
+          },
+          "fork": {
+            "gates": [
+              "coin",
+              "shield",
+              "key"
+            ],
+            "keyRate": 0.06
+          },
+          "tutorial": {
+            "protectionS": 15
+          },
+          "antiCheat": {
+            "maxScorePerRun": 9999999,
+            "maxRunS": 1800,
+            "maxCoinsPerMeter": 0.9,
+            "maxSkillCastsPerMin": 8,
+            "replaySampleRate": 10
+          },
+          "quality": {
+            "high": {
+              "particleMul": 1,
+              "shadow": true,
+              "lodBias": 0,
+              "dprCap": 2
+            },
+            "medium": {
+              "particleMul": 0.6,
+              "shadow": false,
+              "lodBias": 1,
+              "dprCap": 1.5
+            },
+            "low": {
+              "particleMul": 0.3,
+              "shadow": false,
+              "lodBias": 2,
+              "dprCap": 1
+            }
+          },
+          "flight": {
+            "heightM": 4.6,
+            "speedMul": 2.5,
+            "glideSpeedMul": 1.6,
+            "glideS": 1.8,
+            "cloudEveryM": [
+              30,
+              46
+            ]
+          },
+          "audio": {
+            "volume": {
+              "music": 0.7,
+              "sfx": 1
+            },
+            "bgm": {
+              "run": "assets/audio/bgm/run.mp3",
+              "death": "assets/audio/bgm/death.mp3"
+            },
+            "sfx": {
+              "start": "assets/audio/sfx/start.mp3",
+              "death": [
+                "assets/audio/sfx/death-1.mp3",
+                "assets/audio/sfx/death-2.mp3",
+                "assets/audio/sfx/death-3.mp3",
+                "assets/audio/sfx/death-4.mp3",
+                "assets/audio/sfx/death-5.mp3",
+                "assets/audio/sfx/death-6.mp3",
+                "assets/audio/sfx/death-7.mp3"
+              ]
+            },
+            "characters": {
+              "char_volt": {
+                "sfx": {
+                  "cast": "assets/audio/sfx/char/char_volt/cast.mp3",
+                  "pickup": "assets/audio/sfx/char/char_volt/pickup.mp3",
+                  "death": "assets/audio/sfx/char/char_volt/death.mp3"
+                }
+              },
+              "char_mambo": {
+                "sfx": {
+                  "cast": "assets/audio/sfx/char/char_mambo/cast.mp3",
+                  "pickup": "assets/audio/sfx/char/char_mambo/pickup.mp3"
+                }
+              },
+              "char_frog": {
+                "sfx": {
+                  "cast": "assets/audio/sfx/char/char_frog/cast.mp3",
+                  "intro": "assets/audio/sfx/char/char_frog/intro.mp3"
+                }
+              },
+              "char_niu": {
+                "sfx": {
+                  "cast": "assets/audio/sfx/char/char_niu/cast.mp3"
+                }
+              }
+            }
+          }
+        }
+      },
+      "characters": {
+        "$schema": "../schema/config.schema.json#/characters",
+        "configVersion": "1.2.5",
+        "minEngineVersion": "1.0.0",
+        "updatedAt": "2026-11-11",
+        "items": [
+          {
+            "id": "char_volt",
+            "status": "live",
+            "name": {
+              "zh-CN": "牢大",
+              "en-US": "Volt"
+            },
+            "tagline": {
+              "zh-CN": "最便宜的伙伴，最稳的发挥"
+            },
+            "rarity": "R",
+            "unlock": {
+              "type": "free"
+            },
+            "skins": [
+              "skin_volt_default",
+              "skin_volt_thunder"
+            ],
+            "skillRef": "skill_thunder_dash",
+            "talentRef": "talent_volt_coin",
+            "growth": {
+              "maxLevel": 10,
+              "costPerLevel": [
+                {
+                  "level": 2,
+                  "coin": 800,
+                  "shards": "shard_volt:10"
+                },
+                {
+                  "level": 3,
+                  "coin": 1200,
+                  "shards": "shard_volt:15"
+                },
+                {
+                  "level": 4,
+                  "coin": 1800,
+                  "shards": "shard_volt:20"
+                },
+                {
+                  "level": 5,
+                  "coin": 2600,
+                  "shards": "shard_volt:30"
+                },
+                {
+                  "level": 6,
+                  "coin": 3600,
+                  "shards": "shard_volt:40"
+                },
+                {
+                  "level": 7,
+                  "coin": 4800,
+                  "shards": "shard_volt:55"
+                },
+                {
+                  "level": 8,
+                  "coin": 6200,
+                  "shards": "shard_volt:70"
+                },
+                {
+                  "level": 9,
+                  "coin": 8000,
+                  "shards": "shard_volt:90"
+                },
+                {
+                  "level": 10,
+                  "coin": 10000,
+                  "shards": "shard_volt:120"
+                }
+              ],
+              "effectPerLevel": {
+                "target": "skillRef",
+                "paramScalePerLevel": 0.05
+              }
+            },
+            "model": {
+              "prefab": "assets/characters/bball.glb",
+              "scale": 1,
+              "lod": [
+                2,
+                6,
+                12
+              ]
+            },
+            "audio": {
+              "voDir": "assets/audio/vo/volt/",
+              "footstep": "step_sneaker"
+            },
+            "tint": "#FFD84D",
+            "clearance": 1.7,
+            "versions": [
+              {
+                "ver": "1.0.0",
+                "date": "2026-09-22",
+                "change": "首发"
+              },
+              {
+                "ver": "1.1.2",
+                "date": "2026-10-05",
+                "change": "显示名「小电」改「牢大」（用户定稿）。只改 name.zh-CN：内部 id `char_volt`、皮肤 `skin_volt_*`、碎片 `shard_volt`、en-US 标签与音效目录 `assets/audio/sfx/char/char_volt/` 全部不动，音效素材也不换（音频不变）"
+              },
+              {
+                "ver": "1.1.3",
+                "date": "2026-10-12",
+                "change": "删除篮球小子 char_bball 与其默认皮肤，将 bball.glb 建模、1.0 缩放、1.70 净空与默认涂装配色并入牢大；牢大 id、名称、技能、天赋、解锁、成长与音效映射保持不变"
+              }
+            ]
+          },
+          {
+            "id": "char_ama",
+            "status": "live",
+            "name": {
+              "zh-CN": "阿玛拉",
+              "en-US": "Amara"
+            },
+            "tagline": {
+              "zh-CN": "金币见了她，自己会排队"
+            },
+            "rarity": "SR",
+            "unlock": {
+              "type": "free"
+            },
+            "skins": [
+              "skin_ama_default"
+            ],
+            "skillRef": "skill_magnet_pulse",
+            "talentRef": "talent_ama_duration",
+            "growth": {
+              "maxLevel": 10,
+              "costPerLevel": [],
+              "effectPerLevel": {
+                "target": "skillRef",
+                "paramScalePerLevel": 0.05
+              }
+            },
+            "model": {
+              "prefab": "assets/characters/ama.glb",
+              "scale": 1.02,
+              "lod": [
+                2,
+                6,
+                12
+              ]
+            },
+            "audio": {
+              "voDir": "assets/audio/vo/ama/",
+              "footstep": "step_boot"
+            },
+            "tint": "#43D9A3",
+            "versions": [
+              {
+                "ver": "1.0.0",
+                "date": "2026-09-22",
+                "change": "首发"
+              }
+            ]
+          },
+          {
+            "id": "char_kaze",
+            "status": "live",
+            "name": {
+              "zh-CN": "风剃",
+              "en-US": "Kaze"
+            },
+            "tagline": {
+              "zh-CN": "别人绕路，他抄近路"
+            },
+            "rarity": "SR",
+            "unlock": {
+              "type": "free"
+            },
+            "skins": [
+              "skin_kaze_default"
+            ],
+            "skillRef": "skill_blink_smash",
+            "talentRef": "talent_kaze_slide",
+            "growth": {
+              "maxLevel": 10,
+              "costPerLevel": [],
+              "effectPerLevel": {
+                "target": "skillRef",
+                "paramScalePerLevel": 0.05
+              }
+            },
+            "model": {
+              "prefab": "assets/characters/kaze.glb",
+              "scale": 0.98,
+              "lod": [
+                2,
+                6,
+                12
+              ]
+            },
+            "audio": {
+              "voDir": "assets/audio/vo/kaze/",
+              "footstep": "step_skate"
+            },
+            "tint": "#7FD1FF",
+            "versions": [
+              {
+                "ver": "1.0.0",
+                "date": "2026-09-22",
+                "change": "首发"
+              }
+            ]
+          },
+          {
+            "id": "char_rina",
+            "status": "live",
+            "name": {
+              "zh-CN": "莉娜",
+              "en-US": "Rina"
+            },
+            "tagline": {
+              "zh-CN": "地面太挤，她走天上"
+            },
+            "rarity": "SSR",
+            "unlock": {
+              "type": "free"
+            },
+            "skins": [
+              "skin_rina_default"
+            ],
+            "skillRef": "skill_thunder_wings",
+            "talentRef": "talent_rina_shield",
+            "growth": {
+              "maxLevel": 10,
+              "costPerLevel": [],
+              "effectPerLevel": {
+                "target": "skillRef",
+                "paramScalePerLevel": 0.05
+              }
+            },
+            "model": {
+              "prefab": "assets/characters/rina.glb",
+              "scale": 1,
+              "lod": [
+                2,
+                6,
+                12
+              ]
+            },
+            "audio": {
+              "voDir": "assets/audio/vo/rina/",
+              "footstep": "step_boot"
+            },
+            "tint": "#FF5FA2",
+            "versions": [
+              {
+                "ver": "1.0.0",
+                "date": "2026-09-22",
+                "change": "首发"
+              }
+            ]
+          },
+          {
+            "id": "char_bolt",
+            "status": "live",
+            "name": {
+              "zh-CN": "时空行者",
+              "en-US": "Chrono"
+            },
+            "tagline": {
+              "zh-CN": "他不追终点，他把终点挪过来"
+            },
+            "rarity": "SSR",
+            "unlock": {
+              "type": "free"
+            },
+            "skins": [
+              "skin_bolt_default",
+              "skin_bolt_storm"
+            ],
+            "skillRef": "skill_chrono_leap",
+            "talentRef": "talent_chrono_slow",
+            "growth": {
+              "maxLevel": 10,
+              "costPerLevel": [],
+              "effectPerLevel": {
+                "target": "skillRef",
+                "paramScalePerLevel": 0.05
+              }
+            },
+            "model": {
+              "prefab": "assets/characters/bolt.glb",
+              "scale": 1.05,
+              "lod": [
+                2,
+                6,
+                12
+              ]
+            },
+            "audio": {
+              "voDir": "assets/audio/vo/bolt/",
+              "footstep": "step_boot"
+            },
+            "tint": "#B48CFF",
+            "versions": [
+              {
+                "ver": "1.0.0",
+                "date": "2026-09-22",
+                "change": "首发（活动限定）"
+              },
+              {
+                "ver": "1.1.0",
+                "date": "2026-10-04",
+                "change": "用户定稿：「博尔特警长」改名「时空行者」，技能换成穿梭时空（瞬移 100 米收金币），被动换成时间延缓。id 与碎片/皮肤引用保持不变"
+              }
+            ]
+          },
+          {
+            "id": "char_frog",
+            "status": "live",
+            "name": {
+              "zh-CN": "奶蛙",
+              "en-US": "Milky"
+            },
+            "tagline": {
+              "zh-CN": "天塌下来，先笑完这十秒"
+            },
+            "rarity": "SR",
+            "unlock": {
+              "type": "free"
+            },
+            "skins": [
+              "skin_frog_default"
+            ],
+            "skillRef": "skill_belly_laugh",
+            "talentRef": "talent_frog_bounce",
+            "growth": {
+              "maxLevel": 10,
+              "costPerLevel": [],
+              "effectPerLevel": {
+                "target": "skillRef",
+                "paramScalePerLevel": 0.05
+              }
+            },
+            "model": {
+              "prefab": "assets/characters/frog.glb",
+              "scale": 1,
+              "lod": [
+                2,
+                6,
+                12
+              ]
+            },
+            "intro": {
+              "video": "assets/video/frog_intro.mp4",
+              "durationS": 2.38,
+              "widthM": 3,
+              "heightM": 1.7,
+              "distanceM": 4
+            },
+            "audio": {
+              "voDir": "assets/audio/vo/frog/",
+              "footstep": "step_sneaker"
+            },
+            "tint": "#B6F24E",
+            "versions": [
+              {
+                "ver": "1.1.0",
+                "date": "2026-10-04",
+                "change": "新增：捧腹大笑 10 秒无敌 + 每 10 秒一次强跳（沿用现有一套程序化建模，体量偏小）"
+              },
+              {
+                "ver": "1.2.0",
+                "date": "2026-10-10",
+                "change": "接入 frog.glb 与 11 个动作 clip；保留奶蛙的技能、天赋与音频配置"
+              },
+              {
+                "ver": "1.3.0",
+                "date": "2026-10-11",
+                "change": "新增登场动画 intro：进局时在画面中央摆一块 3.0×1.7 米的视频面板（源片裁掉上下黑边后按 3 米宽等比换算），播放期间冻结跑酷，音效走 params.audio.characters.char_frog.sfx.intro"
+              }
+            ]
+          },
+          {
+            "id": "char_mambo",
+            "status": "live",
+            "name": {
+              "zh-CN": "曼波",
+              "en-US": "Mambo"
+            },
+            "tagline": {
+              "zh-CN": "矮，是一种战术"
+            },
+            "rarity": "SR",
+            "unlock": {
+              "type": "free"
+            },
+            "skins": [
+              "skin_mambo_default"
+            ],
+            "skillRef": "skill_mambo_power",
+            "talentRef": "talent_mambo_height",
+            "growth": {
+              "maxLevel": 10,
+              "costPerLevel": [],
+              "effectPerLevel": {
+                "target": "skillRef",
+                "paramScalePerLevel": 0.05
+              }
+            },
+            "model": {
+              "prefab": "assets/characters/pony.glb",
+              "scale": 1,
+              "lod": [
+                2,
+                6,
+                12
+              ]
+            },
+            "audio": {
+              "voDir": "assets/audio/vo/mambo/",
+              "footstep": "step_sneaker"
+            },
+            "tint": "#9A93C8",
+            "clearance": 1.19,
+            "versions": [
+              {
+                "ver": "1.1.0",
+                "date": "2026-10-04",
+                "change": "新增：下滑 10 次攒出曼波之力（2 次下滑护体）+ 身高优势直接穿高杆。用户指定体量明显偏小（scale 0.75）"
+              },
+              {
+                "ver": "1.1.1",
+                "date": "2026-10-11",
+                "change": "删除 char_pony 后，把原马耳女仆建模数据接入曼波：model.prefab 换 pony.glb、scale 1.0、净空 1.19（站立可钻滑铲门）；tint/默认涂装同步用建模侧配色。曼波 id、技能、被动、碎片与音效映射保持不动"
+              }
+            ]
+          },
+          {
+            "id": "char_niu",
+            "status": "live",
+            "name": {
+              "zh-CN": "阿牛",
+              "en-US": "Moo"
+            },
+            "tagline": {
+              "zh-CN": "妈妈说了，挡路的都不用留"
+            },
+            "rarity": "SSR",
+            "unlock": {
+              "type": "free"
+            },
+            "skins": [
+              "skin_niu_default"
+            ],
+            "skillRef": "skill_mama_save",
+            "talentRef": "talent_niu_rush",
+            "growth": {
+              "maxLevel": 10,
+              "costPerLevel": [],
+              "effectPerLevel": {
+                "target": "skillRef",
+                "paramScalePerLevel": 0.05
+              }
+            },
+            "model": {
+              "prefab": "assets/characters/niu.glb",
+              "scale": 1.34,
+              "fallbackScale": 1,
+              "lod": [
+                2,
+                6,
+                12
+              ]
+            },
+            "audio": {
+              "voDir": "assets/audio/vo/niu/",
+              "footstep": "step_boot"
+            },
+            "tint": "#E45C5C",
+            "versions": [
+              {
+                "ver": "1.1.0",
+                "date": "2026-10-04",
+                "change": "新增：妈妈救我清空前方 50 米障碍 + 每 20 秒自动蛮牛冲撞（三倍速、20 米无敌）"
+              },
+              {
+                "ver": "1.1.1",
+                "date": "2026-10-05",
+                "change": "issue #16 校正口径：蛮牛冲撞按 talent_niu_rush 1.1.1 改为「速度顶到地面 maxSpeed 26、冲过 45 米」，上面的「三倍速、20 米」是当时未核钳位的说法"
+              },
+              {
+                "ver": "1.1.2",
+                "date": "2026-10-12",
+                "change": "接入 niu.glb；按用户反馈修正过矮体量：绑定姿实测高 1.297 米，scale 从 1.08 调至 1.34，显示高约 1.74 米（与牢大接近）。只调显示体量，默认碰撞净空 1.7、技能、天赋、成长与音效不变"
+              }
+            ]
+          },
+          {
+            "id": "char_whale",
+            "status": "live",
+            "name": {
+              "zh-CN": "鲸鱼女仆",
+              "en-US": "Whale Maid"
+            },
+            "tagline": {
+              "zh-CN": "尾巴一摆，冲进终点"
+            },
+            "rarity": "SR",
+            "unlock": {
+              "type": "free"
+            },
+            "skins": [
+              "skin_whale_default"
+            ],
+            "skillRef": "skill_thunder_dash",
+            "talentRef": "talent_volt_coin",
+            "growth": {
+              "maxLevel": 10,
+              "costPerLevel": [],
+              "effectPerLevel": {
+                "target": "skillRef",
+                "paramScalePerLevel": 0.05
+              }
+            },
+            "model": {
+              "prefab": "assets/characters/whale.glb",
+              "scale": 1,
+              "lod": [
+                2,
+                6,
+                12
+              ]
+            },
+            "audio": {
+              "voDir": "assets/audio/vo/whale/",
+              "footstep": "step_sneaker"
+            },
+            "tint": "#4A6FD6",
+            "clearance": 1.52,
+            "versions": [
+              {
+                "ver": "1.0.0",
+                "date": "2026-10-10",
+                "change": "首发（GLB 驱动 11 动作 clip）"
+              }
+            ]
+          },
+          {
+            "id": "char_penguin",
+            "status": "live",
+            "name": {
+              "zh-CN": "企鹅娘",
+              "en-US": "Penguin Gal"
+            },
+            "tagline": {
+              "zh-CN": "摇摇摆摆，肚皮滑到底"
+            },
+            "rarity": "SR",
+            "unlock": {
+              "type": "free"
+            },
+            "skins": [
+              "skin_penguin_default"
+            ],
+            "skillRef": "skill_thunder_dash",
+            "talentRef": "talent_volt_coin",
+            "growth": {
+              "maxLevel": 10,
+              "costPerLevel": [],
+              "effectPerLevel": {
+                "target": "skillRef",
+                "paramScalePerLevel": 0.05
+              }
+            },
+            "model": {
+              "prefab": "assets/characters/penguin.glb",
+              "scale": 1,
+              "lod": [
+                2,
+                6,
+                12
+              ]
+            },
+            "audio": {
+              "voDir": "assets/audio/vo/penguin/",
+              "footstep": "step_sneaker"
+            },
+            "tint": "#F19041",
+            "clearance": 1.25,
+            "versions": [
+              {
+                "ver": "1.0.0",
+                "date": "2026-10-13",
+                "change": "首发（GLB 驱动 14 动作 clip）"
+              }
+            ]
+          },
+          {
+            "id": "skin_volt_default",
+            "kind": "skin",
+            "status": "live",
+            "baseRef": "char_volt",
+            "name": {
+              "zh-CN": "默认涂装"
+            },
+            "rarity": "R",
+            "materialOverrides": {
+              "bodyTint": "#FFD84D",
+              "emissive": "#FFE9A8"
+            },
+            "model": {
+              "prefab": "assets/characters/bball.glb"
+            },
+            "unlock": {
+              "type": "free"
+            },
+            "statMods": [],
+            "versions": [
+              {
+                "ver": "1.0.0",
+                "date": "2026-09-22",
+                "change": "首发"
+              },
+              {
+                "ver": "1.0.1",
+                "date": "2026-10-12",
+                "change": "默认涂装改用 bball.glb 与原篮球小子建模配色，皮肤 id 保持不变"
+              }
+            ]
+          },
+          {
+            "id": "skin_volt_thunder",
+            "kind": "skin",
+            "status": "live",
+            "baseRef": "char_volt",
+            "name": {
+              "zh-CN": "雷暴形态"
+            },
+            "rarity": "SR",
+            "materialOverrides": {
+              "bodyTint": "#3A5FAF",
+              "emissive": "#7FD1FF",
+              "trailVfx": "vfx_trail_thunder"
+            },
+            "model": {
+              "prefab": "assets/skins/volt_thunder.glb"
+            },
+            "unlock": {
+              "type": "loot",
+              "lootRef": "loot_thunder_box"
+            },
+            "statMods": [],
+            "versions": [
+              {
+                "ver": "1.0.0",
+                "date": "2026-09-22",
+                "change": "首发"
+              }
+            ]
+          },
+          {
+            "id": "skin_ama_default",
+            "kind": "skin",
+            "status": "live",
+            "baseRef": "char_ama",
+            "name": {
+              "zh-CN": "默认涂装"
+            },
+            "rarity": "SR",
+            "materialOverrides": {
+              "bodyTint": "#E8F6EE",
+              "emissive": "#43D9A3"
+            },
+            "model": {
+              "prefab": "assets/characters/ama.glb"
+            },
+            "unlock": {
+              "type": "free"
+            },
+            "statMods": [],
+            "versions": [
+              {
+                "ver": "1.0.0",
+                "date": "2026-09-22",
+                "change": "首发"
+              }
+            ]
+          },
+          {
+            "id": "skin_kaze_default",
+            "kind": "skin",
+            "status": "live",
+            "baseRef": "char_kaze",
+            "name": {
+              "zh-CN": "默认涂装"
+            },
+            "rarity": "SR",
+            "materialOverrides": {
+              "bodyTint": "#EAF4FF",
+              "emissive": "#7FD1FF"
+            },
+            "model": {
+              "prefab": "assets/characters/kaze.glb"
+            },
+            "unlock": {
+              "type": "free"
+            },
+            "statMods": [],
+            "versions": [
+              {
+                "ver": "1.0.0",
+                "date": "2026-09-22",
+                "change": "首发"
+              }
+            ]
+          },
+          {
+            "id": "skin_rina_default",
+            "kind": "skin",
+            "status": "live",
+            "baseRef": "char_rina",
+            "name": {
+              "zh-CN": "默认涂装"
+            },
+            "rarity": "SSR",
+            "materialOverrides": {
+              "bodyTint": "#FBE7F1",
+              "emissive": "#FF5FA2"
+            },
+            "model": {
+              "prefab": "assets/characters/rina.glb"
+            },
+            "unlock": {
+              "type": "free"
+            },
+            "statMods": [],
+            "versions": [
+              {
+                "ver": "1.0.0",
+                "date": "2026-09-22",
+                "change": "首发"
+              }
+            ]
+          },
+          {
+            "id": "skin_bolt_default",
+            "kind": "skin",
+            "status": "live",
+            "baseRef": "char_bolt",
+            "name": {
+              "zh-CN": "默认涂装"
+            },
+            "rarity": "SSR",
+            "materialOverrides": {
+              "bodyTint": "#E8E6F8",
+              "emissive": "#B48CFF"
+            },
+            "model": {
+              "prefab": "assets/characters/bolt.glb"
+            },
+            "unlock": {
+              "type": "free"
+            },
+            "statMods": [],
+            "versions": [
+              {
+                "ver": "1.0.0",
+                "date": "2026-09-22",
+                "change": "首发"
+              },
+              {
+                "ver": "1.1.0",
+                "date": "2026-10-04",
+                "change": "随角色改名，皮肤名由「警长制服」改为「默认涂装」"
+              }
+            ]
+          },
+          {
+            "id": "skin_bolt_storm",
+            "kind": "skin",
+            "status": "draft",
+            "baseRef": "char_bolt",
+            "name": {
+              "zh-CN": "风暴行者"
+            },
+            "rarity": "SSR",
+            "materialOverrides": {
+              "bodyTint": "#2A3350",
+              "emissive": "#7FD1FF",
+              "trailVfx": "vfx_trail_thunder"
+            },
+            "model": {
+              "prefab": "assets/skins/bolt_storm.glb"
+            },
+            "unlock": {
+              "type": "key",
+              "cost": 12
+            },
+            "statMods": [],
+            "versions": [
+              {
+                "ver": "1.0.0",
+                "date": "2026-09-22",
+                "change": "围城活动商店（上线前 draft）"
+              },
+              {
+                "ver": "1.1.0",
+                "date": "2026-10-04",
+                "change": "随角色改名，皮肤名由「风暴警长」改为「风暴行者」"
+              }
+            ]
+          },
+          {
+            "id": "skin_frog_default",
+            "kind": "skin",
+            "status": "live",
+            "baseRef": "char_frog",
+            "name": {
+              "zh-CN": "默认涂装"
+            },
+            "rarity": "SR",
+            "materialOverrides": {
+              "bodyTint": "#F4FBE8",
+              "emissive": "#B6F24E"
+            },
+            "model": {
+              "prefab": "assets/characters/frog.glb"
+            },
+            "unlock": {
+              "type": "free"
+            },
+            "statMods": [],
+            "versions": [
+              {
+                "ver": "1.1.0",
+                "date": "2026-10-04",
+                "change": "新增"
+              },
+              {
+                "ver": "1.2.0",
+                "date": "2026-10-10",
+                "change": "默认涂装改用 frog.glb 骨骼模型"
+              }
+            ]
+          },
+          {
+            "id": "skin_mambo_default",
+            "kind": "skin",
+            "status": "live",
+            "baseRef": "char_mambo",
+            "name": {
+              "zh-CN": "默认涂装"
+            },
+            "rarity": "SR",
+            "materialOverrides": {
+              "bodyTint": "#9A93C8",
+              "emissive": "#D8CDF0"
+            },
+            "model": {
+              "prefab": "assets/characters/pony.glb"
+            },
+            "unlock": {
+              "type": "free"
+            },
+            "statMods": [],
+            "versions": [
+              {
+                "ver": "1.1.0",
+                "date": "2026-10-04",
+                "change": "新增"
+              },
+              {
+                "ver": "1.1.1",
+                "date": "2026-10-11",
+                "change": "默认涂装改用 pony.glb 骨骼模型与建模侧配色"
+              }
+            ]
+          },
+          {
+            "id": "skin_niu_default",
+            "kind": "skin",
+            "status": "live",
+            "baseRef": "char_niu",
+            "name": {
+              "zh-CN": "默认涂装"
+            },
+            "rarity": "SSR",
+            "materialOverrides": {
+              "bodyTint": "#FBE9E7",
+              "emissive": "#E45C5C"
+            },
+            "model": {
+              "prefab": "assets/characters/niu.glb"
+            },
+            "unlock": {
+              "type": "free"
+            },
+            "statMods": [],
+            "versions": [
+              {
+                "ver": "1.1.0",
+                "date": "2026-10-04",
+                "change": "新增"
+              }
+            ]
+          },
+          {
+            "id": "skin_whale_default",
+            "kind": "skin",
+            "status": "live",
+            "baseRef": "char_whale",
+            "name": {
+              "zh-CN": "默认涂装"
+            },
+            "rarity": "SR",
+            "materialOverrides": {
+              "bodyTint": "#FCF7FB",
+              "emissive": "#7FD1FF"
+            },
+            "model": {
+              "prefab": "assets/characters/whale.glb"
+            },
+            "unlock": {
+              "type": "free"
+            },
+            "statMods": [],
+            "versions": [
+              {
+                "ver": "1.0.0",
+                "date": "2026-10-10",
+                "change": "首发"
+              }
+            ]
+          },
+          {
+            "id": "skin_penguin_default",
+            "kind": "skin",
+            "status": "live",
+            "baseRef": "char_penguin",
+            "name": {
+              "zh-CN": "默认涂装"
+            },
+            "rarity": "SR",
+            "materialOverrides": {
+              "bodyTint": "#F19041",
+              "emissive": "#FFE0B8"
+            },
+            "model": {
+              "prefab": "assets/characters/penguin.glb"
+            },
+            "unlock": {
+              "type": "free"
+            },
+            "statMods": [],
+            "versions": [
+              {
+                "ver": "1.0.0",
+                "date": "2026-10-13",
+                "change": "首发"
+              }
+            ]
+          }
+        ]
+      },
+      "skills": {
+        "$schema": "../schema/config.schema.json#/skills",
+        "configVersion": "1.1.1",
+        "minEngineVersion": "1.1.0",
+        "updatedAt": "2026-10-05",
+        "items": [
+          {
+            "id": "skill_thunder_dash",
+            "kind": "active",
+            "status": "live",
+            "name": {
+              "zh-CN": "雷霆冲刺",
+              "en-US": "Thunder Dash"
+            },
+            "desc": {
+              "zh-CN": "2.5 秒无敌提速，自动避开前方障碍"
+            },
+            "trigger": "double_tap",
+            "cooldownS": 18,
+            "vfx": {
+              "cast": "vfx_thunder_dash",
+              "loop": "vfx_aura_electric"
+            },
+            "effects": [
+              {
+                "primitive": "invincible",
+                "durationS": 2.5
+              },
+              {
+                "primitive": "laneAutoAvoid",
+                "durationS": 2.5,
+                "lookaheadM": 18
+              },
+              {
+                "primitive": "speedMul",
+                "durationS": 2.5,
+                "mul": 1.15
+              }
+            ],
+            "versions": [
+              {
+                "ver": "1.0.0",
+                "date": "2026-09-22",
+                "change": "首发"
+              },
+              {
+                "ver": "1.1.0",
+                "date": "2026-10-04",
+                "change": "移除能量充能，纯冷却释放（用户定稿：删充能，开局第 0 秒即可放）"
+              },
+              {
+                "ver": "1.1.1",
+                "date": "2026-10-05",
+                "change": "issue #16 文案补全：原说明漏了 speedMul 1.15 这一段效果，玩家看不到提速会以为只是无敌。数值不动（小电/阿玛拉/风剃已进 golden 基线，动数值要重放 5 seed × 3 角色，不划算）"
+              }
+            ]
+          },
+          {
+            "id": "skill_magnet_pulse",
+            "kind": "active",
+            "status": "live",
+            "name": {
+              "zh-CN": "磁暴脉冲"
+            },
+            "desc": {
+              "zh-CN": "6 秒全屏金币吸附"
+            },
+            "trigger": "double_tap",
+            "cooldownS": 20,
+            "vfx": {
+              "cast": "vfx_pickup_pop",
+              "loop": "vfx_aura_electric"
+            },
+            "effects": [
+              {
+                "primitive": "magnet",
+                "durationS": 6,
+                "radiusM": 99
+              }
+            ],
+            "versions": [
+              {
+                "ver": "1.0.0",
+                "date": "2026-09-22",
+                "change": "首发"
+              },
+              {
+                "ver": "1.1.0",
+                "date": "2026-10-04",
+                "change": "移除能量充能，纯冷却释放"
+              }
+            ]
+          },
+          {
+            "id": "skill_blink_smash",
+            "kind": "active",
+            "status": "live",
+            "name": {
+              "zh-CN": "瞬闪"
+            },
+            "desc": {
+              "zh-CN": "向前瞬移 12 米，撞碎本车道障碍"
+            },
+            "trigger": "double_tap",
+            "cooldownS": 16,
+            "vfx": {
+              "cast": "vfx_thunder_dash"
+            },
+            "effects": [
+              {
+                "primitive": "dash",
+                "distanceM": 12
+              },
+              {
+                "primitive": "invincible",
+                "durationS": 0.5
+              }
+            ],
+            "versions": [
+              {
+                "ver": "1.0.0",
+                "date": "2026-09-22",
+                "change": "首发"
+              },
+              {
+                "ver": "1.1.0",
+                "date": "2026-10-04",
+                "change": "移除能量充能，纯冷却释放"
+              },
+              {
+                "ver": "1.1.1",
+                "date": "2026-10-05",
+                "change": "issue #16 清死配置：dash 是瞬时原语，buffEngine 里恒撞碎所在车道（EffectWorld.destroyObstacles 只收 lane），destroyObstacles 参数运行时根本不读，留着等于承诺了一个不存在的 false 档；文案同步写准「本车道」"
+              }
+            ]
+          },
+          {
+            "id": "skill_thunder_wings",
+            "kind": "active",
+            "status": "live",
+            "name": {
+              "zh-CN": "雷神之翼"
+            },
+            "desc": {
+              "zh-CN": "8 秒空中飞行，自动拾取空中金币"
+            },
+            "trigger": "double_tap",
+            "cooldownS": 24,
+            "vfx": {
+              "cast": "vfx_thunder_dash",
+              "loop": "vfx_trail_thunder"
+            },
+            "effects": [
+              {
+                "primitive": "fly",
+                "durationS": 8
+              },
+              {
+                "primitive": "magnet",
+                "durationS": 8,
+                "radiusM": 8
+              }
+            ],
+            "versions": [
+              {
+                "ver": "1.0.0",
+                "date": "2026-09-22",
+                "change": "首发"
+              },
+              {
+                "ver": "1.1.0",
+                "date": "2026-10-04",
+                "change": "移除能量充能，纯冷却释放"
+              }
+            ]
+          },
+          {
+            "id": "skill_chrono_leap",
+            "kind": "active",
+            "status": "live",
+            "name": {
+              "zh-CN": "穿梭时空",
+              "en-US": "Chrono Leap"
+            },
+            "desc": {
+              "zh-CN": "瞬移 100 米，沿途金币全部入手"
+            },
+            "trigger": "double_tap",
+            "cooldownS": 25,
+            "vfx": {
+              "cast": "vfx_thunder_dash",
+              "loop": "vfx_aura_electric"
+            },
+            "effects": [
+              {
+                "primitive": "blink",
+                "distanceM": 100,
+                "phase": true,
+                "collectCoins": true
+              },
+              {
+                "primitive": "invincible",
+                "durationS": 0.6
+              }
+            ],
+            "versions": [
+              {
+                "ver": "1.1.0",
+                "date": "2026-10-04",
+                "change": "顶替「时缓领域」（原 skill_storm_domain）：用户定稿改为瞬移 100 米并掠取一路金币。落点带 0.6 秒无敌，防止瞬移终点正卡在障碍里当场判负"
+              }
+            ]
+          },
+          {
+            "id": "skill_belly_laugh",
+            "kind": "active",
+            "status": "live",
+            "name": {
+              "zh-CN": "捧腹大笑",
+              "en-US": "Belly Laugh"
+            },
+            "desc": {
+              "zh-CN": "笑出黄色防护罩，10 秒无敌"
+            },
+            "trigger": "double_tap",
+            "cooldownS": 30,
+            "vfx": {
+              "cast": "vfx_pickup_pop",
+              "loop": "vfx_aura_electric"
+            },
+            "effects": [
+              {
+                "primitive": "invincible",
+                "durationS": 10
+              }
+            ],
+            "versions": [
+              {
+                "ver": "1.1.0",
+                "date": "2026-10-04",
+                "change": "新增（奶蛙）：10 秒无敌。渲染层目前还没有护盾/无敌气泡表现，防护罩先由释放爆点与 HUD 名称承担"
+              },
+              {
+                "ver": "1.1.1",
+                "date": "2026-10-05",
+                "change": "issue #16 复核后维持 10 秒：覆盖率 10/30=33% 看着最高，但这技能只买命不给金币与提速，莉娜同为 33% 覆盖率却额外有 2.5 倍飞行速度和空中金币带，稀有度也对价（SR 4500-7000 金币 vs SSR 奖池/活动）。若评审仍判过强，把 durationS 改 8 即降到 27%（同步 tests/character.test.mjs 那条「无敌应 10 秒」）"
+              }
+            ]
+          },
+          {
+            "id": "skill_mambo_power",
+            "kind": "active",
+            "status": "live",
+            "name": {
+              "zh-CN": "曼波之力",
+              "en-US": "Mambo Power"
+            },
+            "desc": {
+              "zh-CN": "下滑 10 次触发：12 秒内滑行可穿 2 个低障碍"
+            },
+            "trigger": "double_tap",
+            "cooldownS": 0,
+            "charge": {
+              "type": "slideCount",
+              "slides": 10
+            },
+            "vfx": {
+              "cast": "vfx_pickup_pop"
+            },
+            "effects": [
+              {
+                "primitive": "slideGuard",
+                "durationS": 12,
+                "charges": 2
+              }
+            ],
+            "versions": [
+              {
+                "ver": "1.1.0",
+                "date": "2026-10-04",
+                "change": "新增（曼波）：释放门槛是主动下滑 10 次（不是能量充能），护体 2 次不可叠加、12 秒内不用即作废"
+              },
+              {
+                "ver": "1.1.1",
+                "date": "2026-10-05",
+                "change": "issue #16 文案对准运行时：resolveHit 里 slideGuard 只在 sliding 且障碍 cls=low（本来要跳起的那种）时消耗，高杆与满格墙不吃护体；原文案「小型障碍」会被读成任意小东西，且没交代 12 秒就作废。数值不动"
+              }
+            ]
+          },
+          {
+            "id": "skill_mama_save",
+            "kind": "active",
+            "status": "live",
+            "name": {
+              "zh-CN": "妈妈救我",
+              "en-US": "Mama, Save Me"
+            },
+            "desc": {
+              "zh-CN": "前方 50 米障碍全部消失，金币道具都还在"
+            },
+            "trigger": "double_tap",
+            "cooldownS": 18,
+            "vfx": {
+              "cast": "vfx_spark_big"
+            },
+            "effects": [
+              {
+                "primitive": "smashAhead",
+                "aheadM": 50
+              }
+            ],
+            "versions": [
+              {
+                "ver": "1.1.0",
+                "date": "2026-10-04",
+                "change": "新增（阿牛）：清除前方 50 米全部车道的障碍（含金色闪电圈与登车坡），只摘障碍不动金币与道具箱"
+              }
+            ]
+          },
+          {
+            "id": "talent_volt_coin",
+            "kind": "passive",
+            "status": "live",
+            "name": {
+              "zh-CN": "静电收藏家"
+            },
+            "desc": {
+              "zh-CN": "金币收益 +5%"
+            },
+            "trigger": "run_start",
+            "effects": [
+              {
+                "primitive": "coinValueAdd",
+                "durationS": 3600,
+                "pct": 5
+              }
+            ],
+            "versions": [
+              {
+                "ver": "1.0.0",
+                "date": "2026-09-22",
+                "change": "首发"
+              }
+            ]
+          },
+          {
+            "id": "talent_ama_duration",
+            "kind": "passive",
+            "status": "live",
+            "name": {
+              "zh-CN": "磁场余韵"
+            },
+            "desc": {
+              "zh-CN": "道具持续时间 +15%"
+            },
+            "trigger": "run_start",
+            "effects": [
+              {
+                "primitive": "buffDurationAdd",
+                "durationS": 3600,
+                "pct": 15
+              }
+            ],
+            "versions": [
+              {
+                "ver": "1.0.0",
+                "date": "2026-09-22",
+                "change": "首发"
+              }
+            ]
+          },
+          {
+            "id": "talent_kaze_slide",
+            "kind": "passive",
+            "status": "live",
+            "name": {
+              "zh-CN": "贴地飞行"
+            },
+            "desc": {
+              "zh-CN": "滑铲时长 +0.2 秒"
+            },
+            "trigger": "run_start",
+            "effects": [
+              {
+                "primitive": "slideExtend",
+                "durationS": 3600,
+                "addS": 0.2
+              }
+            ],
+            "versions": [
+              {
+                "ver": "1.0.0",
+                "date": "2026-09-22",
+                "change": "首发"
+              }
+            ]
+          },
+          {
+            "id": "talent_rina_shield",
+            "kind": "passive",
+            "status": "live",
+            "name": {
+              "zh-CN": "静电护体"
+            },
+            "desc": {
+              "zh-CN": "开局自带 1 层护盾"
+            },
+            "trigger": "run_start",
+            "effects": [
+              {
+                "primitive": "shieldAdd",
+                "layers": 1
+              }
+            ],
+            "versions": [
+              {
+                "ver": "1.0.0",
+                "date": "2026-09-22",
+                "change": "首发"
+              }
+            ]
+          },
+          {
+            "id": "talent_chrono_slow",
+            "kind": "passive",
+            "status": "live",
+            "name": {
+              "zh-CN": "时间延缓"
+            },
+            "desc": {
+              "zh-CN": "道具持续时间 +2 秒"
+            },
+            "trigger": "run_start",
+            "effects": [
+              {
+                "primitive": "buffDurationFlat",
+                "durationS": 3600,
+                "addS": 2
+              }
+            ],
+            "versions": [
+              {
+                "ver": "1.1.0",
+                "date": "2026-10-04",
+                "change": "顶替「老警长的节奏」（原 talent_bolt_cool 冷却 -20%）：用户定稿改为按固定秒数拉长道具时长"
+              }
+            ]
+          },
+          {
+            "id": "talent_frog_bounce",
+            "kind": "passive",
+            "status": "live",
+            "name": {
+              "zh-CN": "弹跳之力"
+            },
+            "desc": {
+              "zh-CN": "每 10 秒自动获得一次强力跳跃"
+            },
+            "trigger": "run_start",
+            "effects": [
+              {
+                "primitive": "periodic",
+                "durationS": 3600,
+                "everyS": 10,
+                "effects": [
+                  {
+                    "primitive": "jumpBoost",
+                    "durationS": 2.5,
+                    "mul": 1.1
+                  }
+                ]
+              }
+            ],
+            "versions": [
+              {
+                "ver": "1.1.0",
+                "date": "2026-10-04",
+                "change": "新增（奶蛙）：周期被动，每次给 2.5 秒强跳窗口（mul 1.1 = 弹跳鞋定稿值）"
+              }
+            ]
+          },
+          {
+            "id": "talent_mambo_height",
+            "kind": "passive",
+            "status": "live",
+            "name": {
+              "zh-CN": "身高优势"
+            },
+            "desc": {
+              "zh-CN": "需要下滑的障碍，站着就能穿过去"
+            },
+            "trigger": "run_start",
+            "effects": [
+              {
+                "primitive": "duckPass",
+                "durationS": 3600
+              }
+            ],
+            "versions": [
+              {
+                "ver": "1.1.0",
+                "date": "2026-10-04",
+                "change": "新增（曼波）：高杆类（class=high）障碍直接穿过，无需下滑；闪电圈与满格墙不受影响"
+              }
+            ]
+          },
+          {
+            "id": "talent_niu_rush",
+            "kind": "passive",
+            "status": "live",
+            "name": {
+              "zh-CN": "蛮牛冲撞"
+            },
+            "desc": {
+              "zh-CN": "每 20 秒自动冲撞：速度顶到上限，冲过前 45 米"
+            },
+            "trigger": "run_start",
+            "effects": [
+              {
+                "primitive": "periodic",
+                "durationS": 3600,
+                "everyS": 20,
+                "effects": [
+                  {
+                    "primitive": "speedMul",
+                    "distanceM": 45,
+                    "mul": 2.2
+                  },
+                  {
+                    "primitive": "invincible",
+                    "distanceM": 45
+                  }
+                ]
+              }
+            ],
+            "versions": [
+              {
+                "ver": "1.1.0",
+                "date": "2026-10-04",
+                "change": "新增（阿牛）：周期 20 秒，效果按里程到期（无敌与提速都是走完 20 米即止）。注意三倍速会被 game.json runner.maxSpeed 上限夹住"
+              },
+              {
+                "ver": "1.1.1",
+                "date": "2026-10-05",
+                "change": "issue #16 校准：地面速度在 runnerSim 里被 runner.maxSpeed=26 硬夹（baseSpeed 12 × 3 = 36 也只能跑到 26），mul 3 是虚标，改 2.2 后同样的顶满；20 米在顶满速度下只有 0.77 秒，无敌还没走完一个障碍群就到期，改 45 米（≈1.7 秒），文案不再承诺「三倍」"
+              }
+            ]
+          }
+        ]
+      },
+      "items": {
+        "$schema": "../schema/config.schema.json#/items",
+        "configVersion": "1.4.0",
+        "minEngineVersion": "1.0.0",
+        "updatedAt": "2026-10-02",
+        "items": [
+          {
+            "id": "item_coin",
+            "kind": "currency",
+            "status": "live",
+            "name": {
+              "zh-CN": "能量币"
+            },
+            "desc": {
+              "zh-CN": "单局收集货币，结算转入钱包"
+            },
+            "model": {
+              "prefab": "assets/pickups/coin.glb",
+              "spin": true
+            },
+            "pickupVfx": "vfx_coin_fly",
+            "valuePerUnit": 1,
+            "versions": [
+              {
+                "ver": "1.0.0",
+                "date": "2026-09-22",
+                "change": "首发"
+              }
+            ]
+          },
+          {
+            "id": "item_key",
+            "kind": "currency",
+            "status": "live",
+            "name": {
+              "zh-CN": "雷霆之钥"
+            },
+            "desc": {
+              "zh-CN": "稀有货币：开箱与限定兑换"
+            },
+            "model": {
+              "prefab": "assets/pickups/key.glb",
+              "spin": true
+            },
+            "pickupVfx": "vfx_pickup_pop",
+            "valuePerUnit": 1,
+            "versions": [
+              {
+                "ver": "1.0.0",
+                "date": "2026-09-22",
+                "change": "首发"
+              }
+            ]
+          },
+          {
+            "id": "item_magnet",
+            "kind": "pickup",
+            "status": "live",
+            "name": {
+              "zh-CN": "磁暴手套"
+            },
+            "desc": {
+              "zh-CN": "10 秒内吸取身前 8 米全部车道的金币"
+            },
+            "rarity": "common",
+            "model": {
+              "prefab": "assets/pickups/magnet.glb",
+              "spin": true
+            },
+            "pickupVfx": "vfx_pickup_pop",
+            "effects": [
+              {
+                "primitive": "magnet",
+                "durationS": 10,
+                "radiusM": 8
+              }
+            ],
+            "stackRule": "refresh",
+            "dropWeight": 22,
+            "versions": [
+              {
+                "ver": "1.0.0",
+                "date": "2026-09-22",
+                "change": "首发"
+              }
+            ]
+          },
+          {
+            "id": "item_shield",
+            "kind": "pickup",
+            "status": "live",
+            "name": {
+              "zh-CN": "球形护盾"
+            },
+            "desc": {
+              "zh-CN": "抵挡一次碰撞"
+            },
+            "rarity": "common",
+            "model": {
+              "prefab": "assets/pickups/shield.glb",
+              "spin": false
+            },
+            "pickupVfx": "vfx_pickup_pop",
+            "effects": [
+              {
+                "primitive": "shieldAdd",
+                "layers": 1,
+                "durationS": 12
+              }
+            ],
+            "stackRule": "stack",
+            "maxStack": 2,
+            "dropWeight": 16,
+            "versions": [
+              {
+                "ver": "1.0.0",
+                "date": "2026-09-22",
+                "change": "首发"
+              }
+            ]
+          },
+          {
+            "id": "item_jetpack",
+            "kind": "pickup",
+            "status": "live",
+            "name": {
+              "zh-CN": "雷翼飞行包"
+            },
+            "desc": {
+              "zh-CN": "13 秒低空飞行：速度 2.5 倍、空中金币带、穿云特效，结束滑翔降落"
+            },
+            "rarity": "rare",
+            "model": {
+              "prefab": "assets/pickups/jetpack.glb",
+              "spin": true
+            },
+            "pickupVfx": "vfx_pickup_pop",
+            "effects": [
+              {
+                "primitive": "fly",
+                "durationS": 13
+              }
+            ],
+            "stackRule": "refresh",
+            "dropWeight": 8,
+            "versions": [
+              {
+                "ver": "1.0.0",
+                "date": "2026-09-22",
+                "change": "首发"
+              }
+            ]
+          },
+          {
+            "id": "item_board",
+            "kind": "pickup",
+            "status": "live",
+            "name": {
+              "zh-CN": "雷霆滑板"
+            },
+            "desc": {
+              "zh-CN": "抵消一次碰撞并加速"
+            },
+            "rarity": "common",
+            "model": {
+              "prefab": "assets/pickups/board.glb",
+              "spin": true
+            },
+            "pickupVfx": "vfx_pickup_pop",
+            "effects": [
+              {
+                "primitive": "boardArmor",
+                "durationS": 10
+              },
+              {
+                "primitive": "speedMul",
+                "durationS": 10,
+                "mul": 1.15
+              }
+            ],
+            "stackRule": "replace",
+            "dropWeight": 14,
+            "versions": [
+              {
+                "ver": "1.0.0",
+                "date": "2026-09-22",
+                "change": "首发"
+              }
+            ]
+          },
+          {
+            "id": "item_multiplier",
+            "kind": "pickup",
+            "status": "live",
+            "name": {
+              "zh-CN": "充能倍率"
+            },
+            "desc": {
+              "zh-CN": "金币收益 ×2"
+            },
+            "rarity": "common",
+            "model": {
+              "prefab": "assets/pickups/multiplier.glb",
+              "spin": true
+            },
+            "pickupVfx": "vfx_pickup_pop",
+            "effects": [
+              {
+                "primitive": "coinValueAdd",
+                "durationS": 15,
+                "pct": 100
+              }
+            ],
+            "stackRule": "refresh",
+            "dropWeight": 12,
+            "versions": [
+              {
+                "ver": "1.0.0",
+                "date": "2026-09-22",
+                "change": "首发"
+              }
+            ]
+          },
+          {
+            "id": "item_xp_card",
+            "kind": "consumable",
+            "status": "live",
+            "name": {
+              "zh-CN": "经验加速卡"
+            },
+            "desc": {
+              "zh-CN": "下一局账号经验 ×2"
+            },
+            "rarity": "rare",
+            "model": {
+              "prefab": "assets/consumables/xp_card.glb"
+            },
+            "effects": [
+              {
+                "primitive": "xpMul",
+                "durationS": 1,
+                "mul": 2
+              }
+            ],
+            "stackRule": "replace",
+            "versions": [
+              {
+                "ver": "1.0.0",
+                "date": "2026-09-22",
+                "change": "首发"
+              }
+            ]
+          },
+          {
+            "id": "item_boots",
+            "kind": "pickup",
+            "status": "live",
+            "name": {
+              "zh-CN": "弹跳鞋",
+              "en-US": "Bounce Boots"
+            },
+            "desc": {
+              "zh-CN": "12 秒跳跃强化，可直接跃过高杆"
+            },
+            "rarity": "common",
+            "model": {
+              "prefab": "assets/pickups/boots.glb",
+              "spin": true
+            },
+            "pickupVfx": "vfx_pickup_pop",
+            "effects": [
+              {
+                "primitive": "jumpBoost",
+                "durationS": 12,
+                "mul": 1.1
+              }
+            ],
+            "stackRule": "refresh",
+            "dropWeight": 18,
+            "versions": [
+              {
+                "ver": "1.0.0",
+                "date": "2026-09-24",
+                "change": "M2 首个道具批次"
+              },
+              {
+                "ver": "1.9.0",
+                "date": "2026-10-01",
+                "change": "跳跃高度提升：mul 1.15→1.45（用户反馈弹簧鞋高度不够、容错太低）"
+              },
+              {
+                "ver": "1.9.1",
+                "date": "2026-10-02",
+                "change": "跳跃高度回调：mul 1.45→1.10（顶点 5.04m→2.90m）。用户定稿「墙加高 3m 后鞋顶点回 2.6m 级」；实测 2.70/2.80m 顶点下越 2.6m 高杆可通过带仅 0.3m（约 1.5 帧，即旧反馈「容错太低」），按可玩底线取 2.90m（实测带 4.4~5.3m）；3.0m 满格墙顶点仍差 0.22m 跳不过"
+              }
+            ]
+          },
+          {
+            "id": "item_helmet",
+            "kind": "pickup",
+            "status": "live",
+            "name": {
+              "zh-CN": "安全头盔",
+              "en-US": "Safety Helmet"
+            },
+            "desc": {
+              "zh-CN": "20 秒内多一条命：致命碰撞被头盔挡下一次"
+            },
+            "rarity": "rare",
+            "model": {
+              "prefab": "assets/pickups/helmet.glb",
+              "spin": true
+            },
+            "pickupVfx": "vfx_pickup_pop",
+            "effects": [
+              {
+                "primitive": "lifeAdd",
+                "durationS": 20
+              }
+            ],
+            "stackRule": "refresh",
+            "dropWeight": 14,
+            "versions": [
+              {
+                "ver": "1.0.0",
+                "date": "2026-09-25",
+                "change": "M2 道具批次二"
+              }
+            ]
+          }
+        ]
+      },
+      "obstacles": {
+        "$schema": "../schema/config.schema.json#/obstacles",
+        "configVersion": "2.0.0",
+        "minEngineVersion": "1.0.0",
+        "updatedAt": "2026-11-11",
+        "defs": [
+          {
+            "id": "obs_box",
+            "class": "low",
+            "status": "live",
+            "size": [
+              2,
+              2.667,
+              0.12
+            ],
+            "jumpable": true,
+            "slideUnder": false,
+            "model": {
+              "prefab": "assets/obstacles/box.glb"
+            },
+            "hitVfx": "vfx_spark_small",
+            "themes": [
+              "theme_neon_city"
+            ],
+            "versions": [
+              {
+                "ver": "1.0.0",
+                "date": "2026-09-22",
+                "change": "首发"
+              },
+              {
+                "ver": "1.9.3",
+                "date": "2026-10-07",
+                "change": "减薄：1.2m→0.24m，正面贴小海报（render/adPosters.ts 的 small 池，方构图）。可跳判定只看高度（s.y < h*0.75），厚度只影响深度窗，DEPTH_SLACK 0.4m 兜住不穿模"
+              },
+              {
+                "ver": "1.9.4",
+                "date": "2026-10-07",
+                "change": "板面改正方形 2.0×2.0m（config h 2.667 × 可视系数 0.75 = 可视顶 2.0m），384 方图正好一格不裁地贴满；厚度 0.24→0.12m。高度口径：基础跳顶点实测 2.288m，2.0m 可视顶留 0.29m 余量，扫描 100 个起跳提前量能过 11 个（用户定稿「恰好跳得过、比跳跃高度略低」）"
+              }
+            ]
+          },
+          {
+            "id": "obs_gate_low",
+            "class": "high",
+            "status": "live",
+            "size": [
+              1.4,
+              2.6,
+              0.12
+            ],
+            "jumpable": false,
+            "slideUnder": true,
+            "model": {
+              "prefab": "assets/obstacles/gate.glb"
+            },
+            "hitVfx": "vfx_spark_small",
+            "themes": [
+              "theme_neon_city"
+            ],
+            "versions": [
+              {
+                "ver": "1.0.0",
+                "date": "2026-09-22",
+                "change": "首发"
+              },
+              {
+                "ver": "1.9.3",
+                "date": "2026-10-07",
+                "change": "横杆减薄：0.6m→0.2m，杆体正面贴小海报。海报不透明度单独给 0.72（杆体仍是 0.4），既读得出画面又不完全挡住后面的金币（审计 T3 蹲杆挡视线口径不变）"
+              },
+              {
+                "ver": "1.9.5",
+                "date": "2026-10-07",
+                "change": "杆面改正方形 1.4×1.4m（宽 2.0→1.4，杆高 = 2.6 - BAR_BOTTOM 1.2 = 1.4），方图满贴不留边；厚度 0.2→0.12m。窄于车道不影响「必须下滑」：角色横向锁车道中心，1.4m 宽 + 0.8m 角色盒仍覆盖整条车道中线"
+              }
+            ]
+          },
+          {
+            "id": "obs_adwall",
+            "class": "full",
+            "status": "live",
+            "size": [
+              2,
+              3,
+              0.18
+            ],
+            "jumpable": false,
+            "slideUnder": false,
+            "model": {
+              "prefab": "assets/obstacles/adwall.glb"
+            },
+            "hitVfx": "vfx_spark_big",
+            "themes": [
+              "theme_neon_city"
+            ],
+            "versions": [
+              {
+                "ver": "1.0.0",
+                "date": "2026-09-22",
+                "change": "首发"
+              },
+              {
+                "ver": "1.9.1",
+                "date": "2026-10-02",
+                "change": "加高：2.6m→3.0m（用户定稿：弹跳鞋顶点回调 2.70m 后，满格墙保持「只能换道」语义，并消除「视觉可越、判定恒死」的割裂）"
+              },
+              {
+                "ver": "1.9.2",
+                "date": "2026-10-07",
+                "change": "减薄：0.8m→0.18m，正面贴二次元海报（render/adPosters.ts，海报由宿主注入）。判定不变：inDepthWindow 另有 DEPTH_SLACK 0.4m 前瞻，最速 26m/s 下每步 0.43m 仍至少两帧落在 0.98m 判定窗内，不会穿墙"
+              }
+            ]
+          },
+          {
+            "id": "obs_train_static",
+            "class": "vehicle",
+            "status": "live",
+            "size": [
+              2,
+              2.4,
+              24
+            ],
+            "jumpable": true,
+            "rideTop": true,
+            "slideUnder": false,
+            "model": {
+              "prefab": "assets/obstacles/train24.glb"
+            },
+            "hitVfx": "vfx_spark_big",
+            "themes": [
+              "theme_neon_city",
+              "theme_storm"
+            ],
+            "versions": [
+              {
+                "ver": "1.0.0",
+                "date": "2026-09-22",
+                "change": "首发"
+              }
+            ]
+          },
+          {
+            "id": "obs_train_slow",
+            "class": "vehicle",
+            "status": "live",
+            "size": [
+              2,
+              2.4,
+              24
+            ],
+            "jumpable": true,
+            "rideTop": true,
+            "model": {
+              "prefab": "assets/obstacles/train24.glb"
+            },
+            "hitVfx": "vfx_spark_big",
+            "themes": [
+              "theme_neon_city"
+            ],
+            "versions": [
+              {
+                "ver": "1.0.0",
+                "date": "2026-09-22",
+                "change": "首发"
+              },
+              {
+                "ver": "1.8.0",
+                "date": "2026-10-01",
+                "change": "静止化：用户反馈火车不该在视野里移动撞到别的障碍/火车（moveZ 移除）"
+              }
+            ]
+          },
+          {
+            "id": "obs_mount_step",
+            "class": "step",
+            "status": "live",
+            "size": [
+              2,
+              2.4,
+              6
+            ],
+            "jumpable": true,
+            "model": {
+              "prefab": "assets/obstacles/board.glb"
+            },
+            "themes": [
+              "theme_neon_city"
+            ],
+            "versions": [
+              {
+                "ver": "1.8.0",
+                "date": "2026-10-01",
+                "change": "新增：登车板（地铁逃生式板子）。纯支撑面不判负，跑过自动踏上升级，踏板上起跳即可登上火车顶"
+              },
+              {
+                "ver": "1.9.0",
+                "date": "2026-10-01",
+                "change": "改为可走上去的斜坡：坡底贴地、末端 0.8m 平顶接火车顶（2.4m），赤脚沿坡走上车顶，不再需要起跳"
+              }
+            ]
+          },
+          {
+            "id": "obs_pendulum",
+            "class": "moving",
+            "status": "live",
+            "size": [
+              1.2,
+              1.2,
+              1.2
+            ],
+            "swing": {
+              "axis": "x",
+              "amplitudeM": 4.4,
+              "periodS": 3.2
+            },
+            "jumpable": true,
+            "model": {
+              "prefab": "assets/obstacles/pendulum.glb"
+            },
+            "hitVfx": "vfx_spark_big",
+            "themes": [
+              "theme_neon_city"
+            ],
+            "versions": [
+              {
+                "ver": "1.0.0",
+                "date": "2026-09-22",
+                "change": "首发"
+              }
+            ]
+          },
+          {
+            "id": "obs_arc_floor",
+            "class": "hazard",
+            "status": "live",
+            "size": [
+              2,
+              0.1,
+              4
+            ],
+            "damageZoneS": 1.5,
+            "model": {
+              "prefab": "assets/obstacles/arc_floor.glb"
+            },
+            "hitVfx": "vfx_aura_electric",
+            "themes": [
+              "theme_neon_city",
+              "theme_storm"
+            ],
+            "versions": [
+              {
+                "ver": "1.0.0",
+                "date": "2026-09-22",
+                "change": "首发"
+              }
+            ]
+          },
+          {
+            "id": "obs_barrier_low",
+            "class": "low",
+            "status": "live",
+            "size": [
+              1.5,
+              2,
+              0.12
+            ],
+            "jumpable": true,
+            "model": {
+              "prefab": "assets/obstacles/barrier.glb"
+            },
+            "hitVfx": "vfx_spark_small",
+            "themes": [
+              "theme_neon_city"
+            ],
+            "versions": [
+              {
+                "ver": "1.0.0",
+                "date": "2026-09-22",
+                "change": "首发"
+              },
+              {
+                "ver": "1.9.3",
+                "date": "2026-10-07",
+                "change": "减薄：0.5m→0.18m，正面贴小海报（可视高度只有 0.6m，海报按高内接、两侧留边框）"
+              },
+              {
+                "ver": "1.9.5",
+                "date": "2026-10-07",
+                "change": "板面改正方形 1.5×1.5m（config h 2.0 × 可视系数 0.75 = 可视顶 1.5m），方图满贴不留边；厚度 0.18→0.12m。难度定位仍低于 obs_box（2.0m）：扫描 100 个起跳提前量能过 21 个，obs_box 只有 11 个"
+              }
+            ]
+          },
+          {
+            "id": "obs_rusher_long",
+            "class": "vehicle",
+            "status": "live",
+            "size": [
+              2,
+              2.4,
+              8
+            ],
+            "jumpable": false,
+            "rideTop": false,
+            "moveZ": -8,
+            "model": {
+              "prefab": "assets/obstacles/rusher.glb"
+            },
+            "hitVfx": "vfx_spark_big",
+            "themes": [
+              "theme_neon_city"
+            ],
+            "versions": [
+              {
+                "ver": "1.7.0",
+                "date": "2026-09-29",
+                "change": "新增：向玩家冲来的长方体（跳不过去，必须换道；沿途撞飞障碍）"
+              }
+            ]
+          },
+          {
+            "id": "obs_cube_roll",
+            "class": "low",
+            "status": "live",
+            "size": [
+              1.1,
+              1.467,
+              0.12
+            ],
+            "jumpable": true,
+            "moveZ": -6,
+            "model": {
+              "prefab": "assets/obstacles/cube.glb"
+            },
+            "hitVfx": "vfx_spark_small",
+            "themes": [
+              "theme_neon_city"
+            ],
+            "versions": [
+              {
+                "ver": "1.7.0",
+                "date": "2026-09-29",
+                "change": "新增：向玩家冲来的小正方体（可跳过）"
+              },
+              {
+                "ver": "1.9.3",
+                "date": "2026-10-07",
+                "change": "减薄：1.1m→0.24m，正面贴小海报（与 obs_box 同池）"
+              },
+              {
+                "ver": "1.9.4",
+                "date": "2026-10-07",
+                "change": "板面改正方形 1.1×1.1m（config h 1.467 × 0.75 = 可视顶 1.1m，扫描 100 个起跳提前量能过 26 个，仍是软垫级），厚度 0.24→0.12m，海报满贴不留边"
+              }
+            ]
+          },
+          {
+            "id": "obs_lightning_circle",
+            "class": "hazard",
+            "status": "live",
+            "size": [
+              2.2,
+              0.12,
+              2.2
+            ],
+            "zap": true,
+            "model": {
+              "prefab": "assets/obstacles/zap_circle.glb"
+            },
+            "hitVfx": "vfx_aura_electric",
+            "themes": [
+              "theme_neon_city",
+              "theme_storm"
+            ],
+            "versions": [
+              {
+                "ver": "1.7.0",
+                "date": "2026-09-29",
+                "change": "新增：闪电圈（每 200m；先电掉头盔/护盾等护具，无护具第二次直接致死）"
+              }
+            ]
+          }
+        ],
+        "patterns": [
+          {
+            "id": "pat_intro_straight",
+            "minDifficulty": 0,
+            "weight": 30,
+            "lengthSegments": 2,
+            "cells": [
+              {
+                "segment": 0,
+                "lane": 0,
+                "offsetM": 10,
+                "obsRef": "obs_barrier_low"
+              },
+              {
+                "segment": 1,
+                "lane": 0,
+                "offsetM": 8,
+                "coins": 8
+              }
+            ],
+            "guarantee": {
+              "safeLanePattern": [
+                0,
+                0
+              ]
+            }
+          },
+          {
+            "id": "pat_easy_single",
+            "minDifficulty": 0,
+            "weight": 40,
+            "lengthSegments": 1,
+            "cells": [
+              {
+                "segment": 0,
+                "lane": -1,
+                "offsetM": 12,
+                "obsRef": "obs_box"
+              },
+              {
+                "segment": 0,
+                "lane": 1,
+                "offsetM": 6,
+                "coins": 6
+              }
+            ],
+            "guarantee": {
+              "safeLanePattern": [
+                0,
+                1
+              ]
+            }
+          },
+          {
+            "id": "pat_easy_barrier_hop",
+            "minDifficulty": 1,
+            "weight": 20,
+            "lengthSegments": 1,
+            "cells": [
+              {
+                "segment": 0,
+                "lane": 0,
+                "offsetM": 12,
+                "obsRef": "obs_barrier_low"
+              },
+              {
+                "segment": 0,
+                "lane": 0,
+                "offsetM": 5,
+                "coins": 6
+              }
+            ],
+            "guarantee": {
+              "safeLanePattern": [
+                0
+              ]
+            }
+          },
+          {
+            "id": "pat_easy_pair",
+            "minDifficulty": 1,
+            "weight": 30,
+            "lengthSegments": 1,
+            "cells": [
+              {
+                "segment": 0,
+                "lane": -1,
+                "offsetM": 10,
+                "obsRef": "obs_box"
+              },
+              {
+                "segment": 0,
+                "lane": 1,
+                "offsetM": 10,
+                "obsRef": "obs_box"
+              },
+              {
+                "segment": 0,
+                "lane": 0,
+                "offsetM": 4,
+                "coins": 8
+              }
+            ],
+            "guarantee": {
+              "safeLanePattern": [
+                0,
+                0
+              ]
+            }
+          },
+          {
+            "id": "pat_gate_slide",
+            "minDifficulty": 1,
+            "weight": 26,
+            "lengthSegments": 1,
+            "cells": [
+              {
+                "segment": 0,
+                "lane": 0,
+                "offsetM": 12,
+                "obsRef": "obs_gate_low"
+              },
+              {
+                "segment": 0,
+                "lane": 0,
+                "offsetM": 16,
+                "coins": 5
+              }
+            ],
+            "guarantee": {
+              "safeLanePattern": [
+                0
+              ]
+            }
+          },
+          {
+            "id": "pat_mid_gate_combo",
+            "minDifficulty": 3,
+            "weight": 18,
+            "lengthSegments": 2,
+            "cells": [
+              {
+                "segment": 0,
+                "lane": 0,
+                "offsetM": 8,
+                "obsRef": "obs_gate_low"
+              },
+              {
+                "segment": 0,
+                "lane": -1,
+                "offsetM": 16,
+                "obsRef": "obs_box"
+              },
+              {
+                "segment": 1,
+                "lane": 1,
+                "offsetM": 4,
+                "obsRef": "obs_train_static"
+              },
+              {
+                "segment": 1,
+                "lane": 1,
+                "offsetM": 4,
+                "surface": "trainTop",
+                "coins": 6
+              }
+            ],
+            "guarantee": {
+              "safeLanePattern": [
+                1,
+                -1,
+                0
+              ]
+            }
+          },
+          {
+            "id": "pat_mid_wall_dodge",
+            "minDifficulty": 5,
+            "weight": 16,
+            "lengthSegments": 2,
+            "cells": [
+              {
+                "segment": 0,
+                "lane": -1,
+                "offsetM": 8,
+                "obsRef": "obs_adwall"
+              },
+              {
+                "segment": 0,
+                "lane": 0,
+                "offsetM": 8,
+                "obsRef": "obs_adwall"
+              },
+              {
+                "segment": 1,
+                "lane": 1,
+                "offsetM": 10,
+                "obsRef": "obs_adwall"
+              },
+              {
+                "segment": 1,
+                "lane": 0,
+                "offsetM": 10,
+                "obsRef": "obs_adwall"
+              }
+            ],
+            "guarantee": {
+              "safeLanePattern": [
+                1,
+                -1
+              ]
+            }
+          },
+          {
+            "id": "pat_mid_single_wall",
+            "minDifficulty": 3,
+            "weight": 22,
+            "lengthSegments": 2,
+            "cells": [
+              {
+                "segment": 0,
+                "lane": -1,
+                "offsetM": 10,
+                "obsRef": "obs_adwall"
+              },
+              {
+                "segment": 1,
+                "lane": 1,
+                "offsetM": 8,
+                "obsRef": "obs_adwall"
+              }
+            ],
+            "guarantee": {
+              "safeLanePattern": [
+                1,
+                -1
+              ]
+            }
+          },
+          {
+            "id": "pat_mid_wall_gauntlet",
+            "minDifficulty": 5,
+            "weight": 18,
+            "lengthSegments": 2,
+            "cells": [
+              {
+                "segment": 0,
+                "lane": 0,
+                "offsetM": 10,
+                "obsRef": "obs_adwall"
+              },
+              {
+                "segment": 1,
+                "lane": -1,
+                "offsetM": 8,
+                "obsRef": "obs_adwall"
+              }
+            ],
+            "guarantee": {
+              "safeLanePattern": [
+                1,
+                1
+              ]
+            }
+          },
+          {
+            "id": "pat_train_top_run",
+            "minDifficulty": 4,
+            "weight": 14,
+            "lengthSegments": 2,
+            "cells": [
+              {
+                "segment": 0,
+                "lane": 0,
+                "offsetM": 0,
+                "obsRef": "obs_mount_step"
+              },
+              {
+                "segment": 0,
+                "lane": 0,
+                "offsetM": 15,
+                "obsRef": "obs_train_slow"
+              },
+              {
+                "segment": 0,
+                "lane": 0,
+                "offsetM": 15,
+                "surface": "trainTop",
+                "coins": 12
+              },
+              {
+                "segment": 0,
+                "lane": -1,
+                "offsetM": 16,
+                "coins": 8
+              },
+              {
+                "segment": 1,
+                "lane": -1,
+                "offsetM": 12,
+                "obsRef": "obs_box"
+              }
+            ],
+            "guarantee": {
+              "safeLanePattern": [
+                0,
+                0,
+                -1
+              ]
+            }
+          },
+          {
+            "id": "pat_hazard_weave",
+            "minDifficulty": 7,
+            "weight": 12,
+            "lengthSegments": 2,
+            "cells": [
+              {
+                "segment": 0,
+                "lane": 0,
+                "offsetM": 6,
+                "obsRef": "obs_arc_floor"
+              },
+              {
+                "segment": 0,
+                "lane": -1,
+                "offsetM": 16,
+                "obsRef": "obs_arc_floor"
+              },
+              {
+                "segment": 1,
+                "lane": 1,
+                "offsetM": 8,
+                "obsRef": "obs_pendulum"
+              }
+            ],
+            "guarantee": {
+              "safeLanePattern": [
+                1,
+                0,
+                -1
+              ]
+            }
+          },
+          {
+            "id": "pat_beast_chase",
+            "minDifficulty": 8,
+            "weight": 0,
+            "lengthSegments": 2,
+            "cells": [
+              {
+                "segment": 0,
+                "lane": -1,
+                "offsetM": 4,
+                "obsRef": "obs_box"
+              },
+              {
+                "segment": 0,
+                "lane": 0,
+                "offsetM": 12,
+                "obsRef": "obs_gate_low"
+              },
+              {
+                "segment": 0,
+                "lane": 1,
+                "offsetM": 4,
+                "obsRef": "obs_box"
+              },
+              {
+                "segment": 1,
+                "lane": 0,
+                "offsetM": 8,
+                "obsRef": "obs_adwall"
+              },
+              {
+                "segment": 1,
+                "lane": -1,
+                "offsetM": 8,
+                "obsRef": "obs_adwall"
+              }
+            ],
+            "guarantee": {
+              "safeLanePattern": [
+                1,
+                0,
+                -1
+              ]
+            }
+          },
+          {
+            "id": "pat_easy_cube_charge",
+            "minDifficulty": 2,
+            "weight": 18,
+            "lengthSegments": 2,
+            "cells": [
+              {
+                "segment": 0,
+                "lane": -1,
+                "offsetM": 10,
+                "obsRef": "obs_cube_roll"
+              },
+              {
+                "segment": 0,
+                "lane": 1,
+                "offsetM": 6,
+                "coins": 6
+              },
+              {
+                "segment": 1,
+                "lane": 1,
+                "offsetM": 10,
+                "obsRef": "obs_adwall"
+              }
+            ],
+            "guarantee": {
+              "safeLanePattern": [
+                1,
+                1,
+                0
+              ]
+            }
+          },
+          {
+            "id": "pat_mid_rusher",
+            "minDifficulty": 4,
+            "weight": 14,
+            "lengthSegments": 2,
+            "cells": [
+              {
+                "segment": 0,
+                "lane": 0,
+                "offsetM": 4,
+                "obsRef": "obs_rusher_long"
+              },
+              {
+                "segment": 0,
+                "lane": 1,
+                "offsetM": 18,
+                "coins": 6
+              },
+              {
+                "segment": 1,
+                "lane": -1,
+                "offsetM": 10,
+                "obsRef": "obs_box"
+              }
+            ],
+            "guarantee": {
+              "safeLanePattern": [
+                1,
+                1,
+                0
+              ]
+            }
+          },
+          {
+            "id": "pat_combo_slide_jump",
+            "minDifficulty": 4,
+            "weight": 16,
+            "lengthSegments": 2,
+            "cells": [
+              {
+                "segment": 0,
+                "lane": 0,
+                "offsetM": 6,
+                "obsRef": "obs_gate_low"
+              },
+              {
+                "segment": 0,
+                "lane": 0,
+                "offsetM": 15,
+                "obsRef": "obs_box"
+              },
+              {
+                "segment": 0,
+                "lane": 0,
+                "offsetM": 21,
+                "coins": 6
+              },
+              {
+                "segment": 1,
+                "lane": 1,
+                "offsetM": 10,
+                "obsRef": "obs_train_static"
+              },
+              {
+                "segment": 1,
+                "lane": -1,
+                "offsetM": 4,
+                "coins": 8
+              }
+            ]
+          },
+          {
+            "id": "pat_combo_wall_zap",
+            "minDifficulty": 6,
+            "weight": 14,
+            "lengthSegments": 2,
+            "cells": [
+              {
+                "segment": 0,
+                "lane": -1,
+                "offsetM": 8,
+                "obsRef": "obs_adwall"
+              },
+              {
+                "segment": 0,
+                "lane": 1,
+                "offsetM": 8,
+                "obsRef": "obs_adwall"
+              },
+              {
+                "segment": 0,
+                "lane": 0,
+                "offsetM": 8,
+                "obsRef": "obs_lightning_circle"
+              },
+              {
+                "segment": 1,
+                "lane": 0,
+                "offsetM": 8,
+                "obsRef": "obs_gate_low"
+              },
+              {
+                "segment": 1,
+                "lane": -1,
+                "offsetM": 14,
+                "coins": 5
+              }
+            ]
+          },
+          {
+            "id": "pat_combo_train_dismount",
+            "minDifficulty": 7,
+            "weight": 14,
+            "lengthSegments": 3,
+            "cells": [
+              {
+                "segment": 0,
+                "lane": 0,
+                "offsetM": 0,
+                "obsRef": "obs_mount_step"
+              },
+              {
+                "segment": 0,
+                "lane": 0,
+                "offsetM": 15,
+                "obsRef": "obs_train_slow"
+              },
+              {
+                "segment": 0,
+                "lane": 0,
+                "offsetM": 6,
+                "surface": "trainTop",
+                "coins": 6
+              },
+              {
+                "segment": 0,
+                "lane": -1,
+                "offsetM": 4,
+                "coins": 8
+              },
+              {
+                "segment": 1,
+                "lane": 0,
+                "offsetM": 16,
+                "obsRef": "obs_gate_low"
+              },
+              {
+                "segment": 1,
+                "lane": -1,
+                "offsetM": 22,
+                "obsRef": "obs_box"
+              },
+              {
+                "segment": 2,
+                "lane": -1,
+                "offsetM": 6,
+                "coins": 5
+              }
+            ]
+          },
+          {
+            "id": "pat_combo_pendulum_gauntlet",
+            "minDifficulty": 8,
+            "weight": 12,
+            "lengthSegments": 2,
+            "cells": [
+              {
+                "segment": 0,
+                "lane": 0,
+                "offsetM": 6,
+                "obsRef": "obs_pendulum"
+              },
+              {
+                "segment": 0,
+                "lane": 1,
+                "offsetM": 12,
+                "obsRef": "obs_adwall"
+              },
+              {
+                "segment": 0,
+                "lane": -1,
+                "offsetM": 2,
+                "coins": 8
+              },
+              {
+                "segment": 1,
+                "lane": 0,
+                "offsetM": 8,
+                "obsRef": "obs_arc_floor"
+              },
+              {
+                "segment": 1,
+                "lane": -1,
+                "offsetM": 14,
+                "obsRef": "obs_box"
+              },
+              {
+                "segment": 1,
+                "lane": 1,
+                "offsetM": 16,
+                "coins": 6
+              }
+            ]
+          },
+          {
+            "id": "pat_combo_rusher_zap",
+            "minDifficulty": 9,
+            "weight": 12,
+            "lengthSegments": 2,
+            "cells": [
+              {
+                "segment": 0,
+                "lane": 0,
+                "offsetM": 4,
+                "obsRef": "obs_rusher_long"
+              },
+              {
+                "segment": 0,
+                "lane": 1,
+                "offsetM": 10,
+                "obsRef": "obs_lightning_circle"
+              },
+              {
+                "segment": 1,
+                "lane": 0,
+                "offsetM": 8,
+                "obsRef": "obs_gate_low"
+              },
+              {
+                "segment": 1,
+                "lane": -1,
+                "offsetM": 14,
+                "obsRef": "obs_box"
+              },
+              {
+                "segment": 1,
+                "lane": 1,
+                "offsetM": 6,
+                "coins": 5
+              },
+              {
+                "segment": 1,
+                "lane": -1,
+                "offsetM": 20,
+                "coins": 5
+              }
+            ]
+          },
+          {
+            "id": "pat_breather_coins",
+            "minDifficulty": 3,
+            "weight": 14,
+            "lengthSegments": 2,
+            "cells": [
+              {
+                "segment": 0,
+                "lane": -1,
+                "offsetM": 3,
+                "coins": 9
+              },
+              {
+                "segment": 1,
+                "lane": 1,
+                "offsetM": 2,
+                "coins": 9
+              }
+            ],
+            "guarantee": {
+              "safeLanePattern": [
+                -1,
+                0,
+                1
+              ]
+            }
+          },
+          {
+            "id": "pat_breather_slalom",
+            "minDifficulty": 5,
+            "weight": 12,
+            "lengthSegments": 2,
+            "cells": [
+              {
+                "segment": 0,
+                "lane": 0,
+                "offsetM": 8,
+                "obsRef": "obs_barrier_low"
+              },
+              {
+                "segment": 0,
+                "lane": 1,
+                "offsetM": 4,
+                "coins": 6
+              },
+              {
+                "segment": 1,
+                "lane": -1,
+                "offsetM": 6,
+                "obsRef": "obs_cube_roll"
+              },
+              {
+                "segment": 1,
+                "lane": 0,
+                "offsetM": 8,
+                "coins": 5
+              }
+            ],
+            "guarantee": {
+              "safeLanePattern": [
+                1,
+                0
+              ]
+            }
+          },
+          {
+            "id": "pat_breather_empty",
+            "minDifficulty": 7,
+            "weight": 12,
+            "lengthSegments": 2,
+            "cells": [
+              {
+                "segment": 1,
+                "lane": 0,
+                "offsetM": 10,
+                "coins": 1
+              }
+            ],
+            "guarantee": {
+              "safeLanePattern": [
+                -1,
+                0,
+                1
+              ]
+            }
+          }
+        ],
+        "difficultyCurve": [
+          {
+            "by": 0,
+            "poolWeights": {
+              "pat_intro_straight": 30,
+              "pat_easy_single": 50,
+              "pat_easy_pair": 20
+            },
+            "coinDensity": 1,
+            "pickupRate": 0.7
+          },
+          {
+            "by": 1,
+            "poolWeights": {
+              "pat_easy_single": 25,
+              "pat_easy_pair": 25,
+              "pat_gate_slide": 30,
+              "pat_easy_barrier_hop": 20
+            },
+            "coinDensity": 1,
+            "pickupRate": 0.8
+          },
+          {
+            "by": 3,
+            "poolWeights": {
+              "pat_easy_pair": 14,
+              "pat_gate_slide": 22,
+              "pat_mid_gate_combo": 28,
+              "pat_train_top_run": 16,
+              "pat_mid_single_wall": 20,
+              "pat_easy_cube_charge": 14
+            },
+            "coinDensity": 1.1,
+            "pickupRate": 1
+          },
+          {
+            "by": 5,
+            "poolWeights": {
+              "pat_gate_slide": 12,
+              "pat_mid_gate_combo": 19,
+              "pat_mid_wall_dodge": 13,
+              "pat_train_top_run": 14,
+              "pat_mid_single_wall": 14,
+              "pat_mid_wall_gauntlet": 15,
+              "pat_easy_cube_charge": 12,
+              "pat_mid_rusher": 12,
+              "pat_breather_coins": 14,
+              "pat_breather_slalom": 12
+            },
+            "coinDensity": 1.15,
+            "pickupRate": 1
+          },
+          {
+            "by": 7,
+            "poolWeights": {
+              "pat_mid_gate_combo": 10,
+              "pat_mid_wall_dodge": 14,
+              "pat_train_top_run": 10,
+              "pat_hazard_weave": 13,
+              "pat_mid_single_wall": 10,
+              "pat_mid_wall_gauntlet": 12,
+              "pat_easy_cube_charge": 8,
+              "pat_mid_rusher": 10,
+              "pat_combo_slide_jump": 12,
+              "pat_combo_wall_zap": 11,
+              "pat_breather_coins": 14,
+              "pat_breather_slalom": 12,
+              "pat_breather_empty": 12
+            },
+            "coinDensity": 1.2,
+            "pickupRate": 1.1
+          },
+          {
+            "by": 9,
+            "poolWeights": {
+              "pat_mid_wall_dodge": 14,
+              "pat_train_top_run": 12,
+              "pat_hazard_weave": 15,
+              "pat_mid_single_wall": 12,
+              "pat_mid_wall_gauntlet": 12,
+              "pat_easy_cube_charge": 8,
+              "pat_mid_rusher": 11,
+              "pat_combo_slide_jump": 10,
+              "pat_combo_wall_zap": 10,
+              "pat_combo_train_dismount": 8,
+              "pat_combo_pendulum_gauntlet": 11,
+              "pat_breather_coins": 14,
+              "pat_breather_slalom": 12,
+              "pat_breather_empty": 12
+            },
+            "coinDensity": 1.25,
+            "pickupRate": 1.15
+          },
+          {
+            "by": 11,
+            "poolWeights": {
+              "pat_combo_slide_jump": 10,
+              "pat_combo_wall_zap": 11,
+              "pat_combo_train_dismount": 6,
+              "pat_combo_pendulum_gauntlet": 11,
+              "pat_combo_rusher_zap": 11,
+              "pat_mid_wall_gauntlet": 8,
+              "pat_hazard_weave": 8,
+              "pat_mid_rusher": 6,
+              "pat_breather_coins": 14,
+              "pat_breather_slalom": 12,
+              "pat_breather_empty": 12
+            },
+            "coinDensity": 1.3,
+            "pickupRate": 1.2
+          }
+        ],
+        "dropTable": {
+          "weights": {
+            "item_magnet": 22,
+            "item_boots": 18,
+            "item_helmet": 14,
+            "item_jetpack": 8,
+            "item_shield": 16,
+            "item_board": 14
+          },
+          "segmentM": 200,
+          "countWeights": {
+            "1": 50,
+            "2": 30,
+            "3": 20
+          },
+          "edgeMarginM": 8,
+          "minBoxGapM": 30
+        },
+        "laneBlock": {
+          "fromDifficulty": 4,
+          "weights": {
+            "0": 22,
+            "1": 62,
+            "2": 16
+          }
+        },
+        "tideAware": {
+          "lowMax": 0.15,
+          "coinCount": 6
+        },
+        "crossings": {
+          "ring": {
+            "everyM": 100,
+            "fromM": 150,
+            "yMin": 0,
+            "yMax": 3
+          }
+        },
+        "zap": {
+          "ref": "obs_lightning_circle",
+          "everyM": 200,
+          "fromM": 200
+        },
+        "antigrav": {
+          "lengthM": 90,
+          "everyM": 500,
+          "fromM": 600,
+          "ceilingH": 4.6
+        }
+      },
+      "themes": {
+        "$schema": "../schema/config.schema.json#/themes",
+        "configVersion": "2.1.0",
+        "minEngineVersion": "1.0.0",
+        "updatedAt": "2026-09-29",
+        "items": [
+          {
+            "id": "theme_seaside_day",
+            "status": "live",
+            "name": {
+              "zh-CN": "白日海景"
+            },
+            "sky": {
+              "shader": "thunder_sky",
+              "baseColor": "#4FA6DE",
+              "flashColor": "#FFFFFF",
+              "flashEveryS": [
+                9999,
+                9999
+              ]
+            },
+            "fog": {
+              "color": "#CFE9F6",
+              "density": 0.011
+            },
+            "track": {
+              "railMat": "mat_seaside_rail",
+              "groundTiles": [
+                "tile_beach_a",
+                "tile_beach_b"
+              ]
+            },
+            "props": [],
+            "scenery": "coast",
+            "groundColor": "#F0C67A",
+            "grade": {
+              "vignette": 0.12,
+              "grain": 0,
+              "bloom": 0.22,
+              "vignetteBoost": 0.07,
+              "saturationBoost": 0.07,
+              "bloomBoost": 0.09
+            },
+            "music": "assets/audio/bgm/run.mp3",
+            "sfxSet": "city",
+            "vfxTint": "#FFF0C8",
+            "versions": [
+              {
+                "ver": "1.0.0",
+                "date": "2026-09-22",
+                "change": "首发默认主题（霓虹下城）"
+              },
+              {
+                "ver": "2.0.0",
+                "date": "2026-09-29",
+                "change": "替换为白天海滨主题：删除霓虹下城与风暴上层，新增晴天天空/淡雾/暖沙地面配色"
+              },
+              {
+                "ver": "2.1.0",
+                "date": "2026-10-06",
+                "change": "补 scenery 字段声明侧景道具集（seaside = sceneryProps 的既有那套），供设置面板切换场景时按主题取侧景"
+              },
+              {
+                "ver": "3.0.0",
+                "date": "2026-10-08",
+                "change": "改名「白日海景」并切到 coast 道具集：右侧每 100m 一栋双层海景别墅（正方形平台底座 + 全屋落地玻璃 + 室内满陈设），左侧 100m 一节的海滩（木栅栏/长椅/礁石/椰林/浅滩/薄雾），沙地摆遮阳伞躺椅；海面起伏、波光、薄雾、玻璃反光、室内呼吸灯、草灌风动六组轻量化动效"
+              },
+              {
+                "ver": "3.0.1",
+                "date": "2026-10-13",
+                "change": "groundColor 由 #EFDDB8 改 #F0C67A：地面纹理不再自带沙色（改近中性，色调交回主题），这里把沙色补回配置里，渲染结果与原先一致（暖沙），不是改配色"
+              },
+              {
+                "ver": "3.1.0",
+                "date": "2026-11-09",
+                "change": "M0 晴天档：新增 grade 字段覆盖后处理画面参数（暗角 0.28→0.12/颗粒 0.035→0/bloom 0.32→0.22/冲刺联动减半）——雨夜口径的 grade 一直在压 live 默认的晴天通透感（coast-audit ⑤-1 头号风险）；其它主题零漂移（grade 缺省回雨夜常量）"
+              }
+            ]
+          },
+          {
+            "id": "theme_rain_konbini",
+            "status": "draft",
+            "name": {
+              "zh-CN": "雨夜便利店"
+            },
+            "sky": {
+              "shader": "thunder_sky",
+              "baseColor": "#1A2340",
+              "flashColor": "#9FD8FF",
+              "flashEveryS": [
+                11,
+                24
+              ]
+            },
+            "fog": {
+              "color": "#243050",
+              "density": 0.011
+            },
+            "track": {
+              "railMat": "mat_rain_rail",
+              "groundTiles": [
+                "tile_wet_a"
+              ]
+            },
+            "props": [],
+            "scenery": "konbini",
+            "groundColor": "#2C313D",
+            "features": {
+              "wetRoad": true
+            },
+            "music": "assets/audio/bgm/run_rain.mp3",
+            "sfxSet": "city",
+            "vfxTint": "#9FD8FF",
+            "versions": [
+              {
+                "ver": "1.0.0",
+                "date": "2026-10-06",
+                "change": "第二个跑酷场景：雨夜日式便利店街角。三条跑道沿用，两侧改为「便利店（每 100m 两侧交替）+ 有围栏小花园（中间段）+ 远景楼群」，纯程序化几何零素材，含降雨/滴水/涟漪/雨痕/自动门/招牌闪烁/信号灯七组手写动效"
+              },
+              {
+                "ver": "1.1.0",
+                "date": "2026-10-11",
+                "change": "music 改指 run_rain.mp3（雨声空灵版，响度对齐全局 run.mp3 到 -16.5 LUFS）：本字段自这次起真正被运行时读取——audioDirector.enterRun 收主题 BGM 路径，缺省仍回退 params.audio.bgm.run"
+              },
+              {
+                "ver": "1.2.0",
+                "date": "2026-10-12",
+                "change": "run_rain.mp3 换成用户补给的循环母带（雨声空灵版_循环.mp3，8.33 秒无缝版），路径不变、只换字节；仍按 -16.5 LUFS 对齐"
+              },
+              {
+                "ver": "1.3.0",
+                "date": "2026-10-13",
+                "change": "两侧街景扩到「便利店 — 空地路面 — 一排 2~3 层临街商铺（门前一巷杂物 + 公交站 + 贴跑道一条 2m 石板小道）— 小花园」，远景居民楼改三套型深蓝灰；groundColor 保持 #2C313D，但地面纹理不再吃沙色，这片地终于按配置显示成蓝灰而不是 muddy 棕"
+              },
+              {
+                "ver": "1.4.0",
+                "date": "2026-11-09",
+                "change": "M1 开闸（konbini-audit ④ Phase 1）：①环境闪电 flashEveryS [9999,9999]→[11,24]（闪电本就是本主题血脉，闭环同款三段式）；②features.wetRoad=true 开车道线倒影 + 路面水洼 roughnessMap（全主题门控字段，替代 scenery 硬编码）"
+              }
+            ]
+          },
+          {
+            "id": "theme_dusk_harbor",
+            "status": "live",
+            "name": {
+              "zh-CN": "黄昏渔港"
+            },
+            "sky": {
+              "shader": "thunder_sky",
+              "baseColor": "#E8935C",
+              "flashColor": "#FFE3B8",
+              "flashEveryS": [
+                9999,
+                9999
+              ]
+            },
+            "fog": {
+              "color": "#E8B27E",
+              "density": 0.011
+            },
+            "track": {
+              "railMat": "mat_seaside_rail",
+              "groundTiles": [
+                "tile_beach_a"
+              ]
+            },
+            "props": [],
+            "scenery": "harbor",
+            "groundColor": "#C98D5A",
+            "lighting": {
+              "hemiSky": "#7FA0C0",
+              "hemiGround": "#8A5A3A",
+              "hemiIntensity": 1.05,
+              "key": "#FFC98F",
+              "keyIntensity": 1.5
+            },
+            "env": {
+              "sky": "#E8B27E",
+              "glow": "#FFC98F",
+              "ground": "#4A342A"
+            },
+            "features": {
+              "wetRoad": true
+            },
+            "music": "assets/audio/bgm/run.mp3",
+            "sfxSet": "city",
+            "vfxTint": "#FFD9A8",
+            "versions": [
+              {
+                "ver": "1.0.0",
+                "date": "2026-11-06",
+                "change": "第三个跑酷场景：黄昏渔港铁道。网搜精密场景提示词合成（工业视差分层 Ansimuz + 霓虹夜城 5 层视差配方 → 橙青调渔港）：远景剪影+门式起重机、长仓库+集装箱堆（撞色 2-3 层错缝）、系船柱/栈桥暖灯/油桶/渔网架/渔船桅杆五层程序化侧景，约 20 个 draw call"
+              },
+              {
+                "ver": "1.1.0",
+                "date": "2026-11-09",
+                "change": "M1 湿路与光（harbor-audit ④ Phase 1）：①lighting 字段定调黄昏光（hemiSky 白日冷蓝 #bfe3ff→黄昏青蓝 #7FA0C0、key 暖阳→低角度暖橙 #FFC98F/1.5，色值实机可调）；②env 字段挂晚霞 IBL（金币抛光金+湿面晚霞反射）；③features.wetRoad=true 开雨后码头湿路（倒影+水洼）；④栈桥灯头/仓库高窗改暖橙自发光（bloom 轻微溢光，发光只认暖橙一种）"
+              }
+            ]
+          },
+          {
+            "id": "theme_stormspire",
+            "status": "draft",
+            "name": {
+              "zh-CN": "天穹雷脊"
+            },
+            "sky": {
+              "shader": "thunder_sky",
+              "baseColor": "#16233E",
+              "flashColor": "#CFE4FF",
+              "flashEveryS": [
+                7,
+                14
+              ]
+            },
+            "fog": {
+              "color": "#3D6B8F",
+              "density": 0.012
+            },
+            "track": {
+              "railMat": "mat_stormspire_rail",
+              "groundTiles": [
+                "tile_storm_a"
+              ]
+            },
+            "props": [],
+            "scenery": "stormspire",
+            "groundColor": "#24425A",
+            "env": {
+              "sky": "#CFE4FF",
+              "glow": "#FFC145",
+              "ground": "#16233E"
+            },
+            "lighting": {
+              "hemiSky": "#7FA8CC",
+              "hemiGround": "#1A2438",
+              "hemiIntensity": 0.95,
+              "key": "#BFD8EF",
+              "keyIntensity": 1.15
+            },
+            "music": "assets/audio/bgm/run.mp3",
+            "sfxSet": "city",
+            "vfxTint": "#FFC145",
+            "versions": [
+              {
+                "ver": "1.0.0",
+                "date": "2026-11-08",
+                "change": "第四个跑酷场景：天穹雷脊（Phase A 平面版，docs/stormspire-brief.md）。无尽雷暴云海之上的驭雷者废墟：三车道读作云海之上的雷渡石桥，两侧浮空岛链（八原型实例化）+ 雷脊塔远景剪影 + 导雷铜环横跨 + 摆链/风车/瀑布动件 + 风暴魟群与云渊鲸剪影；flashEveryS [7,14] 启用环境闪电（渲染层接线）。调色板 7 色：深渊靛 #16233E / 风暴青 #3D6B8F / 云白 #E9EFF3 / 石灰岩 #97A0AE / 铜绿 #4E9B8F / 熔金电光 #FFC145 / 苔灰绿 #6E8F6B"
+              },
+              {
+                "ver": "1.1.0",
+                "date": "2026-11-09",
+                "change": "IBL 门控契约化：env 字段显式声明雷暴配色（sky #CFE4FF/glow #FFC145/ground #16233E，与原 env.ts 硬编码逐字节同值）——行为零变化，只是从 stormspire 专属硬编码迁到 theme 字段（harbor-audit ②-8 门控契约统一）"
+              }
+            ]
+          },
+          {
+            "id": "theme_titan",
+            "status": "draft",
+            "name": {
+              "zh-CN": "沉眠泰坦"
+            },
+            "sky": {
+              "shader": "thunder_sky",
+              "baseColor": "#151C2C",
+              "flashColor": "#FFE9B8",
+              "flashEveryS": [
+                9999,
+                9999
+              ]
+            },
+            "fog": {
+              "color": "#46606E",
+              "density": 0.012
+            },
+            "track": {
+              "railMat": "mat_titan_rail",
+              "groundTiles": [
+                "tile_titan_a"
+              ]
+            },
+            "props": [],
+            "scenery": "titan",
+            "groundColor": "#4E4A3E",
+            "lighting": {
+              "hemiSky": "#6B7A8C",
+              "hemiGround": "#1A2030",
+              "hemiIntensity": 0.9,
+              "key": "#C9B896",
+              "keyIntensity": 1.05
+            },
+            "music": "assets/audio/bgm/run.mp3",
+            "sfxSet": "city",
+            "vfxTint": "#FFB454",
+            "versions": [
+              {
+                "ver": "1.0.0",
+                "date": "2026-11-09",
+                "change": "第五个跑酷场景：沉眠泰坦（Phase A 平面版，docs/scenes/titan-brief.md）。跑在横跨峡谷的巨神尸体脊沟上：尸身仍按 ~10s 周期呼吸（worldBend 远场 + 矩阵梯度近场），脊沟两侧椎棘骨锥列与甲缝亡火金导引纹，胸廓体块/肋拱×12/断剑冢/弑神箭丛/葬仪石环/须发帘摆动/颅首瞳孔 420m 距离闩锁睁眼，渡魂鸦 1 群 30 只穿拱飞行。调色板 7 色：烬空暮蓝 #151C2C / 雾灰青 #46606E / 骨象牙 #D9D2BE / 苍岩肤 #8A8271 / 尸苔绿 #5C7A5E / 铁锈红褐 #8A4A32 / 亡火金 #FFB454（唯一发光色）"
+              }
+            ]
+          },
+          {
+            "id": "theme_forgeheart",
+            "status": "draft",
+            "name": {
+              "zh-CN": "熔炉巨兽"
+            },
+            "sky": {
+              "shader": "thunder_sky",
+              "baseColor": "#1E1713",
+              "flashColor": "#FF8A50",
+              "flashEveryS": [
+                9999,
+                9999
+              ]
+            },
+            "fog": {
+              "color": "#4A3226",
+              "density": 0.013
+            },
+            "track": {
+              "railMat": "mat_forgeheart_rail",
+              "groundTiles": [
+                "tile_forge_a"
+              ]
+            },
+            "props": [],
+            "scenery": "forgeheart",
+            "groundColor": "#2A201A",
+            "lighting": {
+              "hemiSky": "#B8A99A",
+              "hemiGround": "#5A2E1C",
+              "hemiIntensity": 1,
+              "key": "#FFD2A8",
+              "keyIntensity": 1.1
+            },
+            "grade": {
+              "vignette": 0.3,
+              "grain": 0.04,
+              "bloom": 0.34
+            },
+            "music": "assets/audio/bgm/run.mp3",
+            "sfxSet": "city",
+            "vfxTint": "#FF5A1F",
+            "versions": [
+              {
+                "ver": "1.0.0",
+                "date": "2026-11-09",
+                "change": "第六个跑酷场景：熔炉巨兽（Phase A 平面版，docs/scenes/forgeheart-brief.md）。活火山炉腔内壁的锻运堤道：岩浆海按「炉心心跳」144m 周期潮汐涨落（渲染层纯函数 tide.ts 单源，Phase A 不判负），每 288m 喷发段带 1s 红光预警（eruption.ts 方案 B：LightningFx 同构接口，几何反向地→天喷柱+频闪断口+全场闪橙 FORGE_TINT #FF8A50）。蜂巢柱阵/渣滩阶地/火山颈内壁+螺旋壁架+炉心×2/哑阀/锻像/断链吊桥/焰髓晶簇/渣斗车。调色板 7 色：玄武黑 #1E1713 / 熔渣褐 #4A3A2E / 浮石灰 #B8A99A / 烧结赤 #7A3B2D（热但死）/ 哑青铜 #6E5B3A / 炉火橙 #FF5A1F（唯一发光色）/ 硫壳黄 #D9B545"
+              }
+            ]
+          },
+          {
+            "id": "theme_library",
+            "status": "draft",
+            "name": {
+              "zh-CN": "失重图书馆"
+            },
+            "sky": {
+              "shader": "thunder_sky",
+              "baseColor": "#1E1A33",
+              "flashColor": "#A63A2E",
+              "flashEveryS": [
+                9999,
+                9999
+              ]
+            },
+            "fog": {
+              "color": "#46536B",
+              "density": 0.012
+            },
+            "track": {
+              "railMat": "mat_library_rail",
+              "groundTiles": [
+                "tile_library_a"
+              ]
+            },
+            "props": [],
+            "scenery": "library",
+            "groundColor": "#D9C7A0",
+            "lighting": {
+              "hemiSky": "#B8AE9A",
+              "hemiGround": "#241F3D",
+              "hemiIntensity": 0.9,
+              "key": "#D8C9A8",
+              "keyIntensity": 1
+            },
+            "music": "assets/audio/bgm/run.mp3",
+            "sfxSet": "city",
+            "vfxTint": "#FFB65C",
+            "versions": [
+              {
+                "ver": "1.0.0",
+                "date": "2026-11-09",
+                "change": "第七个跑酷场景：失重图书馆（Phase A 平面版，docs/scenes/library-brief.md）。墨海上的缄默书城：书塔暗面墨青/书页陈纸米/蜡封红结构色/烛光琥珀唯一发光色，墨海条+墨雾带+书页风暴三层 1060 片+光尘 600+涟漪，三档书塔四态+摊开书岛+倒挂书山，万卷塔层带剪影+三片公转顶盖+悬索书梯+蜡封拱门×8+反重力书阁视觉隧道（真反重力 Phase B），纸鹤 3 群穿塔缝+墨渊鲸半沉剪影，障碍皮肤六类（vehicle=巨型对开本典籍保 rideTop）"
+              }
+            ]
+          }
+        ]
+      },
+      "events": {
+        "$schema": "../schema/config.schema.json#/events",
+        "configVersion": "1.1.0",
+        "minEngineVersion": "1.0.0",
+        "updatedAt": "2026-09-22",
+        "items": [
+          {
+            "id": "event_thunder_beast_siege",
+            "kind": "mode",
+            "status": "draft",
+            "name": {
+              "zh-CN": "雷暴围城"
+            },
+            "banner": {
+              "image": "assets/ui/events/siege.png",
+              "menuSlot": 1
+            },
+            "window": {
+              "start": "2026-10-01T10:00:00+08:00",
+              "end": "2026-10-08T23:59:59+08:00"
+            },
+            "entryGate": {
+              "minAccountLevel": 3
+            },
+            "overrides": {
+              "obstaclePoolShift": {
+                "pat_beast_chase": 35
+              },
+              "beastSpeedMul": 1.25,
+              "scoreMul": 1.2
+            },
+            "missions": [
+              {
+                "id": "mission_siege_1",
+                "type": "accumulate",
+                "metric": "distanceM",
+                "target": 15000,
+                "reward": {
+                  "coin": 2000
+                }
+              },
+              {
+                "id": "mission_siege_2",
+                "type": "count",
+                "metric": "skillCasts",
+                "target": 30,
+                "reward": {
+                  "shard": "shard_bolt:5"
+                }
+              },
+              {
+                "id": "mission_siege_3",
+                "type": "count",
+                "metric": "nearMiss",
+                "target": 120,
+                "reward": {
+                  "key": 2
+                }
+              },
+              {
+                "id": "mission_siege_4",
+                "type": "bestScore",
+                "metric": "score",
+                "target": 60000,
+                "reward": {
+                  "coin": 5000,
+                  "key": 1
+                }
+              }
+            ],
+            "leaderboard": {
+              "scope": "event",
+              "resetAt": "2026-10-08T23:59:59+08:00",
+              "topReward": {
+                "key": 10,
+                "shard": "shard_bolt:20"
+              }
+            },
+            "shopExtras": [
+              {
+                "offerRef": "offer_skin_bolt_storm"
+              }
+            ],
+            "versions": [
+              {
+                "ver": "1.0.0",
+                "date": "2026-09-22",
+                "change": "首个活动，上线前置 live 并灰度"
+              }
+            ]
+          },
+          {
+            "id": "event_week_login_nov",
+            "kind": "login",
+            "status": "live",
+            "name": {
+              "zh-CN": "十一月签到周"
+            },
+            "banner": {
+              "image": "assets/ui/events/login_nov.png",
+              "menuSlot": 2
+            },
+            "window": {
+              "start": "2026-11-01T00:00:00+08:00",
+              "end": "2026-11-07T23:59:59+08:00"
+            },
+            "entryGate": {
+              "minAccountLevel": 1
+            },
+            "loginRewards": [
+              {
+                "day": 1,
+                "reward": {
+                  "coin": 500
+                }
+              },
+              {
+                "day": 2,
+                "reward": {
+                  "shard": "shard_volt:5"
+                }
+              },
+              {
+                "day": 3,
+                "reward": {
+                  "coin": 1000
+                }
+              },
+              {
+                "day": 4,
+                "reward": {
+                  "item": "item_xp_card:1"
+                }
+              },
+              {
+                "day": 5,
+                "reward": {
+                  "key": 1
+                }
+              },
+              {
+                "day": 6,
+                "reward": {
+                  "shard": "shard_ama:8"
+                }
+              },
+              {
+                "day": 7,
+                "reward": {
+                  "key": 2,
+                  "coin": 2000
+                }
+              }
+            ],
+            "versions": [
+              {
+                "ver": "1.0.0",
+                "date": "2026-09-22",
+                "change": "模板示例"
+              },
+              {
+                "ver": "1.1.0",
+                "date": "2026-11-05",
+                "change": "转 live：签到系统上线（localEconomy.claimSignIn，每天一次，奖励入本机钱包）"
+              }
+            ]
+          }
+        ]
+      },
+      "economy": {
+        "$schema": "../schema/config.schema.json#/economy",
+        "configVersion": "1.1.0",
+        "minEngineVersion": "1.0.0",
+        "updatedAt": "2026-09-22",
+        "params": {
+          "shards": [
+            {
+              "id": "shard_volt",
+              "grants": "char_volt",
+              "need": {
+                "1": 50,
+                "2": 80,
+                "3": 120,
+                "4": 180,
+                "5": 260
+              }
+            },
+            {
+              "id": "shard_ama",
+              "grants": "char_ama",
+              "need": {
+                "1": 60,
+                "2": 90,
+                "3": 140,
+                "4": 200,
+                "5": 300
+              }
+            },
+            {
+              "id": "shard_kaze",
+              "grants": "char_kaze",
+              "need": {
+                "1": 60,
+                "2": 90,
+                "3": 140,
+                "4": 200,
+                "5": 300
+              }
+            },
+            {
+              "id": "shard_rina",
+              "grants": "char_rina",
+              "need": {
+                "1": 80,
+                "2": 120,
+                "3": 180,
+                "4": 260,
+                "5": 360
+              }
+            },
+            {
+              "id": "shard_bolt",
+              "grants": "char_bolt",
+              "need": {
+                "1": 80,
+                "2": 120,
+                "3": 180,
+                "4": 260,
+                "5": 360
+              }
+            },
+            {
+              "id": "shard_frog",
+              "grants": "char_frog",
+              "need": {
+                "1": 60,
+                "2": 90,
+                "3": 140,
+                "4": 200,
+                "5": 300
+              }
+            },
+            {
+              "id": "shard_mambo",
+              "grants": "char_mambo",
+              "need": {
+                "1": 60,
+                "2": 90,
+                "3": 140,
+                "4": 200,
+                "5": 300
+              }
+            },
+            {
+              "id": "shard_niu",
+              "grants": "char_niu",
+              "need": {
+                "1": 80,
+                "2": 120,
+                "3": 180,
+                "4": 260,
+                "5": 360
+              }
+            }
+          ],
+          "lootTables": [
+            {
+              "id": "loot_coin_chest",
+              "cost": {
+                "coin": 2000
+              },
+              "pity": {
+                "everyN": 10,
+                "guarantee": "rarity_sr_plus"
+              },
+              "entries": [
+                {
+                  "ref": "coin:300",
+                  "weight": 300,
+                  "rarity": "common"
+                },
+                {
+                  "ref": "coin:800",
+                  "weight": 150,
+                  "rarity": "common"
+                },
+                {
+                  "ref": "item_xp_card:1",
+                  "weight": 120,
+                  "rarity": "rare"
+                },
+                {
+                  "ref": "shard_volt:10",
+                  "weight": 150,
+                  "rarity": "rare"
+                },
+                {
+                  "ref": "shard_ama:10",
+                  "weight": 120,
+                  "rarity": "rare"
+                },
+                {
+                  "ref": "shard_kaze:10",
+                  "weight": 120,
+                  "rarity": "rare"
+                },
+                {
+                  "ref": "skin_volt_thunder",
+                  "weight": 20,
+                  "rarity": "sr"
+                },
+                {
+                  "ref": "shard_rina:15",
+                  "weight": 15,
+                  "rarity": "sr"
+                },
+                {
+                  "ref": "key:2",
+                  "weight": 5,
+                  "rarity": "ssr"
+                }
+              ]
+            },
+            {
+              "id": "loot_thunder_box",
+              "cost": {
+                "key": 3
+              },
+              "pity": {
+                "everyN": 5,
+                "guarantee": "rarity_sr_plus"
+              },
+              "entries": [
+                {
+                  "ref": "shard_ama:15",
+                  "weight": 200,
+                  "rarity": "rare"
+                },
+                {
+                  "ref": "shard_kaze:15",
+                  "weight": 200,
+                  "rarity": "rare"
+                },
+                {
+                  "ref": "shard_frog:15",
+                  "weight": 200,
+                  "rarity": "rare"
+                },
+                {
+                  "ref": "shard_mambo:15",
+                  "weight": 200,
+                  "rarity": "rare"
+                },
+                {
+                  "ref": "skin_volt_thunder",
+                  "weight": 60,
+                  "rarity": "sr"
+                },
+                {
+                  "ref": "shard_rina:25",
+                  "weight": 40,
+                  "rarity": "sr"
+                },
+                {
+                  "ref": "shard_niu:25",
+                  "weight": 40,
+                  "rarity": "sr"
+                },
+                {
+                  "ref": "char_rina",
+                  "weight": 8,
+                  "rarity": "ssr"
+                },
+                {
+                  "ref": "char_niu",
+                  "weight": 8,
+                  "rarity": "ssr"
+                }
+              ]
+            }
+          ],
+          "shop": {
+            "offers": [
+              {
+                "id": "offer_refill_coin",
+                "give": [
+                  {
+                    "item": "coin",
+                    "n": 1500
+                  }
+                ],
+                "price": {
+                  "key": 1
+                },
+                "limit": {
+                  "perDay": 5
+                }
+              },
+              {
+                "id": "offer_xp_card",
+                "give": [
+                  {
+                    "item": "item_xp_card",
+                    "n": 1
+                  }
+                ],
+                "price": {
+                  "coin": 1200
+                },
+                "limit": {
+                  "perDay": 3
+                }
+              },
+              {
+                "id": "offer_shard_volt",
+                "give": [
+                  {
+                    "item": "shard_volt",
+                    "n": 5
+                  }
+                ],
+                "price": {
+                  "coin": 600
+                },
+                "limit": {
+                  "perDay": 5
+                }
+              },
+              {
+                "id": "offer_skin_bolt_storm",
+                "give": [
+                  {
+                    "item": "skin_bolt_storm",
+                    "n": 1
+                  }
+                ],
+                "price": {
+                  "key": 12
+                },
+                "limit": {
+                  "once": true
+                },
+                "requiresEvent": "event_thunder_beast_siege"
+              }
+            ]
+          },
+          "missions": {
+            "minRunSeconds": 10,
+            "daily": {
+              "pick": 3,
+              "pool": [
+                {
+                  "id": "mdist",
+                  "tier": "easy",
+                  "type": "accumulate",
+                  "metric": "distanceM",
+                  "target": 3000,
+                  "reward": {
+                    "coin": 400
+                  }
+                },
+                {
+                  "id": "mcoin",
+                  "tier": "easy",
+                  "type": "accumulate",
+                  "metric": "coins",
+                  "target": 500,
+                  "reward": {
+                    "coin": 400
+                  }
+                },
+                {
+                  "id": "mslide",
+                  "tier": "easy",
+                  "type": "count",
+                  "metric": "slides",
+                  "target": 30,
+                  "reward": {
+                    "coin": 450
+                  }
+                },
+                {
+                  "id": "mruns",
+                  "tier": "easy",
+                  "type": "count",
+                  "metric": "runs",
+                  "target": 5,
+                  "reward": {
+                    "coin": 400
+                  }
+                },
+                {
+                  "id": "mskill",
+                  "tier": "mid",
+                  "type": "count",
+                  "metric": "skillCasts",
+                  "target": 10,
+                  "reward": {
+                    "shard": "shard_volt:5"
+                  }
+                },
+                {
+                  "id": "mnear",
+                  "tier": "mid",
+                  "type": "count",
+                  "metric": "nearMiss",
+                  "target": 40,
+                  "reward": {
+                    "coin": 900
+                  }
+                },
+                {
+                  "id": "mnohit",
+                  "tier": "hard",
+                  "type": "count",
+                  "metric": "cleanRuns",
+                  "target": 2,
+                  "reward": {
+                    "key": 1
+                  }
+                },
+                {
+                  "id": "mscore",
+                  "tier": "hard",
+                  "type": "bestScore",
+                  "metric": "score",
+                  "target": 40000,
+                  "reward": {
+                    "shard": "shard_ama:8"
+                  }
+                }
+              ],
+              "rule": "one easy + one mid + one hard"
+            },
+            "weekly": {
+              "pick": 4,
+              "pool": [
+                {
+                  "id": "wdist",
+                  "tier": "mid",
+                  "type": "accumulate",
+                  "metric": "distanceM",
+                  "target": 30000,
+                  "reward": {
+                    "coin": 3000
+                  }
+                },
+                {
+                  "id": "wskill",
+                  "tier": "mid",
+                  "type": "count",
+                  "metric": "skillCasts",
+                  "target": 80,
+                  "reward": {
+                    "shard": "shard_kaze:15"
+                  }
+                },
+                {
+                  "id": "wpickup",
+                  "tier": "easy",
+                  "type": "count",
+                  "metric": "itemPickups",
+                  "target": 50,
+                  "reward": {
+                    "coin": 2000
+                  }
+                },
+                {
+                  "id": "wchars",
+                  "tier": "hard",
+                  "type": "count",
+                  "metric": "charactersPlayed",
+                  "target": 3,
+                  "reward": {
+                    "key": 2,
+                    "diamond": 1
+                  }
+                }
+              ]
+            }
+          },
+          "accountLevels": {
+            "xpPerRunBase": 50,
+            "xpCurve": "n*120",
+            "rewards": {
+              "3": {
+                "unlock": "mode_challenge"
+              },
+              "5": {
+                "unlock": "mode_friend_race"
+              },
+              "10": {
+                "grant": {
+                  "key": 3
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "minRunSeconds": 10,
+    "maxFrames": 108000,
+    "maxActions": 20000
+  },
+  "baseline": "38d5116"
+}

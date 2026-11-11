@@ -38,11 +38,14 @@ export class MissionStore {
         payload_hash TEXT, valid_run INTEGER NOT NULL DEFAULT 0
       );
       CREATE INDEX IF NOT EXISTS runs_by_user ON runs(user_id, started_at);
+      CREATE TABLE IF NOT EXISTS replay_rulesets (id TEXT PRIMARY KEY, definition_json TEXT NOT NULL);
+      CREATE TABLE IF NOT EXISTS service_metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL);
     `);
     // 旧行保留 NULL：无装备、主题走默认；迁移失败需在启动时暴露。
     const columns = new Set(this.db.prepare('PRAGMA table_info(runs)').all().map(column => column.name));
     if (!columns.has('items_json')) this.db.exec('ALTER TABLE runs ADD COLUMN items_json TEXT');
     if (!columns.has('theme_id')) this.db.exec('ALTER TABLE runs ADD COLUMN theme_id TEXT');
+    if (!columns.has('rules_id')) this.db.exec('ALTER TABLE runs ADD COLUMN rules_id TEXT REFERENCES replay_rulesets(id)');
     this.statements = {
       user: this.db.prepare('SELECT id FROM users WHERE id = ?'),
       createUser: this.db.prepare('INSERT INTO users(id, created_at) VALUES(?, ?)'),
@@ -60,8 +63,13 @@ export class MissionStore {
       wallet: this.db.prepare('SELECT item, amount FROM wallets WHERE user_id = ? ORDER BY item'),
       addWallet: this.db.prepare(`INSERT INTO wallets(user_id, item, amount) VALUES(?, ?, ?)
         ON CONFLICT(user_id, item) DO UPDATE SET amount = amount + excluded.amount`),
-      addRun: this.db.prepare(`INSERT INTO runs(id, user_id, started_at, daily_id, weekly_id, seed, char_id, items_json, theme_id)
-        VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)`),
+      addRun: this.db.prepare(`INSERT INTO runs(id, user_id, started_at, daily_id, weekly_id, seed, char_id, items_json, theme_id, rules_id)
+        VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`),
+      addRuleset: this.db.prepare('INSERT OR IGNORE INTO replay_rulesets(id, definition_json) VALUES(?, ?)'),
+      ruleset: this.db.prepare('SELECT definition_json FROM replay_rulesets WHERE id = ?'),
+      legacyMarker: this.db.prepare("SELECT value FROM service_metadata WHERE key = 'legacy-replay-baseline'"),
+      saveLegacyMarker: this.db.prepare("INSERT INTO service_metadata(key, value) VALUES('legacy-replay-baseline', ?)"),
+      bindLegacyRuns: this.db.prepare("UPDATE runs SET rules_id = ? WHERE status = 'open' AND rules_id IS NULL"),
       countOpen: this.db.prepare(`SELECT COUNT(*) AS count FROM runs WHERE user_id = ? AND status = 'open' AND started_at >= ?`),
       run: this.db.prepare('SELECT * FROM runs WHERE id = ? AND user_id = ?'),
       finishRun: this.db.prepare(`UPDATE runs SET status = 'finished', finished_at = ?,
@@ -125,7 +133,22 @@ export class MissionStore {
   addWallet(userId, item, amount) { this.statements.addWallet.run(userId, item, amount); }
   createRun(run) {
     this.statements.addRun.run(run.id, run.userId, run.startedAt, run.dailyId, run.weeklyId, run.seed, run.charId,
-      run.items?.length ? JSON.stringify(run.items) : null, run.themeId ?? null);
+      run.items?.length ? JSON.stringify(run.items) : null, run.themeId ?? null, run.rulesId ?? null);
+  }
+  addRuleset({ id, definition }) { this.statements.addRuleset.run(id, JSON.stringify(definition)); }
+  getRuleset(id) {
+    const row = this.statements.ruleset.get(id);
+    return row ? { id, definition: JSON.parse(row.definition_json) } : null;
+  }
+  adoptLegacyRules(ruleset) {
+    return this.transaction(() => {
+      this.addRuleset(ruleset);
+      const existing = this.statements.legacyMarker.get();
+      if (existing) return { id: existing.value, adopted: 0 };
+      const adopted = Number(this.statements.bindLegacyRuns.run(ruleset.id).changes);
+      this.statements.saveLegacyMarker.run(ruleset.id);
+      return { id: ruleset.id, adopted };
+    });
   }
   getRun(runId, userId) { return this.statements.run.get(runId, userId) ?? null; }
   countOpenRuns(userId, earliestStartedAt = Number.MIN_SAFE_INTEGER) {

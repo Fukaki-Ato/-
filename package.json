@@ -9,7 +9,7 @@
     "apps/*"
   ],
   "scripts": {
-    "build": "tsc -b",
+    "build": "tsc -b && node tools/build-replay-runtime.mjs",
     "watch": "tsc -b --watch",
     "test": "node --test tests/*.test.mjs",
     "validate-config": "node tools/validate-config.mjs",

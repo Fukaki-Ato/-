@@ -140,7 +140,12 @@ export function createMissionHttpServer(options = {}) {
   const trustedProxy = options.trustedProxy ?? process.env.TRUSTED_PROXY_IP;
   if (trustedProxy && !isIP(trustedProxy)) throw new Error('TRUSTED_PROXY_IP must be one exact proxy IP address');
   const store = new MissionStore(options.dbPath ?? process.env.MISSIONS_DB_PATH ?? fileURLToPath(new URL('../data/missions.sqlite', import.meta.url)));
-  const service = new MissionService({ store, content: options.content ?? loadMissionContent(), now, limits, minRunSeconds: options.minRunSeconds });
+  let service;
+  try {
+    service = new MissionService({ store, content: options.content ?? loadMissionContent(), now, limits, minRunSeconds: options.minRunSeconds,
+      replaySource: options.replaySource, legacyRuleset: options.legacyRuleset,
+      trustedReplayRuntimeHashes: options.trustedReplayRuntimeHashes ?? (process.env.TRUSTED_REPLAY_RUNTIME_HASHES ?? '').split(',').map(value => value.trim()).filter(Boolean) });
+  } catch (error) { store.close(); throw error; }
   const limiter = new RateLimiter(limits, now);
 
   // 定期数据清理（runs/users 无限增长审查 S-3）；unref 不阻止进程退出，close 时显式清除
