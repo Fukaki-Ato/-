@@ -45,6 +45,8 @@ export type SimEvent =
   /** flip（B-6 反重力区）：翻转状态实际变化时发一次（进区/出区各一次；飞行/滑翔进区按 B-3 落地后才翻）。
    *  渲染/音频据此做约 0.35s 镜头滚转 + 音效下潜；ceilH=区顶高（出区回 0） */
   | { type: 'flip'; flip: 1 | -1; ceilH: number }
+  | { type: 'bounce'; vy: number }
+  | { type: 'chaserNear'; dist: number }
   | { type: 'cross'; kind: string; lane: number; worldZ: number };
 
 export interface RunnerState {
@@ -70,6 +72,8 @@ export interface RunnerState {
    *  每步 step 由 zoneAt(distance) 推导写入（单向门：飞行/滑翔中不翻转，B-3），渲染层只读不反写 */
   flip: 1 | -1;
   ceilH: number;
+  /** 追击者距离（米，M7a）：8=贴脸→80=远离；受击拉近、奔跑缓慢拉远 */
+  chaserDist: number;
 }
 
 /** 空装备：未指定角色时的默认手感（保持 M1 行为不变） */
@@ -91,6 +95,6 @@ export function initialRunnerState(): RunnerState {
     tideLevel: 0,
     surgeWarn: 0,
     supportY: 0,
-    flip: 1, ceilH: 0,
+    flip: 1, ceilH: 0, chaserDist: 50,
   };
 }

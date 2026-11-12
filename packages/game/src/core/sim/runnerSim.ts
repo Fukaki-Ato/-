@@ -37,7 +37,8 @@ export class RunnerSim {
   readonly cloudsArr: CloudEntity[] = [];
   readonly crossings: CrossingEntity[] = []; // M4 穿越判定体（crossings 配置出生，cross 事件计分）
   readonly events: SimEvent[] = [];
-  private surgeFired = false; readonly tideAware: boolean; // M4 喷发判定化：tideAware=obstacles.json 有 tideAware 块
+  private surgeFired = false;
+  private lastHits = 0; readonly tideAware: boolean; // M4 喷发判定化：tideAware=obstacles.json 有 tideAware 块
   readonly state: RunnerState;
   /** 生命数（game.json runner.lives，默认 1：一撞即出局，新手保护仍生效） */
   readonly lives: number;
@@ -94,6 +95,7 @@ export class RunnerSim {
     this.fly = { heightM: fl.heightM ?? 4.6, speedMul: fl.speedMul ?? 2.5, glideSpeedMul: fl.glideSpeedMul ?? 1.6, glideS: fl.glideS ?? 1.8 };
     this.state = initialRunnerState();
     this.gen = new TrackGen(content, new RunRng(seed));
+    const hs = (this.R as Record<string, number>).headstartM ?? 0; if (hs > 0) this.state.distance = hs;
     this.mv = new Movement({
       laneWidth: this.laneWidth, gravity: this.R.gravity ?? -38, jumpVelocity: this.R.jumpVelocity ?? 15.2, // 参数块合并行守 300 行上限
       slideS: this.R.slideS ?? 0.6, slideCooldownS: this.R.slideCooldownS ?? 0.3, laneChangeS: this.R.laneChangeS ?? 0.18,
@@ -115,7 +117,6 @@ export class RunnerSim {
       tutorial: { protectionS: this.protectionS, take: () => { if (this.usedProtection) return false; this.usedProtection = true; return true; } },
     };
     this.applyPassive();
-    // 装备道具注入（t=0 直接加 buff，不计入 itemPickups 拾取指标）：与局内拾取同一条 buff 通路
     this.initialItems = (initialItems ?? []).filter(id => itemEffects(content, id).length > 0).slice(0, 3);
     for (const id of this.initialItems) this.applyEffects(itemEffects(content, id), id);
   }
@@ -216,16 +217,15 @@ export class RunnerSim {
     const base = this.R.baseSpeed ?? 12; const max = this.R.maxSpeed ?? 26; const ramp = this.R.speedRampPer100M ?? 0.18;
     const modeMul = fx.flyT > 0 ? this.fly.speedMul : s.gliding ? this.fly.glideSpeedMul : s.stunT > 0 ? STUN_SPEED_MUL : 1;
     const raw = Math.min(max, base + ramp * s.distance / 100) * modeMul * fx.speedMul * fx.timeSlowMul;
-    // 飞行/滑翔段允许超过地面 max（2.5 倍巡航），但单步位移仍有绝对上限（FLY_SPEED_CAP）
     const cap = fx.flyT > 0 || s.gliding ? FLY_SPEED_CAP : max;
     const dm = Math.min(raw, cap) * STEP_DT;
     s.distance += dm;
     if (this.tideAware) this.surgeFired = applySurgeStep(s, dm, this.events, this.surgeFired); else s.surgeWarn = 0;
-    // M4 穿越判定层：深度窗+高度带一次性判定（playerY=s.y），命中加分并推 cross 事件（渲染层爆点）
     s.score += stepCrossings(this.crossings, s.distance, s.y, CROSSING_DEFAULTS, this.events) * CROSSING_DEFAULTS.scorePer;
-    cullCrossings(this.crossings, s.distance, CULL_BEHIND_M); s.tideLevel = level(s.distance); // M4 潮位单源：全主题算（~4 op），潮汐主题消费其余忽略
+    cullCrossings(this.crossings, s.distance, CULL_BEHIND_M); s.tideLevel = level(s.distance);
+    s.chaserDist = Math.max(8, Math.min(80, s.chaserDist + (s.hits > this.lastHits ? -8 : 0.02)));
+    this.lastHits = s.hits; // M4 潮位单源：全主题算（~4 op），潮汐主题消费其余忽略
 
-    // 纵向漂移障碍（moveZ<0=向玩家冲来的冲撞体）：推进 worldZ，并把沿途同车道障碍撞开
     for (const o of this.obstacles) {
       if (!o.moveZ || o.done) continue;
       o.worldZ += o.moveZ * STEP_DT;
@@ -263,7 +263,6 @@ export class RunnerSim {
     for (const o of this.obstacles) {
       if (o.done) continue;
       const z = relZ(o, s.distance);
-      // 电弧地面不用 DEPTH_SLACK 前瞻：4m 弧 + 2×0.4 前瞻 = 4.8m 判定期，「跳过弧心但擦到边缘判死」的体感根因之一（与判定线过高叠加，见 collision.HAZARD_HIT_Y）。
       if (o.cls === 'hazard' && o.zap !== true) {
         if (Math.abs(z) > o.d / 2) continue;
       } else if (!inDepthWindow(o, z)) continue;
