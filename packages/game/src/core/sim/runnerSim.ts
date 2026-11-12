@@ -8,8 +8,7 @@ import { buildLoadout, itemEffects, type EffectSpec, type Loadout } from './char
 import { collectCoins, collectPickups, type CollectDeps } from './collect.js';
 import { hitsRunner, inDepthWindow, isNearMiss, relZ, safestLane, type FlipCtx } from './collision.js';
 import { clearSkyCoins } from './landing.js';
-import { applySurgeStep, level } from './tide.js';
-import { CROSSING_DEFAULTS, cullCrossings, stepCrossings } from './crossings.js';
+import { stepFx } from './stepFx.js';
 import { Movement } from './movement.js';
 import { parseReviveConfig, tryRevive, type ReviveState } from './revive.js';
 import { resolveHit, type HitCtx } from './resolveHit.js';
@@ -38,7 +37,7 @@ export class RunnerSim {
   readonly crossings: CrossingEntity[] = []; // M4 穿越判定体（crossings 配置出生，cross 事件计分）
   readonly events: SimEvent[] = [];
   private surgeFired = false;
-  private lastHits = 0; readonly tideAware: boolean; // M4 喷发判定化：tideAware=obstacles.json 有 tideAware 块
+  private readonly fxCtx = { tideAware: false, surgeFired: false, crossings: this.crossings, lastHits: 0, laneWidth: 0 }; readonly tideAware: boolean; // M4 喷发判定化：tideAware=obstacles.json 有 tideAware 块
   readonly state: RunnerState;
   /** 生命数（game.json runner.lives，默认 1：一撞即出局，新手保护仍生效） */
   readonly lives: number;
@@ -82,10 +81,11 @@ export class RunnerSim {
   readonly initialItems: string[];
   constructor(private readonly content: GameContent, seed: number, charId?: string, private readonly recordReplay = false, initialItems?: string[]) {
     this.tideAware = !!(content.obstacles as unknown as { tideAware?: unknown }).tideAware;
+    this.fxCtx.tideAware = this.tideAware;
     const p = content.game.params;
     this.R = (p.runner ?? {}) as Record<string, number>;
     this.SC = (p.score ?? {}) as Record<string, number>;
-    this.laneWidth = this.R.laneWidth ?? 2.2;
+    this.laneWidth = this.R.laneWidth ?? 2.2; this.fxCtx.laneWidth = this.laneWidth;
     this.lives = this.R.lives ?? 1;
     this.invulnS = this.R.invulnS ?? 1.4;
     this.coinFront = -(this.R.coinCollectM ?? 1.1);
@@ -220,11 +220,9 @@ export class RunnerSim {
     const cap = fx.flyT > 0 || s.gliding ? FLY_SPEED_CAP : max;
     const dm = Math.min(raw, cap) * STEP_DT;
     s.distance += dm;
-    if (this.tideAware) this.surgeFired = applySurgeStep(s, dm, this.events, this.surgeFired); else s.surgeWarn = 0;
-    s.score += stepCrossings(this.crossings, s.distance, s.y, CROSSING_DEFAULTS, this.events) * CROSSING_DEFAULTS.scorePer;
-    cullCrossings(this.crossings, s.distance, CULL_BEHIND_M); s.tideLevel = level(s.distance);
-    s.chaserDist = Math.max(8, Math.min(80, s.chaserDist + (s.hits > this.lastHits ? -8 : 0.02)));
-    this.lastHits = s.hits; // M4 潮位单源：全主题算（~4 op），潮汐主题消费其余忽略
+    // M4/M7a 效果步进（surge/crossings/潮位/追击者/弹跳垫，见 stepFx.ts）
+    this.fxCtx.surgeFired = this.surgeFired;
+    this.surgeFired = stepFx(s, dm, this.events, this.obstacles, this.fxCtx);
 
     for (const o of this.obstacles) {
       if (!o.moveZ || o.done) continue;

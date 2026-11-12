@@ -3,7 +3,7 @@
  */
 import * as THREE from 'three';
 import type { CloudEntity, ObstacleEntity } from '@tr/game/core/sim/trackGen.js';
-import { RAMP_TOP_FLAT_M, obstacleX } from '@tr/game/core/sim/collision.js';
+import { RAMP_TOP_FLAT_M, laserOn, obstacleX } from '@tr/game/core/sim/collision.js';
 import { createPosterPicker, posterSize } from './adPosters.js';
 import { createStormspireObstacleSkin, SKIN_CLASSES, type SkinCalibration } from './stormspire/obstacleSkin.js';
 import { createTitanObstacleSkin } from './titan/obstacleSkin.js';
@@ -110,15 +110,13 @@ export function createObstacleLayer(scene: THREE.Scene, laneWidth: number, scene
     ramp.visible = false; root.add(ramp);
     const rampTop = new THREE.Mesh(boxGeo, rampMat);
     rampTop.visible = false; root.add(rampTop);
-    // 广告墙正面：不受光的海报面片（广告牌自带亮度，夜色里不该被方向光压暗）。transparent 一次性打开、只改 opacity：
-    // 横杆要半透明而矮障要不透明，逐帧翻 transparent 会重排渲染队列。
+    // 广告墙正面：不受光的海报面片（广告牌自带亮度，夜色里不该被方向光压暗）。transparent 一次性打开、只改 opacity： 横杆要半透明而矮障要不透明，逐帧翻 transparent 会重排渲染队列。
     const poster = new THREE.Mesh(posterGeo, new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true }));
     poster.visible = false; root.add(poster);
     units.push({ bar, posts, band, disc, bolt, ramp, rampTop, poster });
   }
 
-  // 雷脊假弯道：默认盘残件（zap 圆盘/闪电标志/step 斜坡/海报/电弧光带/横杆立柱）与雷脊皮肤一样跟着地面弯，
-  // 否则远处未换皮障碍漂出弯道（皮肤件在 obstacleSkin.ts 内注入；applyWorldBend 幂等，见 stormspire/worldBend.ts）
+  // 雷脊假弯道：默认盘残件（zap 圆盘/闪电标志/step 斜坡/海报/电弧光带/横杆立柱）与雷脊皮肤一样跟着地面弯， 否则远处未换皮障碍漂出弯道（皮肤件在 obstacleSkin.ts 内注入；applyWorldBend 幂等，见 stormspire/worldBend.ts）
   if (scenery === 'stormspire') {
     applyWorldBend(postMat);
     applyWorldBend(rampMat);
@@ -172,6 +170,7 @@ export function createObstacleLayer(scene: THREE.Scene, laneWidth: number, scene
         const slot = pickPoster(o);
         const m = u.bar;
         m.visible = !isZap && o.cls !== 'step' && !skinned; // 闪电圈用圆盘+闪电标志、斜坡用坡道几何，不画通用方块
+        if (o.cls === 'laser') m.visible = m.visible && !!o.laserCfg && laserOn(o.laserCfg, t);
         let sx = o.w, sy = o.h, sz = o.d, py = o.h / 2;
         if (m.visible) {
           const mat = m.material as THREE.MeshStandardMaterial;

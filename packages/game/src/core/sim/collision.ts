@@ -18,6 +18,11 @@ export function relZ(o: ObstacleEntity, distance: number): number {
   return distance - o.worldZ;
 }
 
+/** 激光是否亮着（M7b）：周期 onS+offS，phase 偏移；确定性纯函数 */
+export function laserOn(cfg: { onS: number; offS: number; phase: number }, t: number): boolean {
+  return ((t + cfg.phase) % (cfg.onS + cfg.offS)) < cfg.onS;
+}
+
 /** 障碍中心 x（pendulum 类随时间横摆，摆幅取一半见 obstacles.json swing.ampM）。
  *  防呆：swing 字段非法（NaN/非正周期）或角色时间异常时按车道中心处理，绝不返回 NaN。 */
 export function obstacleX(o: ObstacleEntity, t: number, laneWidth: number): number {
@@ -88,7 +93,8 @@ export function hitsRunner(o: ObstacleEntity, s: RunnerState, laneWidth: number,
   const playerH = s.sliding ? SLIDE_H : standH;
   const yEff = flip && flip.flip === -1 ? flip.ceilH - s.y : s.y;
   if (o.cls === 'low') return yEff < o.h * 0.75;
-  if (o.cls === 'step') return false; // 板子：纯支撑面，永不判负（用于无弹跳鞋登火车）
+  if (o.cls === 'step' || o.cls === 'bounce') return false; // 支撑/弹跳：纯正向交互，永不判负
+  if (o.cls === 'laser') return !!o.laserCfg && laserOn(o.laserCfg, s.t); // 亮时按满格光束判，灭时穿过
   if (o.cls === 'high') return yEff < o.h && yEff + playerH > BAR_BOTTOM;
   if (o.cls === 'hazard') return yEff < HAZARD_HIT_Y;
   if (o.cls === 'moving') return o.jumpable ? yEff < o.h * 0.75 : true; // 摆锤 jumpable=true：跳够高度即可越过

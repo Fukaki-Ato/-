@@ -13,7 +13,7 @@ export type { CrossingEntity };
 
 export interface ObstacleEntity {
   obsRef: string;
-  cls: 'low' | 'high' | 'full' | 'moving' | 'hazard' | 'vehicle' | 'step';
+  cls: 'low' | 'high' | 'full' | 'moving' | 'hazard' | 'vehicle' | 'step' | 'bounce' | 'laser';
   w: number; h: number; d: number;
   lane: number;
   worldZ: number;
@@ -26,6 +26,8 @@ export interface ObstacleEntity {
   done?: boolean;      // 已命中（避免同一障碍重复判负）
   passed?: boolean;    // 已掠过角色面（近失判定一次性）
   motion?: { xSweepM: number; periodS: number; hoverY: number; bobAmp: number }; // M4 场景专属运动
+  bounceVY?: number;   // M7a 弹跳垫：踩中弹起速度
+  laserCfg?: { onS: number; offS: number; phase: number }; // M7b 激光：on/off 周期
 }
 
 export interface CoinEntity { lane: number; worldZ: number; y?: number; flight?: true; taken?: boolean; passed?: boolean; chain?: number; takenAt?: number }
@@ -121,8 +123,7 @@ export class TrackGen {
   difficulty(z: number): number { return Math.floor(z / 300); }
 
   /**
-   * 铺设空中内容（飞行器触发/续时）：在 [fromZ,toZ] 生成悬浮在飞行高度的金币带（本组车道数 按地面同款 laneGroupWeights 抽 1/2/3 道，不再条条铺满三条路——用户反馈）与随机分布的云团。
-   * 地面内容（障碍/地面金币/道具箱）不受影响、照常生成——飞行只是从上方掠过， 玩家要求「天上也能看到地面障碍」；着陆安全由滑翔段的动态清道保证。
+   * 铺设空中内容（飞行器触发/续时）：在 [fromZ,toZ] 生成悬浮在飞行高度的金币带（本组车道数 按地面同款 laneGroupWeights 抽 1/2/3 道，不再条条铺满三条路——用户反馈）与随机分布的云团。 地面内容（障碍/地面金币/道具箱）不受影响、照常生成——飞行只是从上方掠过， 玩家要求「天上也能看到地面障碍」；着陆安全由滑翔段的动态清道保证。
    */
   spawnSky(fromZ: number, toZ: number, skyY: number, coins: CoinEntity[], clouds: CloudEntity[]) {
     spawnSkyContent({
