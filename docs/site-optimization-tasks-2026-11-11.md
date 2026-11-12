@@ -1,8 +1,8 @@
 # 全站优化：任务账本
 
-**设计版本：v1｜更新：2026-11-11｜执行状态：B01–B04 本地候选已验收，完整工作流进行中**
+**设计版本：v1｜更新：2026-11-12｜执行状态：B01–B05 本地候选已验收，完整工作流进行中**
 
-规则见[工作流设计](site-optimization-workflow-2026-11-11.md)，问题及 E/V/B 证据见[审查框架](site-optimization-framework-2026-11-11.md)。本文是状态唯一入口；范围、版本、负责者和证据见 [B01](site-optimization/records/B01.md)、[B02](site-optimization/records/B02.md)、[B03](site-optimization/records/B03.md)、[B04](site-optimization/records/B04.md)。未激活条目继续保留候选状态。
+规则见[工作流设计](site-optimization-workflow-2026-11-11.md)，问题及 E/V/B 证据见[审查框架](site-optimization-framework-2026-11-11.md)。本文是状态唯一入口；范围、版本、负责者和证据见 [B01](site-optimization/records/B01.md)、[B02](site-optimization/records/B02.md)、[B03](site-optimization/records/B03.md)、[B04](site-optimization/records/B04.md)、[B05](site-optimization/records/B05.md)。未激活条目继续保留候选状态。
 
 ## 1. 如何读与使用
 
@@ -77,7 +77,7 @@
 | REP-03 | 在线版本与结算一致 / 父记录 | T3；T6；E4 | REP-01 | 由 missions/ranking/client-match 继承，分开核对已签发复跑与新开局匹配 | 已替代 |
 | REP-03.missions | [任务签发环境复跑 / 改](site-optimization/records/B04.md#rep-03-missions) | T3；T6；E4 | REP-02.online.missions | rules_id 持久绑定可信 ABI-1 包、配置及资格，跨内容/代码/重启仍按签发环境执行 | 已验收 |
 | REP-03.ranking | 排名版本与挑战一致 / 改 | T3；T6；E4 | REP-02.online.ranking | 落实所定排名分支契约，不借任务 SQLite 结果声称进程内挑战已恢复 | 拟定 |
-| REP-03.client-match | 新开局客户端版本匹配 / 改 | T3；T6；B04 明确边界 | REP-02.online.missions、REP-03.missions | 将客户端实际模拟/配置与服务端新签发环境对齐；旧页面需明确刷新，不影响已签发票据重试 | 拟定 |
+| REP-03.client-match | [新开局客户端版本匹配 / 改](site-optimization/records/B05.md#rep-03-client-match) | T3；T6；B04 明确边界 | REP-02.online.missions、REP-03.missions | 根构建代码身份及基础配置共同声明，任务/榜单签发前拒绝旧版本；实际浏览器旧页面409、刷新201，已签发finish保持兼容 | 已验收 |
 | REP-04 | [离线复现与 golden 语义 / 改](site-optimization/records/B03.md#rep-04) | T3；T8；E4；E9 | REP-01 | 显式 v2 保留主题/初始道具并报告实际生效上下文；默认 v1 与 15 个 golden 字节不变，无重录 | 已验收 |
 
 ## 6. CON：内容契约与职责边界
@@ -238,6 +238,7 @@
 | QA-01.B02 | [B02 关系覆盖 / 实例](site-optimization/records/B02.md#qa-01-b02) | T2；T8；E3 | WF-03、VAL-02、VAL-03、VAL-04 | 核对关联保存、失败/重试、旧存档读取和奖励共存；831 项检查及七组真实浏览器行为对应同一候选 | 已验收 |
 | QA-01.B03 | [B03 版本/上下文覆盖 / 实例](site-optimization/records/B03.md#qa-01-b03) | T3；T7；T8 | WF-03、VAL-05、REP-01、REP-04、REP-02.local、UX-09.profile、UX-01.canvas | 旧读取器红绿对照、实际模拟差异、小屏滚动与 842 项检查；不把在线未决保证计为通过 | 已验收 |
 | QA-01.B04 | [B04 任务绑定覆盖 / 实例](site-optimization/records/B04.md#qa-01-b04) | T3；T6；T8 | WF-03、REP-03.missions、SVC-02.missions | 真实重启红绿复现、受控模拟包B、包与golden等价、数据库代码不自证信任、503队列与一次迁移 | 已验收 |
+| QA-01.B05 | [B05 新开局匹配覆盖 / 实例](site-optimization/records/B05.md#qa-01-b05) | T3；T6；T8 | WF-03、REP-03.client-match | 858项检查、代码/配置身份、真实HTTP与旧finish、实际浏览器201→409→201、票据数和明确刷新反馈 | 已验收 |
 
 ## 15. REL：按批集成与可选发布
 
@@ -255,6 +256,9 @@
 | REL-02.B03 | [B03 候选交付回执 / 实例](site-optimization/records/B03.md#rel-02-b03) | T8；E10 | REL-01.B03 | 交付仍停本地候选，不自动推送/发布，在线旧局及其他页面继续独立推进 | 已验收 |
 | REL-01.B04 | [B04 候选集成 / 实例](site-optimization/records/B04.md#rel-01-b04) | T8；E10 | QA-01.B04 | 实现 a654884、可信38基线、构建/部署约定、本记录及七份证据进入同一候选 | 已验收 |
 | REL-02.B04 | [B04 候选交付回执 / 实例](site-optimization/records/B04.md#rel-02-b04) | T8；E10 | REL-01.B04 | 停在本地候选；未执行生产DDL/服务切换，保留客户端新开局匹配与排名恢复后继 | 已验收 |
+| REL-01.B05 | [B05 候选集成 / 实例](site-optimization/records/B05.md#rel-01-b05) | T8；E10 | QA-01.B05 | 实现907e8b5、构建/部署契约、记录与必要证据进入同一候选；保留B01–B04及WX独立在制树 | 已验收 |
+| REL-02.B05 | [B05 候选交付回执 / 实例](site-optimization/records/B05.md#rel-02-b05) | T8；E10 | REL-01.B05 | 本地候选未发布；只读核对正式38d5116，记录独立测试站alias缺失404，排名生命周期仍独立未决 | 已验收 |
+| REL-03.test-route | [独立测试站交付目录恢复 / 改](site-optimization/records/B05.md#rel-02-b05) | B05 接续实际404与缺失alias目标 | — | 确定恢复的源码/制品版本后补回既有测试目录，核对完整入口、资源与手机流程；保留正式站和既有网络边界，不以隔离浏览器代替该路由恢复 | 拟定 |
 
 实例的额外硬依赖在选批时补入，例如 `REL-01.B01 → UX-01、UX-03、CHR-ama-V`。被依赖的只是已选叶子，不是整个 UX/CHR 主线。若本批选入的 `FEEL-02` 经核实决定保留，需在集成记录中明确接收该不做判定及原产物，不改写为实施成功。发布若不在范围，`REL-02.B01` 仍可按“候选交付”验收，必须写清停点，不能叫已上线。
 

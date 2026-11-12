@@ -1,0 +1,32 @@
+B05 接续与只读审查，2026-11-12
+
+原会话 ses_e369cb74affeA64yPgV2UQhjg0 的最后工作为 B05，候选输入 688394a。
+本次恢复通过定向消息分页和原生子会话列表；未重新执行正式部署。
+首次 session.list --param 查询未得到期望的筛选/数量，改用 URL query 定向分页后成功。
+原截图的输出上限/invalid JSON 错误未重现，不能根据截图确定两者因果或部署结论。
+
+reviewer: ses_e31df405fffeeIBjkq1if5dYp1
+目标: /tmp/opencode/thunder-run-site-optimization-20261111
+已核对 HEAD 688394a、分支 feature/site-optimization-20261111。
+范围: 全部 B05 未提交 diff、新版本模块、相关实际调用方与部署文档。
+结果: 未发现重要具体缺陷或阻断性测试缺口。
+要点: 基础 content 传至真实 Web 开局；代码声明不进入自哈希图；
+finish/队列仍只送 frames/actions，QA 隔离保留；未把排名重启恢复计为完成。
+reviewer 未独立重跑测试；cck-code-review skill 加载被权限拒绝，其余只读审查完成。
+主代理另行重跑 858 项全量检查、Web 构建、真实隔离浏览器并读取两张结果图。
+归档脚本改为仓库相对导入和显式新输出目录后，另行实际执行通过，行为断言不变。
+该次日志: /tmp/opencode/thunder-run-handoff-20261112-Eo4bFx/b05-browser-portable.txt
+首次封存前 cached diff 检查发现构建日志一行尾随空格，提交未执行；
+归档文本仅规范化该处空白，原始构建日志保留，随后重新核对并提交。
+
+原生构建任务: sh_1ce212523001x6dxOua1Oimzwr，exit 0。
+原生浏览器任务: sh_1ce231a62001CPO2Xg1ZVwoPwx，exit 0。
+完整日志: /tmp/opencode/thunder-run-handoff-20261112-Eo4bFx/
+浏览器仅回环候选和临时数据库，新浏览器配置；隔离模式 explicit-no-sandbox。
+2 条 HTTP 409 是受控版本切换的预期响应；无页面脚本错误或失败资源。
+
+只读正式核对: REVISION 38d5116e03d92415584b4fa1b63381a6db104e4d；
+排行榜/任务 active，实际进程 cwd 均指向同 SHA 的 release。
+独立测试站回环 HTML/REVISION 404；现有 Nginx alias 目标
+/tmp/opencode/thunder-run-preview-root 已不存在。未改 Nginx/正式站/测试站。
+主目录 WX/美术在制工作保留；本批候选不等于生产发布或真实 WX 验收。

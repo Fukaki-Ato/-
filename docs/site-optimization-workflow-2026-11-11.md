@@ -1,8 +1,8 @@
 # 全站优化：长任务工作流设计
 
-**版本：设计 v1｜更新：2026-11-11｜执行状态：B01–B04 本地候选已验收，完整工作流进行中**
+**版本：设计 v1｜更新：2026-11-12｜执行状态：B01–B05 本地候选已验收，完整工作流进行中**
 
-本文件最初交付工作流设计与静态任务定义；随后用户授权执行完整工作流，现已进入运行阶段。实际范围、提交与验收见 [B01](site-optimization/records/B01.md)、[B02](site-optimization/records/B02.md)、[B03](site-optimization/records/B03.md)、[B04](site-optimization/records/B04.md)及[任务账本](site-optimization-tasks-2026-11-11.md)。现有微信在制工作仍独立归属；候选未发布正式站。
+本文件最初交付工作流设计与静态任务定义；随后用户授权执行完整工作流，现已进入运行阶段。实际范围、提交与验收见 [B01](site-optimization/records/B01.md)、[B02](site-optimization/records/B02.md)、[B03](site-optimization/records/B03.md)、[B04](site-optimization/records/B04.md)、[B05](site-optimization/records/B05.md)及[任务账本](site-optimization-tasks-2026-11-11.md)。现有微信在制工作仍独立归属；候选未发布正式站。
 
 ## 1. 三份文档各自负责什么
 

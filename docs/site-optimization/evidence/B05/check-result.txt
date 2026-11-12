@@ -1,0 +1,72 @@
+B05 接手后复核，2026-11-12
+命令: npm run check
+目标: /tmp/opencode/thunder-run-site-optimization-20261111
+输入: 688394a + 已提交907e8b5的B05改动
+环境: Node v22.23.3 / npm 10.9.9
+
+[1/7] 编译 TypeScript（tsc -b）...
+[2/7] 构建可持久化回放包...
+[3/7] 构建侧类型检查（tsc --noEmit）...
+[4/7] 运行单元测试...
+[5/7] 配置校验...
+[6/7] 架构禁令检查...
+架构禁令检查通过（269 个源文件：框架/游戏无宿主越界，WX 全局仅在平台目录，全部 ≤300 行）
+[7/7] 微信小游戏 bundle 校验（--dry 不发布）...
+[dry] wx bundle 校验通过 ✓（未发布）
+
+  ---
+  duration_ms: 1.129283
+  type: 'test'
+  ...
+# Subtest: skipCell: both external 12m windows include their outer endpoints for every cell class
+ok 855 - skipCell: both external 12m windows include their outer endpoints for every cell class
+  ---
+  duration_ms: 1.36048
+  type: 'test'
+  ...
+# Subtest: skipCell: zone body retains class filtering and unconfigured tracks retain all cells
+ok 856 - skipCell: zone body retains class filtering and unconfigured tracks retain all cells
+  ---
+  duration_ms: 0.376066
+  type: 'test'
+  ...
+# Subtest: skipCell: neighboring clearance windows take precedence even inside an adjacent zone
+ok 857 - skipCell: neighboring clearance windows take precedence even inside an adjacent zone
+  ---
+  duration_ms: 0.205628
+  type: 'test'
+  ...
+# Subtest: TrackGen.ensure: registered zones suppress obstacle cells in entrance and exit windows
+ok 858 - TrackGen.ensure: registered zones suppress obstacle cells in entrance and exit windows
+  ---
+  duration_ms: 6.791638
+  type: 'test'
+  ...
+1..858
+# tests 858
+# suites 0
+# pass 858
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 57709.485865
+[5/7] 配置校验...
+配置校验通过（8 个文件 + schema 走查 + primitive 双清单比对）
+[6/7] 架构禁令检查...
+架构禁令检查通过（269 个源文件：框架/游戏无宿主越界，WX 全局仅在平台目录，全部 ≤300 行）
+[7/7] 微信小游戏 bundle 校验（--dry 不发布）...
+apps/wx/dist （--dry 临时目录校验）（minify=false）：分包占位 26 项，音频 19 个 2713 KB
+── 小游戏包体（未压缩字节，主包上限 4.00 MB / 整包上限 30.00 MB）──
+  main              1634.1 KB   39.9%  (3 个文件)
+  pkg-assets       13071.8 KB   42.6%  (113 个文件)
+  TOTAL            14705.9 KB
+game.js 体积构成 Top5：
+     621 KB  node_modules/three/build/three.core.js
+     603 KB  node_modules/three/build/three.module.js
+      19 KB  packages/game/dist/render/library/landmarks.js
+      14 KB  packages/game/dist/core/config/configValidator.js
+      13 KB  packages/game/dist/render/titan/relics.js
+[dry] wx bundle 校验通过 ✓（未发布）
+
+============ ALL PASS ============

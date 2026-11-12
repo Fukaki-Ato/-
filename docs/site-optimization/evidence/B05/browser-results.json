@@ -1,0 +1,136 @@
+{
+  "scope": "candidate production bundle, real isolated mission/ranking backends, fresh profile; controlled publication config B; no production writes",
+  "checks": [
+    {
+      "phase": "matched-A",
+      "result": "pass",
+      "rankingStart": 201,
+      "missionStart": 201
+    },
+    {
+      "phase": "stale-page-A-on-B",
+      "result": "pass",
+      "rankingStart": 409,
+      "missionStart": 409,
+      "newMissionTickets": 0,
+      "feedback": "本局未连接任务服务：游戏规则已更新，请刷新页面后重新开局"
+    },
+    {
+      "phase": "refreshed-B",
+      "result": "pass",
+      "rankingStart": 201,
+      "missionStart": 201
+    }
+  ],
+  "receipts": [
+    {
+      "phase": "matched-A",
+      "method": "GET",
+      "path": "/thunder-run/",
+      "status": 200
+    },
+    {
+      "phase": "matched-A",
+      "method": "POST",
+      "path": "/api/missions/session",
+      "status": 201
+    },
+    {
+      "phase": "matched-A",
+      "method": "GET",
+      "path": "/api/missions",
+      "status": 200
+    },
+    {
+      "phase": "matched-A",
+      "method": "POST",
+      "path": "/thunder-run/api/runs",
+      "status": 201,
+      "rulesId": "first-coin-v3:f7c2364650a30483067bf7763f21925a9846c1903ee39209585893a967c3d257:first-coin-v2-1fd6ed70"
+    },
+    {
+      "phase": "matched-A",
+      "method": "POST",
+      "path": "/api/missions/runs",
+      "status": 201,
+      "clientRulesId": "mission-client-v1:f7c2364650a30483067bf7763f21925a9846c1903ee39209585893a967c3d257:a063262d"
+    },
+    {
+      "phase": "matched-A",
+      "method": "POST",
+      "path": "/thunder-run/api/runs/cancel",
+      "status": 200
+    },
+    {
+      "phase": "matched-A",
+      "method": "POST",
+      "path": "/api/missions/runs/:id/finish",
+      "status": 200
+    },
+    {
+      "phase": "matched-A",
+      "method": "GET",
+      "path": "/api/missions",
+      "status": 200
+    },
+    {
+      "phase": "stale-page-A-on-B",
+      "method": "POST",
+      "path": "/thunder-run/api/runs",
+      "status": 409,
+      "rulesId": "first-coin-v3:f7c2364650a30483067bf7763f21925a9846c1903ee39209585893a967c3d257:first-coin-v2-1fd6ed70"
+    },
+    {
+      "phase": "stale-page-A-on-B",
+      "method": "POST",
+      "path": "/api/missions/runs",
+      "status": 409,
+      "clientRulesId": "mission-client-v1:f7c2364650a30483067bf7763f21925a9846c1903ee39209585893a967c3d257:a063262d"
+    },
+    {
+      "phase": "stale-page-A-on-B",
+      "method": "GET",
+      "path": "/api/missions",
+      "status": 200
+    },
+    {
+      "phase": "stale-page-A-on-B",
+      "method": "GET",
+      "path": "/api/missions",
+      "status": 200
+    },
+    {
+      "phase": "refreshed-B",
+      "method": "GET",
+      "path": "/thunder-run/",
+      "status": 200
+    },
+    {
+      "phase": "refreshed-B",
+      "method": "POST",
+      "path": "/api/missions/session",
+      "status": 200
+    },
+    {
+      "phase": "refreshed-B",
+      "method": "GET",
+      "path": "/api/missions",
+      "status": 200
+    },
+    {
+      "phase": "refreshed-B",
+      "method": "POST",
+      "path": "/thunder-run/api/runs",
+      "status": 201,
+      "rulesId": "first-coin-v3:f7c2364650a30483067bf7763f21925a9846c1903ee39209585893a967c3d257:first-coin-v2-4da5fa8b"
+    },
+    {
+      "phase": "refreshed-B",
+      "method": "POST",
+      "path": "/api/missions/runs",
+      "status": 201,
+      "clientRulesId": "mission-client-v1:f7c2364650a30483067bf7763f21925a9846c1903ee39209585893a967c3d257:a2e9b4ba"
+    }
+  ],
+  "errors": []
+}
