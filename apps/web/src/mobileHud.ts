@@ -21,12 +21,14 @@ export function createMobileHud(): HudHandle {
   const hearts = uiText('span', '', 'hud-hearts');
   counters.append(coins, hearts);
   top.append(scoreCard, counters);
+  // A-3 统一事件预告条：顶部居中大横幅（深底+描边；urgency 1=喷发橙红 2=翻转青蓝），淡入淡出走 CSS transition
+  const alert = uiText('div', '', 'hud-alert');
   const buffs = uiText('div', '', 'hud-buffs');
   const skill = uiText('div', '', 'hud-skill');
   const skillName = uiText('strong', '');
   const skillState = uiText('span', '');
   skill.append(uiText('span', 'ϟ', 'hud-skill-icon'), skillName, skillState);
-  root.append(top, buffs, skill);
+  root.append(alert, top, buffs, skill);
   document.body.append(root);
   let disposed = false;
   return {
@@ -39,6 +41,9 @@ export function createMobileHud(): HudHandle {
       const hits = Math.max(0, Math.min(h.hits, lives));
       hearts.textContent = '♥'.repeat(lives - hits) + '♡'.repeat(hits);
       hearts.setAttribute('aria-label', `剩余生命 ${lives - hits}`);
+      // 预告条：有告警亮起（换 urgency 配色），无告警摘类淡出（文本保留不闪换，opacity 过渡在 CSS）
+      if (h.alert) { alert.textContent = h.alert.text; alert.dataset.urgency = String(h.alert.urgency); alert.classList.add('is-on'); }
+      else alert.classList.remove('is-on');
       const merged = new Map<string, number>();
       for (const buff of h.buffs ?? []) merged.set(buff.name, Math.max(merged.get(buff.name) ?? -Infinity, buff.left));
       buffs.textContent = [...merged].map(([name, left]) => `${name}${Number.isFinite(left) ? ` ${Math.ceil(left)}s` : ''}`).join(' · ');

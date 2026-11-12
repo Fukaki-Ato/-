@@ -72,6 +72,9 @@ export interface RunnerState {
    *  每步 step 由 zoneAt(distance) 推导写入（单向门：飞行/滑翔中不翻转，B-3），渲染层只读不反写 */
   flip: 1 | -1;
   ceilH: number;
+  /** 反重力区预告剩余米数（A-1 统一事件预告条）：区外且距下一区起点 ∈(0,60]（60m≈3 秒预告窗）时>0，
+   *  区内/未配置 antigrav 恒 0；stepFx 每步由 zoneAt 推导写入，HUD 顶部横幅消费 */
+  flipWarn: number;
   /** 追击者距离（米，M7a）：8=贴脸→80=远离；受击拉近、奔跑缓慢拉远 */
   chaserDist: number;
 }
@@ -95,6 +98,6 @@ export function initialRunnerState(): RunnerState {
     tideLevel: 0,
     surgeWarn: 0,
     supportY: 0,
-    flip: 1, ceilH: 0, chaserDist: 50,
+    flip: 1, ceilH: 0, chaserDist: 50, flipWarn: 0,
   };
 }

@@ -2,7 +2,8 @@
  * 反重力区 sim 闭环测试（失重图书馆 Phase B，brief §11.2 B-1~B-6）。
  * 同 seed 倒挂 fixture：blanked-pattern 内容（单一空模板=净空世界）+ 真实 antigrav 配置，
  * 断言：flip 轨迹（进区 -1/出区 1）、区内 low 障碍 yEff 镜像判负、单向门（flyT>0 进区
- * 不立即翻转）、区内金币带 y=ceilH−0.65 与倒挂收集、禁铺窗、以及
+ * 不立即翻转）、区内金币带 y=ceilH−0.65 与倒挂收集、禁铺窗、flipWarn 预告窗（A-2，
+ * 距下一区 ≤60m=剩余米数/区内 0/未配置恒 0）、以及
  * 「未配置 antigrav ⇒ flip 恒 1、ceilH 恒 0、既有行为逐字节不变」硬门。
  */
 import test from 'node:test';
@@ -175,6 +176,26 @@ test('禁铺窗：入口前 12m 与出口后 12m 不铺任何障碍 cell；区�
       assert.ok(['low', 'high', 'full', 'hazard'].includes(o.cls), `区内出现禁放类别 ${o.cls}（${o.obsRef}）`);
     }
   }
+});
+
+test('flipWarn 预告窗（A-2）：区外距下一区 ≤60m=剩余米数、距区 30m 处 ≈30、区内=0、未配置恒 0', () => {
+  const sim = new RunnerSim(blankContent(), 777);
+  sim.state.t = 20; sim.state.distance = ZS - 45; sim.gen.genZ = ZS - 45;
+  sim.step(); // 首步 ensure 预注册区（同 yEff 镜像测试口径），次步起 stepFx 写 flipWarn
+  let at30 = null;
+  for (let i = 0; i < 4000 && sim.state.distance < ZS + 5; i++) {
+    sim.step();
+    const s = sim.state;
+    if (s.distance < ZS) {
+      assert.ok(s.flipWarn > 0 && s.flipWarn <= 60, `预告窗内 flipWarn∈(0,60]（${s.flipWarn}@${s.distance}）`);
+      assert.ok(Math.abs(s.flipWarn - (ZS - s.distance)) < 1e-9, 'flipWarn=距下一区起点的剩余米数');
+      if (at30 === null && s.distance >= ZS - 30) at30 = s.flipWarn; // fromM-30 处取样
+    } else assert.equal(s.flipWarn, 0, '区内 flipWarn=0');
+  }
+  assert.ok(at30 !== null && Math.abs(at30 - 30) < 1, `距区 30m 处 flipWarn≈30（实测 ${at30}）`);
+  const off = new RunnerSim(blankContent(false), 777); // 无 antigrav 对照：同起点跑同里程
+  off.state.t = 20; off.state.distance = ZS - 45; off.gen.genZ = ZS - 45;
+  for (let i = 0; i < 600; i++) { off.step(); assert.equal(off.state.flipWarn, 0, '未配置 ⇒ flipWarn 恒 0（全主题零变化）'); }
 });
 
 test('倒挂收集：天花板带金币（y=ceilH−0.65）被翻转身体中心命中；地面高度币不吃', () => {

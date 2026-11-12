@@ -4,6 +4,7 @@
  */
 import { applySurgeStep, level } from './tide.js';
 import { CROSSING_DEFAULTS, cullCrossings, stepCrossings, type CrossingEntity } from './crossings.js';
+import { zoneAt, type Zone } from './zones.js';
 import type { ObstacleEntity } from './trackGen.js';
 import type { RunnerState } from './simTypes.js';
 
@@ -14,6 +15,8 @@ export interface FxCtx {
   crossings: CrossingEntity[];
   lastHits: number;
   laneWidth: number;
+  /** 反重力区表引用（A-2 预告窗用；runnerSim 构造后在 gen 就绪处注入 gen.zones。未配置=空数组 ⇒ flipWarn 恒 0） */
+  zones: Zone[];
 }
 
 /**
@@ -30,6 +33,14 @@ export function stepFx(s: RunnerState, dm: number, events: { type: string; [k: s
   s.score += stepCrossings(ctx.crossings, s.distance, s.y, CROSSING_DEFAULTS, events) * CROSSING_DEFAULTS.scorePer;
   cullCrossings(ctx.crossings, s.distance, 14);
   s.tideLevel = level(s.distance);
+  // A-2 反重力预告窗：zoneAt 查区内（区内=0，用法同 runnerSim 的 flip 推导）；区外二分找下一区起点
+  // （zones 按 startM 升序），剩余 ∈(0,60] ⇒ flipWarn=剩余米数（60m≈3 秒预告）。zones 空 ⇒ 恒 0（硬门）。
+  s.flipWarn = 0;
+  if (ctx.zones.length > 0 && !zoneAt(ctx.zones, s.distance)) {
+    let lo = 0, hi = ctx.zones.length;
+    while (lo < hi) { const mid = (lo + hi) >> 1; if (ctx.zones[mid]!.startM <= s.distance) lo = mid + 1; else hi = mid; }
+    if (lo < ctx.zones.length) { const gap = ctx.zones[lo]!.startM - s.distance; if (gap <= 60) s.flipWarn = gap; }
+  }
   // M7a 追击者：受击拉近 8m、奔跑缓慢拉远（钳 8~80）
   s.chaserDist = Math.max(8, Math.min(80, s.chaserDist + (s.hits > ctx.lastHits ? -8 : 0.02)));
   ctx.lastHits = s.hits;

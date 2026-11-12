@@ -21,7 +21,7 @@ import { createSpeedLines } from './speedLines.js';
 import { createTrackVisuals } from './trackVisuals.js';
 import { createBurstPool } from './vfxBurst.js';
 import { applyLightningFlash, createLightningFx, FLASH_LIGHT_GAIN } from './lightning.js';
-import { deriveRunStage, wireRunInput } from './runTheme.js';
+import { buildAlert, deriveRunStage, wireRunInput } from './runTheme.js';
 import { createPostFx } from './postfx.js';
 import { createEnvMap, disposeEnvMap } from './stormspire/env.js';
 import { createEruption } from './forgeheart/eruption.js'; import { createChaser } from './chaser.js';
@@ -29,7 +29,7 @@ import { createEruption } from './forgeheart/eruption.js'; import { createChaser
 export interface RunCallbacks {
   onHud(h: {
     score: number; coins: number; distance: number; hits: number; lives: number;
-    buffs: { name: string; left: number }[];
+    buffs: { name: string; left: number }[]; alert?: { text: string; urgency: 1 | 2 } | null; // A-3 预告条（buildAlert 派生；null=隐藏横幅，1=喷发橙红 2=翻转青蓝；可选=局首快照可缺省）
     /** cd=冷却剩余秒；charge=下滑积攒门槛（{now, need}），无门槛技能为 null */
     skill: { label: string; cd: number; ready: boolean; charge: { now: number; need: number } | null } | null;
   }): void;
@@ -134,7 +134,7 @@ export function createRunnerScene(
   // ---------- 主循环：固定步长推进 + 插值渲染 ----------
   let raf = 0, last = adapter.now(), acc = 0, hudTimer = 0, shakeT = 0, endTimer = -1, ended = false, running = true;
   let camY = rig0.camY, lookY = rig0.lookY, camX = 0; // 相机平滑状态（初值=稳态，避免首帧俯仰跳动）
-  let rollK = 0, rollDir = 0; // B-7 镜头滚转渲染态：rollK∈[0,1]（0=正向 / 1=倒挂 π），flip 事件定方向，renderSim 按 dt/FLIP_ROLL_S 推进
+  let rollK = 0, rollDir = 0, flipFlashT = 0; // B-7 镜头滚转渲染态：rollK∈[0,1]（0=正向 / 1=倒挂 π），flip 事件定方向，renderSim 按 dt/FLIP_ROLL_S 推进；flipFlashT=A-6 翻转瞬间横幅计时
   let paused = false; // 后台暂停位（见下方 onVisibility）
 
   // ---------- 后台可见性（§7.9）：进后台冻结 tick 累计，回前台把 last 对齐避免 dt 尖峰 ----------
@@ -163,7 +163,7 @@ export function createRunnerScene(
         if (eruption) eruption.strike(ev.lane, ev.worldZ, laneWidth); // forgeheart：zap 继承喷柱+闪橙视觉
       } else if (ev.type === 'surge') { if (eruption) eruption.strike(ev.lane, ev.worldZ, laneWidth); } // M4 喷发判定化
         else if (ev.type === 'cross') { fireAtPlayer(0xffb454); shakeT = 0.1; } // M4 穿越判定：走位奖励爆点（泰坦亡火金色系）
-      else if (ev.type === 'flip') rollDir = ev.flip === -1 ? 1 : -1; // B-7 反重力：进区镜头滚向 π、出区滚回 0（FLIP_ROLL_S 过渡，音效下潜另接）
+      else if (ev.type === 'flip') { rollDir = ev.flip === -1 ? 1 : -1; flipFlashT = 1.2; } // B-7 反重力：进区镜头滚向 π、出区滚回 0（FLIP_ROLL_S 过渡）；A-6 横幅闪现 1.2s「重力翻转！」
       // pickup：按用户要求不加特效与震动，仅 HUD 显示 buff 倒计时（只回调音频）
       else if (ev.type === 'pickup') cb.onPickup?.();
     }
@@ -234,6 +234,7 @@ export function createRunnerScene(
     if (s.surgeWarn > 0) buffs.push({ name: '喷发预警', left: Math.ceil(s.surgeWarn) }); // M4 喷发判定化：1s 红光预警进 HUD
     const sk = sim.loadout.skill;
     cb.onHud({
+      alert: flipFlashT > 0 ? { text: '重力翻转！', urgency: 2 } : buildAlert(s), // A-4/A-6：翻转瞬间 1.2s 闪现优先，常态走 buildAlert
       score: s.score, coins: s.coins, distance: s.distance, hits: s.hits, lives: sim.lives, buffs,
       skill: sk ? {
         label: sk.label,
@@ -260,7 +261,7 @@ export function createRunnerScene(
     bursts.update(dt, fx.magnetT > 0);
     renderSim(acc / STEP_DT, dt);
 
-    hudTimer += dt;
+    hudTimer += dt; if (flipFlashT > 0) flipFlashT -= dt; // A-6 翻转横幅计时衰减（与 HUD 推送同帧域，buildAlert 不动）
     if (hudTimer >= HUD_INTERVAL_S) { hudTimer = 0; pushHud(); }
     if (endTimer >= 0 && !ended) {
       endTimer += dt;

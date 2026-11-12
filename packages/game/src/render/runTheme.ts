@@ -116,6 +116,15 @@ export function deriveRunStage(content: GameContent, opts?: { themeId?: string }
   };
 }
 
+/** A-3 统一事件预告条（HUD 顶部大横幅，两事件共用）：surgeWarn=喷发预警（urgency 1 橙红）、
+ *  flipWarn=重力翻转区剩余米数（urgency 2 青蓝）；两者同真取 flipWarn（翻转更需要提前预告）。
+ *  纯函数零分配，无预告返回 null（HUD 隐藏横幅）；文本在渲染层拼装、HUD 只消费不重算。 */
+export function buildAlert(s: { surgeWarn: number; flipWarn: number }): { text: string; urgency: 1 | 2 } | null {
+  if (s.flipWarn > 0 && s.flipWarn <= 60) return { text: '重力翻转区 · ' + Math.ceil(s.flipWarn) + 'm', urgency: 2 };
+  if (s.surgeWarn > 0) return { text: '喷发预警', urgency: 1 };
+  return null;
+}
+
 /** 输入 → sim（v2：手势与键盘合并为单个 onInput 订阅，§7.8）；返回退订函数进 dispose。 */
 export function wireRunInput(adapter: PlatformAdapter, sim: RunnerSim): Unsubscribe {
   return adapter.onInput((e: InputEvent) => {

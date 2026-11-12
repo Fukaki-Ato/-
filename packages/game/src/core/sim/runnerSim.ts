@@ -13,7 +13,7 @@ import { Movement } from './movement.js';
 import { parseReviveConfig, tryRevive, type ReviveState } from './revive.js';
 import { resolveHit, type HitCtx } from './resolveHit.js';
 import { TrackGen, type CloudEntity, type CoinEntity, type CrossingEntity, type ObstacleEntity, type PickupEntity } from './trackGen.js';
-import { zoneAt } from './zones.js';
+import { zoneAt, type Zone } from './zones.js';
 import { createSimWorld } from './simWorld.js';
 import { FirstCoinRecord, scoreForState } from './firstCoinRecord.js';
 import { cullByWorldZ, cullObstacles, smashAhead } from './entitySweep.js';
@@ -37,7 +37,7 @@ export class RunnerSim {
   readonly crossings: CrossingEntity[] = []; // M4 穿越判定体（crossings 配置出生，cross 事件计分）
   readonly events: SimEvent[] = [];
   private surgeFired = false;
-  private readonly fxCtx = { tideAware: false, surgeFired: false, crossings: this.crossings, lastHits: 0, laneWidth: 0 }; readonly tideAware: boolean; // M4 喷发判定化：tideAware=obstacles.json 有 tideAware 块
+  private readonly fxCtx = { tideAware: false, surgeFired: false, crossings: this.crossings, lastHits: 0, laneWidth: 0, zones: [] as Zone[] }; readonly tideAware: boolean; // M4 喷发判定化：tideAware=obstacles.json 有 tideAware 块
   readonly state: RunnerState;
   /** 生命数（game.json runner.lives，默认 1：一撞即出局，新手保护仍生效） */
   readonly lives: number;
@@ -95,6 +95,7 @@ export class RunnerSim {
     this.fly = { heightM: fl.heightM ?? 4.6, speedMul: fl.speedMul ?? 2.5, glideSpeedMul: fl.glideSpeedMul ?? 1.6, glideS: fl.glideS ?? 1.8 };
     this.state = initialRunnerState();
     this.gen = new TrackGen(content, new RunRng(seed));
+    this.fxCtx.zones = this.gen.zones; // A-2：反重力区表引用注入（fxCtx 字段初始化先于 gen，构造后补传；stepFx 预告窗读）
     const hs = (this.R as Record<string, number>).headstartM ?? 0; if (hs > 0) this.state.distance = hs;
     this.mv = new Movement({
       laneWidth: this.laneWidth, gravity: this.R.gravity ?? -38, jumpVelocity: this.R.jumpVelocity ?? 15.2, // 参数块合并行守 300 行上限

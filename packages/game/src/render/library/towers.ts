@@ -8,6 +8,7 @@
  *   倒挂书山（塔顶倒悬锥）：完好的 M/L 塔顶 35% 概率悬浮倒锥书山。
  *   书脊本体由 books.ts 铺装；塔位原型两文件逐字同式本地复算（互不 import 保证书塔对位）。
  * 全部 InstancedMesh（9 draw call）+ 确定性 rnd + 每帧零分配 + LOOP/WRAP_Z 回收；不读 sim。
+ * 另附反重力天花板跑道（240×8m 静态实例组不回收，见 addCeilingRunway）。
  */
 import * as THREE from 'three';
 import { LOOP, WRAP_Z, rnd, std } from '../sceneryProps.js';
@@ -101,6 +102,28 @@ function makeFolioPage(): THREE.BufferGeometry {
   }
   g.computeVertexNormals();
   return g;
+}
+
+/* ── 反重力天花板跑道（用户实跑反馈：翻转后脚下没有清晰天花板跑道，读作「画面坏了」）──
+ * 周期对齐推导：antigrav fromM 600 / everyM 500，LOOP=240 ⇒ 区起点相位每圈漂移 500−2×240=20m
+ * （对齐周期 lcm(500,240)=6000m=25 圈），离散段无法保证每次进区都踩在跑道上 ⇒ 选最省方案：
+ * 整条 LOOP 铺满（240×8m 陈纸米加色长条 + 烛光琥珀双边线，y=ceilingH 4.6 本地对表）。
+ * 加色+depthWrite false：翻转后从下方读得出纸面跑道，飞行俯视（flight heightM 同为 4.6）也不挡路；
+ * 走 addNU 实例化（1+2 例两组）而非散 mesh＝不破「散 mesh 仅 8 件长平面例外」红线；
+ * 静态不回收、不进 groups/update（每帧零开销）；towers 不知道 zones/sim（渲染只读红线），
+ * 跑道常驻兼作天花板视觉锚点与翻转预告。 */
+function addCeilingRunway(scene: THREE.Scene) {
+  const Y = 4.6, LEN = 240, Z = -102; // y=obstacles.json antigrav.ceilingH（B-8 地板值）；z 覆盖 +18~-222 整条 LOOP
+  const geo = new THREE.PlaneGeometry(1, 1);
+  geo.rotateX(-Math.PI / 2); // 几何级转平：实例只写位置+缩放（sx=宽/sz=长），与塔件同式
+  const mainMat = new THREE.MeshBasicMaterial({ color: P.cream, transparent: true, opacity: 0.34, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
+  const edgeMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(P.amber).multiplyScalar(1.3), transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }); // 琥珀×1.3 过 bloom 阈值（灯笼口径）
+  addNU(scene, geo, mainMat, [{ x: 0, y: Y, z: Z, ry: 0, sx: 8, sy: 1, sz: LEN }]); // 陈纸米发光长条（宽 8m 盖三车道）
+  addNU(scene, geo, edgeMat, [ // 烛光琥珀双边线（±3.8，微降 0.02 防共面闪争）
+    { x: -3.8, y: Y - 0.02, z: Z, ry: 0, sx: 0.4, sy: 1, sz: LEN },
+    { x: 3.8, y: Y - 0.02, z: Z, ry: 0, sx: 0.4, sy: 1, sz: LEN },
+  ]);
+  return { geo, mats: [mainMat, edgeMat] };
 }
 
 export function createTowers(scene: THREE.Scene) {
@@ -198,6 +221,8 @@ export function createTowers(scene: THREE.Scene) {
   ];
   const groups = [bases, boards, eaves, backs, gables, flats, fins, lanterns, mounts, covers, guts, folios, stals, links];
 
+  const runway = addCeilingRunway(scene); // B-7 天花板跑道：静态实例组，不进 wrap 回收 groups（见 addCeilingRunway 注释）
+
   return {
     update(move: number) {
       if (move === 0) return;
@@ -211,8 +236,8 @@ export function createTowers(scene: THREE.Scene) {
       }
     },
     dispose() {
-      for (const g of [boxGeo, prismGeo, finGeo, lanternGeo, folioGeo, stalGeo, linkGeo]) g.dispose();
-      for (const m of [leatherMat, tanMat, abyssMat, lanternMat, folioMat, stalMat, linkMat]) m.dispose();
+      for (const g of [boxGeo, prismGeo, finGeo, lanternGeo, folioGeo, stalGeo, linkGeo, runway.geo]) g.dispose();
+      for (const m of [leatherMat, tanMat, abyssMat, lanternMat, folioMat, stalMat, linkMat, ...runway.mats]) m.dispose();
     },
   };
 }

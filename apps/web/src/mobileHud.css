@@ -10,6 +10,11 @@
 .hud-coins img { width: 20px; height: 20px; object-fit: contain; }
 .hud-hearts { font-size: 17px; color: #df755f; letter-spacing: 2px; }
 .hud-buffs { display: block; width: max-content; max-width: 85%; margin-top: 10px; font-size: 10px; line-height: 1.5; padding: 8px 12px; border-radius: 12px; color: #fffdf4; background: #173f4bd9; }
+/* A-3 统一事件预告条：顶部居中大横幅（深底+描边），出现淡入/消失淡出；描边色按 urgency 变量切换 */
+.hud-alert { position: absolute; top: calc(env(safe-area-inset-top, 0px) + 92px); left: 50%; transform: translateX(-50%); max-width: calc(100% - 48px); width: max-content; padding: 10px 22px; border-radius: 14px; font-size: 15px; font-weight: 800; letter-spacing: .1em; white-space: nowrap; color: #fffdf4; background: #10222cd9; border: 1.5px solid var(--hud-alert-edge, #67e0ff); box-shadow: 0 0 18px #0007; opacity: 0; transition: opacity .25s ease; }
+.hud-alert.is-on { opacity: 1; }
+.hud-alert[data-urgency='1'] { --hud-alert-edge: #ff8a50; } /* 喷发预警：橙红描边 */
+.hud-alert[data-urgency='2'] { --hud-alert-edge: #67e0ff; } /* 重力翻转：青蓝描边 */
 .hud-skill { position: absolute; bottom: max(26px, env(safe-area-inset-bottom)); left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 10px; max-width: calc(100% - 32px); width: max-content; padding: 12px 16px; border: 1px solid #fff9; border-radius: 18px; background: #fffdf3ee; box-shadow: 0 5px 20px #164e5710; }
 .hud-skill strong { font-size: 12px; }
 .hud-skill > span:last-child { font-size: 10px; color: var(--ui-muted); white-space: nowrap; }
