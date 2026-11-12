@@ -10,6 +10,7 @@ const { createMissionHttpServer } = sqliteSupported ? await import('../apps/serv
 import { loadMissionContent } from '../apps/server/src/content.mjs';
 import { getMissionPeriods } from '../apps/server/src/periods.mjs';
 import { RunnerSim } from '../packages/game/dist/core/sim/runnerSim.js';
+import { missionClientRulesId } from '../packages/game/dist/flow/clientVersion.js';
 
 function testContent() {
   const content = structuredClone(loadMissionContent());
@@ -87,7 +88,8 @@ async function setup({ startTime = Date.UTC(2026, 9, 12, 4), limits = {}, minRun
     assert.match(result.response.headers.get('set-cookie'), /SameSite=Lax/i);
     return result;
   };
-  state.startRun = async (api, charId = 'char_volt', extra = {}) => api.call('POST', '/api/missions/runs', { seed: 123, charId, ...extra });
+  state.startRun = async (api, charId = 'char_volt', extra = {}) => api.call('POST', '/api/missions/runs',
+    { seed: 123, charId, clientRulesId: missionClientRulesId(state.content), ...extra });
   state.finish = async (api, runId, payload = { frames: 60, actions: [] }, advanceMs = 1000) => {
     state.now += advanceMs;
     return api.call('POST', `/api/missions/runs/${runId}/finish`, payload);
@@ -213,7 +215,7 @@ test('weekly character progress deduplicates a runner, while daily stale runs ne
 });
 
 test('invalid inputs, forged summaries, CSRF, stale claims, and body caps fail as JSON errors', async () => {
-  const state = await setup({ limits: { bodyBytes: 128 } });
+  const state = await setup({ limits: { bodyBytes: 256 } });
   let api;
   try {
     api = await state.create();
@@ -247,7 +249,7 @@ test('invalid inputs, forged summaries, CSRF, stale claims, and body caps fail a
     assert.equal((await api.call('POST', `/api/missions/runs/${id}/finish`, { frames: 60, actions: [{ frame: 0, action: 'teleport' }] })).response.status, 400);
     const extraAction = await api.call('POST', '/api/missions/runs/' + id + '/finish', { frames: 60, actions: [{ frame: 0, action: 'jump', summary: { score: 1 } }] });
     assert.equal(extraAction.response.status, 400);
-    const large = await api.call('POST', `/api/missions/runs/${id}/finish`, undefined, { rawBody: 'x'.repeat(256) });
+    const large = await api.call('POST', `/api/missions/runs/${id}/finish`, undefined, { rawBody: 'x'.repeat(512) });
     assert.equal(large.response.status, 413);
     for (const result of [noOrigin, crossOrigin, forged, large]) assert.equal(typeof result.data.error, 'string');
     const stale = await api.call('POST', '/api/missions/claim', { period: 'daily', periodId: '2000-01-01', missionId: 'test_distance' });

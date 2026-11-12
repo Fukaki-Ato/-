@@ -24,7 +24,7 @@ export interface RankingFeedback {
   subscribe(listener: (message: string) => void): () => void;
 }
 
-/** Configuration and simulation protocol must match before accepting a ranked run. */
+/** Configuration-only metric digest; the flow/wire helper also binds the compiled simulation. */
 export function leaderboardRulesId(content: GameContent): string {
   const canonical = (value: unknown): string => {
     if (value === null || typeof value !== 'object') return JSON.stringify(value) ?? 'null';

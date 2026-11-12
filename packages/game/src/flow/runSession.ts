@@ -15,7 +15,7 @@ export interface RunSessionDeps {
   recordRun?: (state: import('@tr/game/core/sim/simTypes.js').RunnerState, meta: { seed: number; charId: string; items: string[]; cause: 'death' | 'exit' }) => void;
   service?: LeaderboardService; debug?: boolean; test?: boolean; themeId?: string;
   createScene?: typeof createRunnerScene;
-  trackRun?: (sim: RunnerSim, seed: number) => () => void;
+  trackRun?: (sim: RunnerSim, seed: number, content?: GameContent) => () => void;
   onSeed(seed: number): void; onEnd(summary: RunSummary): void;
   onDeath(): void; onCast(): void; onPickup(): void;
   onIntro?(stage: 'start' | 'end'): void;
@@ -49,7 +49,7 @@ export function createRunSession(d: RunSessionDeps): { dispose(): void } {
     d.onSeed(seed);
     const items = ticket ? [] : d.consumeItems?.() ?? [];
     const sim = new RunnerSim(d.content, seed, d.charId, !!ticket, items, d.themeId);
-    finishTracking = d.trackRun?.(sim, seed);
+    finishTracking = d.trackRun?.(sim, seed, d.content);
     const host = { canvas: d.adapter.canvas.mainCanvas(), size: d.adapter.canvas.windowSize() };
     hud = d.views.mountHud();
     hud.update({ score: 0, coins: 0, distance: 0, hits: 0, lives: sim.lives, buffs: [], skill: null });
@@ -80,11 +80,15 @@ export function createRunSession(d: RunSessionDeps): { dispose(): void } {
   if (eligibleMode) {
     const rulesId = leaderboardRulesId(d.content);
     d.views.renderBoot().setStatus('准备排行榜比赛…（Esc 可返回）', false);
-    const fallback = (): void => {
-      if (!cancelled) { ranking.set('排行榜服务不可用，本局不入榜'); start(); }
+    const fallback = (error?: unknown): void => {
+      if (!cancelled) {
+        ranking.set((error as { code?: string } | undefined)?.code === 'rules_mismatch'
+          ? '游戏规则已更新，请刷新页面；本局不入榜' : '排行榜服务不可用，本局不入榜');
+        start();
+      }
     };
     void d.service!.begin(d.charId, rulesId, d.themeId).then(ticket => {
-      if (ticket.rulesId !== rulesId) { release(ticket); fallback(); return; }
+      if (ticket.rulesId !== rulesId) { release(ticket); fallback({ code: 'rules_mismatch' }); return; }
       start(ticket);
     }, fallback);
   } else start();

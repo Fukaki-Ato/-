@@ -42,7 +42,17 @@ SQLite 启用 WAL 和外键，适用于**单个服务进程/实例**。使用本
 
 保留有效旧票据所需的规则行与可信代码哈希，直到不再有相关有效票据；当前实现不主动清理规则快照，也没有无限期历史 ABI 兼容承诺。缺失、损坏或不受信任的包返回 503，run 保持 open、客户端队列保留；恢复正确规则/信任配置后重试仍只计一次。原 24 小时自然有效期、跨日/周计入规则和资源限流保持不变，不增加“发布即过期”。
 
-升级后不能把不认识规则绑定的旧后端二进制直接接回新库来处理新票据；回退也应使用支持绑定的服务并保留完整规则/metadata/票据数据。已签发票据的保证不等于旧页面升级后新开局已经有版本握手；客户端匹配、榜单进程内挑战恢复属于后续独立链路。
+升级后不能把不认识规则绑定的旧后端二进制直接接回新库来处理新票据；回退也应使用支持绑定的服务并保留完整规则/metadata/票据数据。榜单进程内挑战恢复仍是独立链路。
+
+### 新开局客户端匹配
+
+完整根 build 也把同一回放包的代码 SHA 写入生成的 `packages/game/dist/core/simulationBuild.js`。源文件只含构建占位值；source-only、单独 tsc、watch 的部分输出不构成版本验收，须根 build 后重启相应服务/页面。标记不进入模拟包依赖图，重复完整构建的代码身份保持稳定。
+
+任务客户端对实际基础 GameContent 计算 `mission-client-v1:<代码SHA>:<配置摘要>`，新开局通过 `clientRulesId` 声明。标准 RunSession 把原始基础配置传给任务追踪器，Web 用共享 `MissionApiCore.start(seed, charId, items, themeId, content)` 的第五参数发送；WX transport 共享同一入口，宿主调用时也应提供 content，真实 WX 集成仍须单独验收。
+
+缺少、旧代码或旧配置的声明均在签发前返回 409“请刷新页面后重新开局”，不生成票据、不占用进行中名额。已有 runId 的 finish 仍只交原 frames/actions，不需要补新声明；升级前已签发回放和持久队列继续按绑定环境处理。
+
+声明是发布兼容检查，不是身份凭据、客户端完整性证明或防自动化机制；配置摘要复用项目的确定性快速哈希，服务器仍执行自己的权威规则。不得把来自客户端的字符串当作允许执行的 rules_id/源码。旧页面可按既有逻辑回落本机游玩，但未获票据的局不计任务，应刷新使用匹配版本。
 
 ## API
 
@@ -50,7 +60,7 @@ SQLite 启用 WAL 和外键，适用于**单个服务进程/实例**。使用本
 
 - `POST /api/missions/session`：建立游客会话并设置 cookie；成功返回 `{"ok":true}`。可不带 body。
 - `GET /api/missions`：返回 `MissionSnapshot`：`serverTime`、`daily`、`weekly`、`wallet`、`rewardLedgerId`。时间戳是 Unix 毫秒；每组含 `periodId`、`resetsAt` 和任务视图。wallet 是该 rewardLedgerId 对应的累计已领取奖励账本，不是可消费余额；rewardLedgerId 使用持久游客用户 ID，会话续期不改变它。客户端按币种累计高水位只导入增量到本机钱包，不回写服务端余额。
-- `POST /api/missions/runs`：JSON `{"seed":uint32,"charId":"char_volt"}`（空串表示默认装备），可选 `items`（最多三个有效道具 ID）与 `themeId`（配置中 live/draft 主题，省略取默认）。返回 `{"runId":"..."}`；服务端持久记录种子、角色、装备、主题、开始时间、当时周期和规则引用，结算时按签发环境回放，不接受临时替换主题/规则。
+- `POST /api/missions/runs`：JSON `{"seed":uint32,"charId":"char_volt","clientRulesId":"mission-client-v1:..."}`（空串 charId 表示默认装备），可选 `items`（最多三个有效道具 ID）与 `themeId`（配置中 live/draft 主题，省略取默认）。声明必须匹配当前代码/配置；缺少或不匹配返回409要求刷新。成功返回 `{"runId":"..."}`；服务端持久记录种子、角色、装备、主题、开始时间、当时周期和规则引用，结算时按签发环境回放，不接受临时替换主题/规则。
 - `POST /api/missions/runs/:id/finish`：JSON `{"frames":正整数,"actions":[{"frame":0,"action":"jump|slide|laneL|laneR|skill"}]}`，返回最新 `MissionSnapshot`。frame 从 0 开始；同一帧动作按数组顺序执行，并在该帧 `step()` 前应用。帧数表示总模拟 step 次数，动作需按 frame 非降序排列且 `0 <= frame < frames`。死亡帧必须是最后一帧；存活时主动结束的请求可返回 200，但不计任务进度，200 不等于有效局。客户端不得提交 summary。相同 ticket + 完全相同回放重试是幂等的；更换回放内容返回 409。
 - `POST /api/missions/claim`：JSON `{"period":"daily|weekly","periodId":"...","missionId":"..."}`。任务完成且周期仍当前时才领取；SQLite 事务原子更新 claimed 与 wallet，重复领取不会重复入账。
 

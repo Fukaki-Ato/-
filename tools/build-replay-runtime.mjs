@@ -19,6 +19,9 @@ const source = result.outputFiles[0].text;
 const runtime = await import(`data:text/javascript;base64,${Buffer.from(source).toString('base64')}`);
 if (typeof runtime.replayRun !== 'function' || !Number.isFinite(runtime.STEP_DT) || runtime.STEP_DT <= 0) throw new Error('Replay ABI build failed');
 mkdirSync(dirname(output), { recursive: true }); writeFileSync(output, source);
+// This flow-only declaration is outside the simulation bundle graph, avoiding a self-hashing cycle.
+const clientIdFile = join(root, 'packages/game/dist/core/simulationBuild.js');
+writeFileSync(clientIdFile, `export const SIMULATION_BUILD_ID = ${JSON.stringify(replaySourceHash(source))};\n`);
 console.log(`Replay ABI-1 bundle: ${Buffer.byteLength(source)} bytes`);
 console.log(`Replay runtime SHA-256: ${replaySourceHash(source)}`);
 

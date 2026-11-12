@@ -4,6 +4,8 @@
  * 本模块零宿主 API——fetch/localStorage 的缺省封装在 apps/web/src/missionApi.ts。
  */
 import type { MissionPeriod, MissionSnapshot, ReplayAction } from '../core/missions/types.js';
+import type { GameContent } from '../core/config/configTypes.js';
+import { missionClientRulesId } from './clientVersion.js';
 
 type PendingRun = { runId: string; frames: number; actions: ReplayAction[] };
 
@@ -61,12 +63,13 @@ export class MissionApiCore {
       this.session = null; throw error;
     });
   }
-  async start(seed: number, charId: string, items: string[] = [], themeId?: string): Promise<string> {
+  async start(seed: number, charId: string, items: string[] = [], themeId?: string, content?: GameContent): Promise<string> {
     if (this.queue.length >= 10) throw new Error('待同步记录已满，请先在任务页同步；本局不计入任务进度');
     await this.connect();
     const body: Record<string, unknown> = { seed: seed >>> 0, charId };
     if (items.length) body.items = items; // 装备道具随票提交：server 重放按同清单注入（确定性）
     if (themeId !== undefined) body.themeId = themeId;
+    if (content !== undefined) body.clientRulesId = missionClientRulesId(content);
     return (await this.request<{ runId: string }>('/runs', 'POST', body)).runId;
   }
   private saveQueue(): void {

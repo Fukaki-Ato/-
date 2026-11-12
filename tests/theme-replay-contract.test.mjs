@@ -6,7 +6,9 @@ import { tmpdir } from 'node:os';
 import { DatabaseSync } from 'node:sqlite';
 import { loadContent } from '../tools/replay/runner.mjs';
 import { RunnerSim } from '../packages/game/dist/core/sim/runnerSim.js';
-import { leaderboardRulesId } from '../packages/game/dist/core/leaderboard.js';
+import { leaderboardRulesId as configurationRulesId } from '../packages/game/dist/core/leaderboard.js';
+import { leaderboardRulesId } from '../packages/game/dist/flow/leaderboard.js';
+import { missionClientRulesId } from '../packages/game/dist/flow/clientVersion.js';
 import { createRunSession } from '../packages/game/dist/flow/runSession.js';
 import { MissionApiCore } from '../packages/game/dist/flow/missionApiCore.js';
 import { createLeaderboardServer, API_PATH } from '../server/index.mjs';
@@ -75,10 +77,10 @@ function httpClient(base, origin = base) {
 }
 
 test('theme mappings participate in the existing v2 leaderboard rules hash', () => {
-  const content = loadContent(), original = leaderboardRulesId(content);
+  const content = loadContent(), original = configurationRulesId(content);
   assert.match(original, /^first-coin-v2-/);
   content.themes.items.find(theme => theme.id === LIBRARY).scenery = 'coast';
-  assert.notEqual(leaderboardRulesId(content), original);
+  assert.notEqual(configurationRulesId(content), original);
 });
 
 test('RunSession passes selected theme to simulation, ranking begin and renderer; omitted theme resolves default', async () => {
@@ -134,10 +136,11 @@ test('Web mission integration sends the simulation-resolved theme', async t => {
     calls.push({ url, body: JSON.parse(options.body) }); return Response.json({ runId: 'mission-ticket' });
   };
   const sim = new RunnerSim(content, 123, CHAR, false, [], LIBRARY);
-  const stop = createMissionIntegration(false).trackRun(sim, 123);
+  const stop = createMissionIntegration(false).trackRun(sim, 123, content);
   sim.step(); stop();
   for (let i = 0; i < 5; i++) await tick();
   assert.equal(calls.find(call => call.url.endsWith('/runs')).body.themeId, sim.themeId);
+  assert.equal(calls.find(call => call.url.endsWith('/runs')).body.clientRulesId, missionClientRulesId(content));
   assert.equal(Object.hasOwn(calls.find(call => call.url.endsWith('/finish')).body, 'themeId'), false);
 });
 
@@ -195,7 +198,7 @@ test('mission HTTP validates themes, persists resolved selection and rejects fin
   await new Promise(resolve => app.server.listen(0, '127.0.0.1', resolve));
   const call = httpClient(`http://127.0.0.1:${app.server.address().port}`);
   assert.equal((await call('/api/missions/session', {})).status, 201);
-  const begin = extra => call('/api/missions/runs', { seed: 123, charId: CHAR, ...extra });
+  const begin = extra => call('/api/missions/runs', { seed: 123, charId: CHAR, clientRulesId: missionClientRulesId(content), ...extra });
   for (const themeId of [null, 3, {}, [], '', 'missing_theme', 'theme_retired_test']) {
     assert.equal((await begin({ themeId })).status, 400);
   }

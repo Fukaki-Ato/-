@@ -1,4 +1,6 @@
 import { createServer } from 'node:http';
+import { missionClientRulesId } from '@tr/game/flow/clientVersion.js';
+import { replaySourceHash } from './rules.mjs';
 import { randomBytes, createHash } from 'node:crypto';
 import { DEFAULT_LIMITS } from './limits.mjs';
 import { ApiError } from './errors.mjs';
@@ -200,7 +202,10 @@ export function createMissionHttpServer(options = {}) {
       if (pathname === '/api/missions/runs' && request.method === 'POST') {
         const userId = authenticate(request);
         const body = await readJson(request, limits.bodyBytes);
-        assertKeys(body, ['seed', 'charId', 'items', 'themeId']);
+        assertKeys(body, ['seed', 'charId', 'items', 'themeId', 'clientRulesId']);
+        if (body.clientRulesId !== missionClientRulesId(service.content, replaySourceHash(service.replaySource))) {
+          throw new ApiError(409, '游戏规则已更新，请刷新页面后重新开局');
+        }
         sendJson(response, 201, service.startRun(userId, body));
         return;
       }

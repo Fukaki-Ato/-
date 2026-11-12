@@ -89,7 +89,7 @@ test('debug/test 不向排行榜取票或提交，配置不匹配不入榜', asy
   const f = fixture({ service: { begin: async () => ({ ...ticket, rulesId: 'old' }) } });
   await tick(); assert.equal(f.seen.scenes, 1);
   f.seen.callbacks.onEnd(f.seen.sim.summary());
-  assert.match(f.seen.summary.ranking.message, /服务不可用/); f.session.dispose();
+  assert.match(f.seen.summary.ranking.message, /规则已更新.*刷新/); f.session.dispose();
 });
 
 test('大厅与结算排行榜入口接场景，返回与 Escape 回大厅', async () => {

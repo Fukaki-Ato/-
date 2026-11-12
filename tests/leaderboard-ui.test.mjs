@@ -61,7 +61,7 @@ test('客户端采用同源 Cookie、JSON 和子路径，不携带可伪造的�
   assert.equal('score' in JSON.parse(calls[2].options.body), false);
   assert.equal(JSON.parse(calls[1].options.body).pageId, 'page-credential');
   assert.equal(JSON.parse(calls[2].options.body).pageId, 'page-credential');
-  const bad = createLeaderboardClient('/', async () => ({ ok: false, status: 503 }));
+  const bad = createLeaderboardClient('/', async () => Response.json({ error: { code: 'unavailable' } }, { status: 503 }));
   await assert.rejects(bad.list(), /503/);
 });
 
