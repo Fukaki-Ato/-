@@ -3,6 +3,8 @@
  * 盯三件事：① 全部实例化、无散 mesh（尸体地形不许散装）；
  * ② update(move, t) 每帧推得动、大步长绕回不越界、动画层不报错；
  * ③ 颅首睁眼闩锁：420m 一次性、不可逆、awakeBoost 呼吸幅度联动（§10.1-6）。
+ * 加一例 sim 层：泰坦肋拱穿越（obstacles.json crossings.rib 出生 → cross 事件 kind='rib' 计分；
+ * 视觉 Phase 后置暂不画 rib，先只让判定/计分生效——写法参照 forgeheart.test.mjs 的 surge 用例）。
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -90,4 +92,23 @@ test('睁眼闩锁：420m 一次性触发、不可逆、awakeBoost 呼吸幅度 
   skull.update(2, 3.0, THRESHOLD_M + 500); // 更远也保持醒态
   assert.equal(skull.awakeBoost, 1, '持续醒态');
   disposeScene(scene, skull);
+});
+
+test('泰坦肋拱穿越：crossings.rib 出生网格对齐，跑过推 kind=rib 的 cross 事件（判定/计分先行，视觉后置）', async () => {
+  const { RunnerSim } = await import('../packages/game/dist/core/sim/runnerSim.js');
+  const { loadContent } = await import('../tools/replay/runner.mjs');
+  const sim = new RunnerSim(loadContent(), 4242, 'char_volt');
+  const ribs = [], rings = [];
+  for (let i = 0; i < 60 * 16 && sim.state.alive; i++) { // 16s ≈ 190m：覆盖首两道 rib（100/156m）与首枚 ring（150m）
+    sim.step();
+    for (const ev of sim.drainEvents()) {
+      if (ev.type !== 'cross') continue;
+      (ev.kind === 'rib' ? ribs : rings).push(ev.worldZ);
+    }
+  }
+  // 贴地跑过（y=0）恒在 rib 净高带 0~4.5（跑过档）内 ⇒ 每道都应计一次 cross
+  assert.ok(ribs.length >= 2, `跑过 rib 段应推 kind=rib 的 cross 事件（100/156m 各一道），实得 ${JSON.stringify(ribs)}`);
+  for (const z of ribs) assert.ok((z - 100) % 56 === 0, `rib 落点应在 crossings.rib 网格 100+56k 上，实得 ${z}`);
+  assert.ok(rings.length >= 1, 'ring 金环（crossings.ring）出生不受 rib 接入影响');
+  for (const z of rings) assert.ok((z - 150) % 100 === 0, `ring 落点应在 crossings.ring 网格 150+100k 上，实得 ${z}`);
 });

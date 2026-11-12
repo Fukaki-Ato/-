@@ -553,8 +553,14 @@
           "ver": "1.0.0",
           "date": "2026-11-11",
           "change": "发射台斜坡：复用 obs_mount_step 通路（末端 launch 脉冲 Phase B）"
+        },
+        {
+          "ver": "1.0.1",
+          "date": "2026-11-12",
+          "change": "M7b 发射台弹射：坡末端 vy=18 弹上高处（bounce 事件复用）"
         }
-      ]
+      ],
+      "launchVY": 18
     }
   ],
   "patterns": [
@@ -1646,6 +1652,12 @@
       "fromM": 150,
       "yMin": 0,
       "yMax": 3
+    },
+    "rib": {
+      "everyM": 56,
+      "fromM": 100,
+      "yMin": 0,
+      "yMax": 4.5
     }
   },
   "zap": {

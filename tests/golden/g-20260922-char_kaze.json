@@ -891,7 +891,7 @@
     "eventCounts": {
       "cast": 4,
       "coin": 97,
-      "cross": 3,
+      "cross": 17,
       "flip": 2,
       "hit": 1,
       "pickup": 2,
@@ -900,7 +900,7 @@
       "surge": 3,
       "zap": 1
     },
-    "eventsSha256": "65409c2e7cf4e6fb08e32bb5af099e2bfa4d220d3f35b0ac177f76b6765194d9",
+    "eventsSha256": "67382ceeaad96084901f4a3b1fadd18d9f4db07aeef84a0b310fcbbf5336fe01",
     "inputsSha256": "9618b37f782813472921bba50a736118a5519eb67f4f70e35e75f4c36c2f8dc6"
   }
 }

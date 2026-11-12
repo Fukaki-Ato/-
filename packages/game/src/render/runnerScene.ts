@@ -24,7 +24,7 @@ import { applyLightningFlash, createLightningFx, FLASH_LIGHT_GAIN } from './ligh
 import { deriveRunStage, wireRunInput } from './runTheme.js';
 import { createPostFx } from './postfx.js';
 import { createEnvMap, disposeEnvMap } from './stormspire/env.js';
-import { createEruption } from './forgeheart/eruption.js';
+import { createEruption } from './forgeheart/eruption.js'; import { createChaser } from './chaser.js';
 
 export interface RunCallbacks {
   onHud(h: {
@@ -90,7 +90,7 @@ export function createRunnerScene(
   scene.add(hemi);
   keyLight.position.set(3, 8, 4);
   scene.add(keyLight);
-  const lightning = createLightningFx(scene);
+  const lightning = createLightningFx(scene); const chaser = createChaser(scene); // M7a 追击者兽群（身后剪影，chaser.ts）
   let ambientT = flashGap(); // 环境闪电间隔（theme.sky.flashEveryS 区间随机，缺省关闭）由 runTheme 派生
   // 主题 IBL：theme.env 声明了配色的主题挂程序化环境贴图（stormspire 雷暴/harbor 晚霞），null=无 IBL 自然降级
   const runEnv = env ? createEnvMap(renderer, env) : null;
@@ -188,7 +188,7 @@ export function createRunnerScene(
     const sk = shakeT > 0 ? (Math.random() - 0.5) * SHAKE_AMP : 0;
     const airborne = fx.flyT > 0 || s.gliding;
     const boost = Math.max(0, fx.speedMul - 1); // 雷霆冲刺等提速 buff 的表现强度
-    speedLines.update(dist, boost);
+    speedLines.update(dist, boost); chaser.update(dist, s.chaserDist, s.t, scenery);
     postfx.update(dt, fx.speedMul); // 后处理冲刺联动：暗角收紧/饱和压低/bloom 微增（postfx 内部 lerp）
     // 雷电闪白：灯光增益 + 背景/雾色向冷白插值（MC 闪电式全场变亮，约 0.26s 回落）
     ambientT -= dt;
@@ -283,7 +283,7 @@ export function createRunnerScene(
     if (cb.debug) uninstallRunProbe(); // ?debug 探针随场景销毁卸载，避免 __trRun 指向已销毁的 sim
     avatar.dispose(); // GLB 混流器停摆（几何体/材质由下面的 traverse 统一销毁）
     intro?.dispose(); // 只弃面板自身；视频元素与贴图归 apps 侧复用
-    lightning.dispose();
+    lightning.dispose(); chaser.dispose();
     track.dispose();
     postfx.dispose(); // composer/逐 pass/双缓冲 target 全量释放（wx 降级态是 no-op）
     if (runEnv) disposeEnvMap(runEnv); eruption?.dispose();

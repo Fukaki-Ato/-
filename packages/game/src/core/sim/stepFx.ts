@@ -33,12 +33,16 @@ export function stepFx(s: RunnerState, dm: number, events: { type: string; [k: s
   // M7a 追击者：受击拉近 8m、奔跑缓慢拉远（钳 8~80）
   s.chaserDist = Math.max(8, Math.min(80, s.chaserDist + (s.hits > ctx.lastHits ? -8 : 0.02)));
   ctx.lastHits = s.hits;
-  // M7a 弹跳垫：踩中弹起（vy=bounceVY，一次性）
+  // M7a 弹跳垫 + M7b 发射台：踩中正向弹射（一次性；发射台在坡末端触发，弹上火车顶/高处）
   for (const o of obstacles) {
-    if (o.cls !== 'bounce' || o.done) continue;
-    if (Math.abs(s.distance - o.worldZ) < 2 && Math.abs(s.x - o.lane * ctx.laneWidth) < 1.5 && s.y < 1) {
+    if (o.done) continue;
+    const inLane = Math.abs(s.x - o.lane * ctx.laneWidth) < 1.5;
+    const hitPad = o.cls === 'bounce' && inLane && Math.abs(s.distance - o.worldZ) < 2 && s.y < 1;
+    const hitRamp = o.cls === 'step' && o.launchVY !== undefined && inLane
+      && s.distance - o.worldZ > o.d / 2 - 1.5 && s.distance - o.worldZ < o.d / 2 + 1 && s.y < 1.2;
+    if (hitPad || hitRamp) {
       o.done = true;
-      s.vy = o.bounceVY ?? 24; s.y = 0.1;
+      s.vy = hitRamp ? o.launchVY! : (o.bounceVY ?? 24); s.y = Math.max(s.y, 0.1);
       events.push({ type: 'bounce', vy: s.vy });
     }
   }

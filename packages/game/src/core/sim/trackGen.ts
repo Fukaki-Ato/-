@@ -7,7 +7,7 @@ import { layCoinChains, layTeachingLines, purgeOverlappedCoins } from './trackCo
 import { spawnSkyContent } from './trackSky.js';
 import { coinJumpSpan } from './coinJumpSpan.js';
 import { layTideCoins, type TideAwareCfg } from './tide.js';
-import { spawnRings, type CrossingEntity } from './crossings.js';
+import { parseCrossings, spawnKind, type CrossingEntity, type CrossingRule } from './crossings.js';
 import { parseZoneCfg, skipCell, spawnZones, zoneAt, type Zone, type ZoneCfg } from './zones.js';
 export type { CrossingEntity };
 
@@ -27,6 +27,7 @@ export interface ObstacleEntity {
   passed?: boolean;    // 已掠过角色面（近失判定一次性）
   motion?: { xSweepM: number; periodS: number; hoverY: number; bobAmp: number }; // M4 场景专属运动
   bounceVY?: number;   // M7a 弹跳垫：踩中弹起速度
+  launchVY?: number;  // M7b 发射台：坡末端弹射速度
   laserCfg?: { onS: number; offS: number; phase: number }; // M7b 激光：on/off 周期
 }
 
@@ -64,11 +65,8 @@ export class TrackGen {
   private readonly pickupMinGapM: number;
   private readonly blockFromDiff: number;          // 封路概率规则生效的难度档
   private readonly blockWeights: Record<number, number>; // 封堵 1/2 条道的权重       // 同段两箱最小间隔
-  /** M4 穿越判定层出生规则（crossings 配置块；缺省无=不出生，全主题零变化） */
-  private readonly crossingEveryM: number;
-  private readonly crossingFromM: number;
-  private readonly crossingY: [number, number];
-  private nextCrossZ = Infinity; // M4 穿越判定体出生游标（crossings 配置；未配置=Infinity 不出生）
+  /** M4 穿越判定层出生规则（crossings 块解析：ring 金环 + rib 肋拱，配置键驱动；空=不出生，全主题零变化） */
+  private readonly crossingRules: CrossingRule[];
   private readonly tideAware?: TideAwareCfg; // M4 潮汐感知门控（缺省无=零变化）
   /** 闪电圈生成规则（obstacles.json zap 段）：引用 def / 间隔米 / 下一枚 z */
   private readonly zapRef: string;
@@ -107,12 +105,9 @@ export class TrackGen {
     const lb = (content.obstacles as unknown as { laneBlock?: { fromDifficulty?: number; weights?: Record<string, number> } }).laneBlock;
     this.blockFromDiff = lb?.fromDifficulty ?? 3;
     this.blockWeights = { 1: lb?.weights?.['1'] ?? 80, 2: lb?.weights?.['2'] ?? 20 };
-    const cr = (content.obstacles as unknown as { crossings?: { ring?: { everyM?: number; fromM?: number; yMin?: number; yMax?: number } } }).crossings?.ring;
-    this.crossingEveryM = typeof cr?.everyM === 'number' && cr.everyM > 0 ? cr.everyM : Infinity;
-    this.crossingFromM = typeof cr?.fromM === 'number' ? cr.fromM : 0; this.crossingY = [cr?.yMin ?? 0, cr?.yMax ?? 3];
+    this.crossingRules = parseCrossings(ob); // M4 穿越判定层：ring/rib 两键解析进规则表（含出生游标）
     const ta = (content.obstacles as unknown as { tideAware?: TideAwareCfg }).tideAware;
     this.tideAware = ta && typeof ta.lowMax === 'number' && typeof ta.coinCount === 'number' ? ta : undefined;
-    this.nextCrossZ = this.crossingFromM;
     const zapRaw = (ob as unknown as { zap?: { ref?: unknown; everyM?: unknown; fromM?: unknown } }).zap;
     this.zapRef = typeof zapRaw?.ref === 'string' ? zapRaw.ref : '';
     this.zapEveryM = typeof zapRaw?.everyM === 'number' && zapRaw.everyM > 0 ? zapRaw.everyM : 0;
@@ -136,7 +131,7 @@ export class TrackGen {
   /** 保证赛道铺到 distance + aheadM；新障碍/金币/道具箱追加进传入数组（sim 持有所有权） */
   ensure(distance: number, aheadM: number, obstacles: ObstacleEntity[], coins: CoinEntity[], pickups: PickupEntity[] = [], crossings: CrossingEntity[] = []) {
     const target = distance + aheadM;
-    this.nextCrossZ = spawnRings(crossings, target, this.nextCrossZ, this.crossingEveryM, this.crossingFromM, this.crossingY[0], this.crossingY[1]);
+    for (const r of this.crossingRules) spawnKind(crossings, target, r); // ring+rib 走同一段出生代码，配置键驱动
     // B-1 预注册法：zone 游标先于 pattern 生成推进（同 nextZapZ 模式），落 cell 时禁铺窗/类别过滤才可见
     this.nextZoneZ = spawnZones(this.zones, this.nextZoneZ, target, this.zoneCfg);
     while (this.genZ < target) {

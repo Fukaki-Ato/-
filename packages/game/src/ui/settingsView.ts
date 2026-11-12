@@ -5,8 +5,10 @@
  * 音量行＝图标 + 名称 + 可拖动滑条 + 百分比 + 「< / >」步进：滑条拖动 1% 粒度、按钮 10% 步进，
  * 全部即时回传流程落盘，行内即时更新（立即生效语义）。图标用 ♪/♬ 字形（字体图集收录，缺字形＝空白）。
  * 本文件只组合 @tr/ui 基础控件，零 DOM（包内铁律）；后续设置项按「分节标题 + 行」继续往下加即可。
+ * 小屏溢出修复：主题行多了以后整页高过视口（音量区被顶出屏外），「跑酷场景」区块收进
+ * ScrollView 滚动（视口 60% 封顶，音量区固定在滚动区下方不参与滚动）——行数再涨也只滚场景列表。
  */
-import { Box, Button, Label, mixHex, type UiView } from '@tr/framework/ui/index.js';
+import { Box, Button, Label, ScrollView, mixHex, type UiView } from '@tr/framework/ui/index.js';
 import type { UiHost } from '@tr/framework/ui/host.js';
 import type { GameContent } from '@tr/game/core/config/configTypes.js';
 import type { SettingsActions, VolumeKind, VolumeSettings } from '../flow/views.js';
@@ -144,7 +146,18 @@ export function buildSettingsPage(host: UiHost, d: SettingsPageDeps): SettingsPa
     );
   };
 
+  // 场景区块滚动化：ScrollView 无 maxHeight 选项，外套一层 Box 封顶（maxHeight 只收 px）——
+  // 滚动视口 = min(列表内容高, 上限)。上限 = min(视口 60%, 视口 − 240 固定区)：60% 让 8 行
+  // （7 主题 + 追加）在 720 竖屏完整可见；240 = 标题行 + 音量区 + 内边距的固定开销，矮屏先保音量区在屏内。
   const view = host.makeView();
+  const sceneMaxH = Math.min(Math.round(view.height * 0.6), view.height - 240);
+  const sceneScroll = new ScrollView({
+    content: new Box({ direction: 'column', gap: 6, align: 'stretch', padding: { top: 4 } }, [
+      new Label({ text: '跑酷场景', fontSizePx: 14, color: c.gold }),
+      new Label({ text: '点选即保存，下一局生效', fontSizePx: 12, color: c.muted }),
+      ...(rows.length ? rows : [new Label({ text: '暂无可选场景', fontSizePx: 13, color: c.muted })]),
+    ]),
+  });
   view.add(new Box(
     { direction: 'column', align: 'center', justify: 'center', flex: 1, padding: 12 },
     [new Box(
@@ -160,11 +173,10 @@ export function buildSettingsPage(host: UiHost, d: SettingsPageDeps): SettingsPa
           }),
           new Label({ text: '设置', fontSizePx: 22, color: c.neon }),
         ]),
-        new Box({ direction: 'column', gap: 6, align: 'stretch', padding: { top: 4 } }, [
-          new Label({ text: '跑酷场景', fontSizePx: 14, color: c.gold }),
-          new Label({ text: '点选即保存，下一局生效', fontSizePx: 12, color: c.muted }),
-          ...(rows.length ? rows : [new Label({ text: '暂无可选场景', fontSizePx: 13, color: c.muted })]),
-        ]),
+        new Box(
+          { direction: 'column', align: 'stretch', maxHeight: sceneMaxH },
+          [sceneScroll],
+        ),
         new Box({ direction: 'column', gap: 6, align: 'stretch', padding: { top: 4 } }, [
           new Label({ text: '音量', fontSizePx: 14, color: c.gold }),
           new Label({ text: '拖动或点按，立即生效', fontSizePx: 12, color: c.muted }),
