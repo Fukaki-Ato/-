@@ -5,6 +5,7 @@
 import { applySurgeStep, level } from './tide.js';
 import { CROSSING_DEFAULTS, cullCrossings, stepCrossings, type CrossingEntity } from './crossings.js';
 import { zoneAt, type Zone } from './zones.js';
+import { lowGravAt, warpAt, RAIN_WARN_M, type LowGravSeg, type RainWin, type WarpSeg } from './warps.js';
 import type { ObstacleEntity } from './trackGen.js';
 import type { RunnerState } from './simTypes.js';
 
@@ -17,6 +18,16 @@ export interface FxCtx {
   laneWidth: number;
   /** 反重力区表引用（A-2 预告窗用；runnerSim 构造后在 gen 就绪处注入 gen.zones。未配置=空数组 ⇒ flipWarn 恒 0） */
   zones: Zone[];
+  /** Stormspire 三表引用（warps.ts）：未注入/未配置=空数组=查询恒 null=恒零变化（硬门） */
+  warps: WarpSeg[];
+  rains: RainWin[];
+  lows: LowGravSeg[];
+  /** 金币雨已预告的窗口序号（「当前窗口序号」法，初始 −1：表按 startM 升序 ⇒ 一次性事件纯 (state,ctx) 推导） */
+  lastRain: number;
+  /** 上一帧 warp 状态（0|1，初始 0）：沿检测推 {type:'warp', phase:±1} 一次性事件（渲染闪屏「时空隧道！」消费） */
+  lastWarp: 0 | 1;
+  /** 当前低重力倍率（stepFx 每步写 lg ? lg.gMul : 1；runnerSim 透传给 movement 的重力积分） */
+  lowGravMulNow: number;
 }
 
 /**
@@ -33,6 +44,23 @@ export function stepFx(s: RunnerState, dm: number, events: { type: string; [k: s
   s.score += stepCrossings(ctx.crossings, s.distance, s.y, CROSSING_DEFAULTS, events) * CROSSING_DEFAULTS.scorePer;
   cullCrossings(ctx.crossings, s.distance, 14);
   s.tideLevel = level(s.distance);
+  // Stormspire 三事件派生（warps.ts）：区内 ⇒ warp=1 + warpRemain=endM−distance（HUD 倒计时）；
+  // 低重力带内 ⇒ lowGravRemain 同式 + lowGravMulNow=gMul（movement 重力积分透传）。表空 ⇒ 恒 0/1（硬门）。
+  const wp = warpAt(ctx.warps, s.distance);
+  s.warp = wp ? 1 : 0;
+  s.warpRemain = wp ? wp.endM - s.distance : 0;
+  if (s.warp !== ctx.lastWarp) { ctx.lastWarp = s.warp; events.push({ type: 'warp', phase: wp ? 1 : -1 }); } // 进/出隧道各一次
+  const lg = lowGravAt(ctx.lows, s.distance);
+  s.lowGravRemain = lg ? lg.endM - s.distance : 0;
+  ctx.lowGravMulNow = lg ? lg.gMul : 1;
+  // 金币雨一次性事件：「当前窗口序号」法（lastRain 单调推进，同 surgeFired 口径、纯 (state,ctx) 推导回放安全）。
+  // 二分找 distance 所在/下一窗口，idx 推进且到达预告位（提前 RAIN_WARN_M=30m）⇒ push 一次 coinRain。
+  if (ctx.rains.length > 0) {
+    let lo = 0, hi = ctx.rains.length; // 第一个 endM > distance 的窗口（所在/下一窗；表按 startM 升序）
+    while (lo < hi) { const mid = (lo + hi) >> 1; if (ctx.rains[mid]!.endM <= s.distance) lo = mid + 1; else hi = mid; }
+    const w = ctx.rains[lo];
+    if (w && lo > ctx.lastRain && s.distance >= w.startM - RAIN_WARN_M) { ctx.lastRain = lo; events.push({ type: 'coinRain', startM: w.startM }); }
+  }
   // A-2/B-9 反重力区查询：zoneAt 一次查询共用——区内 ⇒ zoneRemain=endM−distance（HUD 区内倒计时）、flipWarn 保持 0；
   // 区外 ⇒ zoneRemain=0，二分找下一区起点（zones 按 startM 升序），剩余 ∈(0,60] ⇒ flipWarn=剩余米数（60m≈3 秒预告）。
   // zones 空 ⇒ 两者恒 0（硬门）。flipWarn 取值与 A-2 版逐字节一致（同一次 zoneAt 结果分流）。

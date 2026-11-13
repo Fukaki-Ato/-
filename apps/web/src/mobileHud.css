@@ -16,6 +16,8 @@
 .hud-alert[data-urgency='1'] { --hud-alert-edge: #ff8a50; } /* 喷发预警：橙红描边 */
 .hud-alert[data-urgency='2'] { --hud-alert-edge: #67e0ff; } /* 重力翻转：青蓝描边 */
 .hud-alert[data-urgency='3'] { --hud-alert-edge: #ff5a5a; } /* B-9 追击者逼近：红描边 */
+.hud-alert[data-urgency='4'] { --hud-alert-edge: #b06cff; } /* 时空隧道：紫描边 */
+.hud-alert[data-urgency='5'] { --hud-alert-edge: #7dffc4; } /* 低重力带：薄荷描边 */
 /* B-9 翻转瞬间全屏径向闪：opacity 由 HUD 每帧直写（alert.fx 0~1），screen 混合叠亮画面 */
 .hud-flip-flash { position: fixed; inset: 0; pointer-events: none; background: radial-gradient(circle at 50% 46%, #9beeffe0 0%, #59d2ff55 34%, transparent 68%); opacity: 0; mix-blend-mode: screen; }
 /* B-9 危险态（追击者 urgency=3）：红色暗角脉冲覆层（.mobile-hud 已 fixed，伪元素 inset:0 定位成立） */

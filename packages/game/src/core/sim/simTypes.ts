@@ -47,7 +47,11 @@ export type SimEvent =
   | { type: 'flip'; flip: 1 | -1; ceilH: number }
   | { type: 'bounce'; vy: number }
   | { type: 'chaserNear'; dist: number }
-  | { type: 'cross'; kind: string; lane: number; worldZ: number };
+  | { type: 'cross'; kind: string; lane: number; worldZ: number }
+  /** coinRain（Stormspire 金币雨）：距窗口起点 ≤30m 预告位一次性推送，startM=窗口起点（渲染预告/落币特效消费） */
+  | { type: 'coinRain'; startM: number }
+  /** warp（时空隧道）：进出沿各推一次，phase=1 进（「时空隧道！」闪屏）/−1 出（「穿出隧道」）；stepFx 沿检测派生 */
+  | { type: 'warp'; phase: 1 | -1 };
 
 export interface RunnerState {
   t: number; distance: number; prevDistance: number;
@@ -77,6 +81,13 @@ export interface RunnerState {
   flipWarn: number;
   /** B-9 区内剩余米数：stepFx 每步由 zoneAt 派生（endM−distance），区外恒 0；HUD 区内倒计时横幅消费 */
   zoneRemain: number;
+  /** 时空隧道状态（Stormspire 三事件）：warp=1 表区内；warpRemain=区内剩余米数（endM−distance，
+   *  区外恒 0）。stepFx 每步由 warpAt 派生写入，渲染/HUD 只读不反写；未配置 warp 段恒 0/0 */
+  warp: 0 | 1;
+  warpRemain: number;
+  /** 低重力带剩余米数（Stormspire）：stepFx 每步由 lowGravAt 派生（endM−distance），带外恒 0。
+   *  倍率 gMul 不进 state（渲染不需要），经 fxCtx.lowGravMulNow 透传给 movement（warps.ts） */
+  lowGravRemain: number;
   /** 追击者距离（米，M7a）：8=贴脸→80=远离；受击拉近、奔跑缓慢拉远 */
   chaserDist: number;
 }
@@ -101,5 +112,6 @@ export function initialRunnerState(): RunnerState {
     surgeWarn: 0,
     supportY: 0,
     flip: 1, ceilH: 0, chaserDist: 50, flipWarn: 0, zoneRemain: 0,
+    warp: 0, warpRemain: 0, lowGravRemain: 0,
   };
 }

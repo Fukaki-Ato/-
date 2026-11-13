@@ -1670,5 +1670,23 @@
     "everyM": 500,
     "fromM": 600,
     "ceilingH": 4.6
+  },
+  "warp": {
+    "lengthM": 120,
+    "everyM": 700,
+    "fromM": 400
+  },
+  "coinRain": {
+    "spanM": 40,
+    "everyM": 350,
+    "fromM": 250,
+    "count": 24,
+    "ampY": 1.6
+  },
+  "lowGrav": {
+    "lengthM": 70,
+    "everyM": 620,
+    "fromM": 500,
+    "gMul": 0.45
   }
 }

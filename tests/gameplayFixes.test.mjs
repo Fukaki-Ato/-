@@ -27,7 +27,7 @@ import { pickAvatarMode } from '../packages/game/dist/render/avatarRig.js';
 const root = join(fileURLToPath(import.meta.url), '..', '..');
 const NAMES = ['game', 'characters', 'skills', 'items', 'obstacles', 'themes', 'events', 'economy'];
 const content = Object.fromEntries(NAMES.map(n => [n, JSON.parse(readFileSync(join(root, 'config', `${n}.json`), 'utf8'))]));
-
+delete content.obstacles.warp; delete content.obstacles.coinRain; delete content.obstacles.lowGrav; // 机制语义隔离：三事件（warps.test.mjs 专属）不参与本文件断言
 /** 机制类测试用：关闭复活（删除 config revive 段），让「必死」断言保持原语义 */
 const noReviveContent = (() => { const c = structuredClone(content); delete c.game.params.revive; return c; })();
 function cleanSimNoRevive(seed) {

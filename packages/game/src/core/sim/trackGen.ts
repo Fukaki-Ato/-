@@ -9,6 +9,7 @@ import { coinJumpSpan } from './coinJumpSpan.js';
 import { layTideCoins, type TideAwareCfg } from './tide.js';
 import { parseCrossings, spawnKind, type CrossingEntity, type CrossingRule } from './crossings.js';
 import { parseZoneCfg, skipCell, spawnZones, zoneAt, type Zone, type ZoneCfg } from './zones.js';
+import { inWarpClear, layRainCoins, layWarpCoins, parseLowGravCfg, parseRainCfg, parseWarpCfg, spawnLowGravs, spawnRains, spawnWarps, type LowGravCfg, type LowGravSeg, type RainCfg, type RainWin, type WarpCfg, type WarpSeg } from './warps.js';
 export type { CrossingEntity };
 
 export interface ObstacleEntity {
@@ -74,7 +75,8 @@ export class TrackGen {
   private nextZapZ: number;
   /** B-1 反重力区（brief §11.2）：antigrav 配置预注册的 zones + 出生游标（未配置=空数组=全主题零变化） */
   readonly zones: Zone[] = [];
-  private readonly zoneCfg: ZoneCfg | null; private nextZoneZ = 0;
+  private readonly zoneCfg: ZoneCfg | null; private nextZoneZ = 0; readonly warps: WarpSeg[] = []; readonly rains: RainWin[] = []; readonly lows: LowGravSeg[] = []; // Stormspire 三事件表（warps.ts 预注册法；未配置=空数组=查询恒 null=零变化）
+  private readonly warpCfg: WarpCfg | null; private readonly rainCfg: RainCfg | null; private readonly lowCfg: LowGravCfg | null; private nextWarpZ = 0; private nextRainZ = 0; private nextLowZ = 0;
   private nextPickupSeg = 200; // 首段从 200m 开始（新手段净空）
   private chainSeq = 0; // 链编号（整链撤回用）
   /** 上一个抽中的模板 id：pickPattern 用于避免连续同模板 */
@@ -112,7 +114,7 @@ export class TrackGen {
     this.zapRef = typeof zapRaw?.ref === 'string' ? zapRaw.ref : '';
     this.zapEveryM = typeof zapRaw?.everyM === 'number' && zapRaw.everyM > 0 ? zapRaw.everyM : 0;
     this.nextZapZ = typeof zapRaw?.fromM === 'number' && zapRaw.fromM > 0 ? zapRaw.fromM : this.zapEveryM;
-    this.zoneCfg = parseZoneCfg(ob); // B-1：antigrav 段宽容解析，未配置=null ⇒ zones 恒空
+    this.zoneCfg = parseZoneCfg(ob); this.warpCfg = parseWarpCfg(ob); this.rainCfg = parseRainCfg(ob); this.lowCfg = parseLowGravCfg(ob); // B-1+Stormspire 四段宽容解析，未配置=null ⇒ 表恒空
   }
 
   difficulty(z: number): number { return Math.floor(z / 300); }
@@ -131,16 +133,19 @@ export class TrackGen {
   /** 保证赛道铺到 distance + aheadM；新障碍/金币/道具箱追加进传入数组（sim 持有所有权） */
   ensure(distance: number, aheadM: number, obstacles: ObstacleEntity[], coins: CoinEntity[], pickups: PickupEntity[] = [], crossings: CrossingEntity[] = []) {
     const target = distance + aheadM;
-    for (const r of this.crossingRules) spawnKind(crossings, target, r); // ring+rib 走同一段出生代码，配置键驱动
     // B-1 预注册法：zone 游标先于 pattern 生成推进（同 nextZapZ 模式），落 cell 时禁铺窗/类别过滤才可见
     this.nextZoneZ = spawnZones(this.zones, this.nextZoneZ, target, this.zoneCfg);
+    const w0 = this.warps.length, r0 = this.rains.length; this.nextWarpZ = spawnWarps(this.warps, this.nextWarpZ, target, this.warpCfg, this.zones); // Stormspire 互斥链 zones→warps→lows；w0/r0=增量基线（金币河/雨只铺新登记段）
+    this.nextLowZ = spawnLowGravs(this.lows, this.nextLowZ, target, this.lowCfg, this.zones, this.warps); this.nextRainZ = spawnRains(this.rains, this.nextRainZ, target, this.rainCfg, this.zones);
+    for (let i = w0; i < this.warps.length; i++) layWarpCoins(coins, this.warps[i]!, this.laneWidthRef, this.coinSpacing); for (let i = r0; i < this.rains.length; i++) layRainCoins(coins, this.rains[i]!, this.laneWidthRef, this.rng); // 金币河/雨紧随预注册铺增量（雨走 rng 槽内抖动，同 seed 同布局）
+    for (const r of this.crossingRules) spawnKind(crossings, target, r, this.warps); // ring+rib 同段出生代码；在三表预注册后调用：warps 可见 ⇒ 隧道净空内不出生（headstart 大跳也成立）
     while (this.genZ < target) {
       const pat = this.pickPattern(this.difficulty(this.genZ));
       const patStart = obstacles.length; // 记录本轮新障碍起点（金币反向清理用）
       for (const cell of pat.cells) {
         const z = this.genZ + cell.segment * this.segLen + cell.offsetM;
-        // B-1：禁铺窗（入口前/出口后 12m）不铺任何 cell；区内 vehicle/moving/step 跳过（v1 只放 low/high/full/hazard）
-        if (skipCell(this.zones, z, cell.obsRef ? String(this.defs.get(cell.obsRef)?.class ?? '') : '')) continue;
+        // B-1：禁铺窗（入口前/出口后 12m）不铺任何 cell；区内 vehicle/moving/step 跳过；Stormspire 隧道净空（段内±12m）优先于一切——障碍+pattern 金币都禁，金币河替代
+        if (inWarpClear(this.warps, z) || skipCell(this.zones, z, cell.obsRef ? String(this.defs.get(cell.obsRef)?.class ?? '') : '')) continue;
         if (cell.obsRef) {
           const def = this.defs.get(cell.obsRef);
           if (!def) continue; // validateRefs 已保证不会出现，防御一下
@@ -151,7 +156,7 @@ export class TrackGen {
       const maxSpanM = coinJumpSpan(this.runner, Math.min(this.runner.maxSpeed ?? 26, (this.runner.baseSpeed ?? 12) + (this.runner.speedRampPer100M ?? 0.18) * this.genZ / 100), this.jumpSpanRatio);
       const coinBandStart = coins.length; // B-5 金币带扫描起点（含教学线；purge 的 coinStart 语义不动，守无 antigrav 硬门）
       // 模板教学金币线（docs/01「金币即教学」的 config 直给面）：cells 带 coins 的格子由 trackCoins 铺设
-      layTeachingLines({ cells: pat.cells, genZ: this.genZ, segLen: this.segLen, coinSpacing: this.coinSpacing, chainBuckets: this.chainBuckets, obstacles, coins, maxSpanM, seq: () => ++this.chainSeq });
+      layTeachingLines({ cells: pat.cells, genZ: this.genZ, segLen: this.segLen, coinSpacing: this.coinSpacing, chainBuckets: this.chainBuckets, obstacles, coins, maxSpanM, warps: this.warps, seq: () => ++this.chainSeq });
       // 金币链：主链优先铺在模板安全线（docs/01：金币即教学），再按 laneGroupWeights 抽本组车道数；链不跨窗、不与障碍同车道深度重叠（细则见 trackCoins.ts）。
       const safeLane = pat.guarantee?.safeLanePattern?.[0] ?? 0;
       const newObs = obstacles.slice(patStart); // 本轮新障碍（兜底反向清理用）
@@ -159,9 +164,9 @@ export class TrackGen {
       layCoinChains({ rng: this.rng, obstacles, coins,
         winStart: this.genZ, winEnd: this.genZ + pat.lengthSegments * this.segLen,
         safeLane, laneWeights: this.laneWeights, chainBuckets: this.chainBuckets, spacing: this.coinSpacing,
-        laneGapM: this.laneGapM, lastCoinZ: this.lastCoinZ, maxSpanM, seq: () => ++this.chainSeq,
+        laneGapM: this.laneGapM, lastCoinZ: this.lastCoinZ, maxSpanM, warps: this.warps, seq: () => ++this.chainSeq,
       });
-      layTideCoins(this.tideAware, coins, safeLane, this.genZ, this.genZ + pat.lengthSegments * this.segLen, this.coinSpacing, Math.min(pat.lengthSegments * this.segLen, maxSpanM * 0.9), () => ++this.chainSeq);
+      layTideCoins(this.tideAware, coins, safeLane, this.genZ, this.genZ + pat.lengthSegments * this.segLen, this.coinSpacing, Math.min(pat.lengthSegments * this.segLen, maxSpanM * 0.9), () => ++this.chainSeq, this.warps);
       // 兜底反向清理（理论上不触发：链不跨窗；防御未来模板长度参数改小）。只扫本窗口新铺的地面金币：
       // 天空金币带（spawnSky）与奖励金币排（simWorld 的 coinChainSeq 独立计数）都不在此区间，按 id 全数组删会误删无辜链（审查 P0-1）。
       if (newObs.length) {
@@ -193,7 +198,7 @@ export class TrackGen {
         this.nextPickupSeg += this.pickupSegmentM;
       }
       // 闪电圈：每 zapEveryM 一枚（约 200m 一个黑色电圈）。落点车道避开已生成障碍与已投金币；三条道都被占则跳过本枚，保持可解。
-      while (this.zapEveryM > 0 && this.zapRef && this.nextZapZ + 14 <= this.genZ) {
+      while (this.zapEveryM > 0 && this.zapRef && this.nextZapZ + 14 <= this.genZ) { if (inWarpClear(this.warps, this.nextZapZ)) { this.nextZapZ += this.zapEveryM; continue; } // 隧道净空内无闪电圈（奖励段无惩罚判定体，同 crossings 避让口径）
         const def = this.defs.get(this.zapRef);
         if (def) {
           const lanes = [-1, 0, 1]; this.rng.shuffle(lanes);

@@ -37,6 +37,9 @@ export class Movement {
   flyWasActive = false;
   /** 本帧是否刚完成着陆（滑翔末帧）：sim 读取后据此回收空中内容（金币带），随后自行清零 */
   landedThisStep = false;
+  /** 低重力带倍率（Stormspire）：runnerSim 每步从 fxCtx.lowGravMulNow 透传，1=正常重力。
+   *  低重力带：g×gMul，起跳速度不变 ⇒ 跳得更高落地更慢（warps.ts 表驱动，未配置恒 1） */
+  lowGravMul = 1;
   /** 当前可站立支撑面高度（0=地面；>0=列车顶等 rideTop 表面），每帧重算 */
   private floorY = 0;
 
@@ -137,7 +140,9 @@ export class Movement {
     s.supportY = this.floorY; // 渲染层据此区分「站车顶跑」与「滞空」
     // floorY>s.y（地面起跑踏上板子）也要进积分：否则贴不上支撑面，会从板子上穿过去
     if (s.y > 0 || s.vy > 0 || this.floorY > s.y) {
-      s.vy += this.P.gravity * s.flip * dt; // B-3：重力×flip——倒挂反重力向上；flip 恒 1 时与原式逐字节同轨
+      // B-3：重力×flip——倒挂反重力向上；×lowGravMul（低重力带：g×gMul，起跳速度不变 ⇒ 跳得更高落地更慢），
+      // 表空时 lowGravMul=1，乘 1.0 为 IEEE754 恒等 ⇒ 与原式逐字节同轨（硬门）
+      s.vy += this.P.gravity * this.lowGravMul * s.flip * dt;
       s.y += s.vy * dt;
       // 双向落地钳制（B-3）：flip=1 钳上表面（地面/板子/列车顶）；flip=-1 钳 y≥ceilH（落到镜面地板=天花板）
       if (s.flip === -1) { if (s.y >= s.ceilH) { s.y = s.ceilH; s.vy = 0; } }

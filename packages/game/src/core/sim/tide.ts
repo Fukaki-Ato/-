@@ -11,6 +11,7 @@
  *   喷发特效模块走 LightningFx.update(dt, dist) 直接拿 dist——两处算同一公式。
  * 纯函数：零依赖、零状态、零分配；同 dist 恒同结果（回放安全），禁 Math.random。
  */
+import { inWarpClear } from './warps.js';
 
 /** 潮汐周期（米）：班次表的机械遗产（§1.4）——石碑刻痕/哑阀/炉心心跳/涨落必须同相位 */
 const P = 144;
@@ -72,10 +73,15 @@ export interface TideAwareCfg { lowMax: number; coinCount: number }
 /** M4 潮汐感知放置（矛盾 1 方案 A）：到达潮位全程低潮（level ≤ ta.lowMax）时，安全道追加渣滩金币线。
  *  链三纪律全守：同链号（长度落 chainBuckets）/ 跨度 ≤ 跳跃净空 span / 间距恰 = coinSpacing。 */
 export function layTideCoins(ta: { lowMax: number; coinCount: number } | undefined, coins: { lane: number; worldZ: number; y?: number; chain?: number }[],
-  safeLane: number, winStart: number, winEnd: number, coinSpacing: number, span: number, seq: () => number): number {
+  safeLane: number, winStart: number, winEnd: number, coinSpacing: number, span: number, seq: () => number,
+  warps?: { startM: number; endM: number }[]): number {
   if (!ta || !(level(winStart) <= ta.lowMax && level(winEnd) <= ta.lowMax)) return 0;
   const n = Math.min(ta.coinCount, Math.floor(span / coinSpacing));
   const chain = seq();
-  for (let k = 0; k < n; k++) coins.push({ lane: safeLane, worldZ: winStart + (k + 1) * coinSpacing, y: 0.65, chain });
+  for (let k = 0; k < n; k++) {
+    const z = winStart + (k + 1) * coinSpacing;
+    if (warps && inWarpClear(warps, z)) continue; // 隧道净空内不铺潮汐币（金币河替代，Stormspire）
+    coins.push({ lane: safeLane, worldZ: z, y: 0.65, chain });
+  }
   return n;
 }

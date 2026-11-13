@@ -4,6 +4,7 @@
  * 玩家经过时按「深度窗 + 高度带」判一次穿越 → 推 cross 事件进 drainEvents（计分/连击消费）。
  * 纯逻辑：零 three 依赖、零分配（事件对象按需 push 例外）、同输入恒同输出（回放安全）。
  */
+import { inWarpClear, type WarpSeg } from './warps.js';
 
 export type CrossingKind = 'ring' | 'rib';
 
@@ -101,10 +102,12 @@ export function parseCrossings(obstacles: unknown): CrossingRule[] {
   return rules;
 }
 
-/** trackGen 出生钩子：按 rule 在 [from, target) 区间按 everyM 均匀插该 kind 穿越体，游标写回 rule.nextZ */
-export function spawnKind(list: CrossingEntity[], target: number, rule: CrossingRule): void {
+/** trackGen 出生钩子：按 rule 在 [from, target) 区间按 everyM 均匀插该 kind 穿越体，游标写回 rule.nextZ。
+ *  warps 缺省=零变化；传入时隧道净空（段内+前后 12m）候选跳过——隧道内无肋拱/铜环（金币河替代段）。 */
+export function spawnKind(list: CrossingEntity[], target: number, rule: CrossingRule, warps?: WarpSeg[]): void {
   let z = Math.max(rule.nextZ, rule.fromM);
   while (z < target) {
+    if (warps && inWarpClear(warps, z)) { z += rule.everyM; continue; }
     insertCrossing(list, { kind: rule.kind, lane: 0, worldZ: z, yMin: rule.yMin, yMax: rule.yMax });
     z += rule.everyM;
   }

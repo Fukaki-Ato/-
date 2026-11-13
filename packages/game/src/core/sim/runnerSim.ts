@@ -8,7 +8,7 @@ import { buildLoadout, itemEffects, type EffectSpec, type Loadout } from './char
 import { collectCoins, collectPickups, type CollectDeps } from './collect.js';
 import { hitsRunner, inDepthWindow, isNearMiss, relZ, safestLane, type FlipCtx } from './collision.js';
 import { clearSkyCoins } from './landing.js';
-import { stepFx } from './stepFx.js';
+import { stepFx, type FxCtx } from './stepFx.js';
 import { Movement } from './movement.js';
 import { parseReviveConfig, tryRevive, type ReviveState } from './revive.js';
 import { resolveHit, type HitCtx } from './resolveHit.js';
@@ -38,7 +38,7 @@ export class RunnerSim {
   get zones(): Zone[] { return this.gen.zones; } // B-9 渲染层事件门读区表（gen 私有、zones 数组引用稳定；只读不反写）
   readonly events: SimEvent[] = [];
   private surgeFired = false;
-  private readonly fxCtx = { tideAware: false, surgeFired: false, crossings: this.crossings, lastHits: 0, laneWidth: 0, zones: [] as Zone[] }; readonly tideAware: boolean; // M4 喷发判定化：tideAware=obstacles.json 有 tideAware 块
+  private readonly fxCtx: FxCtx = { tideAware: false, surgeFired: false, crossings: this.crossings, lastHits: 0, laneWidth: 0, zones: [], warps: [], rains: [], lows: [], lastRain: -1, lastWarp: 0, lowGravMulNow: 1 }; readonly tideAware: boolean; // M4 喷发判定化：tideAware=obstacles.json 有 tideAware 块；Stormspire 四表空数组=恒零变化（硬门）
   readonly state: RunnerState;
   /** 生命数（game.json runner.lives，默认 1：一撞即出局，新手保护仍生效） */
   readonly lives: number;
@@ -96,7 +96,7 @@ export class RunnerSim {
     this.fly = { heightM: fl.heightM ?? 4.6, speedMul: fl.speedMul ?? 2.5, glideSpeedMul: fl.glideSpeedMul ?? 1.6, glideS: fl.glideS ?? 1.8 };
     this.state = initialRunnerState();
     this.gen = new TrackGen(content, new RunRng(seed));
-    this.fxCtx.zones = this.gen.zones; // A-2：反重力区表引用注入（fxCtx 字段初始化先于 gen，构造后补传；stepFx 预告窗读）
+    this.fxCtx.zones = this.gen.zones; this.fxCtx.warps = this.gen.warps; this.fxCtx.rains = this.gen.rains; this.fxCtx.lows = this.gen.lows; // A-2/Stormspire：四表引用注入（gen 公开只读数组、引用稳定；stepFx 每步派生读）
     const hs = (this.R as Record<string, number>).headstartM ?? 0; if (hs > 0) this.state.distance = hs;
     this.mv = new Movement({
       laneWidth: this.laneWidth, gravity: this.R.gravity ?? -38, jumpVelocity: this.R.jumpVelocity ?? 15.2, // 参数块合并行守 300 行上限
@@ -241,7 +241,7 @@ export class RunnerSim {
 
     if (fx.avoidLookahead > 0) s.lane = safestLane(this.obstacles, s, fx.avoidLookahead);
     this.mv.advanceLateral(s, STEP_DT);
-    this.mv.advanceVertical(s, fx, STEP_DT);
+    this.mv.lowGravMul = this.fxCtx.lowGravMulNow; this.mv.advanceVertical(s, fx, STEP_DT); // 低重力带倍率透传（stepFx 每步写，表空恒 1 ⇒ 与原式逐字节同轨）
     if (this.mv.landedThisStep) clearSkyCoins(this.coinsArr); // 着陆回收空中金币带（用户反馈：回地面后天上的金币应消失）
 
     this.gen.ensure(s.distance, GEN_AHEAD_M, this.obstacles, this.coinsArr, this.pickupsArr, this.crossings);

@@ -151,7 +151,8 @@ test('单向门：flyT>0 进区不立即翻转，滑翔按正常重力落地（y
 });
 
 test('金币带：真实铺设落进区内的地面金币统一改到 y=ceilH−0.65，区外保持地面高度', () => {
-  const c = structuredClone(raw); delete c.obstacles.zap;
+  // 隔离 antigrav 金币带语义：Stormspire 三事件块（隧道金币河/雨的 y≠0.65 会混入断言面）一并关闭
+  const c = structuredClone(raw); delete c.obstacles.zap; delete c.obstacles.warp; delete c.obstacles.coinRain; delete c.obstacles.lowGrav;
   const sim = new RunnerSim(c, 4242);
   sim.state.t = 20; sim.state.distance = 500; sim.gen.genZ = 500; // 与生成前沿对齐后铺进区段
   for (let i = 0; i < 4; i++) sim.step(); // ensure 一次铺到 ~820m（zone 过滤与金币改写均在铺设时生效）

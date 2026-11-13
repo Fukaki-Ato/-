@@ -6,6 +6,7 @@
  */
 import type { RunRng } from '../rng.js';
 import type { CoinEntity, ObstacleEntity } from './trackGen.js';
+import { inWarpClear, type WarpSeg } from './warps.js';
 
 export interface CoinLayDeps {
   rng: RunRng;
@@ -23,6 +24,8 @@ export interface CoinLayDeps {
   laneGapM: number;
   /** 各车道最近一次投币的 z（读写共享：调用方持有） */
   lastCoinZ: Record<number, number>;
+  /** 隧道净空表（warps.ts，Stormspire）：净空内链币逐枚跳过（金币河替代）；缺省=零变化 */
+  warps?: WarpSeg[];
   /** 发链号（sim 内唯一） */
   seq(): number;
 }
@@ -77,8 +80,12 @@ export function layCoinChains(d: CoinLayDeps): void {
   const start = d.rng.range(best[0], best[1] - (len - 1) * d.spacing);
   const id = d.seq();
   for (const lane of accepted) {
-    for (let i = 0; i < len; i++) d.coins.push({ lane, worldZ: start + i * d.spacing, chain: id });
-    d.lastCoinZ[lane] = start + (len - 1) * d.spacing;
+    for (let i = 0; i < len; i++) {
+      const z = start + i * d.spacing;
+      if (d.warps && inWarpClear(d.warps, z)) continue; // 隧道净空内不铺随机链（金币河替代；链留洞但确定性不变）
+      d.coins.push({ lane, worldZ: z, chain: id });
+      d.lastCoinZ[lane] = z;
+    }
   }
 }
 
@@ -94,6 +101,7 @@ export function layTeachingLines(d: {
   obstacles: { lane: number; done?: boolean; worldZ: number; d: number; rideTop?: boolean; h: number }[];
   coins: CoinEntity[];
   maxSpanM: number;
+  warps?: WarpSeg[];
   seq: () => number;
 }): void {
   const minLen = Math.min(...d.chainBuckets.map(b => b.min));
@@ -105,6 +113,7 @@ export function layTeachingLines(d: {
     const spanLen = Math.floor(d.maxSpanM / d.coinSpacing) + 1;
     for (let i = 0; i < Math.min(Math.max(cell.coins, minLen), maxLen, spanLen); i++) {
       const z = z0 + i * d.coinSpacing;
+      if (d.warps && inWarpClear(d.warps, z)) continue; // 隧道净空内不铺教学币（金币河替代，Stormspire）
       // trainTop 线先找载具：车顶金币本来就落在火车深度窗内，不能被同车道避障跳掉（验收 P1-1）
       const carrier = cell.surface === 'trainTop'
         ? d.obstacles.find(o => o.rideTop === true && o.lane === cell.lane && Math.abs(z - o.worldZ) <= o.d / 2 + 0.6)
