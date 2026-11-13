@@ -24,12 +24,12 @@ import { applyLightningFlash, createLightningFx, FLASH_LIGHT_GAIN } from './ligh
 import { buildAlert, deriveRunStage, wireRunInput } from './runTheme.js';
 import { createPostFx } from './postfx.js';
 import { createEnvMap, disposeEnvMap } from './stormspire/env.js';
-import { createEruption } from './forgeheart/eruption.js'; import { createChaser } from './chaser.js';
+import { createEruption } from './forgeheart/eruption.js'; import { createChaser } from './chaser.js'; import { createZoneGates } from './zoneGates.js';
 
 export interface RunCallbacks {
   onHud(h: {
     score: number; coins: number; distance: number; hits: number; lives: number;
-    buffs: { name: string; left: number }[]; alert?: { text: string; urgency: 1 | 2 } | null; // A-3 预告条（buildAlert 派生；null=隐藏横幅，1=喷发橙红 2=翻转青蓝；可选=局首快照可缺省）
+    buffs: { name: string; left: number }[]; alert?: { text: string; urgency: 1 | 2 | 3; fx?: number } | null; // A-3/B-9 预告条（buildAlert 派生；null=隐藏横幅，1=喷发橙红 2=翻转/倒计时青蓝 3=追击者红；fx=翻转瞬间 0~1 闪屏强度，HUD 全屏径向闪用；可选=常态无闪）
     /** cd=冷却剩余秒；charge=下滑积攒门槛（{now, need}），无门槛技能为 null */
     skill: { label: string; cd: number; ready: boolean; charge: { now: number; need: number } | null } | null;
   }): void;
@@ -90,7 +90,7 @@ export function createRunnerScene(
   scene.add(hemi);
   keyLight.position.set(3, 8, 4);
   scene.add(keyLight);
-  const lightning = createLightningFx(scene); const chaser = createChaser(scene); // M7a 追击者兽群（身后剪影，chaser.ts）
+  const lightning = createLightningFx(scene); const chaser = createChaser(scene); const zoneGates = createZoneGates(scene, laneWidth, sim.zones); // M7a 追击者兽群（身后剪影，chaser.ts）；B-9 反重力区事件门（入口青/出口琥珀，zoneGates.ts）
   let ambientT = flashGap(); // 环境闪电间隔（theme.sky.flashEveryS 区间随机，缺省关闭）由 runTheme 派生
   // 主题 IBL：theme.env 声明了配色的主题挂程序化环境贴图（stormspire 雷暴/harbor 晚霞），null=无 IBL 自然降级
   const runEnv = env ? createEnvMap(renderer, env) : null;
@@ -134,7 +134,7 @@ export function createRunnerScene(
   // ---------- 主循环：固定步长推进 + 插值渲染 ----------
   let raf = 0, last = adapter.now(), acc = 0, hudTimer = 0, shakeT = 0, endTimer = -1, ended = false, running = true;
   let camY = rig0.camY, lookY = rig0.lookY, camX = 0; // 相机平滑状态（初值=稳态，避免首帧俯仰跳动）
-  let rollK = 0, rollDir = 0, flipFlashT = 0; // B-7 镜头滚转渲染态：rollK∈[0,1]（0=正向 / 1=倒挂 π），flip 事件定方向，renderSim 按 dt/FLIP_ROLL_S 推进；flipFlashT=A-6 翻转瞬间横幅计时
+  let rollK = 0, rollDir = 0, flipFlashT = 0, flipDir: 1 | -1 = 1; // B-7 镜头滚转渲染态：rollK∈[0,1]（0=正向 / 1=倒挂 π），flip 事件定方向，renderSim 按 dt/FLIP_ROLL_S 推进；flipFlashT=A-6 翻转瞬间横幅计时；flipDir=B-9 翻转方向缓存（进入=-1 显「重力翻转！」、退出=1 显「恢复正常」）
   let paused = false; // 后台暂停位（见下方 onVisibility）
 
   // ---------- 后台可见性（§7.9）：进后台冻结 tick 累计，回前台把 last 对齐避免 dt 尖峰 ----------
@@ -163,7 +163,7 @@ export function createRunnerScene(
         if (eruption) eruption.strike(ev.lane, ev.worldZ, laneWidth); // forgeheart：zap 继承喷柱+闪橙视觉
       } else if (ev.type === 'surge') { if (eruption) eruption.strike(ev.lane, ev.worldZ, laneWidth); } // M4 喷发判定化
         else if (ev.type === 'cross') { fireAtPlayer(0xffb454); shakeT = 0.1; } // M4 穿越判定：走位奖励爆点（泰坦亡火金色系）
-      else if (ev.type === 'flip') { rollDir = ev.flip === -1 ? 1 : -1; flipFlashT = 1.2; } // B-7 反重力：进区镜头滚向 π、出区滚回 0（FLIP_ROLL_S 过渡）；A-6 横幅闪现 1.2s「重力翻转！」
+      else if (ev.type === 'flip') { rollDir = ev.flip === -1 ? 1 : -1; flipDir = ev.flip; flipFlashT = 1.2; } // B-7 反重力：进区镜头滚向 π、出区滚回 0（FLIP_ROLL_S 过渡）；B-9 flipDir 缓存驱动横幅文案与全屏闪
       // pickup：按用户要求不加特效与震动，仅 HUD 显示 buff 倒计时（只回调音频）
       else if (ev.type === 'pickup') cb.onPickup?.();
     }
@@ -185,10 +185,11 @@ export function createRunnerScene(
 
     // 相机：水平跟随人物、垂直按地面/空中两套目标平滑随动（cameraRig 派生：地面 y*0.5+4.6/z 9.2，空中 y*0.75+5.3/z 11.4/FOV 68°）
     shakeT = Math.max(0, shakeT - SHAKE_DECAY);
+    if (s.surgeWarn > 0) shakeT = Math.max(shakeT, 0.06); // B-9 喷发预警 1s 红光期持续微震（预兆感）
     const sk = shakeT > 0 ? (Math.random() - 0.5) * SHAKE_AMP : 0;
     const airborne = fx.flyT > 0 || s.gliding;
     const boost = Math.max(0, fx.speedMul - 1); // 雷霆冲刺等提速 buff 的表现强度
-    speedLines.update(dist, boost); chaser.update(dist, s.chaserDist, s.t, scenery);
+    speedLines.update(dist, boost); chaser.update(dist, s.chaserDist, s.t, scenery); zoneGates.update(dist, s.t, s.flip); // B-9 事件门逐帧重排
     postfx.update(dt, fx.speedMul); // 后处理冲刺联动：暗角收紧/饱和压低/bloom 微增（postfx 内部 lerp）
     // 雷电闪白：灯光增益 + 背景/雾色向冷白插值（MC 闪电式全场变亮，约 0.26s 回落）
     ambientT -= dt;
@@ -234,7 +235,7 @@ export function createRunnerScene(
     if (s.surgeWarn > 0) buffs.push({ name: '喷发预警', left: Math.ceil(s.surgeWarn) }); // M4 喷发判定化：1s 红光预警进 HUD
     const sk = sim.loadout.skill;
     cb.onHud({
-      alert: flipFlashT > 0 ? { text: '重力翻转！', urgency: 2 } : buildAlert(s), // A-4/A-6：翻转瞬间 1.2s 闪现优先，常态走 buildAlert
+      alert: flipFlashT > 0 ? { text: flipDir === -1 ? '重力翻转！' : '恢复正常', urgency: 2, fx: flipFlashT / 1.2 } : buildAlert(s), // A-4/B-9：翻转瞬间 1.2s 闪现+全屏闪强度（进=「重力翻转！」出=「恢复正常」），常态走 buildAlert（区内倒计时/追击者自动带上）
       score: s.score, coins: s.coins, distance: s.distance, hits: s.hits, lives: sim.lives, buffs,
       skill: sk ? {
         label: sk.label,
@@ -284,7 +285,7 @@ export function createRunnerScene(
     if (cb.debug) uninstallRunProbe(); // ?debug 探针随场景销毁卸载，避免 __trRun 指向已销毁的 sim
     avatar.dispose(); // GLB 混流器停摆（几何体/材质由下面的 traverse 统一销毁）
     intro?.dispose(); // 只弃面板自身；视频元素与贴图归 apps 侧复用
-    lightning.dispose(); chaser.dispose();
+    lightning.dispose(); chaser.dispose(); zoneGates.dispose();
     track.dispose();
     postfx.dispose(); // composer/逐 pass/双缓冲 target 全量释放（wx 降级态是 no-op）
     if (runEnv) disposeEnvMap(runEnv); eruption?.dispose();

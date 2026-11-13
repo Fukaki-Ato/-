@@ -3,7 +3,8 @@
  * 同 seed 倒挂 fixture：blanked-pattern 内容（单一空模板=净空世界）+ 真实 antigrav 配置，
  * 断言：flip 轨迹（进区 -1/出区 1）、区内 low 障碍 yEff 镜像判负、单向门（flyT>0 进区
  * 不立即翻转）、区内金币带 y=ceilH−0.65 与倒挂收集、禁铺窗、flipWarn 预告窗（A-2，
- * 距下一区 ≤60m=剩余米数/区内 0/未配置恒 0）、以及
+ * 距下一区 ≤60m=剩余米数/区内 0/未配置恒 0）、zoneRemain 区内剩余米数（B-9，
+ * 区内= endM−distance 随推进递减/区外恒 0/flipWarn 语义不回归）、以及
  * 「未配置 antigrav ⇒ flip 恒 1、ceilH 恒 0、既有行为逐字节不变」硬门。
  */
 import test from 'node:test';
@@ -208,4 +209,50 @@ test('倒挂收集：天花板带金币（y=ceilH−0.65）被翻转身体中心
   assert.equal(sim.state.flip, -1, '区内落地即倒挂');
   for (let i = 0; i < 600 && sim.state.distance < 160; i++) sim.step();
   assert.equal(sim.state.coins, 1, '只吃天花板带币：地面币与倒挂身体中心差 |3.7−0.65|=3.05 > 容差 1.3');
+});
+
+test('zoneRemain（B-9）：区内= endM−distance 且随推进严格递减、出区归 0、区内 flipWarn 保持 0', () => {
+  const sim = new RunnerSim(blankContent(), 777);
+  sim.state.t = 20; sim.state.distance = 560; sim.gen.genZ = 560; // 同 flip 轨迹用例的传送口径（同 seed 仍确定性）
+  sim.step();
+  let prev = null, exited = false;
+  for (let i = 0; i < 1200 && sim.state.distance < ZE + 30; i++) {
+    sim.step();
+    const s = sim.state;
+    if (s.distance >= ZS && s.distance < ZE) {
+      assert.ok(Math.abs(s.zoneRemain - (ZE - s.distance)) < 1e-9, `区内 zoneRemain=endM−distance（${s.zoneRemain}@${s.distance}）`);
+      if (prev !== null) assert.ok(s.zoneRemain < prev, '区内随推进递减（倒计时）');
+      assert.equal(s.flipWarn, 0, '区内 flipWarn 保持 0（常态条让位 zoneRemain 倒计时）');
+      prev = s.zoneRemain;
+    } else {
+      assert.equal(s.zoneRemain, 0, '区外（进区前/出区后禁铺窗）zoneRemain=0');
+      if (s.distance >= ZE) exited = true;
+    }
+  }
+  assert.ok(prev !== null && exited, 'fixture 应覆盖完整区段（进区+出区）');
+});
+
+test('zoneRemain（B-9）：区外恒 0 且 flipWarn 预告语义逐字节不回归；未配置 antigrav 两者恒 0', () => {
+  const sim = new RunnerSim(blankContent(), 777);
+  sim.state.t = 20; sim.state.distance = ZS - 45; sim.gen.genZ = ZS - 45;
+  sim.step(); // 首步 ensure 预注册区（同 flipWarn 预告窗用例口径），次步起 stepFx 派生
+  let sampled = 0;
+  for (let i = 0; i < 4000 && sim.state.distance < ZS; i++) {
+    sim.step();
+    const s = sim.state;
+    if (s.distance < ZS) {
+      sampled++;
+      assert.equal(s.zoneRemain, 0, '预告窗内 zoneRemain=0');
+      assert.ok(s.flipWarn > 0 && s.flipWarn <= 60, `flipWarn 预告窗语义不回归（${s.flipWarn}@${s.distance}）`);
+      assert.ok(Math.abs(s.flipWarn - (ZS - s.distance)) < 1e-9, 'flipWarn=距下一区起点的剩余米数（与 A-2 版逐字节一致）');
+    }
+  }
+  assert.ok(sampled > 0, 'fixture 应覆盖预告窗');
+  const off = new RunnerSim(blankContent(false), 777); // 无 antigrav 对照：同起点跑同里程
+  off.state.t = 20; off.state.distance = ZS - 45; off.gen.genZ = ZS - 45;
+  for (let i = 0; i < 600; i++) {
+    off.step();
+    assert.equal(off.state.zoneRemain, 0, '未配置 ⇒ zoneRemain 恒 0（全主题零变化）');
+    assert.equal(off.state.flipWarn, 0, '未配置 ⇒ flipWarn 恒 0（全主题零变化）');
+  }
 });

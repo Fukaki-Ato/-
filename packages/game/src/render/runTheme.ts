@@ -116,10 +116,13 @@ export function deriveRunStage(content: GameContent, opts?: { themeId?: string }
   };
 }
 
-/** A-3 统一事件预告条（HUD 顶部大横幅，两事件共用）：surgeWarn=喷发预警（urgency 1 橙红）、
- *  flipWarn=重力翻转区剩余米数（urgency 2 青蓝）；两者同真取 flipWarn（翻转更需要提前预告）。
- *  纯函数零分配，无预告返回 null（HUD 隐藏横幅）；文本在渲染层拼装、HUD 只消费不重算。 */
-export function buildAlert(s: { surgeWarn: number; flipWarn: number }): { text: string; urgency: 1 | 2 } | null {
+/** A-3/B-9 统一事件横幅（HUD 顶部大横幅），优先级高→低：追击者逼近（urgency 3 红）>
+ *  反重力区内倒计时（urgency 2 青蓝，常态条）> 重力翻转区预告（urgency 2）> 喷发预警（urgency 1 橙红）。
+ *  纯函数零分配，无告警返回 null（HUD 隐藏横幅）；文本在渲染层拼装、HUD 只消费不重算。
+ *  fx 不在此产生：翻转瞬间全屏闪强度由 runnerScene 组装 alert 时附加（B-9 A 线分工）。 */
+export function buildAlert(s: { surgeWarn: number; flipWarn: number; zoneRemain: number; chaserDist: number }): { text: string; urgency: 1 | 2 | 3; fx?: number } | null {
+  if (s.chaserDist <= 20) return { text: '追击者逼近 · 快跑！', urgency: 3 };
+  if (s.zoneRemain > 0) return { text: '反重力区 · 剩余 ' + Math.ceil(s.zoneRemain) + 'm', urgency: 2 };
   if (s.flipWarn > 0 && s.flipWarn <= 60) return { text: '重力翻转区 · ' + Math.ceil(s.flipWarn) + 'm', urgency: 2 };
   if (s.surgeWarn > 0) return { text: '喷发预警', urgency: 1 };
   return null;

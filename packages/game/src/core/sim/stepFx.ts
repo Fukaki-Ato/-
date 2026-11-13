@@ -33,10 +33,13 @@ export function stepFx(s: RunnerState, dm: number, events: { type: string; [k: s
   s.score += stepCrossings(ctx.crossings, s.distance, s.y, CROSSING_DEFAULTS, events) * CROSSING_DEFAULTS.scorePer;
   cullCrossings(ctx.crossings, s.distance, 14);
   s.tideLevel = level(s.distance);
-  // A-2 反重力预告窗：zoneAt 查区内（区内=0，用法同 runnerSim 的 flip 推导）；区外二分找下一区起点
-  // （zones 按 startM 升序），剩余 ∈(0,60] ⇒ flipWarn=剩余米数（60m≈3 秒预告）。zones 空 ⇒ 恒 0（硬门）。
-  s.flipWarn = 0;
-  if (ctx.zones.length > 0 && !zoneAt(ctx.zones, s.distance)) {
+  // A-2/B-9 反重力区查询：zoneAt 一次查询共用——区内 ⇒ zoneRemain=endM−distance（HUD 区内倒计时）、flipWarn 保持 0；
+  // 区外 ⇒ zoneRemain=0，二分找下一区起点（zones 按 startM 升序），剩余 ∈(0,60] ⇒ flipWarn=剩余米数（60m≈3 秒预告）。
+  // zones 空 ⇒ 两者恒 0（硬门）。flipWarn 取值与 A-2 版逐字节一致（同一次 zoneAt 结果分流）。
+  s.flipWarn = 0; s.zoneRemain = 0;
+  const zn = ctx.zones.length > 0 ? zoneAt(ctx.zones, s.distance) : null;
+  if (zn) s.zoneRemain = zn.endM - s.distance;
+  else {
     let lo = 0, hi = ctx.zones.length;
     while (lo < hi) { const mid = (lo + hi) >> 1; if (ctx.zones[mid]!.startM <= s.distance) lo = mid + 1; else hi = mid; }
     if (lo < ctx.zones.length) { const gap = ctx.zones[lo]!.startM - s.distance; if (gap <= 60) s.flipWarn = gap; }

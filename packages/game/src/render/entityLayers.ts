@@ -18,8 +18,7 @@ const OBS_MAX = 40, CLOUD_MAX = 12;
 const OBS_NEAR = 10, OBS_FAR = -140, CLOUD_NEAR = 12, CLOUD_FAR = -140;
 /** 高杆横杆下沿（与 core/sim 的 BAR_BOTTOM 对应：杆体画在 1.2m 以上，下方留钻的空间） */ const BAR_LOW_Y = 1.2;
 /** 高杆横杆的可见透明度：半透明才不挡视线（审计 T3 蹲杆挡视线） */ const GATE_OPACITY = 0.4;
-/** 横杆上海报的透明度：比杆体实一些才读得出画面，但仍能透出后面的金币（0.4 会让海报形同消失） */
-const GATE_POSTER_OPACITY = 0.72;
+const GATE_POSTER_OPACITY = 0.72; // 横杆上海报的透明度：比杆体实一些才读得出画面，但仍能透出后面的金币（0.4 会让海报形同消失）
 /** low 障碍可视高度系数：与 core 判定口径对齐（collision.ts：s.y < o.h*0.75 判中），穿模观感消除 */
 const LOW_VISUAL_H = 0.75;
 /** hazard 薄片只是核心线，另叠 0.35m 高电弧光带，与「要跳 0.35m」的判定口径对齐 */
@@ -170,17 +169,18 @@ export function createObstacleLayer(scene: THREE.Scene, laneWidth: number, scene
         const slot = pickPoster(o);
         const m = u.bar;
         m.visible = !isZap && o.cls !== 'step' && !skinned; // 闪电圈用圆盘+闪电标志、斜坡用坡道几何，不画通用方块
-        if (o.cls === 'laser') m.visible = m.visible && !!o.laserCfg && laserOn(o.laserCfg, t);
+        if (o.cls === 'laser') m.visible = m.visible && !!o.laserCfg && (laserOn(o.laserCfg, t) || laserOn(o.laserCfg, t + 0.5)); // 激光三态：亮=全强度；灭但 0.5s 内将亮=充能闪烁预兆；否则隐藏（判定仍走 collision.ts laserOn 不动）
         let sx = o.w, sy = o.h, sz = o.d, py = o.h / 2;
         if (m.visible) {
           const mat = m.material as THREE.MeshStandardMaterial;
           mat.color.setHex(slot ? slot.frame : OBS_COLOR[o.cls] ?? 0xd9a24a);
-          mat.emissive.setHex(o.cls === 'hazard' ? 0x7a3fd9 : 0x000000);
+          mat.emissive.setHex(o.cls === 'hazard' ? 0x7a3fd9 : 0x000000); mat.emissiveIntensity = 1; // 强度逐帧复位基准（激光充能态在下方加强，防槽位跨障碍泄漏）
           mat.roughness = 0.6;
-          // 高杆横杆（obs_gate_low）半透明化：下方的金币与障碍要能透出来，只留立柱提示轮廓
-          mat.transparent = o.cls === 'high';
-          mat.opacity = (o.cls === 'high' ? GATE_OPACITY : 1) * (1 - sink);
+          // 高杆横杆（obs_gate_low）半透明化：下方的金币与障碍要能透出来，只留立柱提示轮廓；激光充能态同走半透明
+          mat.transparent = o.cls === 'high' || (o.cls === 'laser' && !laserOn(o.laserCfg!, t));
+          mat.opacity = o.cls === 'laser' && !laserOn(o.laserCfg!, t) ? 0.28 + 0.10 * Math.sin(t * 14) : (o.cls === 'high' ? GATE_OPACITY : 1) * (1 - sink); // 充能态 ~0.28 透明度 + sin(t*14) 闪烁
           mat.depthWrite = o.cls !== 'high';
+          if (o.cls === 'laser' && !laserOn(o.laserCfg!, t)) { mat.emissive.copy(mat.color); mat.emissiveIntensity = 1.6; } // 充能态：发射器（梁体）沿光束本色自发光加强——玩家看到梁体「预燃」就知道马上要亮
           if (o.cls === 'high') { sy = Math.max(0.5, o.h - BAR_LOW_Y); py = BAR_LOW_Y + sy / 2; } // 顶部横杆，下方可钻
           // low：可视高度按判定口径画到 h*0.75（碰撞盒仍为 o.h，见 core/sim collision.ts）
           if (o.cls === 'low') { sy = o.h * LOW_VISUAL_H; py = sy / 2; }

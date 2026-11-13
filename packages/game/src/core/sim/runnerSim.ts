@@ -35,6 +35,7 @@ export class RunnerSim {
   readonly pickupsArr: PickupEntity[] = [];
   readonly cloudsArr: CloudEntity[] = [];
   readonly crossings: CrossingEntity[] = []; // M4 穿越判定体（crossings 配置出生，cross 事件计分）
+  get zones(): Zone[] { return this.gen.zones; } // B-9 渲染层事件门读区表（gen 私有、zones 数组引用稳定；只读不反写）
   readonly events: SimEvent[] = [];
   private surgeFired = false;
   private readonly fxCtx = { tideAware: false, surgeFired: false, crossings: this.crossings, lastHits: 0, laneWidth: 0, zones: [] as Zone[] }; readonly tideAware: boolean; // M4 喷发判定化：tideAware=obstacles.json 有 tideAware 块
