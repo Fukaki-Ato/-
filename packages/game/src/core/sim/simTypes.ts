@@ -39,7 +39,19 @@ export type SimEvent =
   /** zap 带打击位置（lane/worldZ）：渲染层据此把雷电特效画到闪电圈所在车道与深度 */
   | { type: 'zap'; gear: 'shield' | 'board' | 'helmet' | null; lane: number; worldZ: number }
   /** revive：自动复活触发（config revive 段），带本局剩余次数；渲染层可做原地起立特效 */
-  | { type: 'revive'; left: number };
+  | { type: 'revive'; left: number }
+  /** surge（M4 喷发判定化）：进入喷发段一次性事件（lane/worldZ=喷柱落点；渲染层接 eruption 喷柱+闪橙） */
+  | { type: 'surge'; lane: number; worldZ: number }
+  /** flip（B-6 反重力区）：翻转状态实际变化时发一次（进区/出区各一次；飞行/滑翔进区按 B-3 落地后才翻）。
+   *  渲染/音频据此做约 0.35s 镜头滚转 + 音效下潜；ceilH=区顶高（出区回 0） */
+  | { type: 'flip'; flip: 1 | -1; ceilH: number }
+  | { type: 'bounce'; vy: number }
+  | { type: 'chaserNear'; dist: number }
+  | { type: 'cross'; kind: string; lane: number; worldZ: number }
+  /** coinRain（Stormspire 金币雨）：距窗口起点 ≤30m 预告位一次性推送，startM=窗口起点（渲染预告/落币特效消费） */
+  | { type: 'coinRain'; startM: number }
+  /** warp（时空隧道）：进出沿各推一次，phase=1 进（「时空隧道！」闪屏）/−1 出（「穿出隧道」）；stepFx 沿检测派生 */
+  | { type: 'warp'; phase: 1 | -1 };
 
 export interface RunnerState {
   t: number; distance: number; prevDistance: number;
@@ -53,9 +65,31 @@ export interface RunnerState {
   gliding: boolean; // 飞行器燃料耗尽后的降落段
   /** 技能冷却剩余、本局累计主动下滑次数（下滑积攒型技能的门槛计数）、本局释放次数 */
   skillCd: number; slideCount: number; casts: number;
+  /** 潮位 0..1（M4 潮位单源：sim 每步由 core/sim/tide.level(distance) 更新；非潮汐主题不消费该值） */
+  tideLevel: number;
+  /** 喷发预警剩余秒（M4 喷发判定化：进入 1s 红光预警窗时 >0；HUD 提示与红光渐起消费，0=无预警） */
+  surgeWarn: number;
   /** 当前可站立支撑面高度（米，0=地面；>0=列车顶/坡道面）。每帧由 movement 算好后写回：
    *  渲染层据此区分「站在支撑面上跑」与「真正离地」，sim→render 单向数据流 */
   supportY: number;
+  /** 反重力区状态（B-2）：flip=重力方向（1 正常 / -1 倒挂跑天花板）；ceilH=所在区顶高（0=不在区内）。
+   *  每步 step 由 zoneAt(distance) 推导写入（单向门：飞行/滑翔中不翻转，B-3），渲染层只读不反写 */
+  flip: 1 | -1;
+  ceilH: number;
+  /** 反重力区预告剩余米数（A-1 统一事件预告条）：区外且距下一区起点 ∈(0,60]（60m≈3 秒预告窗）时>0，
+   *  区内/未配置 antigrav 恒 0；stepFx 每步由 zoneAt 推导写入，HUD 顶部横幅消费 */
+  flipWarn: number;
+  /** B-9 区内剩余米数：stepFx 每步由 zoneAt 派生（endM−distance），区外恒 0；HUD 区内倒计时横幅消费 */
+  zoneRemain: number;
+  /** 时空隧道状态（Stormspire 三事件）：warp=1 表区内；warpRemain=区内剩余米数（endM−distance，
+   *  区外恒 0）。stepFx 每步由 warpAt 派生写入，渲染/HUD 只读不反写；未配置 warp 段恒 0/0 */
+  warp: 0 | 1;
+  warpRemain: number;
+  /** 低重力带剩余米数（Stormspire）：stepFx 每步由 lowGravAt 派生（endM−distance），带外恒 0。
+   *  倍率 gMul 不进 state（渲染不需要），经 fxCtx.lowGravMulNow 透传给 movement（warps.ts） */
+  lowGravRemain: number;
+  /** 追击者距离（米，M7a）：8=贴脸→80=远离；受击拉近、奔跑缓慢拉远 */
+  chaserDist: number;
 }
 
 /** 空装备：未指定角色时的默认手感（保持 M1 行为不变） */
@@ -74,6 +108,10 @@ export function initialRunnerState(): RunnerState {
     shocks: 0, revivesUsed: 0,
     coins: 0, nearMiss: 0, score: 0, gliding: false,
     skillCd: 0, slideCount: 0, casts: 0,
+    tideLevel: 0,
+    surgeWarn: 0,
     supportY: 0,
+    flip: 1, ceilH: 0, chaserDist: 50, flipWarn: 0, zoneRemain: 0,
+    warp: 0, warpRemain: 0, lowGravRemain: 0,
   };
 }

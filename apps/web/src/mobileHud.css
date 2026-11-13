@@ -10,6 +10,19 @@
 .hud-coins img { width: 20px; height: 20px; object-fit: contain; }
 .hud-hearts { font-size: 17px; color: #df755f; letter-spacing: 2px; }
 .hud-buffs { display: block; width: max-content; max-width: 85%; margin-top: 10px; font-size: 10px; line-height: 1.5; padding: 8px 12px; border-radius: 12px; color: #fffdf4; background: #173f4bd9; }
+/* A-3 统一事件预告条：顶部居中大横幅（深底+描边），出现淡入/消失淡出；描边色按 urgency 变量切换 */
+.hud-alert { position: absolute; top: calc(env(safe-area-inset-top, 0px) + 92px); left: 50%; transform: translateX(-50%); max-width: calc(100% - 48px); width: max-content; padding: 10px 22px; border-radius: 14px; font-size: 15px; font-weight: 800; letter-spacing: .1em; white-space: nowrap; color: #fffdf4; background: #10222cd9; border: 1.5px solid var(--hud-alert-edge, #67e0ff); box-shadow: 0 0 18px #0007; opacity: 0; transition: opacity .25s ease; }
+.hud-alert.is-on { opacity: 1; }
+.hud-alert[data-urgency='1'] { --hud-alert-edge: #ff8a50; } /* 喷发预警：橙红描边 */
+.hud-alert[data-urgency='2'] { --hud-alert-edge: #67e0ff; } /* 重力翻转：青蓝描边 */
+.hud-alert[data-urgency='3'] { --hud-alert-edge: #ff5a5a; } /* B-9 追击者逼近：红描边 */
+.hud-alert[data-urgency='4'] { --hud-alert-edge: #b06cff; } /* 时空隧道：紫描边 */
+.hud-alert[data-urgency='5'] { --hud-alert-edge: #7dffc4; } /* 低重力带：薄荷描边 */
+/* B-9 翻转瞬间全屏径向闪：opacity 由 HUD 每帧直写（alert.fx 0~1），screen 混合叠亮画面 */
+.hud-flip-flash { position: fixed; inset: 0; pointer-events: none; background: radial-gradient(circle at 50% 46%, #9beeffe0 0%, #59d2ff55 34%, transparent 68%); opacity: 0; mix-blend-mode: screen; }
+/* B-9 危险态（追击者 urgency=3）：红色暗角脉冲覆层（.mobile-hud 已 fixed，伪元素 inset:0 定位成立） */
+.mobile-hud.is-danger::after { content: ''; position: absolute; inset: 0; pointer-events: none; box-shadow: inset 0 0 90px #ff2b2b55; animation: hud-danger-pulse .8s ease-in-out infinite alternate; }
+@keyframes hud-danger-pulse { from { opacity: .35; } to { opacity: 1; } }
 .hud-skill { position: absolute; bottom: max(26px, env(safe-area-inset-bottom)); left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 10px; max-width: calc(100% - 32px); width: max-content; padding: 12px 16px; border: 1px solid #fff9; border-radius: 18px; background: #fffdf3ee; box-shadow: 0 5px 20px #164e5710; }
 .hud-skill strong { font-size: 12px; }
 .hud-skill > span:last-child { font-size: 10px; color: var(--ui-muted); white-space: nowrap; }

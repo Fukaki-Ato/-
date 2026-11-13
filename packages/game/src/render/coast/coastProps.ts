@@ -154,7 +154,16 @@ export function createCoastProps(scene: THREE.Scene): SceneryProps {
     pebbles.push(spot(-7.4 - rnd(i, 65) * 4.2, 8 - i * 8.3 - rnd(i, 67) * 4, rnd(i, 69) * 6.28, 0.7 + rnd(i, 71) * 0.8));
   }
   place(build(buildFoam), foam, ['body']);
-  place(build(buildPuddle), puddles, ['body', 'glow']);
+  // 水洼微闪（coast-audit ④ Phase 1 ②）：glow 桶从静态 InstancedMesh 改 kit Layer 相位明灭
+  //（复用 glint 模式 coastProps.ts:177-184；±0 draw call——一批次换一批次）
+  const puddleD = build(buildPuddle);
+  place(puddleD, puddles, ['body']);
+  const puddleGlow = new Layer(scene, puddleD.geometry('glow')!, mats.glow, puddles.length, (i, t, out) => {
+    const p = puddles[i]!;
+    out.x = p.x; out.y = p.y + 0.006; out.z = p.z; out.ry = p.ry; out.s = p.s;
+    const ph = Math.sin(t * (1.2 + rnd(i, 91) * 1.6) + rnd(i, 93) * 6.2);
+    puddleGlow.tint(i, tmp.setScalar(Math.max(0, ph * ph * ph - 0.2))); // 平方压底：多数时间暗、偶发亮闪
+  });
   place(build(buildShell), shells, ['body']);
   place(build(buildPebble), pebbles, ['body']);
 
@@ -228,9 +237,9 @@ export function createCoastProps(scene: THREE.Scene): SceneryProps {
       }
       seaU.uniforms['uT'].value = t;
       shU.uniforms['uT'].value = t;
-      mist.update(t); glint.update(t); sheen.update(t); breathe.update(t);
+      mist.update(t); glint.update(t); sheen.update(t); breathe.update(t); puddleGlow.update(t);
       sway.update(t); swayFlowers.update(t); gullBody.update(t); gullWings.update(t);
-      glint.flushColors(); sheen.flushColors(); breathe.flushColors();
+      glint.flushColors(); sheen.flushColors(); breathe.flushColors(); puddleGlow.flushColors();
     },
     dispose(): void { toonRamp?.dispose(); },
   };

@@ -4,6 +4,7 @@
  */
 import * as THREE from 'three';
 import type { CoinEntity } from '@tr/game/core/sim/trackGen.js';
+import { applyWorldBend } from './stormspire/worldBend.js';
 
 /** 单帧最多绘制的金币数（超出按「离角色最近优先」取舍） */
 const COIN_MAX = 260;
@@ -21,11 +22,25 @@ export interface CoinFieldArgs {
   magnetOn: boolean; playerX: number; playerY: number;
 }
 
-export function createCoinField(scene: THREE.Scene, laneWidth: number) {
+export function createCoinField(scene: THREE.Scene, laneWidth: number,
+  /** 可选接线（stormspire 主线传 { envMap, scenery }）：有 envMap 时金币切换抛光金金属；不传或 null＝与旧版完全一致 */
+  opts?: { envMap?: THREE.Texture | null; scenery?: string },
+) {
+  const env = opts?.envMap ?? null;
   const ringGeo = new THREE.TorusGeometry(0.26, 0.085, 10, 22);
   const ringMat = new THREE.MeshStandardMaterial({ color: 0xffcf3f, emissive: 0xffb300, emissiveIntensity: 0.85, metalness: 0.4, roughness: 0.25 });
   const faceGeo = new THREE.CircleGeometry(0.23, 18);
   const faceMat = new THREE.MeshStandardMaterial({ color: 0xe8a921, metalness: 0.5, roughness: 0.4, side: THREE.DoubleSide });
+  if (opts?.scenery === 'stormspire') {
+    // 假弯道：金币与地面同弯（同一 f(z)，见 stormspire/worldBend.ts），否则远处金币漂出车道
+    applyWorldBend(ringMat);
+    applyWorldBend(faceMat);
+  }
+  if (env) {
+    // 抛光金视觉锚点（仅在 envMap 存在时生效）：metalness 0.9 / roughness 0.25 锐高光 + envMap 反射增益 1.2；
+    // 色相保持金（0xffcf3f 环 / 0xe8a921 面）与自发光不变；无 IBL 时金属度过高会近乎发黑，故其余主题维持旧参数。
+    for (const m of [ringMat, faceMat]) { m.metalness = 0.9; m.roughness = 0.25; m.envMap = env; m.envMapIntensity = 1.2; m.needsUpdate = true; }
+  }
   const ringInst = new THREE.InstancedMesh(ringGeo, ringMat, COIN_MAX);
   const faceInst = new THREE.InstancedMesh(faceGeo, faceMat, COIN_MAX);
   ringInst.instanceMatrix.setUsage(THREE.DynamicDrawUsage);

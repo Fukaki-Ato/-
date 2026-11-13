@@ -56,10 +56,12 @@ function addWarehouse(b: Builder, at: Placement[]) {
   const roof = new THREE.CylinderGeometry(d / 2, d / 2, w, 12, 1, false, 0, Math.PI);
   roof.rotateZ(Math.PI / 2);
   insts.push(addInst(scene, roof, std(WAREHOUSE_ROOF), at.map(p => ({ ...p, y: h * p.s }))));
-  // 大门（朝跑道）与高窗：贴在临路立面
+  // 大门（朝跑道）与高窗：贴在临路立面。高窗暖光改自发光（M1 灯光定调配套：黄昏里自然亮着，
+  // 亮度过 bloom 阈值 0.82 得一层轻微溢光——harbor 发光只认暖橙一种，见 harbor-audit ⑤-3）
   insts.push(addInst(scene, new THREE.BoxGeometry(1.7, 2.1, 0.1), std(0x6b5a45),
     at.map(p => ({ ...p, x: p.x + (p.x < 0 ? w / 2 - 0.06 : -(w / 2 - 0.06)) * p.s, y: 1.2 * p.s, ry: 0, rz: 0 }))));
-  insts.push(addInst(scene, new THREE.BoxGeometry(0.1, 0.5, 2.6), std(0xffd9a0),
+  insts.push(addInst(scene, new THREE.BoxGeometry(0.1, 0.5, 2.6),
+    new THREE.MeshBasicMaterial({ color: 0xffd9a0 }),
     at.map(p => ({ ...p, x: p.x + (p.x < 0 ? -(w / 2 - 0.06) : w / 2 - 0.06) * p.s, y: 2.5 * p.s, ry: 0, rz: 0 }))));
   addShadow(b.scene, b.insts, at, w * 0.62);
 }
@@ -87,12 +89,13 @@ function addBollards(b: Builder, side: -1 | 1) {
   insts.push(addInst(scene, new THREE.CylinderGeometry(0.22, 0.16, 0.1, 8), std(BOLLARD), at.map(p => ({ ...p, y: 0.5 }))));
 }
 
-/** 栈桥灯柱：细杆 + 暖光灯头（黄昏里自然亮着） */
+/** 栈桥灯柱：细杆 + 暖光灯头（黄昏里自然亮着；M1 改自发光 MeshBasicMaterial——过 bloom 阈值得轻微光晕） */
 function addHarborLamps(b: Builder, side: -1 | 1) {
   const { scene, insts } = b;
   const at = row(side, 4.9, 34, side === -1 ? 71 : 72, 1.5, { jx: 0, jz: 0, phase: 15, align: true });
   insts.push(addInst(scene, new THREE.CylinderGeometry(0.05, 0.07, 2.9, 6), std(LAMP_POLE), at));
-  insts.push(addInst(scene, new THREE.SphereGeometry(0.17, 8, 6), std(LAMP_HEAD), at.map(p => ({ ...p, y: 2.98 }))));
+  insts.push(addInst(scene, new THREE.SphereGeometry(0.17, 8, 6),
+    new THREE.MeshBasicMaterial({ color: LAMP_HEAD }), at.map(p => ({ ...p, y: 2.98 }))));
 }
 
 /** 油桶 + 渔网架：近景小件 */

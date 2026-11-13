@@ -37,6 +37,10 @@ export interface ObstaclesFile {
     guarantee?: { safeLanePattern: number[] } }>;
   difficultyCurve: Array<{ by: number; poolWeights: Record<string, number>; coinDensity: number; pickupRate: number }>;
   dropTable: { pickupBoxRatePerSeg: number; weights: Record<string, number> };
+  /** 特殊事件块（可选；同 antigrav 惯例——sim 侧 warps.ts 宽容解析，未配置=undefined ⇒ 表恒空零变化） */
+  warp?: { lengthM: number; everyM: number; fromM: number };
+  coinRain?: { spanM: number; everyM: number; fromM: number; count: number; ampY: number };
+  lowGrav?: { lengthM: number; everyM: number; fromM: number; gMul: number };
 }
 
 /** 加载完成后拼给业务层的「全量内容」 */

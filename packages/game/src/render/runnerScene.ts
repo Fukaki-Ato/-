@@ -1,8 +1,7 @@
 /**
  * 跑酷局渲染场景（render 层总装，docs/02 §5）
- * 本文件只做三件事：搭 Three.js 舞台、按固定步长推进 sim 并用插值 alpha 渲染、把事件翻成表现反馈。
- * 具体表现拆在同目录模块里：trackVisuals（道路）/ avatarRig（角色）/ coinField（金币）/
- * entityLayers（障碍·道具箱·云）/ vfxBurst（爆点）/ runDebugProbe（?debug 自动化探针）。
+ * 本文件只做三件事：搭 Three.js 舞台、按固定步长推进 sim 并用插值 alpha 渲染、把事件翻成表现反馈。具体表现拆在同目录模块里：
+ * trackVisuals（道路）/ avatarRig（角色）/ coinField（金币）/ entityLayers（障碍·道具箱·云）/ vfxBurst（爆点）/ runDebugProbe（?debug 自动化探针）/ runTheme（主题派生 deriveRunStage + 输入接线 wireRunInput）。
  * 铁律：只读 sim 状态，不反写玩法数据（单向数据流）。
  */
 import * as THREE from 'three';
@@ -21,12 +20,16 @@ import { installRunProbe, uninstallRunProbe } from './runDebugProbe.js';
 import { createSpeedLines } from './speedLines.js';
 import { createTrackVisuals } from './trackVisuals.js';
 import { createBurstPool } from './vfxBurst.js';
-import { applyLightningFlash, createLightningFx, FLASH_LIGHT_GAIN, FLASH_TINT } from './lightning.js';
+import { applyLightningFlash, createLightningFx, FLASH_LIGHT_GAIN } from './lightning.js';
+import { buildAlert, deriveRunStage, wireRunInput } from './runTheme.js';
+import { createPostFx } from './postfx.js';
+import { createEnvMap, disposeEnvMap } from './stormspire/env.js';
+import { createEruption } from './forgeheart/eruption.js'; import { createChaser } from './chaser.js'; import { createZoneGates } from './zoneGates.js'; import { createWarpTunnel } from './warpTunnel.js';
 
 export interface RunCallbacks {
   onHud(h: {
     score: number; coins: number; distance: number; hits: number; lives: number;
-    buffs: { name: string; left: number }[];
+    buffs: { name: string; left: number }[]; alert?: { text: string; urgency: 1 | 2 | 3 | 4 | 5; fx?: number } | null; // A-3/B-9 预告条（buildAlert 派生；null=隐藏横幅，1=喷发橙红 2=翻转/倒计时青蓝 3=追击者红 4=时空隧道紫 5=金币雨/低重力薄荷；fx=事件瞬间 0~1 闪屏强度，HUD 全屏径向闪用；可选=常态无闪）
     /** cd=冷却剩余秒；charge=下滑积攒门槛（{now, need}），无门槛技能为 null */
     skill: { label: string; cd: number; ready: boolean; charge: { now: number; need: number } | null } | null;
   }): void;
@@ -42,9 +45,8 @@ export interface RunCallbacks {
   debug?: boolean;
 }
 
-/** 相机目标/FOV 在 cameraRig.ts 派生，本文件只保留平滑系数与注视点纵深。 */
-/** 注视点纵深（米）：四轮反馈「视角有点远」后由 -11 收到 -9.5（构图更紧、人物不上移出画） */
-const CAM_FOLLOW = 0.25, FOV_LERP = 0.06, LOOK_AHEAD_Z = -9.5;
+/** 相机目标/FOV 在 cameraRig.ts 派生，本文件只保留平滑系数与注视点纵深（米）：四轮反馈「视角有点远」后由 -11 收到 -9.5（构图更紧、人物不上移出画） */
+const CAM_FOLLOW = 0.25, FOV_LERP = 0.06, LOOK_AHEAD_Z = -9.5, FLIP_ROLL_S = 0.35; // FLIP_ROLL_S：B-7 反重力镜头滚转过渡时长，与 sim flip 事件节奏对齐（brief §11.2 B-6/B-7）
 /** 加速（speedMul>1）的视野扩张：按 (speedMul-1) 线性加宽并封顶（雷霆冲刺一类技能要看得见加速） */
 const SPEED_FOV_PER_MUL = 70, SPEED_FOV_MAX = 10;
 /** 震屏：每帧衰减量与随机幅度 */
@@ -57,32 +59,23 @@ const BURST_Z = -0.62, CLOUD_BURST_COLOR = 0xdfe9f5;
 const ZAP_BURST_COLOR = 0xffe14d;
 /** 雾视距：障碍在约 3 秒外可见（地铁酷跑式远望） */
 const FOG_NEAR = 22, FOG_FAR = 120;
+const warpFog = new THREE.Color('#1a0b33'); const warpBlend = new THREE.Color(); // 时空隧道氛围：目标雾色（深紫）与混合缓存（模块顶层复用，逐帧零分配）
 
 export function createRunnerScene(
   host: { canvas: GLCanvas; size: WindowSize },
   adapter: PlatformAdapter, sim: RunnerSim, content: GameContent, cb: RunCallbacks,
   opts?: { themeId?: string },
 ) {
-  const runner = (content.game.params.runner ?? {}) as Record<string, number>;
-  const laneWidth = runner.laneWidth ?? 2.2;
-  /** 滑翔倒计时换算：core 以 heightM/glideS 匀速下降（movement.ts），HUD 显示与 s.gliding 一致的真实剩余秒数 */
-  const flight = (content.game.params.flight ?? {}) as Record<string, number>;
-  const glideFallMps = (flight.heightM ?? 4.6) / (flight.glideS ?? 1.8);
-  // 默认主题 = 大厅「场景切换」所选（storage 经 mainFlow 注入）；缺省回首个 live 条目（不硬编码 id，避免删主题时漏改）
-  const themeItems = (content.themes.items ?? []) as Record<string, unknown>[];
-  const theme = (opts?.themeId ? themeItems.find(t => t['id'] === opts.themeId) : undefined)
-    ?? themeItems.find(t => t['status'] === 'live') ?? themeItems[0];
-  const sky = (theme?.sky ?? { baseColor: '#8ED0F2', flashColor: '#FFF3C4' }) as { baseColor: string; flashColor: string };
-  const fogColor = ((theme?.fog as Record<string, unknown> | undefined)?.color as string | undefined) ?? sky.baseColor;
-  const tint = (theme?.vfxTint as string | undefined) ?? '#FFD98A';
-  const groundColor = (theme?.groundColor as string | undefined) ?? '#E3CFA4';
+  // 主题派生（runner 参数 / 主题查找 / sky·fog·vfxTint·groundColor·lighting·scenery 推导）拆到 runTheme.ts
+  const {
+    laneWidth, glideFallMps, sky, fogColor, tint, groundColor, scenery,
+    hemi, keyLight, HEMI_BASE, KEY_BASE, skyBase, fogBase, flashTint, flashGap,
+    grade, wetRoad, env,
+  } = deriveRunStage(content, opts);
   /** buff 派生视图：引擎原地更新同一个对象，渲染层缓存引用安全（docs/09 T2.2） */
   const fx = sim.fx;
 
-  // ---------- 舞台 ----------
-  // 全仓唯一 three 接线断言点（S10 §7.6 / D3）：GLCanvas 是结构化去 DOM 类型，这里喂回
-  // three 需要的 HTMLCanvasElement 形貌；S11 路线 B 的最小垫片（wx canvas 补 addEventListener/
-  // style）即在此处兼容，如与此冲突收敛于此单点。
+  // ---------- 舞台 ---------- 全仓唯一 three 接线断言点（S10 §7.6 / D3）：GLCanvas 是结构化去 DOM 类型，这里喂回 three 需要的 HTMLCanvasElement 形貌；S11 路线 B 的最小垫片（wx canvas 补 addEventListener/ style）即在此处兼容，如与此冲突收敛于此单点。
   const renderer = new THREE.WebGLRenderer({ canvas: host.canvas as unknown as HTMLCanvasElement, ...TR_GAME_CANVAS_ATTRIBUTES });
   const { width, height, dpr } = host.size;
   renderer.setPixelRatio(dpr);
@@ -94,27 +87,29 @@ export function createRunnerScene(
   const camera = new THREE.PerspectiveCamera(rig0.fov, width / height, 0.1, 160);
   camera.position.set(0, rig0.camY, rig0.camZ);
   camera.lookAt(0, rig0.lookY, LOOK_AHEAD_Z);
-  // 白天海滨的光：半球光天空浅蓝/地面暖沙，主光偏暖阳色（夜景那套冷光会让晴天发灰）
-  const hemi = new THREE.HemisphereLight(0xbfe3ff, 0xd8c39a, 1.15);
-  const HEMI_BASE = 1.15;
-  const keyLight = new THREE.DirectionalLight(0xfff2d0, 1.9);
-  const KEY_BASE = 1.9;
+  // 光（hemi/keyLight）与闪白插值色（skyBase/fogBase/flashTint）由 runTheme 按主题 lighting 派生；add 顺序不变
   scene.add(hemi);
   keyLight.position.set(3, 8, 4);
   scene.add(keyLight);
-  /** 闪白（雷电）：背景/雾色的基色与目标色缓存，逐帧按闪白强度插值 */
-  const skyBase = new THREE.Color(sky.baseColor), fogBase = new THREE.Color(fogColor), flashTint = new THREE.Color(FLASH_TINT);
-  const lightning = createLightningFx(scene);
+  const lightning = createLightningFx(scene); const chaser = createChaser(scene); const zoneGates = createZoneGates(scene, laneWidth, sim.zones); const warpFx = createWarpTunnel(scene, laneWidth); // 追击者兽群（chaser.ts）/事件门（zoneGates.ts）/时空隧道环（warpTunnel.ts）
+  let ambientT = flashGap(); // 环境闪电间隔（theme.sky.flashEveryS 区间随机，缺省关闭）由 runTheme 派生
+  // 主题 IBL：theme.env 声明了配色的主题挂程序化环境贴图（stormspire 雷暴/harbor 晚霞），null=无 IBL 自然降级
+  const runEnv = env ? createEnvMap(renderer, env) : null;
+  if (runEnv) scene.environment = runEnv;
+  // 喷发管线（方案 B）：forgeheart 挂 eruption（LightningFx 同构，自排程 1s 预警+喷柱），flash 并入现有管线
+  const eruption = scenery === 'forgeheart' ? createEruption(scene) : null;
+  // 后处理全主题启用（bloom 阈值 0.82 下非自发光几乎无泛光；grade 由 theme.grade 覆盖）；wx/非 WebGL2 降级
+  const postfx = createPostFx(renderer, scene, camera, grade);
 
   const track = createTrackVisuals(scene, laneWidth, {
     baseColor: sky.baseColor, flashColor: sky.flashColor, tint, groundColor,
     sky: { zenith: sky.baseColor, horizon: fogColor },
-  }, (theme?.['scenery'] as string | undefined) ?? 'seaside');
+  }, scenery, { wetRoad }, { crossings: sim.crossings });
   const avatar = createAvatar(scene, laneWidth, sim.loadout, adapter);
-  const coinField = createCoinField(scene, laneWidth);
-  const obstacleLayer = createObstacleLayer(scene, laneWidth);
-  // 道具 3D 模型（items.json model.prefab/spin）：磁铁有文件→近距换 3D，其余预留路径
-  // 文件缺失→加载器返回 null，保持贴图箱（wx 无 extras.readBinary 同理），捞取判定不受影响
+  const coinField = createCoinField(scene, laneWidth, { envMap: runEnv, scenery });
+  // scenery 来源与 createTrackVisuals 同款（themes.json 的 scenery 字段）：stormspire 时障碍层换雷脊废墟皮
+  const obstacleLayer = createObstacleLayer(scene, laneWidth, scenery);
+  // 道具 3D 模型（items.json model.prefab/spin）：磁铁有文件→近距换 3D；文件缺失→null 回贴图箱，捞取判定不受影响
   const pickupLayer = createPickupLayer(scene, laneWidth, createPickupModelLoader(content, adapter));
   const cloudLayer = createCloudLayer(scene);
   const bursts = createBurstPool(scene);
@@ -125,24 +120,8 @@ export function createRunnerScene(
   let chestX = 0, chestY = avatar.chestY;
   const fireAtPlayer = (color?: number) => bursts.fireAt(chestX, chestY, BURST_Z, color);
 
-  // ---------- 输入 → sim（v2：手势与键盘合并为单个 onInput 订阅，§7.8） ----------
-  const offInput = adapter.onInput(e => {
-    if (e.type === 'doubleTap') { sim.applyAction('skill'); return; } // 主动技能：双击屏幕（skills.json trigger=double_tap）
-    if (e.type === 'swipe') {
-      if (e.dir === 'left') sim.applyAction('laneL');
-      else if (e.dir === 'right') sim.applyAction('laneR');
-      else if (e.dir === 'up') sim.applyAction('jump');
-      else if (e.dir === 'down') sim.applyAction('slide');
-      return;
-    }
-    if (e.type !== 'key' || e.phase !== 'down') return; // v1 隐式仅 down（§7.8）；up 留给 UI 按压态
-    const code = e.code;
-    if (code === 'ArrowLeft') sim.applyAction('laneL');
-    else if (code === 'ArrowRight') sim.applyAction('laneR');
-    else if (code === 'ArrowUp' || code === 'Space') sim.applyAction('jump');
-    else if (code === 'ArrowDown') sim.applyAction('slide');
-    else if (code === 'KeyE' || code === 'ShiftLeft' || code === 'ShiftRight') sim.applyAction('skill');
-  });
+  // ---------- 输入 → sim（v2）：swipe/key → applyAction 映射拆到 runTheme.ts（wireRunInput） ----------
+  const offInput = wireRunInput(adapter, sim);
 
   // ---------- 窗口尺寸变化（v2 新增 D9）：重设绘制缓冲 + 相机宽高比，退订进 dispose ----------
   const offResize = adapter.canvas.onResize(size => {
@@ -150,11 +129,13 @@ export function createRunnerScene(
     renderer.setSize(size.width, size.height, false);
     camera.aspect = size.width / size.height;
     camera.updateProjectionMatrix();
+    postfx.resize(size.width, size.height, size.dpr); // composer 与 renderer 同口径（px=dpr×css）
   });
 
   // ---------- 主循环：固定步长推进 + 插值渲染 ----------
   let raf = 0, last = adapter.now(), acc = 0, hudTimer = 0, shakeT = 0, endTimer = -1, ended = false, running = true;
-  let camY = rig0.camY, lookY = rig0.lookY, camX = 0; // 相机平滑状态（初值=稳态，避免首帧俯仰跳动）
+  let camY = rig0.camY, lookY = rig0.lookY, camX = 0, warpK = 0; // 相机平滑状态（初值=稳态）；warpK=隧道氛围系数 0~1（0.6s 平滑进出）
+  let rollK = 0, rollDir = 0, flashT = 0, flashText = '', flashUrg: 1 | 2 | 3 | 4 | 5 = 2, flashFx = 0; // B-7 滚转：rollK∈[0,1]（0=正向/1=倒挂 π）、rollDir 事件定向，renderSim 按 dt/FLIP_ROLL_S 推进；flash*=通用事件横幅状态（事件时定文案/优先级/闪屏峰值，flashT 衰减、fx=峰值×flashT/1.4 推导）
   let paused = false; // 后台暂停位（见下方 onVisibility）
 
   // ---------- 后台可见性（§7.9）：进后台冻结 tick 累计，回前台把 last 对齐避免 dt 尖峰 ----------
@@ -168,19 +149,19 @@ export function createRunnerScene(
       if (ev.type === 'coin') fireAtPlayer();
       else if (ev.type === 'helmetSave') { fireAtPlayer(); shakeT = 0.2; } // 头盔挡刀是关键时刻，给一次反馈
       else if (ev.type === 'hit') shakeT = 0.25;
-      else if (ev.type === 'death') {
-        endTimer = 0;
-        cb.onDeath?.();
-        // 闪电圈致死：雷电落到致死点（普通致死无位置字段，不触发）
-        if (ev.lane !== undefined && ev.worldZ !== undefined) lightning.strike(ev.lane, ev.worldZ, laneWidth);
-      }
+      else if (ev.type === 'death') { endTimer = 0; cb.onDeath?.(); if (ev.lane !== undefined && ev.worldZ !== undefined) lightning.strike(ev.lane, ev.worldZ, laneWidth); } // 闪电圈致死：雷电落到致死点（普通致死无位置字段，不触发）
       // 施放技能：爆点 + 轻微震屏，拖尾/光环等完整表现在 M4 T4.4
       else if (ev.type === 'cast') { fireAtPlayer(); shakeT = 0.12; cb.onCast?.(); }
       else if (ev.type === 'shieldBreak' || ev.type === 'boardBreak' || ev.type === 'slideGuard') { fireAtPlayer(); shakeT = 0.18; }
       else if (ev.type === 'zap') {
         fireAtPlayer(ZAP_BURST_COLOR); shakeT = 0.32;
         lightning.strike(ev.lane, ev.worldZ, laneWidth); // MC 式雷电：天→落点 + 全场闪白
-      }
+        if (eruption) eruption.strike(ev.lane, ev.worldZ, laneWidth); // forgeheart：zap 继承喷柱+闪橙视觉
+      } else if (ev.type === 'surge') { if (eruption) eruption.strike(ev.lane, ev.worldZ, laneWidth); } // M4 喷发判定化
+        else if (ev.type === 'cross') { fireAtPlayer(0xffb454); shakeT = 0.1; } // M4 穿越判定：走位奖励爆点（泰坦亡火金色系）
+      else if (ev.type === 'flip') { rollDir = ev.flip === -1 ? 1 : -1; flashT = 1.2; flashFx = 1; flashText = ev.flip === -1 ? '重力翻转！' : '恢复正常'; flashUrg = 2; } // B-7 滚向 π/回 0（FLIP_ROLL_S 过渡）；B-9 横幅文案与全屏闪
+      else if (ev.type === 'warp') { flashT = 1.4; flashFx = 1; flashText = ev.phase === 1 ? '时空隧道！' : '穿出隧道'; flashUrg = 4; } // 时空隧道进出：紫闪 1.4s（phase=1 进 / -1 出）
+      else if (ev.type === 'coinRain') { flashT = 1.2; flashFx = 0.6; flashText = '金币雨！'; flashUrg = 5; } // 金币雨预告窗（提前 30m 一次）：弱薄荷闪
       // pickup：按用户要求不加特效与震动，仅 HUD 显示 buff 倒计时（只回调音频）
       else if (ev.type === 'pickup') cb.onPickup?.();
     }
@@ -192,44 +173,54 @@ export function createRunnerScene(
     const dist = s.prevDistance + (s.distance - s.prevDistance) * alpha;
 
     avatar.update(s, fx, dt);
-    chestX = s.x; chestY = s.y + avatar.chestY;
+    chestX = s.x; chestY = s.y + avatar.chestY; // B-7：chestY 已按滚转镜像（倒挂为负=挂点垂向脚底原点下方）
     coinField.update({ coins: sim.coinsArr, t: s.t, dist, magnetOn: fx.magnetT > 0, playerX: chestX, playerY: chestY });
-    obstacleLayer.update(sim.obstacles, dist, s.t);
+    obstacleLayer.update(sim.obstacles, dist, s.t, s.flip, s.ceilH); // B-7：整层障碍（皮肤 emit + zap/step 默认盘）随 flip 镜像贴顶
     pickupLayer.update(sim.pickupsArr, dist, s.t);
     cloudLayer.update(sim.cloudsArr, dist, s.t, s.prevDistance, chestX, fx.flyT > 0 || s.gliding,
       (x, y, z) => bursts.fireAt(x, y, z, CLOUD_BURST_COLOR));
     track.update(dist, s.t);
 
-    // 相机：水平跟随人物，垂直按地面/空中两套目标平滑随动，注视点前探 9.5m。
-    // 目标全部由 cameraRig 派生：地面 s.y*0.5+4.6、camZ 9.2（俯角 12.8°，四轮「高度够了但远」收距后的口径）；
-    // 空中（飞行/滑翔）机位抬到 s.y*0.75+5.3、后拉 z=11.4、注视点压回 s.y*0.28+0.8、
-    // FOV 68°——同帧装下地面障碍、角色与空中金币带，且与地面机位差 1.85m/2.2m/13° 肉眼可辨。
+    // 相机：水平跟随人物、垂直按地面/空中两套目标平滑随动（cameraRig 派生：地面 y*0.5+4.6/z 9.2，空中 y*0.75+5.3/z 11.4/FOV 68°）
     shakeT = Math.max(0, shakeT - SHAKE_DECAY);
+    if (s.surgeWarn > 0) shakeT = Math.max(shakeT, 0.06); // B-9 喷发预警 1s 红光期持续微震（预兆感）
     const sk = shakeT > 0 ? (Math.random() - 0.5) * SHAKE_AMP : 0;
     const airborne = fx.flyT > 0 || s.gliding;
     const boost = Math.max(0, fx.speedMul - 1); // 雷霆冲刺等提速 buff 的表现强度
-    speedLines.update(dist, boost);
+    speedLines.update(dist, boost + warpK * 0.4); chaser.update(dist, s.chaserDist, s.t, scenery); zoneGates.update(dist, s.t, s.flip); warpFx.update(dist, s.t, s.warp > 0); // B-9 事件门逐帧重排；隧道环随 s.warp 包裹（速度线随隧道增强）
+    postfx.update(dt, fx.speedMul); // 后处理冲刺联动：暗角收紧/饱和压低/bloom 微增（postfx 内部 lerp）
     // 雷电闪白：灯光增益 + 背景/雾色向冷白插值（MC 闪电式全场变亮，约 0.26s 回落）
-    const flash = lightning.update(dt, dist);
+    ambientT -= dt;
+    if (ambientT <= 0) {
+      ambientT = flashGap();
+      lightning.strike(Math.round(Math.random() * 2 - 1), dist + 14 + Math.random() * 20, laneWidth);
+    }
+    const flash = Math.max(lightning.update(dt, dist), eruption ? eruption.update(dt, dist) : 0);
     hemi.intensity = HEMI_BASE + flash * FLASH_LIGHT_GAIN;
     keyLight.intensity = KEY_BASE + flash * FLASH_LIGHT_GAIN;
     const bg = scene.background as THREE.Color;
     applyLightningFlash(bg, (scene.fog as THREE.Fog).color, skyBase, fogBase, flashTint, flash);
+    warpK += ((s.warp > 0 ? 1 : 0) - warpK) * Math.min(1, dt / 0.6); warpBlend.copy(bg).lerp(warpFog, warpK * 0.85); bg.copy(warpBlend); (scene.fog as THREE.Fog).color.copy(warpBlend); // 隧道氛围：0.6s 平滑进出，背景/雾向深紫压 85%（warp 后写，隧道氛围压过闪电白）
     track.setFlash(flash, flashTint);
-    const rig = camTargets(s.y, airborne);
+    // B-7 镜头滚转过渡：flip 事件置向，FLIP_ROLL_S 内 roll 0↔π（dt 累计、确定性；到端点停表，常态帧零开销）
+    if (rollDir !== 0) { rollK += rollDir * dt / FLIP_ROLL_S; if (rollK <= 0 || rollK >= 1) { rollK = rollK <= 0 ? 0 : 1; rollDir = 0; } }
+    const rig = camTargets(s.y, airborne, s.flip, s.ceilH); // B-7：flip=-1 时机位/注视点按天花板平面镜像（相机落下方仰视）
     camX += (s.x - camX) * CAM_FOLLOW;
     camY += (rig.camY - camY) * CAM_FOLLOW;
     lookY += (rig.lookY - lookY) * CAM_FOLLOW;
     camera.position.x = camX + sk;
-    camera.position.y = camY + sk;
+    // 高速镜头微颠簸（用户点名）：仅地面态叠在 position.y 显示值（空中机位自身升降、再叠会晕；不进 camY 平滑＝噪声不被追赶回摆）；0.03m≈挡风玻璃呼吸感，远小于最低障碍高度不干扰预判
+    camera.position.y = camY + sk + (airborne ? 0 : Math.sin(s.t * 10) * 0.03 + Math.sin(s.t * 23) * 0.012);
     camera.position.z = rig.camZ;
     camera.lookAt(camX, lookY, LOOK_AHEAD_Z);
-    const targetFov = rig.fov + Math.min(SPEED_FOV_MAX, boost * SPEED_FOV_PER_MUL); // 空中视野更广；加速再扩
+    if (rollK > 0) camera.rotateZ(rollK * Math.PI); // B-7：滚转绕视线轴叠加（lookAt 每帧先复位再叠，rollK=0 零开销跳过）
+    const targetFov = rig.fov + Math.min(SPEED_FOV_MAX, boost * SPEED_FOV_PER_MUL) + warpK * 6; // 空中更广；加速再扩；隧道内 +6 视野扩张=速度感
     if (Math.abs(camera.fov - targetFov) > 0.1) {
       camera.fov += (targetFov - camera.fov) * FOV_LERP;
       camera.updateProjectionMatrix();
     }
-    renderer.render(scene, camera);
+    if (postfx.composer) postfx.composer.render(); // 后处理链尾 OutputPass 负责色彩空间收尾
+    else renderer.render(scene, camera); // 降级路径（wx/非 WebGL2/构建失败）走裸渲染
   }
 
   function pushHud() {
@@ -238,8 +229,10 @@ export function createRunnerScene(
     const buffs = sim.buffList().map(b => ({ name: b.label, left: Math.ceil(b.left) }));
     // 滑翔提示不能写死 1s：按当前高度换算真实剩余（glideS≈1.8s），gliding 结束后自然不再 push
     if (s.gliding) buffs.push({ name: '滑翔降落', left: Math.max(0, s.y / glideFallMps) });
+    if (s.surgeWarn > 0) buffs.push({ name: '喷发预警', left: Math.ceil(s.surgeWarn) }); // M4 喷发判定化：1s 红光预警进 HUD
     const sk = sim.loadout.skill;
     cb.onHud({
+      alert: flashT > 0 ? { text: flashText, urgency: flashUrg, fx: flashFx * flashT / 1.4 } : buildAlert(s), // 通用事件横幅（flip/warp/coinRain 事件时定文案与闪屏峰值，随 flashT 比例衰减），常态走 buildAlert（区内倒计时/追击者自动带上）
       score: s.score, coins: s.coins, distance: s.distance, hits: s.hits, lives: sim.lives, buffs,
       skill: sk ? {
         label: sk.label,
@@ -266,7 +259,7 @@ export function createRunnerScene(
     bursts.update(dt, fx.magnetT > 0);
     renderSim(acc / STEP_DT, dt);
 
-    hudTimer += dt;
+    hudTimer += dt; if (flashT > 0) flashT -= dt; // 事件横幅计时衰减（fx 由 pushHud 按 flashT/1.4 推导，不单独衰减；buildAlert 不动）
     if (hudTimer >= HUD_INTERVAL_S) { hudTimer = 0; pushHud(); }
     if (endTimer >= 0 && !ended) {
       endTimer += dt;
@@ -278,6 +271,8 @@ export function createRunnerScene(
 
   if (cb.debug) installRunProbe(sim, () => ({ x: +camX.toFixed(2), y: +camY.toFixed(2) }), bursts,
     () => ({ calls: renderer.info.render.calls, triangles: renderer.info.render.triangles }), coinField);
+  // 斜板定位临时钩子，修完删（二分法用：控制台经 window.__trScene 逐组 visible 开关）
+  if (cb.debug) (globalThis as any).__trScene = scene;
 
   // 只销毁本局资源：不销毁主画布/GL 上下文（wx 屏幕画布不可重建，S10 D1 跨局复用）。
   function dispose() {
@@ -287,8 +282,10 @@ export function createRunnerScene(
     if (cb.debug) uninstallRunProbe(); // ?debug 探针随场景销毁卸载，避免 __trRun 指向已销毁的 sim
     avatar.dispose(); // GLB 混流器停摆（几何体/材质由下面的 traverse 统一销毁）
     intro?.dispose(); // 只弃面板自身；视频元素与贴图归 apps 侧复用
-    lightning.dispose();
+    lightning.dispose(); chaser.dispose(); zoneGates.dispose(); warpFx.dispose();
     track.dispose();
+    postfx.dispose(); // composer/逐 pass/双缓冲 target 全量释放（wx 降级态是 no-op）
+    if (runEnv) disposeEnvMap(runEnv); eruption?.dispose();
     renderer.dispose();
     scene.traverse(o => {
       const m = o as THREE.Mesh;

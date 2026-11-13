@@ -17,6 +17,7 @@ import { FLY_SPEED_CAP } from '../packages/game/dist/core/sim/simTypes.js';
 const root = join(fileURLToPath(import.meta.url), '..', '..');
 const NAMES = ['game', 'characters', 'skills', 'items', 'obstacles', 'themes', 'events', 'economy'];
 const content = Object.fromEntries(NAMES.map(n => [n, JSON.parse(readFileSync(join(root, 'config', `${n}.json`), 'utf8'))]));
+delete content.obstacles.warp; delete content.obstacles.coinRain; delete content.obstacles.lowGrav; // 飞行链路语义隔离：三事件（warps.test.mjs 专属）不参与本文件断言
 const flight = content.game.params.flight;
 const fallMps = flight.heightM / flight.glideS;
 const FLY_D = 13; // item_jetpack durationS

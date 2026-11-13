@@ -37,6 +37,9 @@ export class Movement {
   flyWasActive = false;
   /** 本帧是否刚完成着陆（滑翔末帧）：sim 读取后据此回收空中内容（金币带），随后自行清零 */
   landedThisStep = false;
+  /** 低重力带倍率（Stormspire）：runnerSim 每步从 fxCtx.lowGravMulNow 透传，1=正常重力。
+   *  低重力带：g×gMul，起跳速度不变 ⇒ 跳得更高落地更慢（warps.ts 表驱动，未配置恒 1） */
+  lowGravMul = 1;
   /** 当前可站立支撑面高度（0=地面；>0=列车顶等 rideTop 表面），每帧重算 */
   private floorY = 0;
 
@@ -56,14 +59,16 @@ export class Movement {
 
   /** ↓：空中铲=快速落地接铲；地面铲=直接进入滑行。
    *  「空中」= 高于实时支撑面 0.05 以上：站车顶（y=supportY）按铲是直接滑行，
-   *  不能按 s.y>0 误判空中——那会让车顶滑铲被当「空中铲速降」吞掉（审查 P1）。 */
+   *  不能按 s.y>0 误判空中——那会让车顶滑铲被当「空中铲速降」吞掉（审查 P1）。
+   *  倒挂镜像（B-3）：低于天花板 0.05 以上=正在「坠离镜面地板」，速降反号为向上弹回天花板。 */
   slideInput(s: RunnerState, fx: FxState) {
-    if (s.y > this.supportHeight(s) + 0.05) { s.vy = Math.min(s.vy, DIVE_VY); this.pendingSlide = PENDING_STEPS; }
+    const airborne = s.flip === -1 ? s.y < s.ceilH - 0.05 : s.y > this.supportHeight(s) + 0.05;
+    if (airborne) { s.vy = s.flip === -1 ? Math.max(s.vy, -DIVE_VY) : Math.min(s.vy, DIVE_VY); this.pendingSlide = PENDING_STEPS; } // DIVE_VY 反号
     else this.slide(s, fx);
   }
 
   private jump(s: RunnerState, fx: FxState) {
-    s.vy = this.P.jumpVelocity * (fx.bootsT > 0 ? fx.jumpMul : 1); // 弹跳鞋：跳跃初速乘区
+    s.vy = this.P.jumpVelocity * (fx.bootsT > 0 ? fx.jumpMul : 1) * s.flip; // 弹跳鞋乘区；×flip=倒挂起跳向地面跃（B-3）
     if (s.y <= 0) s.y = 0.001; // 从支撑面起跳：车顶（y>0）不重置高度
   }
 
@@ -129,26 +134,37 @@ export class Movement {
       applyLandingSafety(s, landed);
       return;
     }
-    if (this.pendingJump > 0) { this.pendingJump--; if (s.y <= this.floorY + 0.05) { this.jump(s, fx); this.pendingJump = 0; } }
-    if (this.pendingSlide > 0) { this.pendingSlide--; if (s.y <= this.floorY + 0.05) { this.slide(s, fx); this.pendingSlide = 0; } } // 与 jump 缓冲同口径：落上车顶也接铲
+    if (this.pendingJump > 0) { this.pendingJump--; if (this.atRest(s)) { this.jump(s, fx); this.pendingJump = 0; } }
+    if (this.pendingSlide > 0) { this.pendingSlide--; if (this.atRest(s)) { this.slide(s, fx); this.pendingSlide = 0; } } // 与 jump 缓冲同口径：落上车顶也接铲
     this.floorY = this.supportHeight(s); // 先判支撑后积分：用位移前的 y 判定，避免穿入车体
     s.supportY = this.floorY; // 渲染层据此区分「站车顶跑」与「滞空」
     // floorY>s.y（地面起跑踏上板子）也要进积分：否则贴不上支撑面，会从板子上穿过去
     if (s.y > 0 || s.vy > 0 || this.floorY > s.y) {
-      s.vy += this.P.gravity * dt;
+      // B-3：重力×flip——倒挂反重力向上；×lowGravMul（低重力带：g×gMul，起跳速度不变 ⇒ 跳得更高落地更慢），
+      // 表空时 lowGravMul=1，乘 1.0 为 IEEE754 恒等 ⇒ 与原式逐字节同轨（硬门）
+      s.vy += this.P.gravity * this.lowGravMul * s.flip * dt;
       s.y += s.vy * dt;
-      if (s.y <= this.floorY) { s.y = this.floorY; s.vy = 0; } // 落到/贴上地面、板子或列车顶
+      // 双向落地钳制（B-3）：flip=1 钳上表面（地面/板子/列车顶）；flip=-1 钳 y≥ceilH（落到镜面地板=天花板）
+      if (s.flip === -1) { if (s.y >= s.ceilH) { s.y = s.ceilH; s.vy = 0; } }
+      else if (s.y <= this.floorY) { s.y = this.floorY; s.vy = 0; }
     }
     if (s.sliding) { s.slideT -= dt; if (s.slideT <= 0) this.cancelSlide(s); }
+  }
+
+  /** 落地静止判定（缓冲跳/铲的触发条件）：倒挂时「地面」是天花板平面（B-3 单向门保证此时已按正常重力落地翻转） */
+  private atRest(s: RunnerState): boolean {
+    return s.flip === -1 ? s.y >= s.ceilH - 0.05 : s.y <= this.floorY + 0.05;
   }
 
   /**
    * 可站立支撑面取最高者：
    *  - rideTop 列车：需已到顶面附近（RIDE_TOP_EPS）才算落顶，否则算撞前脸；
    *  - step 斜坡（登车板）：坡底贴地、坡顶接火车顶，沿深度线性升高——跑过去即「走上去」，
-   *    不需要起跳（用户反馈：板子要做成能走上去的斜坡）。
+   *    不需要起跳（用户反馈：板子要做成能走上去的斜坡）；
+   *  - 倒挂（B-3）：区内支撑面恒为天花板平面——B-1 已清走载具/斜坡，v1 不查障碍。
    */
   private supportHeight(s: RunnerState): number {
+    if (s.flip === -1) return s.ceilH;
     let h = 0;
     for (const o of this.obstacles) {
       if (o.done) continue;

@@ -18,6 +18,7 @@ import { layCoinChains } from '../packages/game/dist/core/sim/trackCoins.js';
 const root = join(fileURLToPath(import.meta.url), '..', '..');
 const NAMES = ['game', 'characters', 'skills', 'items', 'obstacles', 'themes', 'events', 'economy'];
 const content = Object.fromEntries(NAMES.map(n => [n, JSON.parse(readFileSync(join(root, 'config', `${n}.json`), 'utf8'))]));
+delete content.obstacles.warp; delete content.obstacles.coinRain; delete content.obstacles.lowGrav; // 基础生成器语义隔离：三事件的铺设/净空专属断言在 warps.test.mjs
 
 test('高难度封路分布：by≥3 时单道约 80% / 双道约 20%（只计 full/vehicle/moving），三道封堵永不出现', () => {
   const gen = new TrackGen(content, new RunRng(2026));
