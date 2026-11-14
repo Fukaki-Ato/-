@@ -7,7 +7,11 @@ import { COINS_KEY, DIAMOND_KEY, KEYS_KEY, SHARD_PREFIX, ITEM_PREFIX, type Econo
 
 export const REWARD_WALLET_KEY = 'thunderrun:reward-wallet-v1';
 type State = { version: 1; values: Record<string, string | null>; ledgers: Record<string, Record<string, number>> };
-export interface RewardWalletStore extends EconomyStore { syncRewards(snapshot: MissionSnapshot): void }
+export interface RewardWalletStore extends EconomyStore {
+  /** 幂等导入快照钱包：只读 rewardLedgerId（账本游标）+wallet（累计奖励）两个字段，
+   *  任务与成就快照共用同一账本，故参数按这两字段收窄（AchievementsApi 的 onSnapshot 同款直传）。 */
+  syncRewards(snapshot: Pick<MissionSnapshot, 'rewardLedgerId' | 'wallet'>): void;
+}
 const isWalletKey = (key: string): boolean => [COINS_KEY, DIAMOND_KEY, KEYS_KEY].includes(key)
   || key.startsWith(SHARD_PREFIX) || key.startsWith(ITEM_PREFIX);
 const keyFor = (id: string): string | null => id === 'coin' ? COINS_KEY : id === 'diamond' ? DIAMOND_KEY

@@ -5,7 +5,7 @@
  * 输入注入）经 UiHost 端口进入，不扩本接口。
  * 本包受禁令约束：这里禁止出现任何 DOM/wx 类型，视图内部长什么样由实现方自决。
  */
-import type { GameContent } from '@tr/game/core/config/configTypes.js';
+import type { AchievementGroup, AchievementSource, AchievementTier, GameContent } from '@tr/game/core/config/configTypes.js';
 import type { RunnerSim } from '@tr/game/core/sim/runnerSim.js';
 import type { RunCallbacks } from '@tr/game/render/runnerScene.js';
 import type { EntryMethod } from './session.js';
@@ -56,6 +56,8 @@ export interface SelectActions {
   onEvents?(): void;
   /** 打开设置页（右上「设置」徽标）；缺省＝该入口只有按压反馈 */
   onSettings?(): void;
+  /** 打开成就页（大厅「成就」勋章）；缺省＝该入口不亮（mainFlow 侧按 views.renderAchievements && 成就 API 同条件置空） */
+  onAchievements?(): void;
   onLeaderboard?(): void;
 }
 
@@ -90,6 +92,54 @@ export interface EventsActions {
   onBack(): void;
   onClaim(): BuyResult;
   state(): SignInState | null;
+}
+
+/** 成就页单行进度（场景层合并服务端快照与本机 totals 后传入；视图不碰存储/API） */
+export interface AchievementRowView {
+  id: string;
+  name: string;
+  desc: string;
+  tier: AchievementTier;
+  group: AchievementGroup;
+  source: AchievementSource;
+  target: number;
+  progress: number;
+  /** 已领取（run 类以服务端为准；离线时 run 条目按未领展示，联网重进即校正） */
+  claimed: boolean;
+  /** 可领取：达标、未领、且（run 类）服务端快照可用 */
+  claimable: boolean;
+  /** 达标但服务端不可得（离线口径）：领取按钮置灰而非隐藏 */
+  locked: boolean;
+  /** 受理中（run 条目乐观受理→快照回包之间）：领取按钮置灰防连点（服务端幂等，重复 POST 仍属冗余） */
+  claiming: boolean;
+  rewardText: string;
+}
+
+/** 成就页分节（UI 骨架标题由场景层给出，两端视图共用一份文案） */
+export interface AchievementSectionView {
+  group: AchievementGroup;
+  title: string;
+  note: string;
+  rows: AchievementRowView[];
+}
+
+/** 成就页整页数据（场景层算好，canvas/DOM 两端视图只做布局） */
+export interface AchievementsPageView {
+  sections: AchievementSectionView[];
+  rows: AchievementRowView[];
+  /** 服务端快照不可得：页面状态行提示，run 类领取置灰 */
+  offline: boolean;
+  offlineMessage: string;
+  /** 最近一次需随整页重绘保留的状态行消息（load 失败原因/领取提示）；缺省=offlineMessage/联网说明的默认口径 */
+  statusMessage?: string;
+  claimedCount: number;
+  total: number;
+}
+
+/** 成就页动作：onClaim 返回 {ok,message}（BuyResult 语义，同商店/签到） */
+export interface AchievementsActions {
+  onBack(): void;
+  onClaim(achievementId: string): BuyResult;
 }
 
 /** 设置页音量声道（存储与音频面同名语义：music＝BGM，sfx＝一次性音效） */
@@ -146,6 +196,8 @@ export interface GameViews {
   renderShop(content: GameContent, actions: ShopActions): void;
   /** 活动页（登录签到等）；缺省＝大厅「活动」入口只有按压反馈 */
   renderEvents?(content: GameContent, actions: EventsActions): void;
+  /** 成就页（大厅「成就」勋章）；缺省＝该入口不亮（防死按钮） */
+  renderAchievements?(content: GameContent, page: AchievementsPageView, actions: AchievementsActions): void;
   /** 设置页（每个游戏都必须有）：切换跑酷场景 + 音量；currentThemeId/volumePrefs 为流程解析出的生效值 */
   renderSettings(
     content: GameContent,

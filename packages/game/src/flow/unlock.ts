@@ -85,8 +85,10 @@ export function canUnlockCharacter(store: EconomyStore, content: GameContent, ch
   return { ok: false, message: '无法解锁' };
 }
 
-/** 解锁落盘：coin/key 扣价；shard 合成扣碎片；event 只登记（活动页/服务端后续消费） */
-export function unlockCharacter(store: EconomyStore, content: GameContent, charId: string, now: Date): BuyResult {
+/** 解锁落盘：coin/key 扣价；shard 合成扣碎片；event 只登记（活动页/服务端后续消费）。
+ *  onUnlocked：markUnlocked 实际落盘后的回调（成就在此累计 charactersUnlocked；重复解锁不触发）。 */
+export function unlockCharacter(store: EconomyStore, content: GameContent, charId: string, now: Date,
+  onUnlocked?: (charId: string) => void): BuyResult {
   const entry = characterEntry(content, charId);
   const unlock = (entry as { unlock?: Entry } | undefined)?.unlock;
   if (!entry || !unlock || unlock.type === 'free') return { ok: false, message: '该角色无需解锁' };
@@ -97,11 +99,13 @@ export function unlockCharacter(store: EconomyStore, content: GameContent, charI
     spend(store, { [unlock.type as string]: Number(unlock.cost) });
   } else if (unlock.type === 'event') {
     markUnlocked(store, charId);
+    onUnlocked?.(charId);
     return { ok: true, message: '已解锁' };
   } else {
     return { ok: false, message: '无法解锁' };
   }
   markUnlocked(store, charId);
+  onUnlocked?.(charId);
   return { ok: true, message: '解锁成功' };
 }
 
@@ -117,24 +121,27 @@ export function canSynthesizeCharacter(store: EconomyStore, content: GameContent
   return { ok: true, message: '' };
 }
 
-export function synthesizeCharacter(store: EconomyStore, content: GameContent, charId: string): BuyResult {
+export function synthesizeCharacter(store: EconomyStore, content: GameContent, charId: string,
+  onUnlocked?: (charId: string) => void): BuyResult {
   const check = canSynthesizeCharacter(store, content, charId);
   if (!check.ok) return check;
   const need = shardSynthesisNeed(content, charId)!;
   addBalance(store, need.shardId, -need.need);
   markUnlocked(store, charId);
+  onUnlocked?.(charId);
   return { ok: true, message: '合成成功' };
 }
 
 /** 选角页解锁动作：门槛判定 + coin/key 解锁 + 碎片合成（活动型在解锁时只登记） */
-export function selectUnlockActions(store: EconomyStore, content: GameContent):
+export function selectUnlockActions(store: EconomyStore, content: GameContent,
+  hooks?: { onUnlocked?(charId: string): void }):
   Pick<CharacterSelectPageActions, 'isGated' | 'gatedPriceText' | 'canUnlock' | 'canSynthesize' | 'onUnlock' | 'onSynthesize'> {
   return {
     isGated: id => isCharacterGated(content, id, store),
     gatedPriceText: id => unlockPriceText(content, id),
     canUnlock: id => canUnlockCharacter(store, content, id, new Date()).ok,
     canSynthesize: id => canSynthesizeCharacter(store, content, id).ok,
-    onUnlock: id => unlockCharacter(store, content, id, new Date()),
-    onSynthesize: id => synthesizeCharacter(store, content, id),
+    onUnlock: id => unlockCharacter(store, content, id, new Date(), hooks?.onUnlocked),
+    onSynthesize: id => synthesizeCharacter(store, content, id, hooks?.onUnlocked),
   };
 }

@@ -42,6 +42,8 @@ SQLite 启用 WAL 和外键，适用于**单个服务进程/实例**。使用本
 
 `config/economy.json → params.missions.minRunSeconds` 是有效对局最短时间，当前为 **10 秒**。短于阈值的结算仍成功，但不计入任何任务。有效对局由 `RunnerSim` 重放结果计入：distance/coins/score/hits/casts 来自 summary，slides/itemPickups 来自 `sim.missionStats`，charactersPlayed 在周周期按不同 `charId` 去重。最佳分任务取最高分；其他累计/计数按有效对局累加。跨日/跨周结束的 ticket 只更新其开始周期仍与当前周期相同的任务，不会把旧回放加到新周期。
 
+成就的 run 类条目沿用同一 validRun 口径结算（死亡收尾 + 最短时长，`apps/server/src/achievement-service.mjs`）。客户端成就页的本机预览镜像同一阈值（`achievementMinRunSeconds`，读 config、缺省 10）；服务端还允许 `options.minRunSeconds` 覆盖（测试用 0），显式覆盖的部署两端预览阈值会偏移，权威进度仍以服务端为准。
+
 服务器还会检查基于 ticket 的最短结算耗时（模拟帧时长减 2 秒网络容差，过快返回可重试的 425）、ticket 24 小时有效期、最多 108,000 帧（30 分钟）/20,000 动作、1 MiB 请求 body，以及按 IP/会话每分钟限流。客户端与服务端共享录制上限；超长局明确提示不计任务。回放每 600 步让出事件循环，同时最多验证 2 局，忙时返回可重试的 429。它们是防滥用边界，不是玩法平衡参数。
 
 ## 验证与安全边界

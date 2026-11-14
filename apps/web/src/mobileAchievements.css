@@ -1,0 +1,35 @@
+/* 成就面板（mobileAchievements.ts）——配色语言同 mobilePanels.css（ui-panel + 固定语义档位色）。
+   档位以行外框颜色表达（ach-row--{tier} 提供 --tier，边框与进度条填充共用）；固定语义色的
+   有意例外（与配置/主题无关），银取中间调以免浅色底上不可辨。状态框三态同盒型：白=未达成、
+   绿=可领取（呼吸光效引导点击）、灰=已领取。 */
+.mobile-achievements { background: radial-gradient(ellipse at top right, #d2eee4, transparent 60%), radial-gradient(ellipse at bottom left, #e6f1df, transparent 55%), #eff2e7; }
+.ach-summary { width: fit-content; margin: -14px 0 10px auto; padding: 3px 12px; border-radius: 999px; background: rgba(255, 255, 255, .75); box-shadow: 0 1px 4px rgba(50, 70, 50, .10); text-align: right; font-size: 12px; font-weight: 800; color: var(--ui-teal); font-variant-numeric: tabular-nums; }
+.ach-status { margin: 0 0 16px; min-height: 18px; }
+.ach-panel { padding: 22px 20px; margin-bottom: 18px; }
+.ach-panel h2 { margin: 0; font-size: 20px; line-height: 1.4; letter-spacing: 1px; }
+.ach-panel h2::after { content: ''; display: block; width: 56px; height: 4px; margin-top: 6px; border-radius: 2px; background: linear-gradient(90deg, var(--ui-teal), transparent); }
+.ach-panel > .ui-muted { margin: 4px 0 14px; }
+.ach-row { --tier: #c98850; display: flex; align-items: center; gap: 10px; margin-top: 12px; padding: 12px 14px; border: 2px solid var(--tier); border-radius: 16px; background: linear-gradient(180deg, #ffffff, #f4f5ed); box-shadow: 0 2px 10px rgba(50, 70, 50, .08); }
+.ach-row--bronze { --tier: #c98850; }
+.ach-row--silver { --tier: #a7b6c4; }
+.ach-row--gold { --tier: #e5b53c; }
+.ach-row.is-claimed { opacity: .66; border-style: dashed; box-shadow: none; }
+.ach-info { flex: 0 0 24%; min-width: 0; }
+.ach-info strong { display: block; font-size: 15px; letter-spacing: .5px; }
+.ach-desc { margin: 2px 0 0; font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ach-reward { display: inline-block; margin-top: 4px; padding: 1px 8px; border-radius: 999px; background: rgba(229, 181, 60, .18); font-size: 11px; font-weight: 700; color: #9a6d10; }
+.ach-progress { flex: 1; height: 10px; min-width: 56px; border-radius: 5px; background: #e5ebe2; box-shadow: inset 0 1px 2px rgba(50, 70, 50, .12); overflow: hidden; }
+.ach-fill { height: 100%; border-radius: 5px; background: var(--tier, var(--ui-teal)); box-shadow: 0 0 8px -2px var(--tier); transition: width 160ms ease; }
+.ach-row.is-claimed .ach-fill { background: #b7c7bd; box-shadow: none; }
+.ach-count { flex: 0 0 auto; font-size: 12px; color: var(--ui-muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ach-state { flex: 0 0 auto; min-width: 72px; display: flex; justify-content: flex-end; }
+/* 状态框：白=未达成，绿=可领取（呼吸光效引导点击），灰=已领取——三态同盒型 */
+.ach-flag { display: inline-grid; place-items: center; min-height: 44px; padding: 8px 14px; border-radius: 14px; font-size: 13px; font-weight: 700; white-space: nowrap; }
+.ach-flag--pending { background: #fff; border: 2px dashed #dfe6d9; color: var(--ui-muted); }
+.ach-flag--claimed { background: #eef1ea; color: var(--ui-muted); }
+.ach-claim { min-height: 44px; padding: 8px 16px; border-radius: 14px; border: none; font-size: 14px; font-weight: 700; background: linear-gradient(180deg, #35b75e, #2ea44f); color: #fff; cursor: pointer; box-shadow: 0 3px 10px rgba(46, 164, 79, .35); animation: ach-glow 2.2s ease-in-out infinite; }
+.ach-claim:active { transform: scale(.97); }
+.ach-claim:disabled { opacity: .55; cursor: default; animation: none; }
+@keyframes ach-glow { 0%, 100% { box-shadow: 0 3px 10px rgba(46, 164, 79, .35); } 50% { box-shadow: 0 3px 18px rgba(46, 164, 79, .60); } }
+@media (prefers-reduced-motion: reduce) { .ach-claim { animation: none; } }
+@media (max-width: 420px) { .ach-info { flex-basis: 30%; } .ach-count { display: none; } }

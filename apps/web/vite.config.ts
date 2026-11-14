@@ -65,6 +65,9 @@ export default defineConfig({
     strictPort: true,
     proxy: {
       '/api/missions': { target: process.env.TR_MISSION_API ?? 'http://127.0.0.1:8768', changeOrigin: false },
+      // 成就与任务同进程（apps/server，见 docs/achievements-backend.md）：生产由站点根 /api/* 反代到 8768，
+      // dev 需同样特判，否则 /api/achievements 落入下面的排行榜网关兜底规则而 404。
+      '/api/achievements': { target: process.env.TR_MISSION_API ?? 'http://127.0.0.1:8768', changeOrigin: false },
       '/api/': { target: 'http://127.0.0.1:8788', changeOrigin: false,
         rewrite: path => `/thunder-run${path}`, cookiePathRewrite: { '/thunder-run/api': '/api' } },
       '/thunder-run/api/': { target: 'http://127.0.0.1:8788', changeOrigin: false },

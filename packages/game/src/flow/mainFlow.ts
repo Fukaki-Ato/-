@@ -20,12 +20,17 @@ import type { LeaderboardService } from './leaderboard.js';
 import { COINS_KEY, consumeEquipped, shopActions, walletBalance } from './localEconomy.js';
 import { configLocked, isCharacterGated, selectUnlockActions } from './unlock.js';
 import { createEventsScene } from './eventsScene.js';
+import { createStartScene } from './startScene.js';
+import { createAchievementsScene } from './achievementsScene.js';
+import { achievementMinRunSeconds, createAchievementTracker } from './achievementTracker.js';
+import type { AchievementApiLike } from './achievementApiCore.js';
+import { observePickupEvents } from '../core/sim/pickupTally.js';
 import { TelemetryRecorder } from './telemetry.js';
 import { createSettingsScene, currentThemeId, pruneThemeSelection, themeMusic, volumePrefs } from './settingsScene.js';
 import { createRunnerScene } from '@tr/game/render/runnerScene.js';
 import type { PlatformAdapter } from '@tr/framework/platform/platformAdapter.js';
 import type { GameViews, RunSummary } from './views.js';
-import { readEntry, saveEntry, wechatAvailable, wechatLogin, type EntryMethod } from './session.js';
+import { readEntry, saveEntry, type EntryMethod } from './session.js';
 
 /** 历史最佳分存储键（v2 修正键；旧版笔误键含真省略号 U+2026，见 LEGACY_BEST_KEY） */
 export const BEST_KEY = 'thunderrun:best';
@@ -49,9 +54,13 @@ export interface GameFlowDeps {
   createScene?: typeof createRunnerScene;
   /** 测试模式（?debug/?test）：run 局内挂载 __trTest 技能开关 API，供左侧测试面板消费 */
   test?: boolean;
+  /** QA 口径位（?anim/?ui=demo；debugMode 同源 qa=debug||test||qa）：关掉 run 局成就统计 */
+  qa?: boolean;
   leaderboard?: LeaderboardService;
   /** 宿主可录制任务回放，结束函数由 RunSession 在死亡或退出时调用。 */
   trackRun?: RunSessionDeps['trackRun'];
+  /** 成就 API（web 壳注入）：缺省＝成就页入口不亮（防死按钮）；run 局成就统计不受此项影响 */
+  achievementsApi?: AchievementApiLike;
 }
 
 export interface GameFlow {
@@ -70,6 +79,19 @@ export function createGameFlow(deps: GameFlowDeps): GameFlow {
   let scene: { dispose(): void } | null = null;
   let lastSeed = 0;
   const telemetry = new TelemetryRecorder(adapter.storage);
+  /** 成就本地进度：run 类=离线预览口径，local 类（角色解锁）=记账处（achievementTracker.ts） */
+  const tracker = createAchievementTracker(adapter.storage);
+  /** 成就观察器工厂：sim 创建即装（分道具拾取打点），死亡/退出共用的 dispose 收口结算；调试局（?debug/?test/?anim/?ui=demo）不装——与任务门同口径。 */
+  const trackAchievements: RunSessionDeps['trackAchievements'] = deps.debug || deps.test || deps.qa ? undefined : sim => {
+    const pickupsById: Record<string, number> = {};
+    const restore = observePickupEvents(sim, id => { pickupsById[id] = (pickupsById[id] ?? 0) + 1; });
+    // 与服务端 validRun 同口径：死亡收尾且时长达 minRunSeconds 的局才计入（Esc 中退/短局不计）
+    return () => {
+      restore();
+      if (sim.state.alive || sim.state.t < achievementMinRunSeconds(content)) return;
+      tracker.applyRunDelta(sim.summary(), sim.missionStats, pickupsById);
+    };
+  };
   /** 音频导演：配置加载成功后创建；game.params.audio 缺省时为空操作（不阻塞玩法） */
   let audio: AudioDirector | null = null;
 
@@ -116,8 +138,6 @@ export function createGameFlow(deps: GameFlowDeps): GameFlow {
   }
   /** 上次在开始页选的入口（本机记忆，选角页展示）；无记忆＝游客态直入主界面 */
   let entry: EntryMethod | null = readEntry(adapter.storage);
-  /** 开始页进入代次：登录 promise 回来时若已离开/重进开始页则丢弃结果 */
-  let startGen = 0;
 
   const enterSelect = (method: EntryMethod): void => {
     entry = method;
@@ -128,33 +148,8 @@ export function createGameFlow(deps: GameFlowDeps): GameFlow {
 
   const machine = createSceneMachine<SceneName>({
     boot: {},
-    start: {
-      onEnter: () => {
-        const gen = ++startGen;
-        const canWechat = wechatAvailable(adapter);
-        let busy = false;
-        const handle = views.renderStart({
-          wechatAvailable: canWechat,
-          onGuest: () => { if (!busy) enterSelect('guest'); },
-          onWechat: () => {
-            if (!canWechat || busy) return;
-            busy = true;
-            handle.setBusy(true);
-            handle.setFeedback('微信登录中…', false);
-            wechatLogin(adapter).then(
-              () => { if (gen === startGen && machine.current() === 'start') enterSelect('wechat'); },
-              (err: unknown) => {
-                if (gen !== startGen || machine.current() !== 'start') return;
-                busy = false;
-                handle.setBusy(false);
-                const msg = err instanceof Error ? err.message : String(err);
-                handle.setFeedback(`微信登录失败：${msg}。可重试，或选择游客登录`, true);
-              },
-            );
-          },
-        });
-      },
-    },
+    // 开始页（startScene.ts）：startGen 代次守卫随场景迁移，入口落库经 enterSelect 留守 mainFlow
+    start: createStartScene({ adapter, views, goSelect: enterSelect, atStart: (): boolean => machine.current() === 'start' }),
     select: {
       onEnter: () => {
         audio?.stopDeathMusic(); // 死亡后 Esc 直接回选角：死亡 BGM 不带进选角页
@@ -166,6 +161,8 @@ export function createGameFlow(deps: GameFlowDeps): GameFlow {
           onShop: () => machine.go('shop', { returnTo: 'select' }),
           onEvents: views.renderEvents ? () => machine.go('events') : undefined,
           onSettings: () => machine.go('settings'),
+          // 成就入口与 renderAchievements 成对亮起：API 缺失（无成就壳注入）时入口不亮，防死按钮
+          onAchievements: views.renderAchievements && deps.achievementsApi ? () => machine.go('achievements') : undefined,
           onLeaderboard: deps.leaderboard && views.renderLeaderboard ? () => machine.go('leaderboard') : undefined,
         }, charId, entry, { coins: walletBalance(adapter.storage, 'coin'), diamonds: walletBalance(adapter.storage, 'diamond') });
       },
@@ -186,8 +183,9 @@ export function createGameFlow(deps: GameFlowDeps): GameFlow {
             if (!configLocked(c, id)) rememberCharacter(id);
             machine.go('shop', { returnTo: 'characterSelect', characterId: id });
           },
-          // 解锁门槛（本机经济，审查 M4-3）：coin/key 扣价、碎片合成、活动型只登记
-          ...selectUnlockActions(adapter.storage, c),
+          // 解锁门槛（本机经济，审查 M4-3）：coin/key 扣价、碎片合成、活动型只登记；
+          // onUnlocked 是 charactersUnlocked 的唯一生产接线点（成就本地落盘）
+          ...selectUnlockActions(adapter.storage, c, { onUnlocked: () => tracker.applyCharacterUnlock() }),
         }, selected, entry);
       },
     },
@@ -210,6 +208,10 @@ export function createGameFlow(deps: GameFlowDeps): GameFlow {
       storage: adapter.storage, views, content: () => content,
       goSelect: () => machine.go('select'), stopDeathMusic: () => audio?.stopDeathMusic(),
     }),
+    achievements: createAchievementsScene({
+      views, content: () => content, goSelect: () => machine.go('select'),
+      tracker, api: deps.achievementsApi,
+    }),
     leaderboard: {
       onEnter: () => {
         if (!deps.leaderboard || !views.renderLeaderboard) { machine.go('select'); return; }
@@ -225,7 +227,7 @@ export function createGameFlow(deps: GameFlowDeps): GameFlow {
         scene = createRunSession({
           adapter, views, content, charId, service: deps.leaderboard,
           createScene: deps.createScene, debug: deps.debug, test: deps.test,
-          trackRun: deps.trackRun,
+          trackRun: deps.trackRun, trackAchievements,
           consumeItems: () => consumeEquipped(adapter.storage, content!),
           recordRun: (state, meta) => telemetry.recordRun(state, meta),
           themeId: currentThemeId(adapter.storage, content) ?? undefined,
@@ -262,6 +264,7 @@ export function createGameFlow(deps: GameFlowDeps): GameFlow {
     if (e.type === 'key' && e.phase === 'down' && e.code === 'Escape' && machine.current() === 'run') machine.go('select');
     else if (e.type === 'key' && e.phase === 'down' && e.code === 'Escape' && machine.current() === 'shop') shopBack?.();
     else if (e.type === 'key' && e.phase === 'down' && e.code === 'Escape' && machine.current() === 'settings') machine.go('select');
+    else if (e.type === 'key' && e.phase === 'down' && e.code === 'Escape' && machine.current() === 'achievements') machine.go('select');
     else if (e.type === 'key' && e.phase === 'down' && e.code === 'Escape' && machine.current() === 'leaderboard') machine.go('select');
   });
 

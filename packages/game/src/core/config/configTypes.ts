@@ -39,6 +39,45 @@ export interface ObstaclesFile {
   dropTable: { pickupBoxRatePerSeg: number; weights: Record<string, number> };
 }
 
+/**
+ * 成就 stat 全集（achievements.json）。stat 命名与任务指标同源（mission 重放 metrics 键，
+ * 如技能释放是 skillCasts 而非 sim.summary() 的 casts），服务端 applyRunMetrics 泛化直读零映射。
+ */
+/** source=run 条目可用：服务端重放可供给（SUPPORTED_METRICS ∖ charactersPlayed + jumps/itemOf 显式新增） */
+export const ACH_RUN_STATS = ['distanceM', 'coins', 'slides', 'jumps', 'itemPickups', 'itemOf', 'runs', 'skillCasts', 'nearMiss', 'cleanRuns', 'score'] as const;
+/** source=local 条目可用：设备本机自记，服务端不可验证（run 条目禁用，标错即服务端恒 0 的死条目） */
+export const ACH_LOCAL_STATS = ['charactersUnlocked'] as const;
+
+export type AchievementStat = (typeof ACH_RUN_STATS)[number] | (typeof ACH_LOCAL_STATS)[number];
+export type AchievementSource = 'run' | 'local';
+export type AchievementTier = 'bronze' | 'silver' | 'gold';
+export type AchievementGroup = 'run' | 'skill' | 'collect' | 'chars';
+
+/** 成就奖励：货币为正整数（零值奖励=可领取却发不出的死条目）；shard 为「存在的碎片id:正整数」 */
+export interface AchievementReward {
+  coin?: number;
+  key?: number;
+  diamond?: number;
+  shard?: string;
+}
+
+/** 单条成就（achievements.json items 元素）；stat=itemOf 时 statRef 指向目标道具 id */
+export interface AchievementEntry extends Record<string, unknown> {
+  id: string;
+  versions: unknown[];
+  name: I18n;
+  desc: I18n;
+  stat: AchievementStat;
+  statRef?: string;
+  target: number;
+  tier: AchievementTier;
+  source: AchievementSource;
+  group: AchievementGroup;
+  reward: AchievementReward;
+  /** 生命周期（与 NamedEntry.status 同枚举）：draft/retired 不进页面不可领（achievementLive） */
+  status?: 'draft' | 'live' | 'retired';
+}
+
 /** 加载完成后拼给业务层的「全量内容」 */
 export interface GameContent {
   game: ParamsFile;
@@ -49,9 +88,11 @@ export interface GameContent {
   themes: ConfigFile;
   events: ConfigFile;
   economy: ParamsFile;
+  /** 运行时仍按 CONTENT_NAMES 要求文件齐备（configLoader 缺文件即 report.ok=false），可选仅为兼容旧构造点 */
+  achievements?: ConfigFile<AchievementEntry[]>;
 }
 
 export type ContentName = keyof GameContent;
 
 /** 每个文件在内容包里的名字与「条目所在处」的取法（校验与引用检查共用） */
-export const CONTENT_NAMES: ContentName[] = ['game', 'characters', 'skills', 'items', 'obstacles', 'themes', 'events', 'economy'];
+export const CONTENT_NAMES: ContentName[] = ['game', 'characters', 'skills', 'items', 'obstacles', 'themes', 'events', 'economy', 'achievements'];

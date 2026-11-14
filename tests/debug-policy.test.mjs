@@ -110,6 +110,7 @@ function bootstrapMocks() {
     './eventsOverlay.js': ['createEventsOverlay'],
     './mobileLobby.js': ['createMobileLobby'],
     './mobilePanels.js': ['createMobileSettings', 'createMobileResult'],
+    './mobileAchievements.js': ['createMobileAchievements'],
     './mobileHud.js': ['createMobileHud'],
     './mobileLeaderboard.js': ['createMobileLeaderboard'],
     './leaderboardClient.js': ['createLeaderboardClient'],

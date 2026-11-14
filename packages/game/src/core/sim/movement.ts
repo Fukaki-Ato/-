@@ -30,6 +30,9 @@ export class Movement {
   slideCd = 0;
   /** 单调统计，独立于技能充能的 slideCount。 */
   totalSlides = 0;
+  /** 单调跳跃统计：jump() 是唯一真实起跳汇点（jumpInput 直跳与落地缓冲都汇入它；
+   *  飞行/滑翔期的跳铲输入在 sim 路由处被丢弃，不会到达这里）。 */
+  totalJumps = 0;
   /** 输入缓冲：落地后仍接受该步数内的跳/铲指令 */
   pendingJump = 0;
   pendingSlide = 0;
@@ -63,6 +66,7 @@ export class Movement {
   }
 
   private jump(s: RunnerState, fx: FxState) {
+    this.totalJumps++; // 起跳计数：缓冲跳也算，滑行起身跳也算
     s.vy = this.P.jumpVelocity * (fx.bootsT > 0 ? fx.jumpMul : 1); // 弹跳鞋：跳跃初速乘区
     if (s.y <= 0) s.y = 0.001; // 从支撑面起跳：车顶（y>0）不重置高度
   }
