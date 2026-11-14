@@ -21,6 +21,7 @@ import {
   buildShell,
 } from './beach.js';
 import { mistGeo, seaMat, shallowMat, waterGeo } from './sea.js';
+import { buildBayHorizon, buildShadePavilion, buildRinseStation, buildSailboat, buildSandRipples, buildShoal } from './bay.js';
 
 const LOOP = 200, WRAP_Z = 18;
 const VILLA_X = 12.3, VILLA_S = 1.15, KEEP = 4.75;
@@ -53,15 +54,17 @@ export function createCoastProps(scene: THREE.Scene): SceneryProps {
 
   /** 占位与避让：先摆的先占地，后摆的只在空位落 */
   const free = (x: number, z: number, r: number): boolean =>
-    Math.abs(x) >= KEEP && !taken.some(b => x > b[0] - r && x < b[1] + r && z > b[2] - r && z < b[3] + r);
+    Math.abs(x) - r >= KEEP && !taken.some(b => x > b[0] - r && x < b[1] + r &&
+      [-LOOP, 0, LOOP].some(dz => z + dz > b[2] - r && z + dz < b[3] + r));
   const take = (x0: number, x1: number, z0: number, z1: number): void => { taken.push([x0, x1, z0, z1]); };
 
-  /** 一份几何 = 一类元素；scroll=false 表示这条不跟着跑道后退（静态长条） */
-  const place = (d: Diorama, at: Spot[], buckets: Bucket[], scroll = true): void => {
+  /** 一份几何 = 一类元素；scroll=false 为沙底/固定远景，不跟着近岸后退。 */
+  const place = (d: Diorama, at: Spot[], buckets: Bucket[], scroll = true, name = ''): void => {
     for (const b of buckets) {
       const geo = d.geometry(b);
       if (!geo) continue;
       const mesh = new THREE.InstancedMesh(geo, mats[b], at.length);
+      mesh.name = name;
       for (let i = 0; i < at.length; i++) writeSpot(mesh, i, at[i]);
       mesh.instanceMatrix.needsUpdate = true;
       mesh.frustumCulled = false;
@@ -78,13 +81,13 @@ export function createCoastProps(scene: THREE.Scene): SceneryProps {
   buildVillaInterior(villa);
   const villas = [spot(VILLA_X, -30, 0, VILLA_S), spot(VILLA_X, -130, 0, VILLA_S)];
   villas.forEach(v => take(v.x - 6, v.x + 6.5, v.z - 6, v.z + 6));
-  place(villa, villas, ['body', 'glow', 'glass']);
+  place(villa, villas, ['body', 'glow', 'glass'], true, 'coast:villas');
 
   const parasols: Spot[] = [];
   for (const z of [-50, -60, -70, -80, -90, -140, -150]) parasols.push(spot(PARASOL_R, z, (rnd(z, 3) - 0.5) * 0.5));
   for (const z of [-22, -72, -122, -172]) parasols.push(spot(-7.9, z, Math.PI + (rnd(z, 5) - 0.5) * 0.4));
   parasols.forEach(p => take(p.x - 1.8, p.x + 1.8, p.z - 1.8, p.z + 1.8));
-  place(build(buildParasolSet), parasols, ['body']);
+  place(build(buildParasolSet), parasols, ['body'], true, 'coast:parasols');
 
   const palms: Spot[] = [];
   for (let i = 0; i < 6; i++) {
@@ -92,11 +95,11 @@ export function createCoastProps(scene: THREE.Scene): SceneryProps {
     palms.push(spot(x, z, rnd(i, 11) * 6.28, 0.82 + rnd(i, 13) * 0.4));
     take(x - 1.7, x + 1.7, z - 1.7, z + 1.7);
   }
-  place(build(buildPalm), palms, ['body']);
+  place(build(buildPalm), palms, ['body'], true, 'coast:palms');
 
   const benches: Spot[] = [];
   for (const z of [-18, -34, -96, -160]) { benches.push(spot(-8.5, z, Math.PI / 2)); take(-9.7, -7.3, z - 1.2, z + 1.2); }
-  place(build(buildBench), benches, ['body']);
+  place(build(buildBench), benches, ['body'], true, 'coast:benches');
 
   const rocks: Spot[] = [];
   for (let i = 0; i < 7; i++) {
@@ -104,13 +107,26 @@ export function createCoastProps(scene: THREE.Scene): SceneryProps {
     rocks.push(spot(x, z, rnd(i, 21) * 6.28, 0.8 + rnd(i, 23) * 0.55));
     take(x - 1.9, x + 1.9, z - 1.9, z + 1.9);
   }
-  place(build(buildRocks), rocks, ['body']);
+  place(build(buildRocks), rocks, ['body'], true, 'coast:rocks');
 
   const gear: Spot[] = [], rings: Spot[] = [];
   for (const z of [-42, -108, -176]) { gear.push(spot(-7.5, z, rnd(z, 25) * 6.28)); take(-8.4, -6.6, z - 0.9, z + 0.9); }
   for (const z of [-64, -132, -196]) { rings.push(spot(-7.3, z, 0)); take(-8.1, -6.5, z - 0.9, z + 0.9); }
   place(build(buildBucket), gear, ['body']);
   place(build(buildRingPost), rings, ['body']);
+
+  // 远景低频海湾锚点；中景沙洲与帆船逐件循环，不和近岸成整章一起跳。
+  place(build(buildBayHorizon), [spot(0, 0)], ['body'], false, 'coast:bay-horizon');
+  place(build(buildShoal), [spot(-20.6, -58, -0.15), spot(-23.5, -151, 0.12, 0.85)], ['body'], true, 'coast:shoals');
+  place(build(buildSailboat), [spot(-30, -47, -0.65, 0.85), spot(-38, -132, 0.55, 1.1)], ['body'], true, 'coast:sailboats');
+
+  // 利用原别墅/右伞之间的大空档，先占地再摆花草。右侧原伞仍固定 x=12.1。
+  const pavilions = [spot(10.2, -108), spot(10.2, -178)];
+  pavilions.forEach(p => take(p.x - 2.8, p.x + 2.8, p.z - 2.2, p.z + 2.2));
+  place(build(buildShadePavilion), pavilions, ['body'], true, 'coast:shade-pavilions');
+  const stations = [spot(8, -10), spot(8, -160)];
+  stations.forEach(p => take(p.x - 1.5, p.x + 1.5, p.z - 1.2, p.z + 1.2));
+  place(build(buildRinseStation), stations, ['body'], true, 'coast:rinse-stations');
 
   // ---------- 开花灌木丛：栅栏撤掉后腾出的这条带子正好给它，左右都要有 ----------
   const shrubs: Spot[] = [];
@@ -123,7 +139,7 @@ export function createCoastProps(scene: THREE.Scene): SceneryProps {
     take(x - 0.9, x + 0.9, z - 0.9, z + 0.9);
   }
   const shrubModel = build(buildFloweringShrub);
-  place(shrubModel, shrubs, ['body', 'glow']);
+  place(shrubModel, shrubs, ['body', 'glow'], true, 'coast:shrubs');
 
   // ---------- ② 花草只往空地塞（栅栏撤了，左右两条沙带都空出来给它） ----------
   const flora: Spot[] = [];
@@ -157,6 +173,12 @@ export function createCoastProps(scene: THREE.Scene): SceneryProps {
   place(build(buildPuddle), puddles, ['body', 'glow']);
   place(build(buildShell), shells, ['body']);
   place(build(buildPebble), pebbles, ['body']);
+  const ripples: Spot[] = [];
+  for (let i = 0; i < 90 && ripples.length < 19; i++) {
+    const x = -7.6 - rnd(i, 83) * 2.5, z = 10 - (i * 8.1) % LOOP;
+    if (free(x, z, 0.85)) ripples.push(spot(x, z, (rnd(i, 85) - 0.5) * 0.6));
+  }
+  place(build(buildSandRipples), ripples, ['body'], true, 'coast:sand-ripples');
 
   // ---------- ④ 静态：沙底两带宽 + 海面 + 浅滩（沿 z 无特征，不滚动也就不会跳） ----------
   place(build(buildSandBase), [spot(0, 0)], ['body'], false);
@@ -207,6 +229,7 @@ export function createCoastProps(scene: THREE.Scene): SceneryProps {
   };
   const sway = new Layer(scene, floraModel.geometry('body')!, mats.body, flora.length, floraPlace);
   const swayFlowers = new Layer(scene, floraModel.geometry('glow')!, mats.glow, flora.length, floraPlace);
+  sway.mesh.name = 'coast:flora'; swayFlowers.mesh.name = 'coast:flora';
   const gullBody = new Layer(scene, build(buildGullBody).geometry('body')!, mats.body, GULL, (i, t, out) => {
     const b = gullPath(i, t);
     out.x = b[0]; out.y = b[1]; out.z = b[2]; out.ry = b[3]; out.s = 1.1;
@@ -219,6 +242,9 @@ export function createCoastProps(scene: THREE.Scene): SceneryProps {
     out.roll = side > 0 ? flap : -flap; out.s = 1.1;
   });
 
+  const ownedInstances = [...meshes.map(g => g.mesh), mist.mesh, glint.mesh, sheen.mesh,
+    breathe.mesh, sway.mesh, swayFlowers.mesh, gullBody.mesh, gullWings.mesh];
+  let disposed = false;
   return {
     update(move: number, t: number): void {
       for (const list of lists) for (const p of list) p.z = wrapZ(p.z + move);
@@ -232,6 +258,12 @@ export function createCoastProps(scene: THREE.Scene): SceneryProps {
       sway.update(t); swayFlowers.update(t); gullBody.update(t); gullWings.update(t);
       glint.flushColors(); sheen.flushColors(); breathe.flushColors();
     },
-    dispose(): void { toonRamp?.dispose(); },
+    dispose(): void {
+      if (disposed) return;
+      disposed = true;
+      // 几何/材质仍由 runnerScene 的 scene.traverse 释放；实例属性缓冲由自身 dispose 释放。
+      for (const mesh of ownedInstances) mesh.dispose();
+      toonRamp?.dispose();
+    },
   };
 }

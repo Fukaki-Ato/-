@@ -51,6 +51,8 @@ export interface SelectActions {
   onCharacterSelect?(): void;
   onShop?(): void;
   onTasks?(): void;
+  onHandbook?(): void;
+  onInventory?(): void;
   /** 打开设置页（右上「设置」徽标）；缺省＝该入口只有按压反馈 */
   onSettings?(): void;
   onLeaderboard?(): void;
@@ -109,6 +111,8 @@ export interface GameViews {
   /** 设置页（每个游戏都必须有）：当前首项＝切换跑酷场景；currentThemeId 为流程解析出的生效主题 */
   renderSettings(content: GameContent, actions: SettingsActions, currentThemeId: string | null): void;
   renderLeaderboard?(service: LeaderboardService, actions: { onBack(): void }): void;
+  renderWelfare?(mode: 'tasks' | 'handbook', actions: { onBack(): void }): void;
+  renderInventory?(actions: { onBack(): void; onShop?(): void }): void;
   mountHud(): HudHandle;
   renderResult(summary: RunSummary, best: number, actions: ResultActions): void;
   toast(msg: string): void;

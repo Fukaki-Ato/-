@@ -1,5 +1,5 @@
 /**
- * tools/replay/runner.mjs — 输入重放格式 v1 的解析/校验 + 无头复跑（S19a，规范见 docs/replay-format.md）
+ * tools/replay/runner.mjs — 输入重放格式 v1 的解析/校验 + 无头复跑（规范见 docs/replay.md）
  * 定位：golden-master 与 S18 云函数复跑防作弊共用的「重放执行器」，只依赖 core 的 dist 产物。
  * 模块 API：loadContent / parseReplay / loadReplayFile / eventToAction / runReplay / canonicalJson / sha256Hex
  * CLI：node tools/replay/runner.mjs <replay.json> [--json]   （需先 npm run build）
@@ -13,7 +13,7 @@ import { STEP_DT } from '../../packages/game/dist/core/sim/simTypes.js';
 import { CONTENT_NAMES } from '../../packages/game/dist/core/config/configTypes.js';
 import { formatResult } from './report.mjs';
 
-/** 本实现支持的唯一重放格式版本；未知版本一律拒绝加载（docs/replay-format.md §5） */
+/** 本实现支持的唯一重放格式版本；未知版本一律拒绝加载（docs/replay.md） */
 export const REPLAY_VERSION = 1;
 /** v1 锁定 60fps 固定步长（core STEP_DT=1/60 秒）；dtMs 与之不符即拒绝 */
 export const DT_MS = STEP_DT * 1000;
@@ -96,7 +96,7 @@ export function parseReplay(data) {
   if (!data || typeof data !== 'object' || Array.isArray(data)) fail('顶层必须是 JSON 对象');
   if (data.version !== REPLAY_VERSION) {
     const got = data.version === undefined ? '缺失' : JSON.stringify(data.version);
-    fail(`version=${got}：仅支持整数 ${REPLAY_VERSION}，未知版本必须拒绝加载（见 docs/replay-format.md §5）`);
+    fail(`version=${got}：仅支持整数 ${REPLAY_VERSION}，未知版本必须拒绝加载（见 docs/replay.md）`);
   }
   if (!Number.isInteger(data.seed) || data.seed < 0 || data.seed > 0xffffffff) {
     fail(`seed 必须是 32 位无符号整数，实际 ${JSON.stringify(data.seed)}`);

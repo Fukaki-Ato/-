@@ -1,0 +1,356 @@
+TAP version 13
+# Subtest: QA mission integration stays untracked; normal runs keep their mission start/finish path
+ok 1 - QA mission integration stays untracked; normal runs keep their mission start/finish path
+  ---
+  duration_ms: 57.368125
+  type: 'test'
+  ...
+# Subtest: recorder replays exact fixed steps, ignores death animation and counts successful slides
+ok 2 - recorder replays exact fixed steps, ignores death animation and counts successful slides
+  ---
+  duration_ms: 76.885543
+  type: 'test'
+  ...
+# Subtest: mission tracking coexists with server-seeded leaderboard recording and cancelled preflight
+ok 3 - mission tracking coexists with server-seeded leaderboard recording and cancelled preflight
+  ---
+  duration_ms: 35.9083
+  type: 'test'
+  ...
+# Subtest: mission panel switches periods, guards claims, displays wallet and disposes late requests
+ok 4 - mission panel switches periods, guards claims, displays wallet and disposes late requests
+  ---
+  duration_ms: 29.851763
+  type: 'test'
+  ...
+# Subtest: mission panel offers retry on service errors
+ok 5 - mission panel offers retry on service errors
+  ---
+  duration_ms: 3.328034
+  type: 'test'
+  ...
+# Subtest: claim failure preserves the task and allows retry without optimistic rewards
+ok 6 - claim failure preserves the task and allows retry without optimistic rewards
+  ---
+  duration_ms: 3.48477
+  type: 'test'
+  ...
+# Subtest: client persists retries and sends no client-authored scores
+ok 7 - client persists retries and sends no client-authored scores
+  ---
+  duration_ms: 4.236356
+  type: 'test'
+  ...
+# Subtest: a full pending queue refuses another mission ticket without discarding prior replays
+ok 8 - a full pending queue refuses another mission ticket without discarding prior replays
+  ---
+  duration_ms: 0.718713
+  type: 'test'
+  ...
+# Subtest: lobby uses the imported spendable wallet, including diamonds, without adding the ledger twice
+ok 9 - lobby uses the imported spendable wallet, including diamonds, without adding the ledger twice
+  ---
+  duration_ms: 13.603196
+  type: 'test'
+  ...
+# Subtest: all reward currencies migrate legacy funds and are spendable without refill on reload
+ok 10 - all reward currencies migrate legacy funds and are spendable without refill on reload
+  ---
+  duration_ms: 3.453796
+  type: 'test'
+  ...
+# Subtest: out-of-order snapshots, new rewards and stable account identities use independent high-water marks
+ok 11 - out-of-order snapshots, new rewards and stable account identities use independent high-water marks
+  ---
+  duration_ms: 0.520004
+  type: 'test'
+  ...
+# Subtest: failed or silently dropped persistence cannot partially grant funds or consume a cursor
+ok 12 - failed or silently dropped persistence cannot partially grant funds or consume a cursor
+  ---
+  duration_ms: 0.787591
+  type: 'test'
+  ...
+# Subtest: invalid snapshots and damaged persisted cursors fail closed without granting any currency
+ok 13 - invalid snapshots and damaged persisted cursors fail closed without granting any currency
+  ---
+  duration_ms: 0.736067
+  type: 'test'
+  ...
+# Subtest: load, repeated claim responses, finish retries and reconnect import once through the API callback
+ok 14 - load, repeated claim responses, finish retries and reconnect import once through the API callback
+  ---
+  duration_ms: 2.42002
+  type: 'test'
+  ...
+# Subtest: a locally failed claim import remains retryable after the server committed it
+ok 15 - a locally failed claim import remains retryable after the server committed it
+  ---
+  duration_ms: 0.607559
+  type: 'test'
+  ...
+# (node:3301302) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: the self-contained server package preserves all existing golden summaries
+ok 16 - the self-contained server package preserves all existing golden summaries
+  ---
+  duration_ms: 542.072075
+  type: 'test'
+  ...
+# Subtest: a run keeps its issued scoring rules when content changes and the server restarts
+ok 17 - a run keeps its issued scoring rules when content changes and the server restarts
+  ---
+  duration_ms: 246.331952
+  type: 'test'
+  ...
+# {"issueScore":3075,"settledScore":3075,"status":"finished"}
+# Subtest: a physics update must not mark a previously valid death replay invalid
+ok 18 - a physics update must not mark a previously valid death replay invalid
+  ---
+  duration_ms: 217.048235
+  type: 'test'
+  ...
+# {"issueAlive":false,"settledValid":1,"status":"finished"}
+# Subtest: a different simulation publication cannot replace the code or timestep of an issued run
+ok 19 - a different simulation publication cannot replace the code or timestep of an issued run
+  ---
+  duration_ms: 237.595975
+  type: 'test'
+  ...
+# Subtest: qualification and input limits remain those of issue; duplicate settlement does not recount
+ok 20 - qualification and input limits remain those of issue; duplicate settlement does not recount
+  ---
+  duration_ms: 185.764364
+  type: 'test'
+  ...
+# Subtest: content mutations affect future admissions without mutating an already-bound snapshot
+ok 21 - content mutations affect future admissions without mutating an already-bound snapshot
+  ---
+  duration_ms: 217.557168
+  type: 'test'
+  ...
+# Subtest: corrupt rules keep the run open and the client queue intact until a valid retry
+ok 22 - corrupt rules keep the run open and the client queue intact until a valid retry
+  ---
+  duration_ms: 223.705418
+  type: 'test'
+  ...
+# Subtest: a valid database hash does not authorize unknown executable code
+ok 23 - a valid database hash does not authorize unknown executable code
+  ---
+  duration_ms: 185.118928
+  type: 'test'
+  ...
+# Subtest: a retained publication needs explicit runtime trust without losing its pending run
+ok 24 - a retained publication needs explicit runtime trust without losing its pending run
+  ---
+  duration_ms: 235.620985
+  type: 'test'
+  ...
+# Subtest: legacy NULL tickets adopt the verified pre-binding baseline once, not a later publication
+ok 25 - legacy NULL tickets adopt the verified pre-binding baseline once, not a later publication
+  ---
+  duration_ms: 185.549061
+  type: 'test'
+  ...
+# (node:3301309) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: actual config only assigns achievable daily missions and retains all weekly tasks
+ok 26 - actual config only assigns achievable daily missions and retains all weekly tasks
+  ---
+  duration_ms: 39.333358
+  type: 'test'
+  ...
+# Subtest: legacy unclaimed task migrates once, preserving identity/reward and unrelated state
+ok 27 - legacy unclaimed task migrates once, preserving identity/reward and unrelated state
+  ---
+  duration_ms: 42.145022
+  type: 'test'
+  ...
+# Subtest: already claimed legacy tasks never reset or pay twice
+ok 28 - already claimed legacy tasks never reset or pay twice
+  ---
+  duration_ms: 21.282238
+  type: 'test'
+  ...
+# Subtest: migration compare-and-swap cannot overwrite a concurrent claim or progress update
+ok 29 - migration compare-and-swap cannot overwrite a concurrent claim or progress update
+  ---
+  duration_ms: 20.634912
+  type: 'test'
+  ...
+# Subtest: in-flight legacy run migrates before scoring, and live truncation still earns nothing
+ok 30 - in-flight legacy run migrates before scoring, and live truncation still earns nothing
+  ---
+  duration_ms: 166.959385
+  type: 'test'
+  ...
+# Subtest: configuration fails early if a daily tier has no achievable alternative
+ok 31 - configuration fails early if a daily tier has no achievable alternative
+  ---
+  duration_ms: 20.280304
+  type: 'test'
+  ...
+# Subtest: migration retries with fresh state when another writer updates the period
+ok 32 - migration retries with fresh state when another writer updates the period
+  ---
+  duration_ms: 20.154664
+  type: 'test'
+  ...
+# Subtest: completed but unclaimed legacy tasks retain their earned reward and original progress
+ok 33 - completed but unclaimed legacy tasks retain their earned reward and original progress
+  ---
+  duration_ms: 20.981595
+  type: 'test'
+  ...
+# Subtest: persistent migration conflicts fail safely after bounded retries
+ok 34 - persistent migration conflicts fail safely after bounded retries
+  ---
+  duration_ms: 20.215232
+  type: 'test'
+  ...
+# (node:3301316) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: Beijing periods reset at midnight; weekly period starts on Monday
+ok 35 - Beijing periods reset at midnight; weekly period starts on Monday
+  ---
+  duration_ms: 2.052586
+  type: 'test'
+  ...
+# Subtest: session cookie, stable daily tiers, all weekly missions, and SQLite persistence
+ok 36 - session cookie, stable daily tiers, all weekly missions, and SQLite persistence
+  ---
+  duration_ms: 267.943524
+  type: 'test'
+  ...
+# Subtest: server replays runs, rejects early time, settles once, and atomically claims reward
+ok 37 - server replays runs, rejects early time, settles once, and atomically claims reward
+  ---
+  duration_ms: 354.357099
+  type: 'test'
+  ...
+# Subtest: weekly character progress deduplicates a runner, while daily stale runs never enter a new day
+ok 38 - weekly character progress deduplicates a runner, while daily stale runs never enter a new day
+  ---
+  duration_ms: 324.56326
+  type: 'test'
+  ...
+# Subtest: invalid inputs, forged summaries, CSRF, stale claims, and body caps fail as JSON errors
+ok 39 - invalid inputs, forged summaries, CSRF, stale claims, and body caps fail as JSON errors
+  ---
+  duration_ms: 263.306977
+  type: 'test'
+  ...
+# Subtest: too-short runs finish but never add mission progress; economy sets the 10-second threshold
+ok 40 - too-short runs finish but never add mission progress; economy sets the 10-second threshold
+  ---
+  duration_ms: 159.861935
+  type: 'test'
+  ...
+# Subtest: rate limits expire and configured public origin controls Secure cookies
+ok 41 - rate limits expire and configured public origin controls Secure cookies
+  ---
+  duration_ms: 281.7536
+  type: 'test'
+  ...
+# Subtest: trusted proxy uses only an overwritten single client IP, untrusted headers cannot bypass limits
+ok 42 - trusted proxy uses only an overwritten single client IP, untrusted headers cannot bypass limits
+  ---
+  duration_ms: 291.164018
+  type: 'test'
+  ...
+# Subtest: concurrent finish credits once; rewards and claim flags survive restart; other visitors cannot settle ticket
+ok 43 - concurrent finish credits once; rewards and claim flags survive restart; other visitors cannot settle ticket
+  ---
+  duration_ms: 219.971161
+  type: 'test'
+  ...
+# Subtest: weekly rollover rejects old claims and does not carry an old run into the new week
+ok 44 - weekly rollover rejects old claims and does not carry an old run into the new week
+  ---
+  duration_ms: 168.86385
+  type: 'test'
+  ...
+# Subtest: replay wall-clock timeout, open-run cap, and data purge guardrails
+ok 45 - replay wall-clock timeout, open-run cap, and data purge guardrails
+  ---
+  duration_ms: 190.897608
+  type: 'test'
+  ...
+# Subtest: 装备道具随票提交：重放同清单注入则 validRun 成立；无效/重复道具 400（道具闭环 M）
+ok 46 - 装备道具随票提交：重放同清单注入则 validRun 成立；无效/重复道具 400（道具闭环 M）
+  ---
+  duration_ms: 233.977325
+  type: 'test'
+  ...
+# Subtest: purge retains earned wallets and progress when their last run expires
+ok 47 - purge retains earned wallets and progress when their last run expires
+  ---
+  duration_ms: 2.543203
+  type: 'test'
+  ...
+# Subtest: expired tickets release open-run slots before purge and respect a configured TTL
+ok 48 - expired tickets release open-run slots before purge and respect a configured TTL
+  ---
+  duration_ms: 203.008254
+  type: 'test'
+  ...
+# (node:3301326) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: theme mappings participate in the existing v2 leaderboard rules hash
+ok 49 - theme mappings participate in the existing v2 leaderboard rules hash
+  ---
+  duration_ms: 26.44897
+  type: 'test'
+  ...
+# Subtest: RunSession passes selected theme to simulation, ranking begin and renderer; omitted theme resolves default
+ok 50 - RunSession passes selected theme to simulation, ranking begin and renderer; omitted theme resolves default
+  ---
+  duration_ms: 78.399179
+  type: 'test'
+  ...
+# Subtest: Web ranking and shared mission clients carry optional start theme without adding it to finish
+ok 51 - Web ranking and shared mission clients carry optional start theme without adding it to finish
+  ---
+  duration_ms: 34.514381
+  type: 'test'
+  ...
+# Subtest: Web mission integration sends the simulation-resolved theme
+ok 52 - Web mission integration sends the simulation-resolved theme
+  ---
+  duration_ms: 44.15275
+  type: 'test'
+  ...
+# Subtest: WX mission transport carries the simulation-resolved theme in the shared start contract
+ok 53 - WX mission transport carries the simulation-resolved theme in the shared start contract
+  ---
+  duration_ms: 2.556504
+  type: 'test'
+  ...
+# Subtest: leaderboard HTTP validates available themes and binds the ticket to the local replay worker theme
+ok 54 - leaderboard HTTP validates available themes and binds the ticket to the local replay worker theme
+  ---
+  duration_ms: 321.30283
+  type: 'test'
+  ...
+# Subtest: mission HTTP validates themes, persists resolved selection and rejects finish-time replacement
+ok 55 - mission HTTP validates themes, persists resolved selection and rejects finish-time replacement
+  ---
+  duration_ms: 339.779123
+  type: 'test'
+  ...
+# Subtest: legacy mission SQLite schema migrates nullable theme_id, replays default, and preserves selected themes on reopen
+ok 56 - legacy mission SQLite schema migrates nullable theme_id, replays default, and preserves selected themes on reopen
+  ---
+  duration_ms: 149.51315
+  type: 'test'
+  ...
+1..56
+# tests 56
+# suites 0
+# pass 56
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 8051.756028

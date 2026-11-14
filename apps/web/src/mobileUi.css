@@ -6,14 +6,14 @@
 }
 
 :root {
-  --ui-ink: #173f4b;
-  --ui-muted: #607c80;
-  --ui-paper: #fffcf4;
-  --ui-mint: #d9f2e9;
-  --ui-teal: #217d79;
-  --ui-coral: #f8755b;
-  --ui-line: #dce8e3;
-  --ui-shadow: 0 12px 36px #164e5720;
+  --ui-ink: #174f65;
+  --ui-muted: #557482;
+  --ui-paper: #fffdf4;
+  --ui-mint: #d6f3ef;
+  --ui-teal: #087e8b;
+  --ui-coral: #ee725a;
+  --ui-line: #bfddd9;
+  --ui-shadow: 0 8px 0 #1767790a, 0 16px 32px #145f6f14;
 }
 
 .tr-mobile-page, .tr-character-select {

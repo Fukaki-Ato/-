@@ -11,13 +11,13 @@ import { fileURLToPath } from 'node:url';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 if (!existsSync(join(root, 'node_modules/typescript/bin/tsc'))) {
-  console.error('缺少 node_modules（npm workspaces 依赖）：请先在仓库根执行 npm install');
+  console.error('缺少 node_modules（npm workspaces 依赖）：请先在仓库根执行 npm ci');
   process.exit(1);
 }
 
 const STEPS = [
   ['编译 TypeScript（tsc -b）', ['node_modules/typescript/bin/tsc', '-b']],
-  ['运行单元测试', ['--test', 'tests/*.test.mjs']],
+  ['运行单元测试', ['tools/test.mjs']],
   ['配置校验', ['tools/validate-config.mjs']],
   ['架构禁令检查', ['tools/check-import-rules.mjs']],
   ['微信小游戏 bundle 校验（--dry 不发布）', ['tools/build-wx.mjs', '--dry']],

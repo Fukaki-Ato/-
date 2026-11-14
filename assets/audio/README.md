@@ -5,7 +5,9 @@ Background music and one-shot cues live here:
 - `bgm/` — looping tracks, referenced from `game.json → params.audio.bgm` (for example `bgm/run.mp3` → `"assets/audio/bgm/run.mp3"`)
 - `sfx/` — one-shot cues, referenced from `game.json → params.audio.sfx` (for example `"assets/audio/sfx/death.mp3"`)
 
-Both builds copy this directory (Web bundle and the WX `pkg-assets` subpackage), so every file counts toward the WX package budget — `npm run check` prints the sizes and fails if the budget is exceeded.
+Web copies this directory; WX recursively copies `.mp3/.m4a/.aac/.ogg/.wav` into `pkg-assets`
+(not README files). Those audio files count toward the WX package budget — `npm run check`
+prints sizes and fails if the budget is exceeded.
 
 Guidelines:
 
@@ -31,8 +33,8 @@ Paths are case-sensitive and must match the character id exactly. Missing events
 cue is skipped and only the global layer plays (global death pool + BGM), so partial coverage is
 safe to land incrementally.
 
-House encoding spec (what `npm run check` and the WX decoder expect): **MP3, 44.1 kHz, mono,
-128 kbps**. Convert with the bundled ffmpeg, e.g.
+Recommended encoding: **MP3, 44.1 kHz, mono, 128 kbps**. `npm run check` checks copy/size,
+not codec parameters or actual decoding. Install ffmpeg separately, e.g.
 `ffmpeg -i in.m4a -vn -ac 1 -ar 44100 -b:a 128k out.mp3`.
 
 Coverage as of 2026-10-05 (issue #17, first batch):

@@ -19,6 +19,8 @@ import { createPickupModelLoader } from './pickupModels.js';
 import { installRunProbe, uninstallRunProbe } from './runDebugProbe.js';
 import { createSpeedLines } from './speedLines.js';
 import { createTrackVisuals } from './trackVisuals.js';
+import { createRendererSurface } from './rendererSurface.js';
+import type { ModelLoaderFactory } from './modelLoader.js';
 import { createBurstPool } from './vfxBurst.js';
 import { applyLightningFlash, createLightningFx, FLASH_LIGHT_GAIN, FLASH_TINT } from './lightning.js';
 
@@ -60,7 +62,7 @@ const FOG_NEAR = 22, FOG_FAR = 120;
 export function createRunnerScene(
   host: { canvas: GLCanvas; size: WindowSize },
   adapter: PlatformAdapter, sim: RunnerSim, content: GameContent, cb: RunCallbacks,
-  opts?: { themeId?: string },
+  opts?: { themeId?: string; renderer?: THREE.WebGLRenderer; createModelLoader?: ModelLoaderFactory },
 ) {
   const runner = (content.game.params.runner ?? {}) as Record<string, number>;
   const laneWidth = runner.laneWidth ?? 2.2;
@@ -82,10 +84,10 @@ export function createRunnerScene(
   // 全仓唯一 three 接线断言点（S10 §7.6 / D3）：GLCanvas 是结构化去 DOM 类型，
   // 这里喂回 three 需要的 HTMLCanvasElement 形貌；S11 路线 B 的最小垫片（wx canvas 补
   // addEventListener/style）即在此处兼容，如与此冲突收敛于此单点。
-  const renderer = new THREE.WebGLRenderer({ canvas: host.canvas as unknown as HTMLCanvasElement, antialias: true });
-  const { width, height, dpr } = host.size;
-  renderer.setPixelRatio(dpr);
-  renderer.setSize(width, height, false);
+  const surface = createRendererSurface(host.size,
+    () => new THREE.WebGLRenderer({ canvas: host.canvas as unknown as HTMLCanvasElement, antialias: true }), opts?.renderer);
+  const { renderer } = surface;
+  const { width, height } = host.size;
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(sky.baseColor);
   scene.fog = new THREE.Fog(fogColor, FOG_NEAR, FOG_FAR);
@@ -109,12 +111,13 @@ export function createRunnerScene(
     baseColor: sky.baseColor, flashColor: sky.flashColor, tint, groundColor,
     sky: { zenith: sky.baseColor, horizon: fogColor },
   }, (theme?.['scenery'] as string | undefined) ?? 'seaside');
-  const avatar = createAvatar(scene, laneWidth, sim.loadout, adapter);
+  const avatar = createAvatar(scene, laneWidth, sim.loadout, adapter, opts?.createModelLoader);
   const coinField = createCoinField(scene, laneWidth);
   const obstacleLayer = createObstacleLayer(scene, laneWidth);
   // 道具 3D 模型（items.json model.prefab/spin）：磁铁有文件→近距换 3D，其余预留路径
   // 文件缺失→加载器返回 null，保持贴图箱（wx 无 extras.readBinary 同理），捞取判定不受影响
-  const pickupLayer = createPickupLayer(scene, laneWidth, createPickupModelLoader(content, adapter));
+  const pickupModels = createPickupModelLoader(content, adapter, opts?.createModelLoader);
+  const pickupLayer = createPickupLayer(scene, laneWidth, pickupModels);
   const cloudLayer = createCloudLayer(scene);
   const bursts = createBurstPool(scene);
   const speedLines = createSpeedLines(scene, tint);
@@ -143,8 +146,7 @@ export function createRunnerScene(
 
   // ---------- 窗口尺寸变化（v2 新增 D9）：重设绘制缓冲 + 相机宽高比，退订进 dispose ----------
   const offResize = adapter.canvas.onResize(size => {
-    renderer.setPixelRatio(size.dpr);
-    renderer.setSize(size.width, size.height, false);
+    surface.resize(size);
     camera.aspect = size.width / size.height;
     camera.updateProjectionMatrix();
   });
@@ -267,7 +269,7 @@ export function createRunnerScene(
       endTimer += dt;
       if (endTimer > END_DELAY_S) { ended = true; cb.onEnd(sim.summary()); }
     }
-    raf = adapter.requestFrame(tick);
+    if (running) raf = adapter.requestFrame(tick);
   }
   raf = adapter.requestFrame(tick);
 
@@ -276,14 +278,17 @@ export function createRunnerScene(
 
   // 只销毁本局资源：不销毁主画布/GL 上下文（wx 屏幕画布不可重建，S10 D1 跨局复用）。
   function dispose() {
+    if (!running) return;
     running = false;
     adapter.cancelFrame(raf);
     offInput(); offResize(); offVisibility();
     if (cb.debug) uninstallRunProbe(); // ?debug 探针随场景销毁卸载，避免 __trRun 指向已销毁的 sim
     avatar.dispose(); // GLB 混流器停摆（几何体/材质由下面的 traverse 统一销毁）
+    pickupLayer.dispose();
+    pickupModels.dispose();
     lightning.dispose();
     track.dispose();
-    renderer.dispose();
+    surface.dispose();
     scene.traverse(o => {
       const m = o as THREE.Mesh;
       if (m.geometry) m.geometry.dispose();

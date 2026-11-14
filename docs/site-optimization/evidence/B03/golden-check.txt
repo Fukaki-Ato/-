@@ -1,0 +1,16 @@
+  ok  g-101-char_volt.json
+  ok  g-101-char_ama.json
+  ok  g-101-char_kaze.json
+  ok  g-777-char_volt.json
+  ok  g-777-char_ama.json
+  ok  g-777-char_kaze.json
+  ok  g-4242-char_volt.json
+  ok  g-4242-char_ama.json
+  ok  g-4242-char_kaze.json
+  ok  g-65001-char_volt.json
+  ok  g-65001-char_ama.json
+  ok  g-65001-char_kaze.json
+  ok  g-20260922-char_volt.json
+  ok  g-20260922-char_ama.json
+  ok  g-20260922-char_kaze.json
+golden 校验通过：15 例与磁盘逐字节一致（未写盘）

@@ -1,0 +1,34 @@
+{
+  "source": "Noto Sans CJK SC Regular",
+  "sourceUrl": "https://raw.githubusercontent.com/notofonts/noto-cjk/main/Sans/OTF/SimplifiedChinese/NotoSansCJKsc-Regular.otf",
+  "sourceSha256": "2c76254f6fc379fddfce0a7e84fb5385bb135d3e399294f6eeb6680d0365b74b",
+  "license": "SIL OFL 1.1",
+  "copyright": "© 2014-2021 Adobe (http://www.adobe.com/).",
+  "sourceModified": false,
+  "originalGeometricMarks": [
+    "ϟ",
+    "⁻",
+    "⚑",
+    "✔",
+    "✦",
+    "❤"
+  ],
+  "rebuild": "node tools/fontgen/licensed.mjs --font <documented-Noto.otf> --out <new-directory>",
+  "outputs": [
+    {
+      "name": "latin",
+      "glyphs": 95,
+      "width": 2030,
+      "height": 113,
+      "bytes": 26923
+    },
+    {
+      "name": "cjk",
+      "glyphs": 1509,
+      "width": 2046,
+      "height": 1987,
+      "bytes": 883405
+    }
+  ],
+  "note": "Old atlases and Microsoft/Segoe fonts are not inputs. Source font itself is not distributed."
+}

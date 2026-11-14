@@ -3,9 +3,10 @@
  * fetchJson：wx.request(dataType:'json')，非 2xx 或 fail → reject（两端一致）。
  * readJson/readBinary：包内相对路径走 getFileSystemManager().readFile；
  *   http(s) URL 走 downloadFile→tempFilePath→readFile（S8 CDN 复用同一入口）。
- * S8 前的占位：URL 直读时若无 downloadFile 环境（node mock）则回退 fetchJson 语义。
+ * 仓库 assets/... 路径映射到 pkg-assets/assets/...；下载后的临时路径保持原样。
  */
 import type { WxLike } from './wxTypes.js';
+import { resolveWxAssetPath } from './assetPaths.js';
 
 export function wxFetchJson(wx: WxLike, url: string): Promise<unknown> {
   return new Promise((resolve, reject) => {
@@ -32,7 +33,7 @@ function readText(wx: WxLike, path: string): Promise<string> {
       fail: err => reject(new Error(`readFile 失败: ${err.errMsg} ${filePath}`)),
     });
   });
-  if (!/^https?:\/\//i.test(path)) return open(path);
+  if (!/^https?:\/\//i.test(path)) return open(resolveWxAssetPath(path));
   return new Promise((resolve, reject) => {
     wx.downloadFile({
       url: path,
@@ -54,7 +55,7 @@ function readBinary(wx: WxLike, path: string): Promise<ArrayBuffer> {
       fail: err => reject(new Error(`readFile 失败: ${err.errMsg} ${filePath}`)),
     });
   });
-  if (!/^https?:\/\//i.test(path)) return open(path);
+  if (!/^https?:\/\//i.test(path)) return open(resolveWxAssetPath(path));
   return new Promise((resolve, reject) => {
     wx.downloadFile({
       url: path,

@@ -12,13 +12,17 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest]
+        node:
+          - version: '22.23.0'
+          - file: .nvmrc
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 24
+          node-version: ${{ matrix.node.version }}
+          node-version-file: ${{ matrix.node.file }}
           cache: npm
 
       - name: 安装依赖
@@ -31,7 +35,7 @@ jobs:
         run: npm run build:web
 
       - name: 上传 web 产物
-        if: matrix.os == 'ubuntu-latest'
+        if: matrix.os == 'ubuntu-latest' && matrix.node.file == '.nvmrc'
         uses: actions/upload-artifact@v4
         with:
           name: web-dist
@@ -46,7 +50,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 24
+          node-version-file: .nvmrc
           cache: npm
 
       - name: 安装依赖

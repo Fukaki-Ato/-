@@ -16,6 +16,7 @@ Replay fixtures make the deterministic simulation reviewable. A replay records a
 `version: 1` requires `dtMs = 1000 / 60`. Inputs are ordered by nondecreasing frame and use platform-normalized event types: `swipe`, `doubleTap`, `tap`, and `key`.
 
 ```bash
+npm run build
 node tools/replay/runner.mjs tools/replay/examples/example-v1.json
 node tools/replay/golden-gen.mjs
 node tools/replay/golden-gen.mjs --update

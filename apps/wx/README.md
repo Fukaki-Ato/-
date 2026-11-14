@@ -1,21 +1,52 @@
-# WX App
+# 微信小游戏集成入口（目标端待验收）
 
-`apps/wx` produces an importable WX Developer Tools package.
+在仓库根执行：
 
 ```bash
-npm run build:wx
+npm ci
 npm run build:wx -- --minify
 ```
 
-Import `apps/wx/dist` with the WX Developer Tools in tourist mode.
+用微信开发者工具按**小游戏**导入 `apps/wx/dist`。`project.config.json` 含工程 AppID，
+请确认账号有权限；游客调试不等于真实 AppID/真机验收，也不保证 CLI 能打开项目。
+开发者工具改写的是构建产物；源码配置变更应在 `apps/wx` 维护。
 
-## What It Verifies
+`src/main.ts` 经 `bootstrap.ts` 加载 `pkg-assets`、字体/菜单图片和 8 份配置，
+启动共享 `GameFlow`：大厅、选角弹层、跑酷/HUD、结算与重开。单个原生帧循环按
+游戏→UI 的顺序使用同一 renderer，跨局保留主画布；原始触控用于按压与列表拖动。
 
-- The WX `PlatformAdapter` implementation and canvas shim.
-- The Three.js empty scene.
-- Loading `pkg-assets`, then reading and validating all configuration files.
-- Bundle-size limits: 4 MB main package and 30 MB total package.
+大厅/结算已统一为海滨俱乐部页面并展示真实GLB离线portrait；任务/免费福利手册、商店、仓库、角色及设置已有海滨风功能页面，自绘排行榜和上传失败重试已接通。
+九个live角色已接可编辑海滨GLB与完整动作，原五模型保留为制作输入；新动作在换道后保持跑步相位。海湾加入灯塔/沙洲/帆船与木亭等层次，原海面shader和车道净空保留。制作入口为`tools/art/README.md`，离线图和构建不等于微信视觉/性能验收。
+角色/仓库/商店已复用实际模型肖像及技能/天赋说明；主题为真实配置配色预览。实际掉落6类均有3D（另有未入掉落表的倍率器模型），远距/读取未完时以矢量标志区分补给，金币保持实例几何。首次金币前纪录在结算与总成绩分开，WX HUD使用双击屏幕提示。
+`tools/art/ui_README.md`提供无端口/无浏览器的离线同源shader页面观察方法；样例和软件OpenGL像素结果不代表真实云或微信验收。
+手机HUD已按可用宽度拆分成绩/生命、金币/里程、技能和增益，避免窄屏多增益截断；任务/手册请求中相应刷新/领取按钮置灰。WX分包仅收当前9张角色肖像，旧菜单图片保留在源码但不再分发；Three完整MIT文本随`pkg-assets/licenses/`打包。
+当前工程/云上传路径、素材来源及未验收条件见[首发交付核查](../../docs/goals/wechat-release-2026-11-06/RELEASE-READINESS.md)。
+WX字体现为`assets/fonts/noto`的OFL Noto＋原创几何符号，旧混合图集不再分发；字体对、许可和来源记录随包。磁铁也已换成`assets/pickups/coastal/magnet.glb`原创模型，旧文件留作历史。原5角色派生及部分历史音频的来源待补证事项仍在。
+应用图标和玩法/审核、隐私资料为[独立候选包](../../docs/goals/wechat-release-2026-11-06/launch/README.md)，不进入客户端，也没有后台提交记录。下一阶段按负责人配合单取得环境/预算与设备条件后再真实验收。
+云函数已实现日/周任务、四章手册、统一领奖和确定性交易：金币/钻石入钱包，钥匙/碎片入库存，角色购买/碎片兑换/回收及限购由服务器处理。仓库可查看与出战，角色/主题选择保存到云档案并同步下一局。
+购买须确认服务器报价；未确认结果保留原幂等键，重进商店可核对同笔交易。严格本地交易记录保存失败时不发送购买，普通游戏缓存仍维持原容错行为。未接用途的XP卡/皮肤等不开放购买。
+新启动链用原生 `wx.cloud.callFunction` 连接 `thunder-api`，不使用旧 `extras.login/cloud` 的本地占位身份。
+配置在 `apps/wx/cloud.config.json`：**envId 当前为空**，代表本地开发，不初始化云服务。
+目标环境获准后填环境 ID；连接成功才读取云钱包和拥有角色。云账户结算不自行加本机金币，
+只有服务端重放确认后更新余额；初次云连接失败会报错重试，不冒充登录成功。
+结算上传期间暂时禁用返回/重开，避免尚未确定结果就失去回放重试入口；失败后可在原页重试，
+或按明确提示放弃本局未确认奖励再离开。服务器与客户端用事务 revision 处理响应乱序。
+HUD“结束本局”可主动结算，合法收入和有效任务进度仍同步，但不入排行榜；用于完成无伤任务。
+任务按北京时间重置，手册不随日周重置；页面提供刷新以处理跨周期状态。
+UI viewport 和触摸坐标已避开胶囊/安全区，跑酷保持全屏；这些接线仍须真机确认。
 
-## Current Limitation
+云函数独立构建用 `node tools/build-wx-cloud.mjs`，产物为 `apps/wx/cloud-dist/thunder-api`，
+部署条件与权限说明见 [云函数 README](../../cloudfunctions/README.md)。当前尚无真实云部署/读写验收。
+`pkg-assets/manifest.json` 列出实际打包文件与缺失模型；缺失资源不会生成假 GLB。
+模型加载已注入 UTF-8 解码与微信原生 Image 内嵌 PNG 路径，避免 GLTFLoader 走浏览器 Blob/DOM；
+目前仅支持仓库现有的内嵌 PNG 模型，实际原生解码、外观和性能仍须微信端验证。
 
-This is not yet the full playable WX game. `src/main.ts` intentionally starts the empty scene while the Web-only flow uses the full menu, game, HUD, and result views. Moving that flow to a single WX renderer is a separate integration task and must not be mixed into unrelated gameplay changes.
+Node 的 `tests/wx-runtime.test.mjs` 覆盖共享流程、真实模拟到死亡结算、重开及调度顺序，
+但 renderer 使用测试替身，**未证明像素渲染、微信 API、音频或真机性能正确**。
+启动资源或配置校验失败会释放本次实例，通过微信原生弹窗提示并可重试。
+
+`npm run check` 验证编译、mock、bundle 布局和仓库体积门禁（主包 4 MB、整包 30 MB），
+不证明开发者工具或真机能运行。历史配置读取和高性能模式问题仍待复测，
+见 [运行时发现](../../docs/wx-runtime-findings.md)；最终平台限制也需按目标发布条件核实。
+
+长任务状态见 [Goal 进展](../../docs/goals/wechat-release-2026-11-06/PROGRESS.md)。

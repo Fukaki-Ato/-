@@ -113,3 +113,50 @@ test('大厅与结算排行榜入口接场景，返回与 Escape 回大厅', asy
   flow.machine.go('result', { score: 0, coins: 0 }); seen.result.onLeaderboard();
   assert.equal(flow.machine.current(), 'leaderboard');
 });
+
+test('上传失败可显式重试原票据和回放，连点不并发上传，成功后取消重试入口', async () => {
+  const payloads = []; let complete;
+  const service = {
+    begin: async () => ticket,
+    submit(replay) {
+      payloads.push(structuredClone(replay));
+      if (payloads.length === 1) return Promise.reject(new Error('response lost'));
+      return new Promise(resolve => { complete = resolve; });
+    },
+  };
+  const { seen, session } = fixture({ service });
+  await tick(); seen.sim.step(); seen.callbacks.onEnd(seen.sim.summary());
+  await tick();
+  const retry = seen.summary.ranking.retry;
+  assert.equal(typeof retry, 'function'); retry(); retry();
+  assert.equal(payloads.length, 2); assert.deepEqual(payloads[0], payloads[1]);
+  assert.equal(seen.summary.ranking.retry, undefined);
+  complete({ accepted: true }); await tick();
+  assert.match(seen.summary.ranking.message, /已入全服榜/);
+  assert.equal(seen.summary.ranking.retry, undefined); session.dispose();
+});
+
+test('主动结束使用quit回放，落定最后一次手势帧，收到未入榜成功也明确已同步', async () => {
+  const payloads = [];
+  const f = fixture({ service: { begin: async () => ticket, submit: async replay => {
+    payloads.push(replay); return { accepted: false };
+  } } });
+  assert.equal(f.session.finish(), false, 'ticket is not ready');
+  await tick(); f.seen.sim.step();
+  f.seen.sim.applyAction('jump');
+  assert.equal(f.session.finish(), true);
+  assert.equal(f.session.finish(), false, 'finish once only');
+  await tick();
+  assert.equal(payloads[0].finishReason, 'quit'); assert.equal(payloads[0].frames, 2);
+  assert.deepEqual(payloads[0].inputs, [{ frame: 1, action: 'jump' }]);
+  assert.equal(f.seen.summary.alive, true);
+  assert.match(f.seen.summary.ranking.message, /进度已同步/);
+  f.session.dispose();
+});
+
+test('云账户取票失败的普通跑局明确提示奖励和任务也不保存', async () => {
+  const f = fixture({ cloudProgress: true, service: { begin: async () => { throw Error('offline'); } } });
+  await tick(); f.seen.sim.step(); f.seen.callbacks.onEnd(f.seen.sim.summary());
+  assert.match(f.seen.summary.ranking.message, /不计奖励、任务和排行榜/);
+  f.session.dispose();
+});

@@ -1,0 +1,8 @@
+{
+  "tests": 842,
+  "passed": 842,
+  "failed": 0,
+  "allCheckStagesPassed": true,
+  "platform": "cloud Linux / Node v22.23.3",
+  "scope": "combined candidate; WX dry bundle is not target-device acceptance"
+}

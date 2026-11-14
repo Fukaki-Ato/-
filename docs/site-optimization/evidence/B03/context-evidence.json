@@ -1,0 +1,16 @@
+{
+  "version": 2,
+  "withItem": {
+    "themeId": "theme_library",
+    "initialItems": [
+      "item_jetpack"
+    ]
+  },
+  "withoutItem": {
+    "themeId": "theme_library",
+    "initialItems": []
+  },
+  "distanceWithItem": 60.27,
+  "distanceWithoutItem": 24.04,
+  "identicalInputHash": true
+}

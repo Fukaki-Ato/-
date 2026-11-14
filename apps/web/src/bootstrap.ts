@@ -14,6 +14,8 @@ import { createMobileHud } from './mobileHud.js';
 import { createMobileLeaderboard } from './mobileLeaderboard.js';
 import { createLeaderboardClient } from './leaderboardClient.js';
 import { DEBUG_TOOLS_ENABLED, runtimeDebugFlags, runtimeDebugParams } from './debugPolicy.js';
+import './coastalSkins.css';
+import './coastalFrames.css';
 
 const mount = document.getElementById('screen')!;
 const { debug, test: testMode, qa } = runtimeDebugFlags(location.search);

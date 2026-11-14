@@ -11,7 +11,7 @@
   "scripts": {
     "build": "tsc -b",
     "watch": "tsc -b --watch",
-    "test": "node --test tests/*.test.mjs",
+    "test": "npm run build && node tools/test.mjs",
     "validate-config": "node tools/validate-config.mjs",
     "check-imports": "node tools/check-import-rules.mjs",
     "check": "node tools/check.mjs",

@@ -40,6 +40,8 @@ export interface OverlayViewsDeps {
   resultRenderer?: (summary: RunSummary, best: number, actions: ResultActions) => () => void;
   hudRenderer?: () => HudHandle;
   leaderboardRenderer?: (service: LeaderboardService, actions: { onBack(): void }) => () => void;
+  welfareRenderer?: (mode: 'tasks' | 'handbook', actions: { onBack(): void }) => () => void;
+  inventoryRenderer?: (actions: { onBack(): void; onShop?(): void }) => () => void;
   selectRenderer?: (
     content: GameContent,
     actions: CharacterSelectPageActions,
@@ -111,7 +113,8 @@ export function createOverlayViews(deps: OverlayViewsDeps): OverlayViews {
         actions,
         currentCharId,
         extras: { coins: extras?.coins ?? 0, diamonds: extras?.diamonds ?? 0, badges: deps.badges },
-        slots: { onShop: actions.onShop, onSettings: actions.onSettings, onRank: actions.onLeaderboard },
+        slots: { onShop: actions.onShop, onSettings: actions.onSettings, onRank: actions.onLeaderboard,
+          onTasks: actions.onTasks, onHandbook: actions.onHandbook, onChest: actions.onInventory },
       });
       stopBackdrop();
       let frame: ((t: number) => void) | undefined;
@@ -166,6 +169,22 @@ export function createOverlayViews(deps: OverlayViewsDeps): OverlayViews {
         clearTransient(); stopBackdrop();
         host.mount(host.makeView(), { transparent: true });
         disposePanelRenderer = deps.leaderboardRenderer!(service, actions);
+      },
+    } : {}),
+
+    ...(deps.welfareRenderer ? {
+      renderWelfare(mode: 'tasks' | 'handbook', actions: { onBack(): void }): void {
+        clearTransient(); stopBackdrop();
+        host.mount(host.makeView(), { transparent: true });
+        disposePanelRenderer = deps.welfareRenderer!(mode, actions);
+      },
+    } : {}),
+
+    ...(deps.inventoryRenderer ? {
+      renderInventory(actions: { onBack(): void; onShop?(): void }): void {
+        clearTransient(); stopBackdrop();
+        host.mount(host.makeView(), { transparent: true });
+        disposePanelRenderer = deps.inventoryRenderer!(actions);
       },
     } : {}),
 

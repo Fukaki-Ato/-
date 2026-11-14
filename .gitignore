@@ -1,6 +1,7 @@
 # Build output
 dist/
 /apps/*/build/
+/apps/wx/cloud-dist/
 *.tsbuildinfo
 /out/
 

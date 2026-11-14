@@ -1,0 +1,9 @@
+{
+  "name": "thunder-api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "commonjs",
+  "main": "index.js",
+  "engines": { "node": ">=20.19.0" },
+  "dependencies": { "wx-server-sdk": "4.0.2" }
+}

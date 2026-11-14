@@ -47,6 +47,8 @@ Each app owns its host integration.
 
 ### GLB display scale and effect heights
 
+The quality gate does not run the Web production build or validate browser/WebGL/WX runtime behavior. See [development.md](development.md) and [wx-runtime-findings.md](wx-runtime-findings.md) for target checks.
+
 - Asset units and rendered height are distinct: measure the GLB, then apply `characters.json → model.scale`. Do not assume the legacy scale fits a newly delivered model or normalize intentionally short characters globally.
 - If the GLB and procedural fallback have different native dimensions, configure `model.fallbackScale` independently; omitting it preserves the existing `model.scale` fallback. Cover loading, failure, and no-GLB platforms, not just successful hot-swap.
 - Before measuring animated/skinned meshes with `Box3.setFromObject(..., true)`, call `group.updateMatrixWorld(true)` for the complete hierarchy, as the renderer does. Per-node box updates can otherwise read stale child-bone transforms after changing the root scale.

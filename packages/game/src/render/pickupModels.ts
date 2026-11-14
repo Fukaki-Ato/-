@@ -1,16 +1,16 @@
 /**
  * 道具 3D 模型加载器（items.json 的 model.prefab/spin → GLB，照 animAvatar 的角色 GLB 模式）。
- * 为什么需要：item_magnet 等 10 个道具早已在 config 里预留了 model.prefab，但仓库里只有
- * 磁铁一个文件，且渲染层从未消费过这两个字段——道具视觉一直是 entityLayers 的贴图箱。
+ * 首发掉落池6种已有实际GLB；另有已配置但未入掉落表的倍率器。货币/未接消耗品不在本层生成。
  *
  * 铁律（与角色 GLB 同款）：任何一步失败（无 adapter/extras、拉取失败、解析失败、文件不存在）
- * 都返回 null，调用方保持贴图箱现状——8 个预留路径里 7 个没有文件，绝不能集体报错或空白。
- * 加载是异步的：未就绪前同样返回 null（箱先显示，模型就绪后自然换上，不阻塞开局）。
+ * 都返回 null，调用方保留带标志的箱子，不报错或空白。
+ * 加载是异步的：未就绪前返回 null，模型就绪后自然换上，不阻塞开局。
  */
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import type { GameContent } from '@tr/game/core/config/configTypes.js';
 import type { PlatformAdapter } from '@tr/framework/platform/platformAdapter.js';
+import { disposeModel, type ModelLoaderFactory } from './modelLoader.js';
 
 export interface PickupModelLoader {
   /** 该道具是否配了 model.prefab（配了但文件缺失也返回 true——加载仍会失败回落） */
@@ -19,6 +19,7 @@ export interface PickupModelLoader {
   model(itemRef: string): THREE.Object3D | null;
   /** items.json model.spin：渲染层据此绕 Y 自转 */
   spins(itemRef: string): boolean;
+  dispose(): void;
 }
 
 /** 夜间可见性补偿强度：资产纯色无 emissive，而贴图箱是自发光地标；给同色弱发光保持可比性 */
@@ -29,7 +30,7 @@ export const PICKUP_MODEL_NEAR = -35, PICKUP_MODEL_FAR = -40;
 /** 模型自转角速度（rad/s，绕 Y）：消费 items.json 的 model.spin；asset 已面朝玩家，不转也成立 */
 const PICKUP_SPIN_RAD_S = 0.9;
 
-export function createPickupModelLoader(content: GameContent, adapter?: PlatformAdapter): PickupModelLoader {
+export function createPickupModelLoader(content: GameContent, adapter?: PlatformAdapter, createModelLoader?: ModelLoaderFactory): PickupModelLoader {
   const specs = new Map<string, { prefab: string; spin: boolean }>();
   for (const it of content.items?.items ?? []) {
     const m = it['model'] as { prefab?: unknown; spin?: unknown } | undefined;
@@ -40,12 +41,13 @@ export function createPickupModelLoader(content: GameContent, adapter?: Platform
   /** itemRef → 场景（null=已确认不可用：没读入口/拉取失败/解析失败） */
   const loaded = new Map<string, THREE.Object3D | null>();
   const loading = new Set<string>();
-  const loader = new GLTFLoader();
+  let disposed = false;
+  const loader = createModelLoader?.() ?? new GLTFLoader();
   const read = adapter?.extras?.readBinary;
 
   function startLoad(itemRef: string): void {
     const spec = specs.get(itemRef);
-    if (!spec || loading.has(itemRef) || loaded.has(itemRef)) return;
+    if (disposed || !spec || loading.has(itemRef) || loaded.has(itemRef)) return;
     if (!read) { loaded.set(itemRef, null); return; } // 宿主没注入 readBinary（wx）→ 直接判定不可用
     loading.add(itemRef);
     read(spec.prefab)
@@ -55,6 +57,7 @@ export function createPickupModelLoader(content: GameContent, adapter?: Platform
       }))
       .then(scene => {
         loading.delete(itemRef);
+        if (disposed) { if (scene) disposeModel(scene); return; }
         if (!scene) { loaded.set(itemRef, null); return; }
         // 一次性补弱 emissive（材质被所有 clone 共享，只改一次）
         scene.traverse(o => {
@@ -78,6 +81,11 @@ export function createPickupModelLoader(content: GameContent, adapter?: Platform
       return loaded.get(itemRef) ?? null;
     },
     spins: itemRef => specs.get(itemRef)?.spin === true,
+    dispose() {
+      disposed = true;
+      for (const scene of loaded.values()) if (scene) disposeModel(scene);
+      loaded.clear();
+    },
   };
 }
 
@@ -89,6 +97,8 @@ export interface PickupModelSlots {
   show(itemRef: string, worldZ: number, x: number, y: number, z: number, t: number): boolean;
   /** 帧末隐藏未占用的槽（清 item 记忆，下次换道具不串味） */
   hideRest(): void;
+  /** clone共享加载器资源；只卸下槽位，不重复释放共享几何/材质。 */
+  dispose(): void;
 }
 
 export function createPickupModelSlots(scene: THREE.Scene, max: number, models: PickupModelLoader): PickupModelSlots {
@@ -98,13 +108,13 @@ export function createPickupModelSlots(scene: THREE.Scene, max: number, models: 
     g.visible = false; scene.add(g); slots.push({ g, item: null });
   }
   /** worldZ → 当前是否已换模型（只存 near 状态的键，天然有界） */
-  const shown = new Set<number>();
+  let shown = new Set<number>(), thisFrame = new Set<number>();
   let used = 0;
   return {
     show(itemRef, worldZ, x, y, z, t) {
       const was = shown.has(worldZ);
       const inWindow = was ? z >= PICKUP_MODEL_FAR : z > PICKUP_MODEL_NEAR;
-      if (inWindow) shown.add(worldZ); else shown.delete(worldZ);
+      if (inWindow) thisFrame.add(worldZ);
       const src = inWindow ? models.model(itemRef) : null;
       if (!src || used >= slots.length) return false;
       const slot = slots[used++];
@@ -116,7 +126,12 @@ export function createPickupModelSlots(scene: THREE.Scene, max: number, models: 
     },
     hideRest() {
       for (; used < slots.length; used++) { slots[used].g.visible = false; slots[used].item = null; }
+      const previous = shown; shown = thisFrame; thisFrame = previous; thisFrame.clear();
       used = 0;
+    },
+    dispose() {
+      for (const slot of slots) { slot.g.clear(); scene.remove(slot.g); }
+      shown.clear(); thisFrame.clear();
     },
   };
 }

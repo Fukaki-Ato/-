@@ -1,0 +1,7 @@
+B04 scoped review receipts, 2026-11-11
+
+Reasoner ses_e34cc11b6ffe6JvsopXXR5YsbS (read-only, complex routing): recommended a build-time self-contained ABI-1 replay package and full content/effective qualification policy persisted once per ruleset. A bare config snapshot cannot preserve simulation code. Existing unbound tickets may adopt only a verified pre-binding baseline, without claiming reconstruction of unknown original history. Existing 24h TTL remains.
+
+Reviewer ses_e34997729ffeWaeivO8KEGhRb1 (read-only): no concrete important defect reported in binding, legacy migration, async transaction idempotence, issued budgets, code-hash trust outside SQLite, HTTP field whitelist, 503 queue retention, or build/check wiring. Dedicated Git inspection was scoped to the main worktree, so no precise target diff was claimed; tests/build were not independently rerun. Primary checked the actual target Git scope and completed the functional checks.
+
+Primary correction after checks: 852 tests passed but architecture rejected a 318-line service. Replay wire validation and legacy stored-item parsing were moved, unchanged, to run-payload.mjs. Final service length is 296 lines and the entire final check passes.

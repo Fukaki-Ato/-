@@ -40,7 +40,7 @@ const realAdapter = { extras: { readBinary: async (p) => {
 const garbageAdapter = { extras: { readBinary: async () => new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8]).buffer } };
 const flush = () => new Promise(r => setTimeout(r, 60));
 
-test('加载器：磁铁 GLB 加载成功（尺寸/原点/双网格/自转口径）', async () => {
+test('加载器：原创海滨磁铁GLB加载成功（尺寸/原点/合批/自转口径）', async () => {
   const loader = createPickupModelLoader(content, realAdapter);
   assert.equal(loader.hasPrefab('item_magnet'), true);
   assert.equal(loader.spins('item_magnet'), true, 'items.json model.spin=true 应被消费');
@@ -55,7 +55,7 @@ test('加载器：磁铁 GLB 加载成功（尺寸/原点/双网格/自转口径
   assert.ok(box.getCenter(new THREE.Vector3()).length() < 0.01, '几何中心应在原点（与道具箱同锚点）');
   let meshes = 0;
   m.traverse(o => { if (o.isMesh) meshes++; });
-  assert.equal(meshes, 2, ' magnet_red + magnet_blue 两个 primitive');
+  assert.equal(meshes, 4, '原创红蓝极、触点与槽四种材质合批');
   // 夜间可见性补偿：源资产无 emissive，加载后补了同色弱发光
   m.traverse(o => {
     if (!o.isMesh) return;
@@ -69,10 +69,12 @@ test('加载器：磁铁 GLB 加载成功（尺寸/原点/双网格/自转口径
 test('加载器回退铁律：预留路径文件缺失/垃圾字节/无适配器/未配置道具全部返回 null', async () => {
   const ok = createPickupModelLoader(content, realAdapter);
   await flush();
-  for (const id of ['item_shield', 'item_jetpack', 'item_coin', 'item_key', 'item_boots', 'item_helmet', 'item_board', 'item_multiplier']) {
+  for (const id of ['item_coin', 'item_key', 'item_xp_card']) {
     assert.equal(ok.hasPrefab(id), true, `${id} 配了 prefab（预留路径）`);
     assert.equal(ok.model(id), null, `${id} 文件不存在 → null（保持贴图箱）`);
   }
+  await flush();
+  for (const id of ['item_coin', 'item_key', 'item_xp_card']) assert.equal(ok.model(id), null, '实际缺失，非仅首帧异步未就绪');
   assert.equal(ok.hasPrefab('item_nope'), false, '未配置道具');
   assert.equal(ok.model('item_nope'), null);
 

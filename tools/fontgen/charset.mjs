@@ -37,6 +37,8 @@ export function scanTargets(root) {
   // 2026-10-10 回归：角色名入 main 后 charset/图集未重建，选角页字形缺失。此后新增文案
   //（含 apps/web 覆盖层）都要按 README 重建：npm run charset && npm run gen:cjk。
   walkTs(join(root, 'apps', 'web', 'src'));
+  // WX 的自绘页面与启动/结算文案同样需要字形覆盖。
+  walkTs(join(root, 'apps', 'wx', 'src'));
   const cfgDir = join(root, 'config');
   for (const name of readdirSync(cfgDir).sort()) {
     if (name.endsWith('.json')) files.push(join(cfgDir, name));
