@@ -69,7 +69,7 @@ export class RunnerSim {
   private bonusScore = 0;
   private itemPickups = 0;
   /** 任务遥测不改变历史 summary / golden 回放结构。 */
-  get missionStats() { return { slides: this.mv.totalSlides, itemPickups: this.itemPickups }; }
+  get missionStats() { return { slides: this.mv.totalSlides, jumps: this.mv.totalJumps, itemPickups: this.itemPickups }; }
   /** Actual pickups (before currency multipliers). */
   collectedCoins = 0;
   readonly firstCoinRecord = new FirstCoinRecord();

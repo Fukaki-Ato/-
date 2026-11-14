@@ -14,6 +14,9 @@ export class ReplayTimeoutError extends Error {
 export async function replayRun(content, run, frames, actions, timeoutMs = Number.POSITIVE_INFINITY, items = []) {
   const startedAt = performance.now();
   const sim = new RunnerSim(content, run.seed, run.char_id || undefined, false, items);
+  // 分道具拾取统计：SimEvent {type:'pickup', itemRef} 是唯一带 id 的来源；drainEvents 每帧清空，
+  // 必须在回放循环内打点（死亡收口时事件早已排空，事后读不到）。
+  const itemPickupsById = {};
   let cursor = 0;
   let completedFrames = 0;
   for (let frame = 0; frame < frames; frame++) {
@@ -22,7 +25,9 @@ export async function replayRun(content, run, frames, actions, timeoutMs = Numbe
       cursor++;
     }
     sim.step();
-    sim.drainEvents();
+    for (const event of sim.drainEvents()) {
+      if (event.type === 'pickup') itemPickupsById[event.itemRef] = (itemPickupsById[event.itemRef] ?? 0) + 1;
+    }
     completedFrames++;
     if (!sim.state.alive) break;
     if (completedFrames % 600 === 0) {
@@ -34,6 +39,6 @@ export async function replayRun(content, run, frames, actions, timeoutMs = Numbe
     frames: completedFrames,
     summary: sim.summary(),
     elapsedSeconds: sim.state.t,
-    missionStats: sim.missionStats ?? { slides: 0, itemPickups: 0 },
+    missionStats: { slides: 0, itemPickups: 0, ...sim.missionStats, itemPickupsById },
   };
 }

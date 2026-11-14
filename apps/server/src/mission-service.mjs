@@ -97,11 +97,12 @@ function updatePeriodProgress(store, userId, period, periodId, metrics, characte
 }
 
 export class MissionService {
-  constructor({ store, content, now = Date.now, limits = {}, minRunSeconds }) {
+  constructor({ store, content, now = Date.now, limits = {}, minRunSeconds, achievements = null }) {
     this.store = store;
     this.content = content;
     this.now = now;
     this.limits = { ...DEFAULT_LIMITS, ...limits };
+    this.achievements = achievements;
     this.activeReplays = 0;
     const config = content.economy?.params?.missions;
     validateMissionConfig(config);
@@ -233,9 +234,11 @@ export class MissionService {
     const metrics = {
       distanceM: replay.summary.distance, coins: replay.summary.coins,
       slides: validCount(replay.missionStats?.slides) ? replay.missionStats.slides : 0,
+      jumps: validCount(replay.missionStats?.jumps) ? replay.missionStats.jumps : 0,
       runs: 1, skillCasts: replay.summary.casts, nearMiss: replay.summary.nearMiss,
       cleanRuns: replay.summary.hits === 0 ? 1 : 0, score: replay.summary.score,
       itemPickups: validCount(replay.missionStats?.itemPickups) ? replay.missionStats.itemPickups : 0,
+      itemPickupsById: replay.missionStats?.itemPickupsById ?? {},
     };
     this.store.transaction(() => {
       const latest = this.store.getRun(runId, userId);
@@ -252,6 +255,8 @@ export class MissionService {
           const playedCount = replay.summary.charId ? this.store.addWeeklyCharacter(userId, current.weekly.periodId, replay.summary.charId) : 0;
           updatePeriodProgress(this.store, userId, 'weekly', current.weekly.periodId, metrics, playedCount);
         }
+        // 成就终身进度与任务进度同一事务结算：validRun 门槛（死亡收尾+最短局）与任务同口径
+        this.achievements?.applyRunMetrics(userId, metrics);
       }
       if (this.store.markRunFinished(runId, finishedAt, payloadHash, validRun) !== 1) throw new ApiError(409, '跑酷记录已被处理');
     });

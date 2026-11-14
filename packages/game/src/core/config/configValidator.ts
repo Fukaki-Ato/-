@@ -3,7 +3,8 @@
  * 对应文档：docs/03 §8（校验规则）。是 schema/config.schema.json 的「运行时轻量版」，
  * 只做结构与引用检查，不做全量 JSON Schema（那是 CI 里 ajv 的职责，M2 接入）。
  */
-import type { ConfigFile, GameContent, NamedEntry, ObstaclesFile, ParamsFile } from './configTypes.js';
+import type { AchievementEntry, ConfigFile, GameContent, NamedEntry, ObstaclesFile, ParamsFile } from './configTypes.js';
+import { validateAchievementEntry, validateAchievementRefs } from './achievementsValidator.js';
 import { isPrimitiveSupported } from '../effects/buffEngine.js';
 
 /** 各文件条目 id 的合法前缀（docs/03 §1.1）；数组表示允许多种 */
@@ -13,6 +14,7 @@ const ID_PREFIX: Record<string, string[]> = {
   items: ['item_'],
   themes: ['theme_'],
   events: ['event_'],
+  achievements: ['ach_'],
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -62,13 +64,17 @@ export function validateFile(name: string, data: unknown): string[] {
     return errors;
   }
 
-  // characters/skills/items/themes/events：标准 items 数组
+  // characters/skills/items/themes/events/achievements：标准 items 数组
   if (!Array.isArray(file.items)) { errors.push(`${name}: 缺少 items 数组`); return errors; }
   collectIds(file.items, ID_PREFIX[name] ?? [], errors, name);
   for (const entry of file.items) {
     if (!Array.isArray(entry.versions) || (entry.versions as unknown[]).length === 0) {
       errors.push(`${name}.${entry.id}: 缺少 versions 记录（docs/03 §1.4）`);
     }
+  }
+  // achievements：在标准检查之上追加成就专属规则（stat 白名单/source 兼容/tier/group/reward）
+  if (name === 'achievements') {
+    for (const entry of file.items) errors.push(...validateAchievementEntry(entry as AchievementEntry));
   }
   return errors;
 }
@@ -142,6 +148,8 @@ export function validateRefs(content: GameContent): string[] {
       if (!ok) errors.push(`${loot.id}: 奖池引用不存在 -> ${e.ref}`);
     }
   }
+  // 成就（achievements.json）：itemOf 的道具引用与 shard 奖励引用；无此文件的旧调用方按空集豁免
+  errors.push(...validateAchievementRefs(content.achievements?.items ?? [], items, shards));
   // 商店 offers（审查 T-2）：商业化数据此前只查「params 是对象」，give/price/limit/活动引用
   // 全部无校验——typo 会让付费商品静默不出现或定价错乱直接进包
   const events = idsOf(content.events);

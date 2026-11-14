@@ -14,6 +14,7 @@ import { createMissionIntegration } from './missionIntegration.js';
 import { openProfileOverlay } from './profileOverlay.js';
 import { createEventsOverlay } from './eventsOverlay.js';
 import { createMobileSettings, createMobileResult } from './mobilePanels.js';
+import { createMobileAchievements } from './mobileAchievements.js';
 import { createMobileHud } from './mobileHud.js';
 import { createMobileLeaderboard } from './mobileLeaderboard.js';
 import { createLeaderboardClient } from './leaderboardClient.js';
@@ -51,6 +52,7 @@ async function main(): Promise<void> {
     eventsRenderer: (content, actions) => createEventsOverlay(content, actions, shell.fonts),
     lobbyRenderer: missions.lobbyRenderer,
     settingsRenderer: createMobileSettings,
+    achievementsRenderer: createMobileAchievements,
     resultRenderer: createMobileResult,
     hudRenderer: createMobileHud,
     leaderboardRenderer: createMobileLeaderboard,
@@ -66,7 +68,9 @@ async function main(): Promise<void> {
     configResolve,
     debug,
     test: testMode,
+    qa, // QA 口径位：?anim/?ui=demo 等纯演示局与任务门同源地关掉 run 局成就统计
     trackRun: missions.trackRun,
+    achievementsApi: missions.achievementsApi,
     leaderboard: qa ? undefined : createLeaderboardClient(import.meta.env.BASE_URL),
   });
 

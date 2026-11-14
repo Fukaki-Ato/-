@@ -16,6 +16,8 @@ export interface RunSessionDeps {
   service?: LeaderboardService; debug?: boolean; test?: boolean; themeId?: string;
   createScene?: typeof createRunnerScene;
   trackRun?: (sim: RunnerSim, seed: number) => () => void;
+  /** 成就观察器（mainFlow 注入）：sim 创建即装（分道具拾取打点），死亡/退出共用的 dispose 收口结算 */
+  trackAchievements?: (sim: RunnerSim) => () => void;
   onSeed(seed: number): void; onEnd(summary: RunSummary): void;
   onDeath(): void; onCast(): void; onPickup(): void;
   onIntro?(stage: 'start' | 'end'): void;
@@ -37,6 +39,7 @@ export function createRunSession(d: RunSessionDeps): { dispose(): void } {
   let hud: ReturnType<GameViews['mountHud']> | null = null;
   let activeTicket: RankedTicket | undefined, completed = false;
   let finishTracking: (() => void) | undefined;
+  let finishAchievements: (() => void) | undefined;
   const release = (ticket?: RankedTicket): void => {
     if (ticket && d.service?.cancel) void d.service.cancel(ticket.runId).catch(() => {});
   };
@@ -49,7 +52,9 @@ export function createRunSession(d: RunSessionDeps): { dispose(): void } {
     d.onSeed(seed);
     const items = ticket ? [] : d.consumeItems?.() ?? [];
     const sim = new RunnerSim(d.content, seed, d.charId, !!ticket, items);
+    // trackRun 本就对每局（含排位局）无条件安装；成就观察器同点安装，排位/休闲两口径一致
     finishTracking = d.trackRun?.(sim, seed);
+    finishAchievements = d.trackAchievements?.(sim);
     const host = { canvas: d.adapter.canvas.mainCanvas(), size: d.adapter.canvas.windowSize() };
     hud = d.views.mountHud();
     hud.update({ score: 0, coins: 0, distance: 0, hits: 0, lives: sim.lives, buffs: [], skill: null });
@@ -91,6 +96,7 @@ export function createRunSession(d: RunSessionDeps): { dispose(): void } {
   return { dispose() {
     cancelled = true;
     finishTracking?.(); finishTracking = undefined;
+    finishAchievements?.(); finishAchievements = undefined; // 死亡与退出共用 funnel：成就按局收口在此
     if (!completed) release(activeTicket);
     scene?.dispose(); hud?.dispose();
     if (d.test) uninstallTestApi();
