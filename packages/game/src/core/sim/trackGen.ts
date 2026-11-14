@@ -12,7 +12,6 @@ import { layTideCoins, type TideAwareCfg } from './tide.js';
 import { spawnRings, type CrossingEntity } from './crossings.js';
 import { parseZoneCfg, skipCell, spawnZones, zoneAt, type Zone, type ZoneCfg } from './zones.js';
 export type { CrossingEntity };
-
 export interface ObstacleEntity {
   obsRef: string;
   cls: 'low' | 'high' | 'full' | 'moving' | 'hazard' | 'vehicle' | 'step';
@@ -191,6 +190,7 @@ export class TrackGen {
         const refs = Object.keys(this.dropWeights);
         for (let k = 0; k < n && refs.length; k++) {
           const z = segStart + this.pickupEdgeM + k * (this.pickupMinGapM + slot) + this.rng.range(0, slot);
+          if (zoneAt(this.zones, z)) continue; // 地面箱尚无倒挂拾取/显示，不在反重力区投放不可达奖励。
           const freeLanes = [-1, 0, 1].filter(l => !obstacles.some(o => o.lane === l && Math.abs(z - o.worldZ) < o.d / 2 + 1.2));
           if (!freeLanes.length) continue;
           pickups.push({ itemRef: this.rng.weighted(refs, r => this.dropWeights[r] ?? 0), lane: this.rng.pick(freeLanes), worldZ: z });

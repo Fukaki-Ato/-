@@ -101,7 +101,9 @@ test('判定面前移：金币被收集时圆心仍在身体前表面之外（�
 });
 
 test('道具箱段规则：每 200m 段 1~3 箱（约 50/30/20），间隔 ≥30m、不与障碍重叠', () => {
-  const gen = new TrackGen(content, new RunRng(hashSeed('pk2')));
+  const ordinary = structuredClone(content);
+  delete ordinary.obstacles.antigrav; // 普通赛道分布；图书馆倒挂区的地面箱排除由专用回归覆盖。
+  const gen = new TrackGen(ordinary, new RunRng(hashSeed('pk2')));
   const obstacles = [], coins = [], pickups = [];
   for (let d = 0; d <= 20200; d += 200) gen.ensure(d, 400, obstacles, coins, pickups);
   assert.ok(pickups.length >= 60, `样本不足: ${pickups.length}`);

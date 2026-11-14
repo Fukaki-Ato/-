@@ -52,7 +52,7 @@ export function createCreatures(scene: THREE.Scene) {
   // ---- 云渊鲸（剪影 + 微光）----
   const SEG = 12;
   const whale = new THREE.InstancedMesh(new THREE.SphereGeometry(1, 8, 6),
-    new THREE.MeshLambertMaterial({ color: P.abyss }), SEG + 3);
+    new THREE.MeshLambertMaterial({ color: P.abyss }), SEG);
   scene.add(whale);
   const fins = new THREE.InstancedMesh(new THREE.ConeGeometry(0.5, 2.2, 4), std(P.abyss), 4); // 第 4 枚：头部短角
   scene.add(fins);

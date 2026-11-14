@@ -47,4 +47,4 @@ export function createSceneMachine<S extends string>(scenes: Record<S, SceneDef>
  * ↔ events（活动/签到）↔ settings（设置页，首项＝切换跑酷场景）→ run → result → select。
  * start（微信/游客入口）保留但 boot 后不再可达。
  */
-export type SceneName = 'boot' | 'start' | 'select' | 'characterSelect' | 'shop' | 'events' | 'settings' | 'leaderboard' | 'run' | 'result';
+export type SceneName = 'boot' | 'start' | 'select' | 'characterSelect' | 'shop' | 'inventory' | 'events' | 'settings' | 'leaderboard' | 'tasks' | 'handbook' | 'run' | 'result';

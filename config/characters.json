@@ -1,8 +1,8 @@
 {
   "$schema": "../schema/config.schema.json#/characters",
-  "configVersion": "1.2.5",
+  "configVersion": "1.2.6",
   "minEngineVersion": "1.0.0",
-  "updatedAt": "2026-11-11",
+  "updatedAt": "2026-11-13",
   "items": [
     {
       "id": "char_volt", "status": "live",
@@ -24,7 +24,7 @@
           { "level": 10, "coin": 10000, "shards": "shard_volt:120" }
         ],
         "effectPerLevel": { "target": "skillRef", "paramScalePerLevel": 0.05 } },
-      "model": { "prefab": "assets/characters/bball.glb", "scale": 1.0, "lod": [2, 6, 12] },
+      "model": { "prefab": "assets/characters/coastal/bball.glb", "scale": 1.0, "lod": [2, 6, 12] },
       "audio": { "voDir": "assets/audio/vo/volt/", "footstep": "step_sneaker" },
       "tint": "#FFD84D",
       "clearance": 1.70,
@@ -42,7 +42,7 @@
       "skins": ["skin_ama_default"],
       "skillRef": "skill_magnet_pulse", "talentRef": "talent_ama_duration",
       "growth": { "maxLevel": 10, "costPerLevel": [], "effectPerLevel": { "target": "skillRef", "paramScalePerLevel": 0.05 } },
-      "model": { "prefab": "assets/characters/ama.glb", "scale": 1.02, "lod": [2, 6, 12] },
+      "model": { "prefab": "assets/characters/coastal/ama.glb", "scale": 1.02, "lod": [2, 6, 12] },
       "audio": { "voDir": "assets/audio/vo/ama/", "footstep": "step_boot" },
       "tint": "#43D9A3",
       "versions": [ { "ver": "1.0.0", "date": "2026-09-22", "change": "首发" } ]
@@ -55,7 +55,7 @@
       "skins": ["skin_kaze_default"],
       "skillRef": "skill_blink_smash", "talentRef": "talent_kaze_slide",
       "growth": { "maxLevel": 10, "costPerLevel": [], "effectPerLevel": { "target": "skillRef", "paramScalePerLevel": 0.05 } },
-      "model": { "prefab": "assets/characters/kaze.glb", "scale": 0.98, "lod": [2, 6, 12] },
+      "model": { "prefab": "assets/characters/coastal/kaze.glb", "scale": 0.98, "lod": [2, 6, 12] },
       "audio": { "voDir": "assets/audio/vo/kaze/", "footstep": "step_skate" },
       "tint": "#7FD1FF",
       "versions": [ { "ver": "1.0.0", "date": "2026-09-22", "change": "首发" } ]
@@ -68,7 +68,7 @@
       "skins": ["skin_rina_default"],
       "skillRef": "skill_thunder_wings", "talentRef": "talent_rina_shield",
       "growth": { "maxLevel": 10, "costPerLevel": [], "effectPerLevel": { "target": "skillRef", "paramScalePerLevel": 0.05 } },
-      "model": { "prefab": "assets/characters/rina.glb", "scale": 1.0, "lod": [2, 6, 12] },
+      "model": { "prefab": "assets/characters/coastal/rina.glb", "scale": 1.0, "lod": [2, 6, 12] },
       "audio": { "voDir": "assets/audio/vo/rina/", "footstep": "step_boot" },
       "tint": "#FF5FA2",
       "versions": [ { "ver": "1.0.0", "date": "2026-09-22", "change": "首发" } ]
@@ -81,7 +81,7 @@
       "skins": ["skin_bolt_default", "skin_bolt_storm"],
       "skillRef": "skill_chrono_leap", "talentRef": "talent_chrono_slow",
       "growth": { "maxLevel": 10, "costPerLevel": [], "effectPerLevel": { "target": "skillRef", "paramScalePerLevel": 0.05 } },
-      "model": { "prefab": "assets/characters/bolt.glb", "scale": 1.05, "lod": [2, 6, 12] },
+      "model": { "prefab": "assets/characters/coastal/bolt.glb", "scale": 1.05, "lod": [2, 6, 12] },
       "audio": { "voDir": "assets/audio/vo/bolt/", "footstep": "step_boot" },
       "tint": "#B48CFF",
       "versions": [
@@ -97,7 +97,7 @@
       "skins": ["skin_frog_default"],
       "skillRef": "skill_belly_laugh", "talentRef": "talent_frog_bounce",
       "growth": { "maxLevel": 10, "costPerLevel": [], "effectPerLevel": { "target": "skillRef", "paramScalePerLevel": 0.05 } },
-      "model": { "prefab": "assets/characters/frog.glb", "scale": 1.0, "lod": [2, 6, 12] },
+      "model": { "prefab": "assets/characters/coastal/frog.glb", "scale": 1.0, "lod": [2, 6, 12] },
       "intro": { "video": "assets/video/frog_intro.mp4", "durationS": 2.38, "widthM": 3.0, "heightM": 1.7, "distanceM": 4.0 },
       "audio": { "voDir": "assets/audio/vo/frog/", "footstep": "step_sneaker" },
       "tint": "#B6F24E",
@@ -115,7 +115,7 @@
       "skins": ["skin_mambo_default"],
       "skillRef": "skill_mambo_power", "talentRef": "talent_mambo_height",
       "growth": { "maxLevel": 10, "costPerLevel": [], "effectPerLevel": { "target": "skillRef", "paramScalePerLevel": 0.05 } },
-      "model": { "prefab": "assets/characters/pony.glb", "scale": 1.0, "lod": [2, 6, 12] },
+      "model": { "prefab": "assets/characters/coastal/pony.glb", "scale": 1.0, "lod": [2, 6, 12] },
       "audio": { "voDir": "assets/audio/vo/mambo/", "footstep": "step_sneaker" },
       "tint": "#9A93C8",
       "clearance": 1.19,
@@ -132,7 +132,7 @@
       "skins": ["skin_niu_default"],
       "skillRef": "skill_mama_save", "talentRef": "talent_niu_rush",
       "growth": { "maxLevel": 10, "costPerLevel": [], "effectPerLevel": { "target": "skillRef", "paramScalePerLevel": 0.05 } },
-      "model": { "prefab": "assets/characters/niu.glb", "scale": 1.34, "fallbackScale": 1.0, "lod": [2, 6, 12] },
+      "model": { "prefab": "assets/characters/coastal/niu.glb", "scale": 1.34, "fallbackScale": 1.0, "lod": [2, 6, 12] },
       "audio": { "voDir": "assets/audio/vo/niu/", "footstep": "step_boot" },
       "tint": "#E45C5C",
       "versions": [
@@ -149,7 +149,7 @@
       "skins": ["skin_whale_default"],
       "skillRef": "skill_thunder_dash", "talentRef": "talent_volt_coin",
       "growth": { "maxLevel": 10, "costPerLevel": [], "effectPerLevel": { "target": "skillRef", "paramScalePerLevel": 0.05 } },
-      "model": { "prefab": "assets/characters/whale.glb", "scale": 1.0, "lod": [2, 6, 12] },
+      "model": { "prefab": "assets/characters/coastal/whale.glb", "scale": 1.0, "lod": [2, 6, 12] },
       "audio": { "voDir": "assets/audio/vo/whale/", "footstep": "step_sneaker" },
       "tint": "#4A6FD6",
       "clearance": 1.52,
@@ -172,7 +172,7 @@
     { "id": "skin_volt_default", "kind": "skin", "status": "live", "baseRef": "char_volt",
       "name": { "zh-CN": "默认涂装" }, "rarity": "R",
       "materialOverrides": { "bodyTint": "#FFD84D", "emissive": "#FFE9A8" },
-      "model": { "prefab": "assets/characters/bball.glb" },
+      "model": { "prefab": "assets/characters/coastal/bball.glb" },
       "unlock": { "type": "free" }, "statMods": [],
       "versions": [ { "ver": "1.0.0", "date": "2026-09-22", "change": "首发" }, { "ver": "1.0.1", "date": "2026-10-12", "change": "默认涂装改用 bball.glb 与原篮球小子建模配色，皮肤 id 保持不变" } ]
     },
@@ -184,15 +184,15 @@
       "unlock": { "type": "loot", "lootRef": "loot_thunder_box" }, "statMods": [],
       "versions": [ { "ver": "1.0.0", "date": "2026-09-22", "change": "首发" } ]
     },
-    { "id": "skin_ama_default", "kind": "skin", "status": "live", "baseRef": "char_ama", "name": { "zh-CN": "默认涂装" }, "rarity": "SR", "materialOverrides": { "bodyTint": "#E8F6EE", "emissive": "#43D9A3" }, "model": { "prefab": "assets/characters/ama.glb" }, "unlock": { "type": "free" }, "statMods": [], "versions": [ { "ver": "1.0.0", "date": "2026-09-22", "change": "首发" } ] },
-    { "id": "skin_kaze_default", "kind": "skin", "status": "live", "baseRef": "char_kaze", "name": { "zh-CN": "默认涂装" }, "rarity": "SR", "materialOverrides": { "bodyTint": "#EAF4FF", "emissive": "#7FD1FF" }, "model": { "prefab": "assets/characters/kaze.glb" }, "unlock": { "type": "free" }, "statMods": [], "versions": [ { "ver": "1.0.0", "date": "2026-09-22", "change": "首发" } ] },
-    { "id": "skin_rina_default", "kind": "skin", "status": "live", "baseRef": "char_rina", "name": { "zh-CN": "默认涂装" }, "rarity": "SSR", "materialOverrides": { "bodyTint": "#FBE7F1", "emissive": "#FF5FA2" }, "model": { "prefab": "assets/characters/rina.glb" }, "unlock": { "type": "free" }, "statMods": [], "versions": [ { "ver": "1.0.0", "date": "2026-09-22", "change": "首发" } ] },
-    { "id": "skin_bolt_default", "kind": "skin", "status": "live", "baseRef": "char_bolt", "name": { "zh-CN": "默认涂装" }, "rarity": "SSR", "materialOverrides": { "bodyTint": "#E8E6F8", "emissive": "#B48CFF" }, "model": { "prefab": "assets/characters/bolt.glb" }, "unlock": { "type": "free" }, "statMods": [], "versions": [ { "ver": "1.0.0", "date": "2026-09-22", "change": "首发" }, { "ver": "1.1.0", "date": "2026-10-04", "change": "随角色改名，皮肤名由「警长制服」改为「默认涂装」" } ] },
+    { "id": "skin_ama_default", "kind": "skin", "status": "live", "baseRef": "char_ama", "name": { "zh-CN": "默认涂装" }, "rarity": "SR", "materialOverrides": { "bodyTint": "#E8F6EE", "emissive": "#43D9A3" }, "model": { "prefab": "assets/characters/coastal/ama.glb" }, "unlock": { "type": "free" }, "statMods": [], "versions": [ { "ver": "1.0.0", "date": "2026-09-22", "change": "首发" } ] },
+    { "id": "skin_kaze_default", "kind": "skin", "status": "live", "baseRef": "char_kaze", "name": { "zh-CN": "默认涂装" }, "rarity": "SR", "materialOverrides": { "bodyTint": "#EAF4FF", "emissive": "#7FD1FF" }, "model": { "prefab": "assets/characters/coastal/kaze.glb" }, "unlock": { "type": "free" }, "statMods": [], "versions": [ { "ver": "1.0.0", "date": "2026-09-22", "change": "首发" } ] },
+    { "id": "skin_rina_default", "kind": "skin", "status": "live", "baseRef": "char_rina", "name": { "zh-CN": "默认涂装" }, "rarity": "SSR", "materialOverrides": { "bodyTint": "#FBE7F1", "emissive": "#FF5FA2" }, "model": { "prefab": "assets/characters/coastal/rina.glb" }, "unlock": { "type": "free" }, "statMods": [], "versions": [ { "ver": "1.0.0", "date": "2026-09-22", "change": "首发" } ] },
+    { "id": "skin_bolt_default", "kind": "skin", "status": "live", "baseRef": "char_bolt", "name": { "zh-CN": "默认涂装" }, "rarity": "SSR", "materialOverrides": { "bodyTint": "#E8E6F8", "emissive": "#B48CFF" }, "model": { "prefab": "assets/characters/coastal/bolt.glb" }, "unlock": { "type": "free" }, "statMods": [], "versions": [ { "ver": "1.0.0", "date": "2026-09-22", "change": "首发" }, { "ver": "1.1.0", "date": "2026-10-04", "change": "随角色改名，皮肤名由「警长制服」改为「默认涂装」" } ] },
     { "id": "skin_bolt_storm", "kind": "skin", "status": "draft", "baseRef": "char_bolt", "name": { "zh-CN": "风暴行者" }, "rarity": "SSR", "materialOverrides": { "bodyTint": "#2A3350", "emissive": "#7FD1FF", "trailVfx": "vfx_trail_thunder" }, "model": { "prefab": "assets/skins/bolt_storm.glb" }, "unlock": { "type": "key", "cost": 12 }, "statMods": [], "versions": [ { "ver": "1.0.0", "date": "2026-09-22", "change": "围城活动商店（上线前 draft）" }, { "ver": "1.1.0", "date": "2026-10-04", "change": "随角色改名，皮肤名由「风暴警长」改为「风暴行者」" } ] },
-    { "id": "skin_frog_default", "kind": "skin", "status": "live", "baseRef": "char_frog", "name": { "zh-CN": "默认涂装" }, "rarity": "SR", "materialOverrides": { "bodyTint": "#F4FBE8", "emissive": "#B6F24E" }, "model": { "prefab": "assets/characters/frog.glb" }, "unlock": { "type": "free" }, "statMods": [], "versions": [ { "ver": "1.1.0", "date": "2026-10-04", "change": "新增" }, { "ver": "1.2.0", "date": "2026-10-10", "change": "默认涂装改用 frog.glb 骨骼模型" } ] },
-    { "id": "skin_mambo_default", "kind": "skin", "status": "live", "baseRef": "char_mambo", "name": { "zh-CN": "默认涂装" }, "rarity": "SR", "materialOverrides": { "bodyTint": "#9A93C8", "emissive": "#D8CDF0" }, "model": { "prefab": "assets/characters/pony.glb" }, "unlock": { "type": "free" }, "statMods": [], "versions": [ { "ver": "1.1.0", "date": "2026-10-04", "change": "新增" }, { "ver": "1.1.1", "date": "2026-10-11", "change": "默认涂装改用 pony.glb 骨骼模型与建模侧配色" } ] },
-    { "id": "skin_niu_default", "kind": "skin", "status": "live", "baseRef": "char_niu", "name": { "zh-CN": "默认涂装" }, "rarity": "SSR", "materialOverrides": { "bodyTint": "#FBE9E7", "emissive": "#E45C5C" }, "model": { "prefab": "assets/characters/niu.glb" }, "unlock": { "type": "free" }, "statMods": [], "versions": [ { "ver": "1.1.0", "date": "2026-10-04", "change": "新增" } ] },
-    { "id": "skin_whale_default", "kind": "skin", "status": "live", "baseRef": "char_whale", "name": { "zh-CN": "默认涂装" }, "rarity": "SR", "materialOverrides": { "bodyTint": "#FCF7FB", "emissive": "#7FD1FF" }, "model": { "prefab": "assets/characters/whale.glb" }, "unlock": { "type": "free" }, "statMods": [], "versions": [ { "ver": "1.0.0", "date": "2026-10-10", "change": "首发" } ] },
+    { "id": "skin_frog_default", "kind": "skin", "status": "live", "baseRef": "char_frog", "name": { "zh-CN": "默认涂装" }, "rarity": "SR", "materialOverrides": { "bodyTint": "#F4FBE8", "emissive": "#B6F24E" }, "model": { "prefab": "assets/characters/coastal/frog.glb" }, "unlock": { "type": "free" }, "statMods": [], "versions": [ { "ver": "1.1.0", "date": "2026-10-04", "change": "新增" }, { "ver": "1.2.0", "date": "2026-10-10", "change": "默认涂装改用 frog.glb 骨骼模型" } ] },
+    { "id": "skin_mambo_default", "kind": "skin", "status": "live", "baseRef": "char_mambo", "name": { "zh-CN": "默认涂装" }, "rarity": "SR", "materialOverrides": { "bodyTint": "#9A93C8", "emissive": "#D8CDF0" }, "model": { "prefab": "assets/characters/coastal/pony.glb" }, "unlock": { "type": "free" }, "statMods": [], "versions": [ { "ver": "1.1.0", "date": "2026-10-04", "change": "新增" }, { "ver": "1.1.1", "date": "2026-10-11", "change": "默认涂装改用 pony.glb 骨骼模型与建模侧配色" } ] },
+    { "id": "skin_niu_default", "kind": "skin", "status": "live", "baseRef": "char_niu", "name": { "zh-CN": "默认涂装" }, "rarity": "SSR", "materialOverrides": { "bodyTint": "#FBE9E7", "emissive": "#E45C5C" }, "model": { "prefab": "assets/characters/coastal/niu.glb" }, "unlock": { "type": "free" }, "statMods": [], "versions": [ { "ver": "1.1.0", "date": "2026-10-04", "change": "新增" } ] },
+    { "id": "skin_whale_default", "kind": "skin", "status": "live", "baseRef": "char_whale", "name": { "zh-CN": "默认涂装" }, "rarity": "SR", "materialOverrides": { "bodyTint": "#FCF7FB", "emissive": "#7FD1FF" }, "model": { "prefab": "assets/characters/coastal/whale.glb" }, "unlock": { "type": "free" }, "statMods": [], "versions": [ { "ver": "1.0.0", "date": "2026-10-10", "change": "首发" } ] },
     { "id": "skin_penguin_default", "kind": "skin", "status": "live", "baseRef": "char_penguin", "name": { "zh-CN": "默认涂装" }, "rarity": "SR", "materialOverrides": { "bodyTint": "#F19041", "emissive": "#FFE0B8" }, "model": { "prefab": "assets/characters/penguin.glb" }, "unlock": { "type": "free" }, "statMods": [], "versions": [ { "ver": "1.0.0", "date": "2026-10-13", "change": "首发" } ] }
   ]
 }

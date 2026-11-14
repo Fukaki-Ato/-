@@ -28,6 +28,10 @@ test('9 个角色都能装配出完整装备（主动技能 + 被动天赋）', 
   for (const c of chars) {
     const l = buildLoadout(content, c.id);
     assert.equal(l.charId, c.id);
+    const skin = content.characters.items.find(item => item.id === l.skinId);
+    assert.equal(skin.baseRef, c.id);
+    assert.equal(skin.model.prefab, c.model.prefab, `${c.id} 默认皮肤与角色应使用同一海滨模型`);
+    assert.ok(existsSync(join(root, l.prefab)), `${c.id} 的真实 GLB 必须存在`);
     assert.ok(l.name && l.name !== c.id, `${c.id} 应有中文显示名`);
     assert.match(l.tint, /^#[0-9A-Fa-f]{6}$/, `${c.id} 应有 tint 配色`);
     assert.ok(l.skill, `${c.id} 应装配主动技能`);
@@ -45,11 +49,11 @@ test('9 个角色都能装配出完整装备（主动技能 + 被动天赋）', 
   }
 });
 
-test('奶龙角色已移除，奶蛙承接 frog.glb 骨骼模型', () => {
+test('奶龙角色已移除，奶蛙接入 coastal/frog.glb 骨骼模型', () => {
   assert.equal(playableCharacters(content).some(c => c.id === 'char_nailong'), false, '奶龙不再进入跑者名单');
   assert.equal(content.characters.items.some(c => c.id === 'skin_nailong_default'), false, '奶龙默认皮肤已清理');
   const frog = buildLoadout(content, 'char_frog');
-  assert.equal(frog.prefab, 'assets/characters/frog.glb');
+  assert.equal(frog.prefab, 'assets/characters/coastal/frog.glb');
   assert.equal(frog.modelScale, 1.0);
   assert.ok(existsSync(join(root, frog.prefab)), '奶蛙模型资源必须存在');
   assert.equal(frog.skill.id, 'skill_belly_laugh', '奶蛙技能保持不变');
@@ -60,7 +64,7 @@ test('马耳女仆已删除，建模数据并入曼波且音效/技能不变', (
   assert.equal(playableCharacters(content).some(c => c.id === 'char_pony'), false, '马耳女仆不再进入跑者名单');
   assert.equal(content.characters.items.some(c => c.id === 'skin_pony_default'), false, '马耳女仆默认皮肤已清理');
   const mambo = buildLoadout(content, 'char_mambo');
-  assert.equal(mambo.prefab, 'assets/characters/pony.glb', '曼波改用原马耳女仆模型');
+  assert.equal(mambo.prefab, 'assets/characters/coastal/pony.glb', '曼波接入海滨改造模型');
   assert.equal(mambo.modelScale, 1.0, '按 1.0 不缩放，VFX 锚点与资产契约一致');
   assert.equal(mambo.clearance, 1.19, '曼波沿用 pony 净空 1.19：站立可钻滑铲门');
   assert.equal(mambo.tint, '#9A93C8');
@@ -81,7 +85,7 @@ test('篮球小子已删除，牢大承接建模且身份、玩法和三种音�
   assert.equal(content.characters.items.some(c => c.id === 'char_bball' || c.id === 'skin_bball_default'), false);
   const volt = buildLoadout(content, 'char_volt');
   assert.equal(volt.name, '牢大');
-  assert.equal(volt.prefab, 'assets/characters/bball.glb');
+  assert.equal(volt.prefab, 'assets/characters/coastal/bball.glb');
   assert.ok(existsSync(join(root, volt.prefab)), '承接的 GLB 必须存在');
   assert.equal(volt.modelScale, 1.0);
   assert.equal(volt.clearance, 1.70);
@@ -366,11 +370,11 @@ test('渲染装配同样来自配置：体色/发光色/体量读皮肤 material
   assert.equal(buildLoadout(content, 'char_bolt').modelScale, 1.05, '时空行者应比牢大高 5%');
 
   // prefab 直通：GLB 路径进 Loadout（render/animAvatar 据此切 glb 驱动；文件不存在则回退程序化）
-  assert.equal(buildLoadout(content, 'char_frog').prefab, 'assets/characters/frog.glb');
-  assert.equal(volt.prefab, 'assets/characters/bball.glb');
-  assert.equal(buildLoadout(content, 'char_whale').prefab, 'assets/characters/whale.glb');
+  assert.equal(buildLoadout(content, 'char_frog').prefab, 'assets/characters/coastal/frog.glb');
+  assert.equal(volt.prefab, 'assets/characters/coastal/bball.glb');
+  assert.equal(buildLoadout(content, 'char_whale').prefab, 'assets/characters/coastal/whale.glb');
   assert.equal(buildLoadout(content, 'char_whale').modelScale, 1.0, '鲸鱼女仆 Q 版 1.52m，按 1.0 试玩不定档');
-  assert.equal(buildLoadout(content, 'char_mambo').prefab, 'assets/characters/pony.glb');
+  assert.equal(buildLoadout(content, 'char_mambo').prefab, 'assets/characters/coastal/pony.glb');
   assert.equal(buildLoadout(content, 'char_mambo').modelScale, 1.0, '曼波沿用 pony 建模的 1.0 缩放（改 scale 会同时改变 VFX 锚点高度）');
   assert.equal(buildLoadout(content, 'char_mambo').clearance, 1.19, '曼波净空 1.19 < 横杆下沿 1.2：站立可钻滑铲门');
   assert.equal(buildLoadout(content, 'char_whale').clearance, 1.52, '鲸鱼女仆净空 1.52：站立仍必须滑铲');

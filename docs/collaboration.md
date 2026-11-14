@@ -1,111 +1,39 @@
-# Collaboration Interfaces
+# 内容与修复接口
 
-Role-specific work interfaces. Process rules live in [CONTRIBUTING.md](../CONTRIBUTING.md);
-architecture boundaries live in [architecture.md](architecture.md).
+人员、分支、评审规则只维护在 [CONTRIBUTING.md](../CONTRIBUTING.md)；架构边界见 [architecture.md](architecture.md)。
+`.github/CODEOWNERS` 声明评审所有者；远程分支保护是否启用需在 GitHub 核实，文件本身不保证已启用。
 
-| GitHub | Role | Primary surface | Branch |
-| --- | --- | --- | --- |
-| `@Fukaki-Ato` | Review and merge manager | Reviews every PR into `main` | — |
-| `@kljfg` | Game content author | `config/**`, effect primitives, content tests | `content/<topic>` |
-| `@mostny` | Bug fixer | `packages/game/**` fixes, tests | `fix/<topic>` |
+## 用户推送约定
 
-`main` is protected: no direct pushes, and every PR needs the code-owner review declared in
-`.github/CODEOWNERS`.
+2026-11-11：后续更新中，用户明确说“推送”即授权将当次更新提交（如需）并推送到远程仓库 `origin`，无需再次确认同一推送意图；分支与 PR 仍按 [CONTRIBUTING.md](../CONTRIBUTING.md) 执行。
 
-## Content author interface (`@kljfg`)
+当前待推送批次（2026-11-11）：协作者 PR #55/#56 及集成修正位于本地 `feature/integrate-collaborators-20261111`，集成基线 `7d179fa`，独立工作树 `/tmp/opencode/thunder-run-integrate-collaborators-20261111`；详细记录见该树的 `docs/collaborator-integration-2026-11-11.md`。803 项测试及 Web 构建通过，尚未推送；末次远程复核遇到 TLS/EOF，推送前需 fetch 核对新增提交。原目录的微信/美术在制改动不属于此批次。
 
-### Contracts
+本轮界面更新：同一待推送分支已推进至 `38ae32c`，第 1 项「档案入口从角色页移至设置」已完成；记录见该树的 `docs/pending-ui-updates-2026-11-11.md`。805 项测试、Web 构建及 320/390px 手机页面交互核对通过；尚未推送，正式部署见下条记录。
 
-- `config/` holds the eight content files: `game`, `characters`, `skills`, `items`,
-  `obstacles`, `themes`, `events`, and `economy`. Every file is a versioned envelope
-  (`configVersion`, `minEngineVersion`, `updatedAt`) and declares `$schema`.
-- `packages/game/src/core/config/configTypes.ts` documents the envelopes and special shapes,
-  for example the `defs` / `patterns` / `difficultyCurve` / `dropTable` layout of
-  `obstacles.json`.
-- `schema/config.schema.json` is the editor/envelope contract and the authoritative list of
-  effect primitives.
-- `packages/game/src/core/config/configValidator.ts` owns the runtime rules: ids, cross-file
-  references, and value ranges. `tools/validate-config.mjs` runs the same code for local
-  checks and CI.
-- `packages/game/src/core/effects/primitives.ts` (`PRIMITIVES`) must stay exactly in sync
-  with the schema `primitive` enum. `effectTypes.ts` defines `FxState` (the derived view) and
-  `EffectWorld` (the capabilities instant primitives call into); `buffEngine.ts` owns the
-  slot lifecycle (`add` / `tick` / `recompute`).
-- Audio content (music / one-shot cues) is registered in `game.json → params.audio` with files
-  under `assets/audio/`; playback is already wired through
-  `packages/game/src/core/audio/audioDirector.ts`. See [audio.md](audio.md).
-- Some source comments reference the upstream design spec `docs/03`; that document is not
-  part of this repository. The in-repo authorities are the schema, the validator, and the
-  existing entries in `config/`.
+正式发布记录（2026-11-11）：按用户本次「直接发布正式站」指令，Web、排行榜和任务后端已直接部署本地 `38ae32c`；165 个服务文件、正式接口与手机档案入口复核通过，原榜单/钱包数据保留。备份在 `/opt/thunder-run-web-backups/38ae32c-20261111/`，详细回执在 `/tmp/opencode/thunder-run-publish-38ae32c-20261111/RELEASE.md`。远程仓库尚未推送，独立测试站未更新。
 
-### Adding or changing content
+最新更新（2026-11-11）：第 2 项「先将全部角色解锁」已完成，当前十个角色统一免费开放，保留解锁机制以后再加门槛。待推送分支及正式站均推进至 `38d5116`；808 项检查、手机十角色选角与实际跑局、正式十角色票据检查通过。数据备份在 `/opt/thunder-run-web-backups/open-roster-38d5116-20261111/`，回执在 `/tmp/opencode/thunder-run-open-roster-20261111/RELEASE.md`；尚未推送远程。
 
-1. Add the entry to its owning file. Catalogs use an `items` array with a stable `id`, i18n
-   `name` / `desc`, `status` (`draft` | `live` | `retired`), and a `versions` history entry.
-   Referenced ids (skills, talents, skins, …) must exist in their own file.
-2. Keep gameplay values in `config/`; simulation code reads configuration and never embeds
-   balance numbers.
-3. Validate quickly with `node tools/validate-config.mjs`, then run `npm run check`.
-4. If the change moves player-visible simulation results, review the golden diff before
-   regenerating it with `node tools/replay/golden-gen.mjs --update` (see
-   [replay.md](replay.md)).
-5. Open the PR from `content/<topic>` with one concern per PR, the player-visible behavior
-   described, and a note on configuration or golden changes (use the repository template).
+## 内容改动
 
-### Adding an effect primitive
+2026-11-13 本地整合：`integration/collaborators-local-20261113-gRBgr7` 已继承上述协作者/优化成果并合入原目录 WX、美术、云函数在制快照。审核修正、验证与历史分支处置见 [整合记录](collaborator-local-integration-2026-11-13.md)。本地 `main` 和原目录工作状态保留；远程最新提交因 TLS/EOF 待复核，候选尚未推送或发布。
 
-All three parts land in the same PR (see CONTRIBUTING rules):
+- `config/` 有 `game`、`characters`、`skills`、`items`、`obstacles`、`themes`、`events`、`economy` 八份配置，带版本 envelope 和 `$schema`。
+- 类型：`packages/game/src/core/config/configTypes.ts`；编辑器/envelope 与 primitive 枚举：`schema/config.schema.json`；运行时 ID、引用、范围规则：`configValidator.ts`。
+- Catalog 使用稳定 `id`、i18n `name/desc`、`status` 与 `versions`；`game` 等特殊结构按类型和现有条目维护，不能把所有文件都当 `items` 列表。
+- 新 primitive 同时修改 `core/effects/primitives.ts`、schema 枚举和 `tests/effects.test.mjs`。按 timed/instant/cyclic 补齐 `FxState`、`EffectWorld` 或 `buffEngine` 生命周期。
+- 音频已接入 `core/audio/audioDirector.ts`，内容在 `game.json → params.audio` 和 `assets/audio`，见 [audio.md](audio.md)。
+- 修改自绘 UI 中文（包括 `apps/web/src` 的文字）需核对字体；生成器要单独安装依赖并提供字体，见 [字体说明](../assets/fonts/README.md)。不同源字体不保证只有新增 glyph 的 diff。
 
-1. Engine (`primitives.ts`): register the primitive in `PRIMITIVES` as `timed`, `instant` or
-   `cyclic`. A `timed` primitive needs a merge rule in `buffEngine.ts` `recompute()` and a
-   field in `FxState` when it exposes new derived state; an `instant` primitive needs a branch
-   in `castInstant()` that uses `EffectWorld` capabilities implemented by the simulation; a
-   `cyclic` primitive (`periodic`) re-applies its `effects` child list every `everyS` seconds.
-   Timed state may expire by seconds (`durationS`) and/or by metres travelled (`distanceM`).
-2. Schema: add the name to the `primitive` enum in `schema/config.schema.json`.
-3. Tests: extend `tests/effects.test.mjs` and cover the configuration entries that use it.
+先 `npm run build && npm run validate-config`，再 `npm run check`。模拟结果有意改变时，核对 [golden 回放](replay.md) 的差异后才更新。
+源码提到的旧设计文档 `docs/03` 不在本仓；以现有类型、schema、validator 和配置为准。
 
-### Adding display text (names, taglines, skill descriptions)
+## Bug 修复
 
-The CJK font atlas is a subset, not a full font: `assets/fonts/cjk.png` only carries the
-glyphs that existed in the scanned sources when it was generated. A character whose glyph is
-missing occupies width but draws nothing, so new wording silently renders as blanks.
+1. 从模拟 `core/sim`、渲染 `render`、流程 `flow`、页面 `ui` 或 app 平台层定位；先读调用方和对应测试。
+2. 优先使用确定性复现：Web `?debug` 在开局后可取 `__trSeed()`；按 [replay.md](replay.md) 构造输入文件，然后用回放工具复跑。
+3. 加回归测试，修复后跑 `npm run check`。测试只编译/跑 Node；浏览器/WebGL 或 WX 运行时问题还需实际目标环境验证。
+4. PR 写明复现、预期/实际、覆盖范围；框架公共 API 改动单独说明兼容影响。
 
-After changing any rendered Chinese string in `config/**` or `packages/game/src/**`, rebuild
-the atlas before testing: `node tools/fontgen/charset.mjs` then `node tools/fontgen/gen.mjs
---preset cjk` (needs the system font in `C:/Windows/Fonts`). Both outputs are deterministic,
-so the diff should contain only the added glyphs.
-
-## Bug fixer interface (`@mostny`)
-
-### Where fixes go
-
-- Simulation and rules: `packages/game/src/core/**` (for example `core/sim/`,
-  `core/effects/`, `core/config/`, `core/scene/`).
-- Rendering: `packages/game/src/render/**`. Flow and pages: `packages/game/src/flow/**`,
-  `packages/game/src/ui/**`.
-- Host integration: the matching app under `apps/`. Keep platform-specific code inside the
-  app packages.
-- Out of bounds: `window` / `document` / `localStorage` / `fetch` / `wx` inside
-  `packages/**`, importing app code from `packages/**`, source files over 300 lines, and
-  unrelated `packages/framework/**` public-API changes (coordinate with `@Fukaki-Ato`).
-
-### Reproduce first
-
-1. Prefer a deterministic replay. Open the Web build with `?debug` to capture the seed
-   (`__trSeed()` in `apps/web/src/bootstrap.ts`), record inputs in the v1 replay format, and
-   reproduce with `node tools/replay/runner.mjs <replay.json>`. See [replay.md](replay.md)
-   and `tools/replay/examples/example-v1.json`.
-2. Add a failing test under `tests/` (`node:test`). Common homes: `runnerSim.test.mjs`,
-   `mainFlow.test.mjs`, `replay.test.mjs`, `golden.test.mjs`, plus the area-specific files.
-3. Fix, then run `npm run check`.
-4. If deterministic results legitimately change, inspect the golden diff and regenerate the
-   fixtures with `node tools/replay/golden-gen.mjs --update` in the same PR.
-5. Open the PR from `fix/<topic>` with reproduction steps, the seed or replay file, and
-   expected versus actual behavior.
-
-## Verification
-
-`npm run check` runs five steps: TypeScript build, unit tests, configuration validation,
-architecture/import rules, and a disposable WX bundle. Run it before every PR; documentation-
-only changes do not require it.
+共享包不调用宿主 API；源码不超过 300 行；不夹带无关框架改动。环境与命令见 [development.md](development.md)。

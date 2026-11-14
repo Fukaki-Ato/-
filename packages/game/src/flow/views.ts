@@ -54,6 +54,8 @@ export interface SelectActions {
   onTasks?(): void;
   /** 打开限时活动页（大厅「活动」入口）；缺省＝该入口只有按压反馈 */
   onEvents?(): void;
+  onHandbook?(): void;
+  onInventory?(): void;
   /** 打开设置页（右上「设置」徽标）；缺省＝该入口只有按压反馈 */
   onSettings?(): void;
   onLeaderboard?(): void;
@@ -154,6 +156,8 @@ export interface GameViews {
     volumePrefs?: VolumeSettings,
   ): void;
   renderLeaderboard?(service: LeaderboardService, actions: { onBack(): void }): void;
+  renderWelfare?(mode: 'tasks' | 'handbook', actions: { onBack(): void }): void;
+  renderInventory?(actions: { onBack(): void; onShop?(): void }): void;
   mountHud(): HudHandle;
   renderResult(summary: RunSummary, best: number, actions: ResultActions): void;
   toast(msg: string): void;

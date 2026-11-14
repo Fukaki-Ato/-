@@ -25,6 +25,42 @@ const step = (avatar, s, fx = noFx) => {
   avatar.group.position.set(s.x, s.y, 0); avatar.update(dt, s, fx);
 };
 
+function skinnedMeshes(root) {
+  const meshes = [];
+  root.traverse(node => { if (node.isSkinnedMesh) meshes.push(node); });
+  return meshes;
+}
+
+function hasCoastalRig(root) {
+  let authored = false;
+  root.traverse(node => { if (node.userData.thunderMotionVersion === 2) authored = true; });
+  return authored && skinnedMeshes(root).some(mesh =>
+    ['Hips', 'Spine', 'Chest', 'Head'].every(name => mesh.skeleton.bones.some(bone => bone.isBone && bone.name === name)));
+}
+
+/** 合批后 Body 不再是独立节点：只测由躯干骨主导的实际蒙皮顶点，排除脚/手的最低点。 */
+function torsoMinY(root) {
+  const point = new THREE.Vector3();
+  let min = Infinity, count = 0;
+  for (const mesh of skinnedMeshes(root)) {
+    const { position, skinIndex, skinWeight } = mesh.geometry.attributes;
+    const torsoBones = new Set(mesh.skeleton.bones.flatMap((bone, i) =>
+      ['Hips', 'Spine', 'Chest'].includes(bone.name) ? [i] : []));
+    for (let i = 0; i < position.count; i++) {
+      let weight = 0;
+      for (let component = 0; component < 4; component++) {
+        if (torsoBones.has(skinIndex.getComponent(i, component))) weight += skinWeight.getComponent(i, component);
+      }
+      if (weight <= 0.6) continue;
+      point.fromBufferAttribute(position, i);
+      mesh.applyBoneTransform(i, point);
+      min = Math.min(min, mesh.localToWorld(point).y); count++;
+    }
+  }
+  assert.ok(count > 0, '真实蒙皮中必须存在躯干骨权重 > 0.6 的顶点');
+  return min;
+}
+
 test('阿牛按真实配置显示约 1.74m，与牢大接近，不再是 1.40m；碰撞与玩法音效不变', async () => {
   assert.equal(look.modelScale, 1.34);
   assert.equal(look.fallbackModelScale, 1.0);
@@ -85,8 +121,7 @@ test('放大后的真实局内 Run 仍喷落脚尘土；Slide/Death 不因放大
       for (let i = 0; i < Math.round(duration / dt); i++) {
         step(a, s);
         a.group.updateMatrixWorld(true);
-        const obj = clip === 'Death' ? a.group.getObjectByName('Body') : a.group;
-        min = Math.min(min, new THREE.Box3().setFromObject(obj, true).min.y);
+        min = Math.min(min, clip === 'Death' ? torsoMinY(a.group) : new THREE.Box3().setFromObject(a.group, true).min.y);
       }
       assert.ok(min > minAllowed, `${clip} 实际最低点 ${min} 不应深于 ${minAllowed}m`);
     } finally { a.dispose(); }
@@ -97,8 +132,8 @@ test('avatarRig 真实装配：头盔/火焰/护盾跟随放大后的 Head/Chest
   const scene = new THREE.Scene();
   const rig = createAvatar(scene, 2.2, look, adapter);
   try {
-    for (let i = 0; i < 100 && !rig.group.getObjectByName('NostrilL'); i++) await new Promise(setImmediate);
-    assert.ok(rig.group.getObjectByName('NostrilL'), '必须从程序化占位热替换到 niu.glb');
+    for (let i = 0; i < 100 && !hasCoastalRig(rig.group); i++) await new Promise(setImmediate);
+    assert.ok(hasCoastalRig(rig.group), '必须从无蒙皮的程序化占位热替换到 v2 海滨 GLB 骨架');
     const s = initialRunnerState(); s.y = s.supportY = 2.4;
     rig.update(s, { ...noFx, helmetT: 1, shieldLayers: 1 }, dt);
     const chest = rig.group.getObjectByName('Chest'), head = rig.group.getObjectByName('Head');
@@ -125,7 +160,7 @@ test('阿牛加载前、加载失败和无 GLB 平台：占位保持 1.0 缩放�
       await new Promise(setImmediate);
       assert.equal(rig.group.scale.y, 1);
       near(rig.chestY, 0.89, '占位胸口高度不使用 GLB 放大倍率');
-      assert.equal(rig.group.getObjectByName('NostrilL'), undefined);
+      assert.equal(skinnedMeshes(rig.group).length, 0, '程序化占位没有蒙皮网格');
     } finally { rig.dispose(); }
   }
   let resolve;
@@ -133,9 +168,10 @@ test('阿牛加载前、加载失败和无 GLB 平台：占位保持 1.0 缩放�
   const scene = new THREE.Scene(), rig = createAvatar(scene, 2.2, look, slow);
   try {
     assert.equal(rig.group.scale.y, 1, '加载期间先显示正常体量的占位');
+    assert.equal(skinnedMeshes(rig.group).length, 0, '加载期间仍是无蒙皮占位');
     resolve(await adapter.extras.readBinary(look.prefab));
-    for (let i = 0; i < 100 && !rig.group.getObjectByName('NostrilL'); i++) await new Promise(setImmediate);
-    assert.ok(rig.group.getObjectByName('NostrilL'));
+    for (let i = 0; i < 100 && !hasCoastalRig(rig.group); i++) await new Promise(setImmediate);
+    assert.ok(hasCoastalRig(rig.group));
     assert.equal(rig.group.scale.y, 1.34, 'GLB 就绪后才用自己的放大倍率');
   } finally { rig.dispose(); }
   const legacy = buildLoadout(content, 'char_bolt');

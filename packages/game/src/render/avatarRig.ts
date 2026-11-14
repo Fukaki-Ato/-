@@ -17,6 +17,7 @@ import type { PlatformAdapter } from '@tr/framework/platform/platformAdapter.js'
 import { createRunnerModel } from './runnerModel.js';
 import { createAnimAvatar, type AnimAvatar } from './animAvatar.js';
 import { createFootDust } from './footDust.js';
+import type { ModelLoaderFactory } from './modelLoader.js';
 
 /** 无敌期身体往霓虹色打闪的强度与频率（docs/05 §5 角色放电的最小版本） */
 const FLASH_ON = 1.15, FLASH_OFF = 0.1, FLASH_HZ = 30;
@@ -50,7 +51,7 @@ const VFX_ANCHOR = {
   shieldOrb: { bone: 'Chest', offset: new THREE.Vector3(0, 0.05, 0) },
 } as const;
 
-export function createAvatar(scene: THREE.Scene, laneWidth: number, look: Loadout, adapter?: PlatformAdapter) {
+export function createAvatar(scene: THREE.Scene, laneWidth: number, look: Loadout, adapter?: PlatformAdapter, createModelLoader?: ModelLoaderFactory) {
   const model = createRunnerModel({ body: look.bodyTint, glow: look.emissive, scale: look.fallbackModelScale ?? look.modelScale });
   const procGroup = model.group;
   scene.add(procGroup);
@@ -92,7 +93,7 @@ export function createAvatar(scene: THREE.Scene, laneWidth: number, look: Loadou
   let disposed = false; // 迟到装配防护：dispose 之后 GLB 才加载完成时放弃装配（animAvatar isDead）
   const urlParams = adapter?.extras?.urlParams;
   if (look.prefab && adapter) {
-    createAnimAvatar(adapter, look.prefab, look.modelScale, urlParams, () => disposed)
+    createAnimAvatar(adapter, look.prefab, look.modelScale, urlParams, () => disposed, createModelLoader)
       .then(a => {
         if (!a) return;
         if (disposed) { a.dispose(); return; } // 双保险：fetch 期间本局已销毁
@@ -121,7 +122,7 @@ export function createAvatar(scene: THREE.Scene, laneWidth: number, look: Loadou
      *  正是挂点绕脚底原点 roll 的真实 y 投影；flip=1 时乘 cos(0)=1 与旧版逐字节同值 */
     get chestY() { return (glbReady && glb ? glb.chestY : model.chestY) * Math.cos(rollK * Math.PI); },
     /** 局末释放：停 GLB 混流器（几何体由 runnerScene 统一 traverse 销毁） */
-    dispose() { glb?.dispose(); dust.dispose(); },
+    dispose() { disposed = true; glb?.dispose(); dust.dispose(); },
     /** @param dt 帧间隔（秒），驱动 GLB 混流器 */
     update(s: RunnerState, fx: FxState, dt = 1 / 60) {
       const stunned = s.stunT > 0;

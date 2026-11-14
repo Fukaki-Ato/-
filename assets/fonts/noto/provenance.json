@@ -1,0 +1,42 @@
+{
+  "source": "Noto Sans CJK SC Regular",
+  "sourceUrl": "https://raw.githubusercontent.com/notofonts/noto-cjk/main/Sans/OTF/SimplifiedChinese/NotoSansCJKsc-Regular.otf",
+  "sourceSha256": "2c76254f6fc379fddfce0a7e84fb5385bb135d3e399294f6eeb6680d0365b74b",
+  "license": "SIL OFL 1.1",
+  "copyright": "© 2014-2021 Adobe (http://www.adobe.com/).",
+  "sourceModified": false,
+  "originalGeometricMarks": [
+    "ϟ",
+    "⁻",
+    "⚑",
+    "✔",
+    "✦",
+    "❤"
+  ],
+  "rebuild": "node assets/fonts/noto/rebuild.mjs --font <documented-Noto.otf> --out <new-directory>",
+  "outputs": [
+    {
+      "name": "latin",
+      "glyphs": 95,
+      "width": 2030,
+      "height": 113,
+      "bytes": 26923
+    },
+    {
+      "name": "cjk",
+      "glyphs": 1830,
+      "width": 2048,
+      "height": 2404,
+      "bytes": 1077751
+    }
+  ],
+  "note": "Old atlases and Microsoft/Segoe fonts are not inputs. Source font itself is not distributed. Merged coverage retains codepoints from both legacy atlases and the previous WX charset; no legacy outlines or pixels. U+FE0F is zero-width with no ink.",
+  "defaultIgnorables": [
+    {
+      "codepoint": 65039,
+      "char": "️",
+      "advance": 0,
+      "note": "Unicode variation selector-16; empty cell, no font outline or geometric mark"
+    }
+  ]
+}

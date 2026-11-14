@@ -7,13 +7,13 @@
  *        game.js / game.json / project.config.json      —— 主包（引擎+启动场景）
  *        pkg-assets/                                    —— 分包（game.json subpackages 声明）
  *          config/*.json、字体图集、真实音频 assets/audio/**（递归，计入包体门禁）、
- *          非默认角色/皮肤/主题资源占位
+ *          真实角色/道具 GLB 与 manifest.json（实际文件/缺失模型清单）
  *   3. 打印主包/分包体积表并做门禁（tools/check-wx-size.mjs 同一实现）。
  * 用法：
  *   node tools/build-wx.mjs [--minify] [--dry]
  *   --minify 压缩产物；--dry 只 bundle+体积校验（写临时目录后删除，不发布，check.mjs 第 5 步用）。
  * 前置：先 npm run build（tsc -b），否则 workspace 产物缺失。
- * 作为模块 import 时只导出 copyAudioAssets（测试用），不触发构建。
+ * 作为模块 import 时导出音频复制工具（测试用），不触发构建。
  */
 import { build } from 'esbuild';
 import {
@@ -24,6 +24,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { formatSizeTable, measureDist } from './check-wx-size.mjs';
+import { copyWxModelAssets, copyWxUiAssets, copyWxFontAssets, writeWxAssetManifest } from './wx-assets.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 /** 直接 node 执行才构建（realpath 比较，防符号链接路径误判为「被 import」而静默跳过构建） */
@@ -34,9 +35,6 @@ const isMain = (() => {
     return false;
   }
 })();
-
-/** 默认进主包/首屏可用的资源 id；其余进分包占位。 */
-const DEFAULT_CHAR = 'char_volt';
 
 /** 运行时音频扩展名（README 等说明文件不进包）。 */
 export const AUDIO_FILE_RE = /\.(mp3|m4a|aac|ogg|wav)$/i;
@@ -49,7 +47,7 @@ export function patchWxGameJson(outDir, keepIOSHighPerformance) {
   writeFileSync(p, JSON.stringify(json, null, 2) + '\n');
 }
 
-/** 分包内 config/game.json 撞微信保留名读不出（#4）：包内改名 gameplay.json，运行时 main.ts 名映射还原 */
+/** 分包内 config/game.json 读取失败（#4）：包内改名 gameplay.json，运行时 bootstrap.ts 名映射还原 */
 export function renamePkgGameConfig(pkgDir) {
   renameSync(join(pkgDir, 'config', 'game.json'), join(pkgDir, 'config', 'gameplay.json'));
 }
@@ -78,36 +76,6 @@ export function copyAudioAssets(repoRoot, pkgDir) {
     return true;
   });
   return { files, bytes };
-}
-
-/** 分包资源占位（S8 内容管线替换）：非默认角色/皮肤/主题各生成 placeholder.json。 */
-function writeAssetPlaceholders(outDir) {
-  const chars = JSON.parse(readFileSync(join(root, 'config/characters.json'), 'utf8')).items;
-  const themes = JSON.parse(readFileSync(join(root, 'config/themes.json'), 'utf8')).items;
-  const entries = [];
-  for (const c of chars) {
-    const isSkin = c.kind === 'skin';
-    const owner = isSkin ? c.baseRef : c.id;
-    if (owner === DEFAULT_CHAR && (!isSkin || c.id === 'skin_volt_default')) continue; // 默认角色+默认皮肤随主流程程序化模型，无需分包
-    const rel = isSkin ? `characters/${owner}/skins/${c.id}` : `characters/${c.id}`;
-    entries.push({ id: c.id, kind: isSkin ? 'skin' : 'character', status: c.status, path: `pkg-assets/${rel}/placeholder.json` });
-  }
-  const defaultTheme = themes[0] ? themes[0].id : null;
-  for (const t of themes) {
-    if (t.id === defaultTheme) continue;
-    entries.push({ id: t.id, kind: 'theme', status: t.status, path: `pkg-assets/themes/${t.id}/placeholder.json` });
-  }
-  for (const e of entries) {
-    const file = join(outDir, e.path.replace('pkg-assets/', ''));
-    mkdirSync(dirname(file), { recursive: true });
-    writeFileSync(file, JSON.stringify({
-      placeholder: true,
-      note: 'S8 内容管线在此落真实资源（模型/贴图/音频），路径约定见本文件',
-      ...e,
-    }, null, 2));
-  }
-  writeFileSync(join(outDir, 'manifest.json'), JSON.stringify({ generatedBy: 'tools/build-wx.mjs', entries }, null, 2));
-  return entries.length;
 }
 
 if (isMain) await main();
@@ -140,28 +108,30 @@ async function main() {
       metafile: true,
     });
 
-    for (const f of ['game.json', 'project.config.json']) copyFileSync(join(src, f), join(out, f));
+    for (const f of ['game.json', 'project.config.json', 'cloud.config.json']) copyFileSync(join(src, f), join(out, f));
     patchWxGameJson(out, process.env.TR_WX_IOS_HP === '1');
 
-    // 分包 pkg-assets（redesign §3.5：config 随包走 + 字体图集 + 真实音频 + 非默认资源占位）；
+    // 分包 pkg-assets：config + 字体图集 + UI + 真实音频/模型；
     // wx 侧启动链：loadSubpackage → extras.readJson('pkg-assets/config/<name>.json')（apps/wx/src/main.ts）
     const pkg = join(out, 'pkg-assets');
     mkdirSync(pkg, { recursive: true });
     copyDir(join(root, 'config'), join(pkg, 'config'), n => n.endsWith('.json'));
     renamePkgGameConfig(pkg);
-    copyDir(join(root, 'assets/fonts'), join(pkg, 'assets/fonts'), n => /\.(png|metrics\.json)$/.test(n));
-    // 主界面 UI 资源随分包走（徽标两帧/纯背景/分层动效贴图；只收 png——
-    // 微信小游戏没有 <video> 通路，背景动效在 wx 端由这些贴图驱动，视频不进包）
-    copyDir(join(root, 'assets/ui'), join(pkg, 'assets/ui'), n => n.endsWith('.png'));
+    copyWxFontAssets(root, pkg);
+    // 当前WX页面仅使用模型肖像，旧Web菜单资源不再分发；保留已打包Three的完整MIT许可。
+    copyWxUiAssets(root, pkg);
     // 真实音频随分包走（game.json params.audio 的 'assets/audio/...' 由 WX 音频实现映射到此处）
     const audio = copyAudioAssets(root, pkg);
-    const placeholders = writeAssetPlaceholders(pkg);
+    const models = copyWxModelAssets(root, pkg);
     // 开发者工具硬性要求 game.json 声明的每个分包 root 下存在 game.js，否则拒绝打包
     // （报「未找到 ["subpackages"][0]["root"] 对应的 /pkg-assets/game.js」）。分包内容经 wx.loadSubpackage 读取，此入口无执行逻辑。
     writeFileSync(join(pkg, 'game.js'), '/* pkg-assets 分包占位入口：本包只提供资源，无执行逻辑 */\n');
+    writeWxAssetManifest(pkg, models.entries);
 
     const m = measureDist(out);
-    console.log(`apps/wx/dist ${dry ? '（--dry 临时目录校验）' : '就绪'}（minify=${minify}）：分包占位 ${placeholders} 项，音频 ${audio.files} 个 ${(audio.bytes / 1024).toFixed(0)} KB`);
+    console.log(`apps/wx/dist ${dry ? '（--dry 临时目录校验）' : '就绪'}（minify=${minify}）：真实模型 ${models.files} 个 ${(models.bytes / 1024).toFixed(0)} KB，音频 ${audio.files} 个 ${(audio.bytes / 1024).toFixed(0)} KB`);
+    const missing = [...new Set(models.entries.filter(e => e.delivery === 'missing').map(e => e.source))];
+    if (missing.length) console.warn(`尚未交付的模型 ${missing.length} 个（详见 pkg-assets/manifest.json）：\n  ${missing.join('\n  ')}`);
     console.log(formatSizeTable(m));
 
     const firstOutput = Object.values(result.metafile.outputs).find(o => o.entryPoint);

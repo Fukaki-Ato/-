@@ -44,6 +44,7 @@ Replay fixtures make the deterministic simulation reviewable. V1 records a seed,
 ## Commands and golden compatibility
 
 ```bash
+npm run build
 node tools/replay/runner.mjs tools/replay/examples/example-v1.json
 node tools/replay/runner.mjs tools/replay/examples/example-v2.json --json
 node tools/replay/recorder.mjs --seed=777 --theme=theme_library --items=item_helmet --frames=1200

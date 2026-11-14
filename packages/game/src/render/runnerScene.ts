@@ -19,6 +19,8 @@ import { createIntroPanel } from './introPanel.js';
 import { installRunProbe, uninstallRunProbe } from './runDebugProbe.js';
 import { createSpeedLines } from './speedLines.js';
 import { createTrackVisuals } from './trackVisuals.js';
+import { createRendererSurface } from './rendererSurface.js';
+import type { ModelLoaderFactory } from './modelLoader.js';
 import { createBurstPool } from './vfxBurst.js';
 import { applyLightningFlash, createLightningFx, FLASH_LIGHT_GAIN } from './lightning.js';
 import { deriveRunStage, wireRunInput } from './runTheme.js';
@@ -59,11 +61,10 @@ const BURST_Z = -0.62, CLOUD_BURST_COLOR = 0xdfe9f5;
 const ZAP_BURST_COLOR = 0xffe14d;
 /** 雾视距：障碍在约 3 秒外可见（地铁酷跑式远望） */
 const FOG_NEAR = 22, FOG_FAR = 120;
-
 export function createRunnerScene(
   host: { canvas: GLCanvas; size: WindowSize },
   adapter: PlatformAdapter, sim: RunnerSim, content: GameContent, cb: RunCallbacks,
-  opts?: { themeId?: string },
+  opts?: { themeId?: string; renderer?: THREE.WebGLRenderer; createModelLoader?: ModelLoaderFactory },
 ) {
   // 主题派生（runner 参数 / 主题查找 / sky·fog·vfxTint·groundColor·lighting·scenery 推导）拆到 runTheme.ts
   const {
@@ -74,11 +75,11 @@ export function createRunnerScene(
   /** buff 派生视图：引擎原地更新同一个对象，渲染层缓存引用安全（docs/09 T2.2） */
   const fx = sim.fx;
 
-  // ---------- 舞台 ---------- 全仓唯一 three 接线断言点（S10 §7.6 / D3）：GLCanvas 是结构化去 DOM 类型，这里喂回 three 需要的 HTMLCanvasElement 形貌；S11 路线 B 的最小垫片（wx canvas 补 addEventListener/ style）即在此处兼容，如与此冲突收敛于此单点。
-  const renderer = new THREE.WebGLRenderer({ canvas: host.canvas as unknown as HTMLCanvasElement, ...TR_GAME_CANVAS_ATTRIBUTES });
-  const { width, height, dpr } = host.size;
-  renderer.setPixelRatio(dpr);
-  renderer.setSize(width, height, false);
+  // ---------- 舞台 ---------- GLCanvas → three 的唯一接线断言点；WX 复用宿主 renderer。
+  const surface = createRendererSurface(host.size,
+    () => new THREE.WebGLRenderer({ canvas: host.canvas as unknown as HTMLCanvasElement, ...TR_GAME_CANVAS_ATTRIBUTES }), opts?.renderer);
+  const { renderer } = surface;
+  const { width, height } = host.size;
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(sky.baseColor);
   scene.fog = new THREE.Fog(fogColor, FOG_NEAR, FOG_FAR);
@@ -104,12 +105,13 @@ export function createRunnerScene(
     baseColor: sky.baseColor, flashColor: sky.flashColor, tint, groundColor,
     sky: { zenith: sky.baseColor, horizon: fogColor },
   }, scenery, { wetRoad }, { crossings: sim.crossings });
-  const avatar = createAvatar(scene, laneWidth, sim.loadout, adapter);
+  const avatar = createAvatar(scene, laneWidth, sim.loadout, adapter, opts?.createModelLoader);
   const coinField = createCoinField(scene, laneWidth, { envMap: runEnv, scenery });
   // scenery 来源与 createTrackVisuals 同款（themes.json 的 scenery 字段）：stormspire 时障碍层换雷脊废墟皮
   const obstacleLayer = createObstacleLayer(scene, laneWidth, scenery);
-  // 道具 3D 模型（items.json model.prefab/spin）：磁铁有文件→近距换 3D；文件缺失→null 回贴图箱，捞取判定不受影响
-  const pickupLayer = createPickupLayer(scene, laneWidth, createPickupModelLoader(content, adapter));
+  // 模型未就绪/读取失败时回退信标箱，捞取判定不受影响；WX 注入纹理兼容加载器。
+  const pickupModels = createPickupModelLoader(content, adapter, opts?.createModelLoader);
+  const pickupLayer = createPickupLayer(scene, laneWidth, pickupModels);
   const cloudLayer = createCloudLayer(scene);
   const bursts = createBurstPool(scene);
   const speedLines = createSpeedLines(scene, tint);
@@ -124,8 +126,7 @@ export function createRunnerScene(
 
   // ---------- 窗口尺寸变化（v2 新增 D9）：重设绘制缓冲 + 相机宽高比，退订进 dispose ----------
   const offResize = adapter.canvas.onResize(size => {
-    renderer.setPixelRatio(size.dpr);
-    renderer.setSize(size.width, size.height, false);
+    surface.resize(size);
     camera.aspect = size.width / size.height;
     camera.updateProjectionMatrix();
     postfx.resize(size.width, size.height, size.dpr); // composer 与 renderer 同口径（px=dpr×css）
@@ -266,7 +267,7 @@ export function createRunnerScene(
       endTimer += dt;
       if (endTimer > END_DELAY_S) { ended = true; cb.onEnd(sim.summary()); }
     }
-    raf = adapter.requestFrame(tick);
+    if (running) raf = adapter.requestFrame(tick);
   }
   raf = adapter.requestFrame(tick);
 
@@ -275,17 +276,20 @@ export function createRunnerScene(
 
   // 只销毁本局资源：不销毁主画布/GL 上下文（wx 屏幕画布不可重建，S10 D1 跨局复用）。
   function dispose() {
+    if (!running) return;
     running = false;
     adapter.cancelFrame(raf);
     offInput(); offResize(); offVisibility();
     if (cb.debug) uninstallRunProbe(); // ?debug 探针随场景销毁卸载，避免 __trRun 指向已销毁的 sim
     avatar.dispose(); // GLB 混流器停摆（几何体/材质由下面的 traverse 统一销毁）
     intro?.dispose(); // 只弃面板自身；视频元素与贴图归 apps 侧复用
+    pickupLayer.dispose();
+    pickupModels.dispose();
     lightning.dispose();
     track.dispose();
     postfx.dispose(); // composer/逐 pass/双缓冲 target 全量释放（wx 降级态是 no-op）
     if (runEnv) disposeEnvMap(runEnv); eruption?.dispose();
-    renderer.dispose();
+    surface.dispose();
     scene.traverse(o => {
       const m = o as THREE.Mesh;
       if (m.geometry) m.geometry.dispose();

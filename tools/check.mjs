@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 if (!existsSync(join(root, 'node_modules/typescript/bin/tsc'))) {
-  console.error('缺少 node_modules（npm workspaces 依赖）：请先在仓库根执行 npm install');
+  console.error('缺少 node_modules（npm workspaces 依赖）：请先在仓库根执行 npm ci');
   process.exit(1);
 }
 
@@ -21,7 +21,7 @@ const STEPS = [
   // 构建侧源码（vite.config / rankPageGateway）不在任何 tsc -b project 里，单独 noEmit 检查（审查 W-3）：
   // rankPageGateway 是正式站安全链路，腐化必须在这里红而不是线上运行时炸
   ['构建侧类型检查（tsc --noEmit）', ['node_modules/typescript/bin/tsc', '-p', 'apps/web/tsconfig.node.json']],
-  ['运行单元测试', ['--test', 'tests/*.test.mjs']],
+  ['运行单元测试', ['tools/test.mjs']],
   ['配置校验', ['tools/validate-config.mjs']],
   ['架构禁令检查', ['tools/check-import-rules.mjs']],
   ['微信小游戏 bundle 校验（--dry 不发布）', ['tools/build-wx.mjs', '--dry']],

@@ -61,7 +61,6 @@ export function createSdfMaterial(texture: THREE.Texture | null, p: SdfMaterialP
     depthTest: false,
     depthWrite: false,
     side: THREE.DoubleSide,
-    extensions: { derivatives: true },
   });
 }
 

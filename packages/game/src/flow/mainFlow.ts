@@ -1,11 +1,6 @@
 /**
- * 主流程装配（@tr/game）——从 apps/web/src/bootstrap.ts 提取，两端共用（redesign §3.5）。
- * 职责：平台适配（经 adapter 注入）→ 场景状态机 → 加载配置 → 驱动页面流转：
- *       boot（配置加载）→ select（游客主界面）↔ characterSelect（Web 角色页）↔ shop ↔ settings → run → result → select；
- *       start（微信/游客登录页）保留在场景机里但 boot 后不再可达——默认游客进入，
- *       全程不调 adapter.extras.login()、不弹授权（issue：重构主界面并默认游客进入）；
- * 微信登录只调注入的 adapter.extras.login()（wx 侧现为游客占位，服务端鉴权未接），见 session.ts。
- * 铁律：本包零 DOM/wx——挂载点与页面全部经 GameViews 由 apps/* 注入。
+ * 两端共享主流程：boot → 大厅/选角/商店/设置 → run → result。
+ * 默认游客直入；登录页保留但不在 boot 路径上。页面由宿主注入，包内零 DOM/wx。
  */
 import { loadAllConfig } from '@tr/game/core/config/configLoader.js';
 import type { GameContent, NamedEntry } from '@tr/game/core/config/configTypes.js';
@@ -17,24 +12,20 @@ import type { AudioDirector } from '@tr/game/core/audio/audioDirector.js';
 import { hashSeed, mulberry32 } from '@tr/game/core/rng.js';
 import { createRunSession, type RunSessionDeps } from './runSession.js';
 import type { LeaderboardService } from './leaderboard.js';
-import { COINS_KEY, consumeEquipped, shopActions, walletBalance } from './localEconomy.js';
+import { consumeEquipped, shopActions } from './localEconomy.js';
 import { configLocked, isCharacterGated, selectUnlockActions } from './unlock.js';
 import { createEventsScene } from './eventsScene.js';
 import { TelemetryRecorder } from './telemetry.js';
-import { createSettingsScene, currentThemeId, pruneThemeSelection, themeMusic, volumePrefs } from './settingsScene.js';
+import { createSettingsScene, currentThemeId, pruneThemeSelection, themeMusic, volumePrefs, THEME_KEY } from './settingsScene.js';
 import { createRunnerScene } from '@tr/game/render/runnerScene.js';
 import type { PlatformAdapter } from '@tr/framework/platform/platformAdapter.js';
 import type { GameViews, RunSummary } from './views.js';
-import { readEntry, saveEntry, wechatAvailable, wechatLogin, type EntryMethod } from './session.js';
+import { readEntry, saveEntry, type EntryMethod } from './session.js';
+import { createStartScene } from './startScene.js';
+import { CHAR_KEY, DEFAULT_CHAR, createFlowProgress } from './progress.js';
+import type { PlayerAccount } from '../core/playerProfile.js';
 
-/** 历史最佳分存储键（v2 修正键；旧版笔误键含真省略号 U+2026，见 LEGACY_BEST_KEY） */
-export const BEST_KEY = 'thunderrun:best';
-/** 旧版笔误键 'thunderrun:b…st'：bestScore() 读取时一次性迁移，避免旧成绩静默丢失 */
-const LEGACY_BEST_KEY = 'thunderrun:b\u2026st';
-export const CHAR_KEY = 'thunderrun:character';
-export const DEFAULT_CHAR = 'char_volt';
-// 钱包存储键与购买/解锁逻辑在 localEconomy.ts；COINS_KEY 从那里 re-export（旧导入路径兼容）
-export { COINS_KEY, DIAMOND_KEY } from './localEconomy.js';
+export { BEST_KEY, CHAR_KEY, DEFAULT_CHAR, COINS_KEY, DIAMOND_KEY } from './progress.js';
 export { THEME_KEY } from './settingsScene.js'; // 定义与读写语义见 settingsScene.ts
 
 export interface GameFlowDeps {
@@ -50,6 +41,7 @@ export interface GameFlowDeps {
   /** 测试模式（?debug/?test）：run 局内挂载 __trTest 技能开关 API，供左侧测试面板消费 */
   test?: boolean;
   leaderboard?: LeaderboardService;
+  account?: PlayerAccount;
   /** 宿主可录制任务回放，结束函数由 RunSession 在死亡或退出时调用。 */
   trackRun?: RunSessionDeps['trackRun'];
 }
@@ -62,43 +54,34 @@ export interface GameFlow {
   currentSeed(): number;
   /** 遥测骨架读取口（S16b 前置；debug 探针/未来 QA 面板消费） */
   telemetry(): { snapshot(): unknown[]; summary(): Record<string, unknown> };
+  finishRun(): boolean;
+  dispose(): void;
 }
 
 export function createGameFlow(deps: GameFlowDeps): GameFlow {
   const { adapter, views } = deps;
   let content: GameContent | null = null;
-  let scene: { dispose(): void } | null = null;
+  let scene: ReturnType<typeof createRunSession> | null = null;
   let lastSeed = 0;
   const telemetry = new TelemetryRecorder(adapter.storage);
   /** 音频导演：配置加载成功后创建；game.params.audio 缺省时为空操作（不阻塞玩法） */
   let audio: AudioDirector | null = null;
 
-  /** 历史最佳分：兼容旧键；脏值按 0，result 仅在破纪录时落盘。 */
-  const bestScore = (): number => {
-    const raw = adapter.storage.get(BEST_KEY);
-    if (raw !== null) { const n = Number(raw); return Number.isFinite(n) && n > 0 ? n : 0; }
-    const legacy = adapter.storage.get(LEGACY_BEST_KEY);
-    if (legacy === null) return 0;
-    const n = Number(legacy);
-    adapter.storage.remove(LEGACY_BEST_KEY);
-    if (!Number.isFinite(n) || n <= 0) return 0;
-    adapter.storage.set(BEST_KEY, String(n));
-    return n;
-  };
+  const progress = createFlowProgress(adapter.storage, deps.account);
   /** 上次选的角色（本机记忆；账号级保存在 S9 接 extras.cloud 后端） */
-  let charId = adapter.storage.get(CHAR_KEY) ?? DEFAULT_CHAR;
+  let charId = progress.initialCharacter();
   const knownCharacterEntry = (id: string): NamedEntry | undefined =>
     content ? playableCharacters(content).find(character => character.id === id) : undefined;
   const knownCharacter = (id: string): boolean => knownCharacterEntry(id) !== undefined;
   // 可出战 = 未被 config 锁定 且 不被解锁门槛挡住（unlock 字段：coin/key/loot/event，记录在 localEconomy）
   const availableCharacter = (id: string): boolean => {
     const c = content;
-    return c !== null && playableCharacters(c).some(character => character.id === id
+    return c !== null && progress.owns(id) && playableCharacters(c).some(character => character.id === id
       && !isCharacterLocked(character) && !isCharacterGated(c, id, adapter.storage));
   };
   const fallbackCharacter = (): string => {
     if (!content) return '';
-    const available = playableCharacters(content).filter(character => !isCharacterLocked(character));
+    const available = playableCharacters(content).filter(character => availableCharacter(character.id));
     return available.find(character => character.id === DEFAULT_CHAR)?.id ?? available[0]?.id ?? '';
   };
   function rememberCharacter(id: string): boolean {
@@ -116,8 +99,6 @@ export function createGameFlow(deps: GameFlowDeps): GameFlow {
   }
   /** 上次在开始页选的入口（本机记忆，选角页展示）；无记忆＝游客态直入主界面 */
   let entry: EntryMethod | null = readEntry(adapter.storage);
-  /** 开始页进入代次：登录 promise 回来时若已离开/重进开始页则丢弃结果 */
-  let startGen = 0;
 
   const enterSelect = (method: EntryMethod): void => {
     entry = method;
@@ -126,49 +107,26 @@ export function createGameFlow(deps: GameFlowDeps): GameFlow {
   };
   let shopBack: (() => void) | null = null;
 
-  const machine = createSceneMachine<SceneName>({
+  const showSelect = (): void => {
+    audio?.stopDeathMusic();
+    if (content) views.renderSelect(content, {
+      onStartRun: id => { if (rememberCharacter(id)) machine.go('run'); },
+      onChooseCharacter: id => rememberCharacter(id), onBack: () => machine.go('start'),
+      onCharacterSelect: views.renderCharacterSelectPage ? () => machine.go('characterSelect') : undefined,
+      onShop: () => machine.go('shop', { returnTo: 'select' }), onSettings: () => machine.go('settings'),
+      onEvents: views.renderEvents ? () => machine.go('events') : undefined,
+      onLeaderboard: deps.leaderboard && views.renderLeaderboard ? () => machine.go('leaderboard') : undefined,
+      onTasks: views.renderWelfare ? () => machine.go('tasks') : undefined,
+      onHandbook: views.renderWelfare ? () => machine.go('handbook') : undefined,
+      onInventory: views.renderInventory ? () => machine.go('inventory') : undefined,
+    }, charId, entry, progress.wallet());
+  };
+
+  const machine: GameFlow['machine'] = createSceneMachine<SceneName>({
     boot: {},
-    start: {
-      onEnter: () => {
-        const gen = ++startGen;
-        const canWechat = wechatAvailable(adapter);
-        let busy = false;
-        const handle = views.renderStart({
-          wechatAvailable: canWechat,
-          onGuest: () => { if (!busy) enterSelect('guest'); },
-          onWechat: () => {
-            if (!canWechat || busy) return;
-            busy = true;
-            handle.setBusy(true);
-            handle.setFeedback('微信登录中…', false);
-            wechatLogin(adapter).then(
-              () => { if (gen === startGen && machine.current() === 'start') enterSelect('wechat'); },
-              (err: unknown) => {
-                if (gen !== startGen || machine.current() !== 'start') return;
-                busy = false;
-                handle.setBusy(false);
-                const msg = err instanceof Error ? err.message : String(err);
-                handle.setFeedback(`微信登录失败：${msg}。可重试，或选择游客登录`, true);
-              },
-            );
-          },
-        });
-      },
-    },
+    start: createStartScene(adapter, views, enterSelect, () => machine.current() === 'start'),
     select: {
-      onEnter: () => {
-        audio?.stopDeathMusic(); // 死亡后 Esc 直接回选角：死亡 BGM 不带进选角页
-        if (content) views.renderSelect(content, {
-          onStartRun: id => { if (rememberCharacter(id)) machine.go('run'); },
-          onChooseCharacter: id => rememberCharacter(id),
-          onBack: () => machine.go('start'),
-          onCharacterSelect: views.renderCharacterSelectPage ? () => machine.go('characterSelect') : undefined,
-          onShop: () => machine.go('shop', { returnTo: 'select' }),
-          onEvents: views.renderEvents ? () => machine.go('events') : undefined,
-          onSettings: () => machine.go('settings'),
-          onLeaderboard: deps.leaderboard && views.renderLeaderboard ? () => machine.go('leaderboard') : undefined,
-        }, charId, entry, { coins: walletBalance(adapter.storage, 'coin'), diamonds: walletBalance(adapter.storage, 'diamond') });
-      },
+      onEnter: showSelect,
     },
     characterSelect: {
       onEnter: ctx => {
@@ -194,7 +152,8 @@ export function createGameFlow(deps: GameFlowDeps): GameFlow {
     shop: {
       onEnter: ctx => {
         const request = typeof ctx === 'object' && ctx !== null ? ctx as { returnTo?: unknown; characterId?: unknown } : {};
-        const returnTo = request.returnTo === 'characterSelect' ? 'characterSelect' : 'select';
+        const returnTo = request.returnTo === 'characterSelect' ? 'characterSelect'
+          : request.returnTo === 'inventory' ? 'inventory' : 'select';
         const characterId = typeof request.characterId === 'string' && knownCharacter(request.characterId)
           ? request.characterId : undefined;
         if (!content) { machine.go('select'); return; }
@@ -216,6 +175,18 @@ export function createGameFlow(deps: GameFlowDeps): GameFlow {
         views.renderLeaderboard(deps.leaderboard, { onBack: () => machine.go('select') });
       },
     },
+    tasks: { onEnter: () => {
+      if (views.renderWelfare) views.renderWelfare('tasks', { onBack: () => machine.go('select') });
+      else machine.go('select');
+    } },
+    handbook: { onEnter: () => {
+      if (views.renderWelfare) views.renderWelfare('handbook', { onBack: () => machine.go('select') });
+      else machine.go('select');
+    } },
+    inventory: { onEnter: () => {
+      if (views.renderInventory) views.renderInventory({ onBack: () => machine.go('select'), onShop: () => machine.go('shop', { returnTo: 'inventory' }) });
+      else machine.go('select');
+    } },
     run: {
       onEnter: () => {
         if (!content) return;
@@ -224,9 +195,10 @@ export function createGameFlow(deps: GameFlowDeps): GameFlow {
         audio?.enterRun(charId, themeMusic(adapter.storage, content)); // 按当前主题选 BGM，缺省回退全局 run
         scene = createRunSession({
           adapter, views, content, charId, service: deps.leaderboard,
+          cloudProgress: !!deps.account,
           createScene: deps.createScene, debug: deps.debug, test: deps.test,
           trackRun: deps.trackRun,
-          consumeItems: () => consumeEquipped(adapter.storage, content!),
+          consumeItems: deps.account ? undefined : () => consumeEquipped(adapter.storage, content!),
           recordRun: (state, meta) => telemetry.recordRun(state, meta),
           themeId: currentThemeId(adapter.storage, content) ?? undefined,
           onSeed: seed => { lastSeed = seed; }, onEnd: summary => machine.go('result', summary),
@@ -242,10 +214,8 @@ export function createGameFlow(deps: GameFlowDeps): GameFlow {
         // 视图要显示角色名而非内部 id（char_volt → 小电）：查 characters 配置补 charName（content 可空）
         const summary: RunSummary = { ...(ctx as RunSummary) };
         if (content && summary.charId) summary.charName = buildLoadout(content, summary.charId).name;
-        const best = bestScore();
-        if (summary.score > best) adapter.storage.set(BEST_KEY, String(summary.score));
-        const coinsGot = summary.coins ?? 0;
-        if (coinsGot > 0) adapter.storage.set(COINS_KEY, String(walletBalance(adapter.storage, 'coin') + coinsGot));
+        const best = progress.bestScore();
+        progress.recordLocal(summary);
         const lbEntry = deps.leaderboard && views.renderLeaderboard ? () => machine.go('leaderboard') : undefined;
         views.renderResult(summary, best, {
           onRetry: () => { if (rememberCharacter(charId)) machine.go('run'); },
@@ -256,13 +226,25 @@ export function createGameFlow(deps: GameFlowDeps): GameFlow {
       onExit: () => audio?.stopDeathMusic(),
     },
   }, 'boot');
+  const syncAccountSelection = (): void => {
+    const preferences = deps.account?.read().preferences;
+    if (!preferences || !content) return;
+    if (preferences.characterId !== charId) rememberCharacter(preferences.characterId);
+    if (content.themes.items?.some(theme => theme.id === preferences.themeId)
+      && adapter.storage.get(THEME_KEY) !== preferences.themeId) adapter.storage.set(THEME_KEY, preferences.themeId);
+  };
+  const offAccount = deps.account?.subscribe(() => {
+    syncAccountSelection(); if (machine.current() === 'select') showSelect();
+  });
 
   // 全局按键：run 中 Esc 退回选角页（v2 onInput 的 key 分支，替代 v1 adapter.onKey，S10 §7.3）
-  adapter.onInput(e => {
+  const offInput = adapter.onInput(e => {
     if (e.type === 'key' && e.phase === 'down' && e.code === 'Escape' && machine.current() === 'run') machine.go('select');
     else if (e.type === 'key' && e.phase === 'down' && e.code === 'Escape' && machine.current() === 'shop') shopBack?.();
     else if (e.type === 'key' && e.phase === 'down' && e.code === 'Escape' && machine.current() === 'settings') machine.go('select');
     else if (e.type === 'key' && e.phase === 'down' && e.code === 'Escape' && machine.current() === 'leaderboard') machine.go('select');
+    else if (e.type === 'key' && e.phase === 'down' && e.code === 'Escape'
+      && (machine.current() === 'tasks' || machine.current() === 'handbook' || machine.current() === 'inventory')) machine.go('select');
   });
 
   async function boot(): Promise<void> {
@@ -282,6 +264,7 @@ export function createGameFlow(deps: GameFlowDeps): GameFlow {
       return;
     }
     content = report.content;
+    syncAccountSelection();
     normalizeCharacter();
     pruneThemeSelection(adapter.storage, content); // 存档主题已删/改名 → 清掉，不把无效 id 带进渲染
     audio = createAudioDirector(adapter, content.game.params, {
@@ -293,5 +276,10 @@ export function createGameFlow(deps: GameFlowDeps): GameFlow {
     machine.go('select');
   }
 
-  return { machine, boot, currentSeed: () => lastSeed, telemetry: () => ({ snapshot: () => telemetry.snapshot(), summary: () => telemetry.summary() }) };
+  return {
+    machine, boot, currentSeed: () => lastSeed,
+    telemetry: () => ({ snapshot: () => telemetry.snapshot(), summary: () => telemetry.summary() }),
+    finishRun: () => machine.current() === 'run' ? scene?.finish() ?? false : false,
+    dispose() { offInput(); offAccount?.(); machine.go('boot'); audio?.dispose(); },
+  };
 }

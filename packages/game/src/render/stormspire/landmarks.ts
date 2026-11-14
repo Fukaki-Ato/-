@@ -111,7 +111,7 @@ export function createLandmarks(scene: THREE.Scene) {
     mesh.setMatrixAt(i, M);
   };
 
-  // M4 crossings 视觉对齐：sim 判定体（everyM 100）画成可穿金环——z 直接跟判定体（worldZ−dist），done 即隐
+  // M4 crossings 视觉对齐：前方判定体画在负 Z（dist−worldZ），done 即隐
   const simRingGeo = new THREE.TorusGeometry(2.2, 0.14, 8, 24);
   const simRings = new THREE.InstancedMesh(simRingGeo, gold(), 16);
   simRings.frustumCulled = false; scene.add(simRings);
@@ -123,7 +123,7 @@ export function createLandmarks(scene: THREE.Scene) {
         if (c.done || n >= 16) continue;
         const rel = c.worldZ - dist;
         if (rel < -10 || rel > 120) continue;
-        compose(simRings, n++, c.lane * laneW, 2.2, rel, 0, 0.3, 0, 1);
+        compose(simRings, n++, c.lane * laneW, 2.2, -rel, 0, 0.3, 0, 1);
       }
       for (let i = n; i < 16; i++) compose(simRings, i, 0, -999, 0, 0, 0, 0.0001);
       simRings.instanceMatrix.needsUpdate = true;

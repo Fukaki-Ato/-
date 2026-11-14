@@ -94,7 +94,8 @@ test('a different simulation publication cannot replace the code or timestep of 
   const f = setup(t), replay = deathReplay(f.content);
   const { runId } = f.service.startRun('rule-user', { seed: 123, charId: 'char_volt' });
   const oldRulesId = f.store.getRun(runId, 'rule-user').rules_id;
-  const restarted = f.restart(f.content, { replaySource: otherRuntime });
+  const restarted = f.restart(f.content, { replaySource: otherRuntime,
+    trustedReplayRuntimeHashes: [replaySourceHash(f.service.replaySource)] });
   assert.notEqual(restarted.rulesId, oldRulesId);
   f.clock.now += replay.payload.frames * 1000 / 60 + 1000;
   const oldResult = await restarted.finishRun('rule-user', runId, replay.payload);

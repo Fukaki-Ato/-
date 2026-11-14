@@ -1,8 +1,8 @@
 {
   "$schema": "../schema/config.schema.json#/items",
-  "configVersion": "1.4.0",
+  "configVersion": "1.4.2",
   "minEngineVersion": "1.0.0",
-  "updatedAt": "2026-10-02",
+  "updatedAt": "2026-11-07",
   "items": [
     {
       "id": "item_coin",
@@ -64,7 +64,7 @@
       },
       "rarity": "common",
       "model": {
-        "prefab": "assets/pickups/magnet.glb",
+        "prefab": "assets/pickups/coastal/magnet.glb",
         "spin": true
       },
       "pickupVfx": "vfx_pickup_pop",
@@ -97,7 +97,7 @@
       },
       "rarity": "common",
       "model": {
-        "prefab": "assets/pickups/shield.glb",
+        "prefab": "assets/pickups/coastal/shield.glb",
         "spin": false
       },
       "pickupVfx": "vfx_pickup_pop",
@@ -131,7 +131,7 @@
       },
       "rarity": "rare",
       "model": {
-        "prefab": "assets/pickups/jetpack.glb",
+        "prefab": "assets/pickups/coastal/jetpack.glb",
         "spin": true
       },
       "pickupVfx": "vfx_pickup_pop",
@@ -163,7 +163,7 @@
       },
       "rarity": "common",
       "model": {
-        "prefab": "assets/pickups/board.glb",
+        "prefab": "assets/pickups/coastal/board.glb",
         "spin": true
       },
       "pickupVfx": "vfx_pickup_pop",
@@ -200,7 +200,7 @@
       },
       "rarity": "common",
       "model": {
-        "prefab": "assets/pickups/multiplier.glb",
+        "prefab": "assets/pickups/coastal/multiplier.glb",
         "spin": true
       },
       "pickupVfx": "vfx_pickup_pop",
@@ -264,7 +264,7 @@
       },
       "rarity": "common",
       "model": {
-        "prefab": "assets/pickups/boots.glb",
+        "prefab": "assets/pickups/coastal/boots.glb",
         "spin": true
       },
       "pickupVfx": "vfx_pickup_pop",
@@ -308,7 +308,7 @@
       },
       "rarity": "rare",
       "model": {
-        "prefab": "assets/pickups/helmet.glb",
+        "prefab": "assets/pickups/coastal/helmet.glb",
         "spin": true
       },
       "pickupVfx": "vfx_pickup_pop",

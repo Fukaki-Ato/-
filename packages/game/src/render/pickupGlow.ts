@@ -63,6 +63,7 @@ export interface PickupGlow {
   show(x: number, z: number, itemRef: string, phase: number, t: number): void;
   /** 帧末收掉本帧没刷新到的槽位 */
   hideRest(): void;
+  dispose(): void;
 }
 
 export function createPickupGlow(scene: THREE.Scene): PickupGlow {
@@ -105,6 +106,11 @@ export function createPickupGlow(scene: THREE.Scene): PickupGlow {
     hideRest() {
       for (; used < MAX; used++) slots[used].mesh.visible = false;
       used = 0;
+    },
+    dispose() {
+      for (const { mesh, mat } of slots) { scene.remove(mesh); mat.dispose(); }
+      geo.dispose();
+      colorCache.clear();
     },
   };
 }

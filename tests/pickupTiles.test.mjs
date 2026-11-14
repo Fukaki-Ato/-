@@ -8,6 +8,7 @@ import * as THREE from 'three';
 import { PICKUP_TILES, pickupTileFor, setPickupTiles } from '../packages/game/dist/render/pickupTiles.js';
 import { PICKUP_CENTER_Y } from '../packages/game/dist/core/sim/collect.js';
 import { createPickupLayer } from '../packages/game/dist/render/pickupLayer.js';
+import { PICKUP_BEACON_COLORS } from '../packages/game/dist/render/pickupBeacons.js';
 
 const MAGNET = { itemRef: 'item_magnet', lane: 0, worldZ: 40 };
 
@@ -35,7 +36,7 @@ function disposeScene(scene) {
 
 test('pickupTileFor：认得的道具给砖，没出图的走兜底砖，池子空时给 null', () => {
   setPickupTiles([]);
-  assert.equal(pickupTileFor('item_magnet'), null, '未注入 ⇒ 退回纯色箱');
+  assert.equal(pickupTileFor('item_magnet'), null, '未注入 ⇒ 使用配色箱与几何徽标');
   injectAll();
   assert.ok(pickupTileFor('item_magnet'), '表内道具应有砖');
   assert.equal(pickupTileFor('item_magnet').bg, PICKUP_TILES.find(t => t.item === 'item_magnet').bg, '底色取表内值');
@@ -48,6 +49,7 @@ test('道具箱：贴上砖图、自发光随徽标底色，且不再绕 Y 自�
   t.after(() => disposeScene(scene));
   assert.ok(box, '道具箱应在');
   assert.equal(box.material.map, texes[0], '正面砖图');
+  assert.equal(box.children[0].visible, false, '已注入砖图时隐藏几何徽标');
   assert.equal(box.material.emissiveMap, texes[0], '自发光叠同一张砖图 ⇒ 夜里自己亮着');
   assert.equal(box.material.color.getHex(), 0xffffff, '有砖图时不再叠色');
   assert.equal(box.material.emissive.getHex(), pickupTileFor('item_magnet').bg, '发光色与徽标底色同系');
@@ -59,10 +61,17 @@ test('道具箱：贴上砖图、自发光随徽标底色，且不再绕 Y 自�
   assert.equal(box.rotation.y, 0, '徽标正对玩家（含 ±90° 看不到图的角度）');
 });
 
-test('未注入（微信端无加载链）：退回原来的纯色箱，不挂空贴图', t => {
+test('未注入（微信端无加载链）：配色箱显示磁铁几何徽标，不挂空贴图', t => {
   setPickupTiles([]);
   const { scene, box } = one([MAGNET]);
   t.after(() => disposeScene(scene));
+  assert.ok(box, '按 BoxGeometry 选中道具箱，不把地面光圈当作箱体');
   assert.equal(box.material.map, null);
-  assert.equal(box.material.color.getHex(), 0xb48cff, 'magnet 原有纯色兜底');
+  assert.equal(box.material.emissiveMap, null);
+  assert.equal(box.material.color.getHex(), PICKUP_BEACON_COLORS.item_magnet, '使用磁铁信标配色');
+  assert.equal(box.material.emissive.getHex(), PICKUP_BEACON_COLORS.item_magnet, '信标箱保持同色自发光');
+  const icon = box.children[0];
+  assert.ok(icon?.isMesh && icon.visible, '无贴图时显示真正的几何徽标');
+  assert.equal(icon.geometry.name, 'pickup-beacon:item_magnet', '磁铁使用可识别轮廓');
+  assert.ok(icon.position.z > 0.35, '徽标位于面向玩家的箱面前方');
 });

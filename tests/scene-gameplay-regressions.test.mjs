@@ -5,6 +5,8 @@ import { RunnerSim } from '../packages/game/dist/core/sim/runnerSim.js';
 import { cullCrossings, insertCrossing, stepCrossings, CROSSING_DEFAULTS } from '../packages/game/dist/core/sim/crossings.js';
 import { buildObstacleEntity } from '../packages/game/dist/core/sim/trackDefs.js';
 import { advanceMovingObstacles } from '../packages/game/dist/core/sim/entitySweep.js';
+import { TrackGen } from '../packages/game/dist/core/sim/trackGen.js';
+import { RunRng } from '../packages/game/dist/core/rng.js';
 
 function blank() {
   const content = loadContent();
@@ -89,4 +91,20 @@ test('真实冲撞列车进入反重力区外侧净空时消散，不闯入倒�
   assert.equal(rusher.done, true);
   assert.ok(rusher.worldZ >= 1690 && rusher.worldZ <= 1702);
   assert.ok(Number.isFinite(rusher.clearT));
+});
+
+test('地面道具不投放到倒挂区，普通主题与区外仍有真实掉落', () => {
+  const generate = antigrav => {
+    const content = blank();
+    content.obstacles.dropTable = { weights: { item_helmet: 1 }, countWeights: { 1: 1, 2: 0, 3: 0 } };
+    if (!antigrav) delete content.obstacles.antigrav;
+    const rng = new RunRng(55);
+    rng.range = (min, max) => (min + max) / 2;
+    const gen = new TrackGen(content, rng), pickups = [];
+    gen.genZ = 1000; gen.nextPickupSeg = 550;
+    gen.ensure(1000, 1, [], [], pickups);
+    return pickups.map(p => p.worldZ);
+  };
+  assert.deepEqual(generate(false), [650, 850]);
+  assert.deepEqual(generate(true), [850], '600–690m 倒挂时无法拾取地面箱，区外850m不受影响');
 });

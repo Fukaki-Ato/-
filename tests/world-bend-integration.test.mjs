@@ -4,6 +4,7 @@ import * as THREE from 'three';
 import { createTrackVisuals } from '../packages/game/dist/render/trackVisuals.js';
 import { createCoinField } from '../packages/game/dist/render/coinField.js';
 import { uBendX, uBendY } from '../packages/game/dist/render/stormspire/worldBend.js';
+import { createLandmarks } from '../packages/game/dist/render/stormspire/landmarks.js';
 
 function assertBend(material) {
   const shader = { uniforms: {}, vertexShader: '#include <project_vertex>' };
@@ -11,6 +12,23 @@ function assertBend(material) {
   assert.equal(shader.uniforms.uBendX, uBendX);
   assert.equal(shader.uniforms.uBendY, uBendY);
 }
+
+test('雷脊计分环在玩家前方负Z，接近时向0推进，完成后隐藏', t => {
+  const scene = new THREE.Scene(), landmarks = createLandmarks(scene);
+  t.after(() => scene.traverse(o => {
+    o.geometry?.dispose();
+    for (const material of o.material ? [o.material].flat() : []) material.dispose();
+  }));
+  const rings = scene.children.find(o => o.isInstancedMesh && o.geometry.type === 'TorusGeometry' && o.count === 16);
+  assert.ok(rings);
+  const matrix = new THREE.Matrix4(), position = new THREE.Vector3();
+  const ring = { lane: 1, worldZ: 150 };
+  const readPosition = () => { rings.getMatrixAt(0, matrix); return position.setFromMatrixPosition(matrix); };
+  landmarks.syncCrossings([ring], 100, 2.2);
+  assert.equal(readPosition().z, -50); assert.ok(Math.abs(position.x - 2.2) < 1e-6);
+  landmarks.syncCrossings([ring], 125, 2.2); assert.equal(readPosition().z, -25);
+  landmarks.syncCrossings([{ ...ring, done: true }], 150, 2.2); assert.equal(readPosition().y, -999);
+});
 
 for (const scenery of ['stormspire', 'titan', 'forgeheart', 'library']) {
   test(`${scenery}: 路面、车道线和金币共用弯道，图书馆道路也有足够细分`, t => {
