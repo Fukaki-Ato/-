@@ -102,6 +102,7 @@ function bootstrapMocks() {
     './uiShell.js': ['createUiShell'],
     './characterSelectOverlay.js': ['createCharacterSelectOverlay'],
     './shopOverlay.js': ['createShopOverlay'],
+    './chestOverlay.js': ['createChestOverlay'],
     './runAssets.js': ['injectObstaclePosters', 'injectPickupTiles'],
     './introVideo.js': ['injectIntroVideos'],
     './startupConfig.js': ['preloadStartupConfig'],

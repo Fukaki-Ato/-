@@ -1,9 +1,9 @@
 /**
  * 主界面（P3 v4，按 issue #12 参考图 1024×1536 重排）：
  * 顶栏＝合并货币胶囊（金币+钻石各带「+」）｜右上角设置；左＝活动、任务；右＝成就、排行榜；
- * 中下＝「开始酷跑」大牌匾（设计稿原字整块抠图）；底部棕条＝商店｜福利手册｜仓库｜角色＋竖分隔线。
+ * 中下＝「开始酷跑」大牌匾（设计稿原字整块抠图）；底部棕条＝商店｜福利手册｜宝箱｜角色＋竖分隔线。
  * 布局坐标全走 menuLayout 常量表（等比缩放、顶贴顶/底贴底锚定）；控件一律 absolute 叠在背景上。
- * 未定义入口（设置/活动/成就/任务/排行榜/手册/仓库/货币+）只有按下/松开视觉反馈
+ * 未定义入口（设置/活动/成就/任务/排行榜/手册/宝箱/货币+）只有按下/松开视觉反馈
  * （badgeButton 换 glow 帧）；商店通过 LobbySlotHandlers 注入只读商店导航。
  * 选角面板复用现有选角 UI（lobbyPanels），由「角色」格开关；开始酷跑沿用 选角→跑酷 流程。
  */
@@ -147,7 +147,7 @@ export function buildLobbyPage(host: UiHost, d: LobbyDeps): LobbyPage {
     [
       cell('shop', '商店', slot('onShop')), div(),
       cell('handbook', '福利手册', slot('onHandbook')), div(),
-      cell('chest', '仓库', slot('onChest')), div(),
+      cell('chest', '宝箱', slot('onChest')), div(),
       cell('character', '角色', toggleChar),
     ],
   );

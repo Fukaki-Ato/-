@@ -12,6 +12,7 @@ import type { EntryMethod } from './session.js';
 import type { LeaderboardService, RankingFeedback } from './leaderboard.js';
 import type { FirstCoinStats } from '../core/sim/firstCoinRecord.js';
 import type { SignInState } from './signIn.js';
+import type { ChestActions } from './chest.js';
 
 /** 结算摘要（与 core RunnerSim.summary() 同源）；charName 由 mainFlow 查 characters 配置补入，供结果页显示 */
 export type RunSummary = ReturnType<RunnerSim['summary']> & {
@@ -270,6 +271,8 @@ export interface GameViews {
     entry: EntryMethod | null,
   ): void;
   renderShop(content: GameContent, actions: ShopActions): void;
+  /** 宝箱页（铜/银/金三档，钥匙开启）；缺省＝大厅「宝箱」入口只有按压反馈（动作契约在 flow/chest.ts） */
+  renderChest?(content: GameContent, actions: ChestActions): void;
   /** 活动页（登录签到等）；缺省＝大厅「活动」入口只有按压反馈 */
   renderEvents?(content: GameContent, actions: EventsActions): void;
   /** 成就页（大厅「成就」勋章）；缺省＝该入口不亮（防死按钮） */

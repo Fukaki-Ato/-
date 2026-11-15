@@ -1,0 +1,98 @@
+/* 宝箱页（tr-chest-overlay）：三档卡 + 开启动效。
+   仿 shop-product-card 的卡片骨架；动效为纯 CSS keyframes（prefers-reduced-motion 由
+   mobileUi.css 全局兜底自动关闭）。档位色 is-bronze/silver/gold，稀有度色 is-common/rare/sr/ssr。*/
+
+.chest-intro { margin: 0; color: var(--tr-text-muted, #8fa3c0); font-size: 13px; }
+.chest-wallet { margin: 0; color: #ffd84d; font-size: 13px; font-weight: 600; }
+.chest-card-layer { display: flex; flex-direction: column; gap: 12px; }
+.chest-empty-message { margin: 0; padding: 16px; text-align: center; color: #8fa3c0; }
+
+.chest-card {
+  display: grid;
+  grid-template-columns: 96px 1fr;
+  gap: 12px;
+  padding: 12px;
+  border: 2px solid rgba(255, 216, 77, 0.35);
+  border-radius: 14px;
+  position: relative;
+  /* 不裁 overflow：粒子要飞出 96px 艺术框、散到卡面（圆角背景由 border/radius 自身呈现） */
+}
+.chest-card.is-bronze { border-color: #c88a4a; }
+.chest-card.is-silver { border-color: #b9c4cf; }
+.chest-card.is-gold { border-color: #ffd84d; }
+
+.chest-art { position: relative; width: 96px; height: 96px; }
+.chest-art img {
+  width: 100%; height: 100%; object-fit: contain; display: block;
+  filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.45));
+}
+.chest-card.is-bronze .chest-art img { filter: sepia(0.55) saturate(1.4) hue-rotate(-18deg); }
+.chest-card.is-silver .chest-art img { filter: saturate(0.35) brightness(1.12); }
+.chest-card.is-gold .chest-art img { filter: saturate(1.35) brightness(1.06); }
+
+.chest-details { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.chest-cost { font-size: 12px; color: #ffd84d; font-weight: 600; }
+.chest-card h2 { margin: 0; font-size: 17px; }
+.chest-card.is-bronze h2 { color: #b5763a; }
+.chest-card.is-silver h2 { color: #6f8496; }
+.chest-card.is-gold h2 { color: #c99a00; }
+.chest-desc { margin: 0; font-size: 12px; color: var(--tr-text-muted, #8fa3c0); }
+
+.chest-action-row { display: flex; gap: 8px; margin-top: 2px; }
+.chest-action {
+  min-height: 40px; padding: 0 16px; border-radius: 10px; border: none;
+  font-size: 14px; font-weight: 700; color: #10203a; background: #ffd84d; cursor: pointer;
+}
+.chest-card.is-bronze .chest-action { background: #e0a468; }
+.chest-card.is-silver .chest-action { background: #ccd6df; }
+.chest-action:disabled { opacity: 0.45; cursor: default; }
+.chest-action.is-confirm { background: #43d9a3; }
+.chest-cancel-action { background: rgba(255, 255, 255, 0.14); color: inherit; }
+
+.chest-feedback { margin: 0; min-height: 16px; font-size: 12px; color: #ffd84d; }
+.chest-rewards { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; grid-column: 1 / -1; }
+.chest-reward {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 600;
+  background: rgba(255, 255, 255, 0.08);
+  animation: chest-reward-pop 260ms ease-out both;
+}
+.chest-reward-tag { font-size: 10px; opacity: 0.75; }
+.chest-reward.is-common { color: #a9b7c9; }
+.chest-reward.is-rare { color: #6fd3ff; }
+.chest-reward.is-sr { color: #ffd84d; }
+.chest-reward.is-ssr { color: #ff9de2; }
+
+/* 开启动效：摇箱（角度衰减）+ 粒子抛散（方向/延迟走内联 CSS 变量） */
+.chest-art.is-shaking img { animation: chest-shake 600ms ease-in-out both; }
+.chest-art.is-shaking .chest-chip { display: block; animation: chest-chip-fly 700ms ease-out both; }
+
+.chest-chip {
+  display: none;
+  position: absolute; left: 50%; top: 46%;
+  width: 13px; height: 13px; border-radius: 4px;
+  background: #ffd84d;
+  box-shadow: 0 0 10px rgba(255, 216, 77, 0.95), 0 0 3px rgba(255, 255, 255, 0.8);
+  pointer-events: none;
+}
+.chest-card.is-bronze .chest-chip { background: #e0a468; }
+.chest-card.is-silver .chest-chip { background: #ccd6df; }
+
+@keyframes chest-shake {
+  0% { transform: rotate(0deg) translateX(0); }
+  15% { transform: rotate(-6deg) translateX(-5px); }
+  30% { transform: rotate(5deg) translateX(4px); }
+  45% { transform: rotate(-4deg) translateX(-3px); }
+  60% { transform: rotate(3deg) translateX(2px); }
+  75% { transform: rotate(-2deg) translateX(-1px); }
+  100% { transform: rotate(0deg) translateX(0); }
+}
+@keyframes chest-chip-fly {
+  0% { transform: translate(0, 0) scale(1); opacity: 1; }
+  70% { opacity: 0.9; }
+  100% { transform: translate(var(--dx, 40px), var(--dy, -50px)) scale(0.4); opacity: 0; }
+}
+@keyframes chest-reward-pop {
+  from { transform: scale(0.6); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}

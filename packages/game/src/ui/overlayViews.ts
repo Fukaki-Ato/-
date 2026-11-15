@@ -11,6 +11,7 @@ import type {
   GameViews, HudHandle, ResultActions, RunSummary, SelectActions, SelectExtras, SettingsActions,
   ShopActions, StartActions, StartHandle, VolumeSettings,
 } from '../flow/views.js';
+import type { ChestActions } from '../flow/chest.js';
 import { DEFAULT_MUSIC_VOLUME, DEFAULT_SFX_VOLUME } from '../core/audio/audioDirector.js';
 import type { EntryMethod } from '../flow/session.js';
 import type { LeaderboardService } from '../flow/leaderboard.js';
@@ -21,6 +22,7 @@ import { buildLobbyPage } from './lobbyView.js';
 import { buildHudPage } from './hudView.js';
 import { buildResultPage } from './resultView.js';
 import { buildShopPage } from './shopView.js';
+import { buildChestPage } from './chestView.js';
 import { buildEventsPage } from './eventsView.js';
 import { buildSettingsPage } from './settingsView.js';
 import { buildAchievementsPage } from './achievementsView.js';
@@ -39,6 +41,8 @@ export interface OverlayViewsDeps {
    */
   onLobbyVisible?(visible: boolean): void;
   shopRenderer?: (content: GameContent, actions: ShopActions) => () => void;
+  /** 宝箱页 DOM renderer（web 壳注入）；缺省走 canvas 版 buildChestPage */
+  chestRenderer?: (content: GameContent, actions: ChestActions) => () => void;
   eventsRenderer?: (content: GameContent, actions: EventsActions) => () => void;
   lobbyRenderer?: (content: GameContent, actions: SelectActions, currentCharId: string, extras?: SelectExtras) => () => void;
   settingsRenderer?: (
@@ -63,10 +67,16 @@ export function createOverlayViews(deps: OverlayViewsDeps): OverlayViews {
   let backdrop: MenuBackdrop | null = null;
   let disposeCharacterSelect: (() => void) | null = null;
   let disposeShopRenderer: (() => void) | null = null;
+  let disposeChestRenderer: (() => void) | null = null;
   let disposePanelRenderer: (() => void) | null = null;
   const clearShopRenderer = (): void => {
     const dispose = disposeShopRenderer;
     disposeShopRenderer = null;
+    dispose?.();
+  };
+  const clearChestRenderer = (): void => {
+    const dispose = disposeChestRenderer;
+    disposeChestRenderer = null;
     dispose?.();
   };
   const clearCharacterSelect = (): void => {
@@ -75,7 +85,7 @@ export function createOverlayViews(deps: OverlayViewsDeps): OverlayViews {
     dispose?.();
   };
   const clearTransient = (): void => {
-    clearCharacterSelect(); clearShopRenderer();
+    clearCharacterSelect(); clearShopRenderer(); clearChestRenderer();
     const dispose = disposePanelRenderer;
     disposePanelRenderer = null;
     dispose?.();
@@ -119,7 +129,7 @@ export function createOverlayViews(deps: OverlayViewsDeps): OverlayViews {
         actions,
         currentCharId,
         extras: { coins: extras?.coins ?? 0, diamonds: extras?.diamonds ?? 0, badges: deps.badges },
-        slots: { onShop: actions.onShop, onSettings: actions.onSettings, onRank: actions.onLeaderboard, onAchievements: actions.onAchievements },
+        slots: { onShop: actions.onShop, onChest: actions.onChest, onSettings: actions.onSettings, onRank: actions.onLeaderboard, onAchievements: actions.onAchievements },
       });
       stopBackdrop();
       let frame: ((t: number) => void) | undefined;
@@ -158,6 +168,17 @@ export function createOverlayViews(deps: OverlayViewsDeps): OverlayViews {
       host.mount(buildShopPage(host, content, actions).view);
     },
 
+    renderChest(content: GameContent, actions: ChestActions): void {
+      clearTransient();
+      stopBackdrop();
+      if (deps.chestRenderer) {
+        host.mount(host.makeView(), { transparent: true });
+        disposeChestRenderer = deps.chestRenderer(content, actions);
+        return;
+      }
+      host.mount(buildChestPage(host, content, actions, deps.badges).view);
+    },
+
     renderEvents(content: GameContent, actions: EventsActions): void {
       clearTransient();
       stopBackdrop();
@@ -190,6 +211,7 @@ export function createOverlayViews(deps: OverlayViewsDeps): OverlayViews {
       }
       host.mount(buildAchievementsPage(host, { page, actions }).view);
     },
+
 
     ...(deps.leaderboardRenderer ? {
       renderLeaderboard(service: LeaderboardService, actions: { onBack(): void }): void {

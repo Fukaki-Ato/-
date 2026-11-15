@@ -21,6 +21,7 @@ import { COINS_KEY, consumeEquipped, runEnhance, walletBalance } from './localEc
 import { configLocked, isCharacterGated, selectUnlockActions } from './unlock.js';
 import { createEventsScene } from './eventsScene.js';
 import { createShopScene } from './shopScene.js';
+import { createChestScene } from './chestScene.js';
 import { createStartScene } from './startScene.js';
 import { createAchievementsScene } from './achievementsScene.js';
 import { achievementMinRunSeconds, createAchievementTracker } from './achievementTracker.js';
@@ -137,6 +138,8 @@ export function createGameFlow(deps: GameFlowDeps): GameFlow {
     goShopBack: (returnTo, characterId) => machine.go(returnTo, returnTo === 'characterSelect' ? { characterId } : undefined),
     onCharacterUnlocked: () => tracker.applyCharacterUnlock(),
   });
+  // 宝箱场景（chestScene.ts）：铜/银/金三档开箱（钥匙扣价→按档连抽→发货→碎片自动合成）
+  const chestScene = createChestScene({ adapter, views, content: () => content, goSelect: () => machine.go('select'), onCharacterUnlocked: () => tracker.applyCharacterUnlock() });
 
   const machine = createSceneMachine<SceneName>({
     boot: {},
@@ -151,6 +154,7 @@ export function createGameFlow(deps: GameFlowDeps): GameFlow {
           onBack: () => machine.go('start'),
           onCharacterSelect: views.renderCharacterSelectPage ? () => machine.go('characterSelect') : undefined,
           onShop: () => machine.go('shop', { returnTo: 'select' }),
+          onChest: views.renderChest ? () => machine.go('chest') : undefined,
           onEvents: views.renderEvents ? () => machine.go('events') : undefined,
           onSettings: () => machine.go('settings'),
           // 成就入口与 renderAchievements 成对亮起：API 缺失（无成就壳注入）时入口不亮，防死按钮
@@ -182,6 +186,7 @@ export function createGameFlow(deps: GameFlowDeps): GameFlow {
       },
     },
     shop: shopScene,
+    chest: chestScene,
     events: createEventsScene({ adapter, views, content: () => content, goSelect: () => machine.go('select') }),
     settings: createSettingsScene({
       storage: adapter.storage, views, content: () => content,
@@ -246,6 +251,7 @@ export function createGameFlow(deps: GameFlowDeps): GameFlow {
     if (e.type !== 'key' || e.phase !== 'down' || e.code !== 'Escape') return;
     const cur = machine.current();
     if (cur === 'shop') shopScene.escape();
+    else if (cur === 'chest') chestScene.escape();
     else if (cur === 'run' || cur === 'settings' || cur === 'achievements' || cur === 'leaderboard') machine.go('select');
   });
 

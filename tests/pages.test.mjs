@@ -175,10 +175,10 @@ test('select 页（主界面）：参考图板块齐全且等比不裁出、角�
   view2Pass(host);
 
   const t0 = texts(host); // 徽标带不可见名牌 Label，texts 可断言板块名
-  for (const s of ['商店', '角色', '仓库', '福利手册', '成就', '任务', '活动', '排行榜', '设置', '开始酷跑']) {
+  for (const s of ['商店', '角色', '宝箱', '福利手册', '成就', '任务', '活动', '排行榜', '设置', '开始酷跑']) {
     assert.ok(t0.includes(s), `主界面板块 ${s} 可见，实得 ${JSON.stringify(t0)}`);
   }
-  for (const gone of ['宝箱', '场景切换', '登录方式']) {
+  for (const gone of ['仓库', '场景切换', '登录方式']) {
     assert.ok(!t0.some(x => x.includes(gone)), `旧板块 ${gone} 已下线`);
   }
 
@@ -293,15 +293,15 @@ test('select 页（主界面）：未定义入口仅按压反馈（无 toast/无
   views.renderSelect(report.content, { onStartRun() {}, onChooseCharacter: () => true, onBack: () => {} }, chars[0].id, 'wechat');
   view2Pass(host);
   const t = texts(host);
-  assert.ok(t.includes('仓库') && !t.some(x => x.includes('宝箱')), '底栏第四格＝仓库');
+  assert.ok(t.includes('宝箱') && !t.some(x => x.includes('仓库')), '底栏第四格＝宝箱');
   assert.ok(!t.some(x => x.includes('登录方式')), '游客态不显示登录方式');
   assert.equal(findButton(host, '清除本机缓存'), null, '无清缓存按钮');
   assert.equal(findButton(host, '返回'), null, '主界面不带旧返回按钮');
   assert.equal(findButton(host, '开始 · 跑酷！'), null, '旧文字按钮已换牌匾徽标');
 
-  // 未定义入口：点一遍全部板块，不得产生任何文案/弹窗/导航（仅 glow 帧按压反馈）
+  // 未定义入口：点一遍全部板块，不得产生任何文案/弹窗/导航（仅 glow 帧按压反馈）；
   const before = texts(host).join('|');
-  for (const tag of ['成就', '任务', '活动', '排行榜', '设置', '商店', '福利手册', '仓库']) {
+  for (const tag of ['成就', '任务', '活动', '排行榜', '邮件', '设置', '商店', '福利手册', '宝箱']) {
     clickWidget(host, findWidget(host, cellOf(tag)), host.overlay.current.relayout());
   }
   assert.equal(texts(host).join('|'), before, '未定义入口零副作用');

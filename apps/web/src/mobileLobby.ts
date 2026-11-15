@@ -88,7 +88,7 @@ export function createMobileLobby(content: GameContent, actions: SelectActions, 
   nav.setAttribute('aria-label', '主菜单导航');
   for (const [label, icon, action] of [
     ['商店', shopIcon, actions.onShop ?? comingSoon], ['福利手册', handbookIcon, comingSoon],
-    ['仓库', chestIcon, comingSoon], ['角色', characterIcon, openCharacters],
+    ['宝箱', chestIcon, actions.onChest ?? comingSoon], ['角色', characterIcon, openCharacters],
   ] as const) {
     const button = uiButton('', 'lobby-nav-button', action);
     const image = document.createElement('img');

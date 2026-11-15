@@ -34,7 +34,7 @@ export interface MenuLayout {
   rank: Rect;
   plaque: Rect;
   bar: Rect;
-  /** 底栏四格图标位（商店/福利手册/仓库/角色） */
+  /** 底栏四格图标位（商店/福利手册/宝箱/角色） */
   cells: Rect[];
   /** 底栏格间竖分隔线 */
   dividers: Rect[];
