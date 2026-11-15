@@ -17,13 +17,15 @@ import type { AudioDirector } from '@tr/game/core/audio/audioDirector.js';
 import { hashSeed, mulberry32 } from '@tr/game/core/rng.js';
 import { createRunSession, type RunSessionDeps } from './runSession.js';
 import type { LeaderboardService } from './leaderboard.js';
-import { COINS_KEY, consumeEquipped, shopActions, walletBalance } from './localEconomy.js';
+import { COINS_KEY, consumeEquipped, runEnhance, walletBalance } from './localEconomy.js';
 import { configLocked, isCharacterGated, selectUnlockActions } from './unlock.js';
 import { createEventsScene } from './eventsScene.js';
+import { createShopScene } from './shopScene.js';
 import { createStartScene } from './startScene.js';
 import { createAchievementsScene } from './achievementsScene.js';
 import { achievementMinRunSeconds, createAchievementTracker } from './achievementTracker.js';
 import type { AchievementApiLike } from './achievementApiCore.js';
+import { bestScore, BEST_KEY } from './bestScore.js';
 import { observePickupEvents } from '../core/sim/pickupTally.js';
 import { TelemetryRecorder } from './telemetry.js';
 import { createSettingsScene, currentThemeId, pruneThemeSelection, themeMusic, volumePrefs } from './settingsScene.js';
@@ -32,15 +34,12 @@ import type { PlatformAdapter } from '@tr/framework/platform/platformAdapter.js'
 import type { GameViews, RunSummary } from './views.js';
 import { readEntry, saveEntry, type EntryMethod } from './session.js';
 
-/** 历史最佳分存储键（v2 修正键；旧版笔误键含真省略号 U+2026，见 LEGACY_BEST_KEY） */
-export const BEST_KEY = 'thunderrun:best';
-/** 旧版笔误键 'thunderrun:b…st'：bestScore() 读取时一次性迁移，避免旧成绩静默丢失 */
-const LEGACY_BEST_KEY = 'thunderrun:b\u2026st';
+/** 历史最佳分键（读写在 bestScore.ts）：旧导入路径兼容 re-export（tests/mainFlow.test.mjs 与 profileView 消费） */
+export { BEST_KEY } from './bestScore.js';
 export const CHAR_KEY = 'thunderrun:character';
 export const DEFAULT_CHAR = 'char_volt';
-// 钱包存储键与购买/解锁逻辑在 localEconomy.ts；COINS_KEY 从那里 re-export（旧导入路径兼容）
-export { COINS_KEY, DIAMOND_KEY } from './localEconomy.js';
-export { THEME_KEY } from './settingsScene.js'; // 定义与读写语义见 settingsScene.ts
+// 钱包存储键与购买/解锁逻辑在 localEconomy.ts；COINS_KEY 旧导入路径兼容、THEME_KEY 读写语义见 settingsScene.ts
+export { COINS_KEY, DIAMOND_KEY, THEME_KEY } from './localEconomy.js';
 
 export interface GameFlowDeps {
   adapter: PlatformAdapter;
@@ -95,18 +94,6 @@ export function createGameFlow(deps: GameFlowDeps): GameFlow {
   /** 音频导演：配置加载成功后创建；game.params.audio 缺省时为空操作（不阻塞玩法） */
   let audio: AudioDirector | null = null;
 
-  /** 历史最佳分：兼容旧键；脏值按 0，result 仅在破纪录时落盘。 */
-  const bestScore = (): number => {
-    const raw = adapter.storage.get(BEST_KEY);
-    if (raw !== null) { const n = Number(raw); return Number.isFinite(n) && n > 0 ? n : 0; }
-    const legacy = adapter.storage.get(LEGACY_BEST_KEY);
-    if (legacy === null) return 0;
-    const n = Number(legacy);
-    adapter.storage.remove(LEGACY_BEST_KEY);
-    if (!Number.isFinite(n) || n <= 0) return 0;
-    adapter.storage.set(BEST_KEY, String(n));
-    return n;
-  };
   /** 上次选的角色（本机记忆；账号级保存在 S9 接 extras.cloud 后端） */
   let charId = adapter.storage.get(CHAR_KEY) ?? DEFAULT_CHAR;
   const knownCharacterEntry = (id: string): NamedEntry | undefined =>
@@ -144,7 +131,12 @@ export function createGameFlow(deps: GameFlowDeps): GameFlow {
     saveEntry(adapter.storage, method);
     machine.go('select');
   };
-  let shopBack: (() => void) | null = null;
+  // 商店场景（shopScene.ts）：进店自动合成扫描 + 完整商店动作装配，escape 供全局 Esc 退回
+  const shopScene = createShopScene({
+    adapter, views, content: () => content,
+    goShopBack: (returnTo, characterId) => machine.go(returnTo, returnTo === 'characterSelect' ? { characterId } : undefined),
+    onCharacterUnlocked: () => tracker.applyCharacterUnlock(),
+  });
 
   const machine = createSceneMachine<SceneName>({
     boot: {},
@@ -189,20 +181,7 @@ export function createGameFlow(deps: GameFlowDeps): GameFlow {
         }, selected, entry);
       },
     },
-    shop: {
-      onEnter: ctx => {
-        const request = typeof ctx === 'object' && ctx !== null ? ctx as { returnTo?: unknown; characterId?: unknown } : {};
-        const returnTo = request.returnTo === 'characterSelect' ? 'characterSelect' : 'select';
-        const characterId = typeof request.characterId === 'string' && knownCharacter(request.characterId)
-          ? request.characterId : undefined;
-        if (!content) { machine.go('select'); return; }
-        const c = content;
-        shopBack = () => machine.go(returnTo, returnTo === 'characterSelect' ? { characterId } : undefined);
-        // 本机经济购买（审查 M4-2）：钱包快照供按钮可用态，onBuy 返回结果供视图回显
-        views.renderShop(content, shopActions(adapter.storage, c, () => shopBack?.()));
-      },
-      onExit: () => { shopBack = null; },
-    },
+    shop: shopScene,
     events: createEventsScene({ adapter, views, content: () => content, goSelect: () => machine.go('select') }),
     settings: createSettingsScene({
       storage: adapter.storage, views, content: () => content,
@@ -229,6 +208,8 @@ export function createGameFlow(deps: GameFlowDeps): GameFlow {
           createScene: deps.createScene, debug: deps.debug, test: deps.test,
           trackRun: deps.trackRun, trackAchievements,
           consumeItems: () => consumeEquipped(adapter.storage, content!),
+          // 本机强化注入（休闲局生效，排位局 runSession 内跳过保重放确定性）：道具时长加成 + 技能等级缩放
+          enhance: runEnhance(adapter.storage, content!, charId),
           recordRun: (state, meta) => telemetry.recordRun(state, meta),
           themeId: currentThemeId(adapter.storage, content) ?? undefined,
           onSeed: seed => { lastSeed = seed; }, onEnd: summary => machine.go('result', summary),
@@ -244,7 +225,7 @@ export function createGameFlow(deps: GameFlowDeps): GameFlow {
         // 视图要显示角色名而非内部 id（char_volt → 小电）：查 characters 配置补 charName（content 可空）
         const summary: RunSummary = { ...(ctx as RunSummary) };
         if (content && summary.charId) summary.charName = buildLoadout(content, summary.charId).name;
-        const best = bestScore();
+        const best = bestScore(adapter.storage);
         if (summary.score > best) adapter.storage.set(BEST_KEY, String(summary.score));
         const coinsGot = summary.coins ?? 0;
         if (coinsGot > 0) adapter.storage.set(COINS_KEY, String(walletBalance(adapter.storage, 'coin') + coinsGot));
@@ -259,13 +240,13 @@ export function createGameFlow(deps: GameFlowDeps): GameFlow {
     },
   }, 'boot');
 
-  // 全局按键：run 中 Esc 退回选角页（v2 onInput 的 key 分支，替代 v1 adapter.onKey，S10 §7.3）
+  // 全局按键：Esc（v2 onInput 的 key 分支，替代 v1 adapter.onKey，S10 §7.3）——run 回主界面，
+  // shop/achievements 交给场景自管回退目标，settings/leaderboard 统一回主界面
   adapter.onInput(e => {
-    if (e.type === 'key' && e.phase === 'down' && e.code === 'Escape' && machine.current() === 'run') machine.go('select');
-    else if (e.type === 'key' && e.phase === 'down' && e.code === 'Escape' && machine.current() === 'shop') shopBack?.();
-    else if (e.type === 'key' && e.phase === 'down' && e.code === 'Escape' && machine.current() === 'settings') machine.go('select');
-    else if (e.type === 'key' && e.phase === 'down' && e.code === 'Escape' && machine.current() === 'achievements') machine.go('select');
-    else if (e.type === 'key' && e.phase === 'down' && e.code === 'Escape' && machine.current() === 'leaderboard') machine.go('select');
+    if (e.type !== 'key' || e.phase !== 'down' || e.code !== 'Escape') return;
+    const cur = machine.current();
+    if (cur === 'shop') shopScene.escape();
+    else if (cur === 'run' || cur === 'settings' || cur === 'achievements' || cur === 'leaderboard') machine.go('select');
   });
 
   async function boot(): Promise<void> {
