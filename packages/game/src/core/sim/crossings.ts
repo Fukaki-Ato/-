@@ -4,6 +4,7 @@
  * 玩家经过时按「深度窗 + 高度带」判一次穿越 → 推 cross 事件进 drainEvents（计分/连击消费）。
  * 纯逻辑：零 three 依赖、零分配（事件对象按需 push 例外）、同输入恒同输出（回放安全）。
  */
+import { inWarpClear, type WarpSeg } from './warps.js';
 
 export type CrossingKind = 'ring' | 'rib';
 
@@ -68,13 +69,47 @@ export function cullCrossings(list: CrossingEntity[], dist: number, cullBehindM:
   list.length = kept;
 }
 
-/** trackGen 出生钩子：[from, target) 区间按 everyM 均匀插 ring，返回新的 nextZ（调用方持有游标） */
-export function spawnRings(list: CrossingEntity[], target: number, nextZ: number,
-  everyM: number, fromM: number, yMin: number, yMax: number): number {
-  let z = Math.max(nextZ, fromM);
-  while (z < target) {
-    insertCrossing(list, { kind: 'ring', lane: 0, worldZ: z, yMin, yMax });
-    z += everyM;
+/** crossings 配置段的一条出生规则（obstacles.json crossings.ring / crossings.rib；nextZ=出生游标，trackGen 持有推进） */
+export interface CrossingRule {
+  kind: CrossingKind;
+  everyM: number;
+  fromM: number;
+  yMin: number;
+  yMax: number;
+  nextZ: number;
+}
+
+/**
+ * 解析 obstacles.json 的 crossings 块（配置键驱动：ring=雷脊金环 / rib=泰坦肋拱；缺键或 everyM≤0=不出该 kind）。
+ * trackGen 构造调用一次；未配置 crossings 返回空数组 ⇒ 全主题零变化。
+ * rib 的 yMax=4.5 对齐泰坦肋拱「跑过档」净高（ribs.ts 两档 4.5 跑过 / 2.2 滑铲）；
+ * 泰坦侧暂不画 rib 视觉（渲染 Phase 后置，金环视觉只在 stormspire/landmarks.ts），先只让 sim 判定/计分生效。
+ */
+export function parseCrossings(obstacles: unknown): CrossingRule[] {
+  const block = (obstacles as { crossings?: Record<string, { everyM?: unknown; fromM?: unknown; yMin?: unknown; yMax?: unknown }> }).crossings;
+  const rules: CrossingRule[] = [];
+  for (const kind of ['ring', 'rib'] as const) {
+    const c = block?.[kind];
+    if (!c || typeof c.everyM !== 'number' || c.everyM <= 0) continue; // 未配置/非法 ⇒ 该 kind 不出生
+    const fromM = typeof c.fromM === 'number' ? c.fromM : 0;
+    rules.push({
+      kind, everyM: c.everyM, fromM,
+      yMin: typeof c.yMin === 'number' ? c.yMin : 0,
+      yMax: typeof c.yMax === 'number' ? c.yMax : 3,
+      nextZ: fromM,
+    });
   }
-  return Math.max(z, fromM);
+  return rules;
+}
+
+/** trackGen 出生钩子：按 rule 在 [from, target) 区间按 everyM 均匀插该 kind 穿越体，游标写回 rule.nextZ。
+ *  warps 缺省=零变化；传入时隧道净空（段内+前后 12m）候选跳过——隧道内无肋拱/铜环（金币河替代段）。 */
+export function spawnKind(list: CrossingEntity[], target: number, rule: CrossingRule, warps?: WarpSeg[]): void {
+  let z = Math.max(rule.nextZ, rule.fromM);
+  while (z < target) {
+    if (warps && inWarpClear(warps, z)) { z += rule.everyM; continue; }
+    insertCrossing(list, { kind: rule.kind, lane: 0, worldZ: z, yMin: rule.yMin, yMax: rule.yMax });
+    z += rule.everyM;
+  }
+  rule.nextZ = Math.max(z, rule.fromM);
 }

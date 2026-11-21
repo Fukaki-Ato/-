@@ -13,6 +13,10 @@ export function contentForRunTheme(content: GameContent, themeId?: string): Game
   const obstacles = { ...content.obstacles };
   if (scenery !== 'library') delete obstacles['antigrav'];
   if (scenery !== 'forgeheart') delete obstacles['tideAware'];
-  if (scenery !== 'stormspire') delete obstacles['crossings'];
+  const crossings = obstacles.crossings;
+  if (scenery === 'stormspire') obstacles.crossings = crossings?.ring ? { ring: crossings.ring } : undefined;
+  else if (scenery === 'titan') obstacles.crossings = crossings?.rib ? { rib: crossings.rib } : undefined;
+  else delete obstacles.crossings;
+  if (scenery !== 'stormspire') { delete obstacles.warp; delete obstacles.coinRain; delete obstacles.lowGrav; }
   return { ...content, obstacles };
 }

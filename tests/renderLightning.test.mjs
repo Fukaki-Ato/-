@@ -7,6 +7,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { applyLightningFlash, createLightningFx, FLASH_PEAK, FLASH_TINT } from '../packages/game/dist/render/lightning.js';
+import { updateWarpAtmosphere } from '../packages/game/dist/render/warpAtmosphere.js';
 
 test('闪电闪白分别恢复天空色与雾色基线', () => {
   const skyBase = new THREE.Color('#8ED0F2');
@@ -20,6 +21,33 @@ test('闪电闪白分别恢复天空色与雾色基线', () => {
   applyLightningFlash(background, fog, skyBase, fogBase, flashTint, 0);
   assert.equal(background.getHex(), skyBase.getHex());
   assert.equal(fog.getHex(), fogBase.getHex());
+});
+
+test('雷脊无隧道保留主题雾；隧道从本帧各自底色混合，退出精确恢复', () => {
+  const skyBase = new THREE.Color('#16233E'), fogBase = new THREE.Color('#3D6B8F');
+  const tint = new THREE.Color(FLASH_TINT), warpTint = new THREE.Color('#1a0b33');
+  const background = new THREE.Color(), fog = new THREE.Color();
+  let k = 0;
+  const frame = (active, flash, dt = 0.05) => {
+    applyLightningFlash(background, fog, skyBase, fogBase, tint, flash);
+    k = updateWarpAtmosphere(background, fog, k, active, dt);
+  };
+  frame(false, 0);
+  assert.equal(background.getHex(), skyBase.getHex()); assert.equal(fog.getHex(), fogBase.getHex());
+  frame(true, 0.5, 0.3);
+  assert.equal(k, 0.5);
+  assert.equal(background.getHex(), skyBase.clone().lerp(tint, 0.425).lerp(warpTint, 0.425).getHex());
+  assert.equal(fog.getHex(), fogBase.clone().lerp(tint, 0.425).lerp(warpTint, 0.425).getHex());
+  frame(true, 0, 0.6);
+  assert.equal(k, 1);
+  frame(false, 0, 0.3);
+  assert.equal(k, 0.5);
+  assert.equal(fog.getHex(), fogBase.clone().lerp(warpTint, 0.425).getHex());
+  frame(false, 0, 0.3);
+  assert.equal(k, 0);
+  assert.equal(background.getHex(), skyBase.getHex()); assert.equal(fog.getHex(), fogBase.getHex());
+  frame(false, 1);
+  assert.equal(fog.getHex(), fogBase.clone().lerp(tint, 0.85).getHex(), '退出后闪电仍使用主题雾基线');
 });
 
 test('触发雷击：闪白立即拉满并随时间衰减归零', () => {

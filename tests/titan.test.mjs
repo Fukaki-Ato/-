@@ -3,6 +3,8 @@
  * 盯三件事：① 全部实例化、无散 mesh（尸体地形不许散装）；
  * ② update(move, t) 每帧推得动、大步长绕回不越界、动画层不报错；
  * ③ 颅首睁眼闩锁：420m 一次性、不可逆、awakeBoost 呼吸幅度联动（§10.1-6）。
+ * 加一例 sim 层：泰坦肋拱穿越（obstacles.json crossings.rib 出生 → cross 事件 kind='rib' 计分；
+ * 视觉 Phase 后置暂不画 rib，先只让判定/计分生效——写法参照 forgeheart.test.mjs 的 surge 用例）。
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -90,4 +92,23 @@ test('睁眼闩锁：420m 一次性触发、不可逆、awakeBoost 呼吸幅度 
   skull.update(2, 3.0, THRESHOLD_M + 500); // 更远也保持醒态
   assert.equal(skull.awakeBoost, 1, '持续醒态');
   disposeScene(scene, skull);
+});
+
+test('泰坦肋拱与雷脊金环：各自按出生网格触发，不串到其他主题', async () => {
+  const { RunnerSim } = await import('../packages/game/dist/core/sim/runnerSim.js');
+  const { loadContent } = await import('../tools/replay/runner.mjs');
+  const content = loadContent();
+  const play = themeId => {
+    const sim = new RunnerSim(content, 4242, 'char_volt', false, [], themeId);
+    const crossings = [];
+    for (let i = 0; i < 60 * 16 && sim.state.alive; i++) {
+      sim.step();
+      for (const ev of sim.drainEvents()) if (ev.type === 'cross') crossings.push([ev.kind, ev.worldZ]);
+    }
+    assert.ok(sim.state.distance > 156, '真实跑局应覆盖首两道肋拱和首枚金环的位置');
+    return crossings;
+  };
+  assert.deepEqual(play('theme_titan'), [['rib', 100], ['rib', 156]]);
+  assert.deepEqual(play('theme_stormspire'), [['ring', 150]]);
+  assert.deepEqual(play('theme_seaside_day'), []);
 });

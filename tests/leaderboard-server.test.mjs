@@ -42,6 +42,7 @@ function rankedFixture({ coinRun = false } = {}) {
   }];
   content.obstacles.dropTable.weights = {};
   delete content.obstacles.zap;
+  delete content.obstacles.warp; delete content.obstacles.coinRain; delete content.obstacles.lowGrav; // 排名fixture隔离三事件：零输入基线（collectedCoins=0）不被金币河/金币雨打破
   return content;
 }
 

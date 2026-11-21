@@ -3,7 +3,7 @@
  */
 import * as THREE from 'three';
 import type { CloudEntity, ObstacleEntity } from '@tr/game/core/sim/trackGen.js';
-import { RAMP_TOP_FLAT_M, obstacleX } from '@tr/game/core/sim/collision.js';
+import { RAMP_TOP_FLAT_M, laserOn, obstacleX } from '@tr/game/core/sim/collision.js';
 import { createPosterPicker, posterSize } from './adPosters.js';
 import { createStormspireObstacleSkin, SKIN_CLASSES, type SkinCalibration } from './stormspire/obstacleSkin.js';
 import { createTitanObstacleSkin } from './titan/obstacleSkin.js';
@@ -18,8 +18,7 @@ const OBS_MAX = 40, CLOUD_MAX = 12;
 const OBS_NEAR = 10, OBS_FAR = -140, CLOUD_NEAR = 12, CLOUD_FAR = -140;
 /** 高杆横杆下沿（与 core/sim 的 BAR_BOTTOM 对应：杆体画在 1.2m 以上，下方留钻的空间） */ const BAR_LOW_Y = 1.2;
 /** 高杆横杆的可见透明度：半透明才不挡视线（审计 T3 蹲杆挡视线） */ const GATE_OPACITY = 0.4;
-/** 横杆上海报的透明度：比杆体实一些才读得出画面，但仍能透出后面的金币（0.4 会让海报形同消失） */
-const GATE_POSTER_OPACITY = 0.72;
+const GATE_POSTER_OPACITY = 0.72; // 横杆上海报的透明度：比杆体实一些才读得出画面，但仍能透出后面的金币（0.4 会让海报形同消失）
 /** low 障碍可视高度系数：与 core 判定口径对齐（collision.ts：s.y < o.h*0.75 判中），穿模观感消除 */
 const LOW_VISUAL_H = 0.75;
 /** hazard 薄片只是核心线，另叠 0.35m 高电弧光带，与「要跳 0.35m」的判定口径对齐 */
@@ -110,8 +109,7 @@ export function createObstacleLayer(scene: THREE.Scene, laneWidth: number, scene
     ramp.visible = false; root.add(ramp);
     const rampTop = new THREE.Mesh(boxGeo, rampMat);
     rampTop.visible = false; root.add(rampTop);
-    // 广告墙正面：不受光的海报面片（广告牌自带亮度，夜色里不该被方向光压暗）。transparent 一次性打开、只改 opacity：
-    // 横杆要半透明而矮障要不透明，逐帧翻 transparent 会重排渲染队列。
+    // 广告墙正面：不受光的海报面片（广告牌自带亮度，夜色里不该被方向光压暗）。transparent 一次性打开、只改 opacity： 横杆要半透明而矮障要不透明，逐帧翻 transparent 会重排渲染队列。
     const poster = new THREE.Mesh(posterGeo, new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true }));
     poster.visible = false; root.add(poster);
     units.push({ bar, posts, band, disc, bolt, ramp, rampTop, poster });
@@ -170,18 +168,20 @@ export function createObstacleLayer(scene: THREE.Scene, laneWidth: number, scene
           && (!isZap || skin.zapSkin === true);
         /** 正面海报（广告墙竖版图 / 矮障·横杆·车头的方版图）；不挂或宿主未注入时为 null ⇒ 纯色挡板 */
         const slot = pickPoster(o);
-        const m = u.bar;
-        m.visible = !isZap && o.cls !== 'step' && !skinned; // 闪电圈用圆盘+闪电标志、斜坡用坡道几何，不画通用方块
+        const m = u.bar, laserLit = o.cls === 'laser' && !!o.laserCfg && laserOn(o.laserCfg, t);
+        const charging = o.cls === 'laser' && !!o.laserCfg && !laserLit && laserOn(o.laserCfg, t + 0.5);
+        m.visible = !isZap && o.cls !== 'step' && !skinned && (o.cls !== 'laser' || laserLit || charging); // 激光亮灭与核心同源，充能单独提示
         let sx = o.w, sy = o.h, sz = o.d, py = o.h / 2;
         if (m.visible) {
           const mat = m.material as THREE.MeshStandardMaterial;
           mat.color.setHex(slot ? slot.frame : OBS_COLOR[o.cls] ?? 0xd9a24a);
-          mat.emissive.setHex(o.cls === 'hazard' ? 0x7a3fd9 : 0x000000);
+          mat.emissive.setHex(o.cls === 'hazard' ? 0x7a3fd9 : 0x000000); mat.emissiveIntensity = 1; // 强度逐帧复位基准（激光充能态在下方加强，防槽位跨障碍泄漏）
           mat.roughness = 0.6;
-          // 高杆横杆（obs_gate_low）半透明化：下方的金币与障碍要能透出来，只留立柱提示轮廓
-          mat.transparent = o.cls === 'high';
-          mat.opacity = (o.cls === 'high' ? GATE_OPACITY : 1) * (1 - sink);
-          mat.depthWrite = o.cls !== 'high';
+          // 高杆横杆（obs_gate_low）半透明化：下方的金币与障碍要能透出来，只留立柱提示轮廓；激光充能态同走半透明
+          mat.transparent = o.cls === 'high' || charging;
+          mat.opacity = (charging ? 0.28 + 0.10 * Math.sin(t * 14) : o.cls === 'high' ? GATE_OPACITY : 1) * (1 - sink);
+          mat.depthWrite = o.cls !== 'high' && !charging;
+          if (o.cls === 'laser') { mat.emissive.copy(mat.color); mat.emissiveIntensity = charging ? 1.6 : 2.4; } // 预燃弱光与启用强光分开；槽位复用在上方复位
           if (o.cls === 'high') { sy = Math.max(0.5, o.h - BAR_LOW_Y); py = BAR_LOW_Y + sy / 2; } // 顶部横杆，下方可钻
           // low：可视高度按判定口径画到 h*0.75（碰撞盒仍为 o.h，见 core/sim collision.ts）
           if (o.cls === 'low') { sy = o.h * LOW_VISUAL_H; py = sy / 2; }
