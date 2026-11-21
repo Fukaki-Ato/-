@@ -4,7 +4,7 @@
 import { RunRng } from '../rng.js'; import { MAX_RANKED_INPUTS, type ReplayInput } from '../leaderboard.js';
 import type { GameContent } from '../config/configTypes.js';
 import { BuffEngine, type BuffView, type CastContext, type FxState } from '../effects/buffEngine.js';
-import { buildLoadout, itemEffects, type EffectSpec, type Loadout } from './character.js';
+import { buildLoadout, itemEffects, type EffectSpec, type Loadout, itemSpecsWithBonus, type RunEnhance } from './character.js';
 import { collectCoins, collectPickups, type CollectDeps } from './collect.js';
 import { hitsRunner, inDepthWindow, isNearMiss, relZ, safestLane, type FlipCtx } from './collision.js';
 import { clearSkyCoins } from './landing.js';
@@ -30,7 +30,6 @@ const GEN_AHEAD_M = 320;
 const CULL_BEHIND_M = 14;
 /** 受击后的速度惩罚、倒地动画推进系数与上限 */
 const STUN_SPEED_MUL = 0.6, TOPPLE_RATE = 2.2, TOPPLE_MAX = 1.4;
-
 export class RunnerSim {
   readonly obstacles: ObstacleEntity[] = [];
   readonly coinsArr: CoinEntity[] = [];
@@ -69,19 +68,18 @@ export class RunnerSim {
   private readonly buffCtx: CastContext = { distance: 0, lane: 0 };
   private bonusScore = 0;
   private itemPickups = 0;
+  private readonly itemOf: Record<string, number> = {};
   /** 任务遥测不改变历史 summary / golden 回放结构。 */
-  get missionStats() { return { slides: this.mv.totalSlides, itemPickups: this.itemPickups }; }
-  /** Actual pickups (before currency multipliers). */
-  collectedCoins = 0;
+  get missionStats() { return { slides: this.mv.totalSlides, jumps: this.mv.totalJumps, itemPickups: this.itemPickups, itemOf: { ...this.itemOf } }; }
+  /** Actual pickups (before currency multipliers). */ collectedCoins = 0;
   readonly firstCoinRecord = new FirstCoinRecord();
   replayFrames = 0;
-  readonly replayInputs: ReplayInput[] = [];
-  replayOverflow = false;
-
+  readonly replayInputs: ReplayInput[] = []; replayOverflow = false;
   /** 开局注入的道具：购买自动装备→开局消费→server 重放按 run.items_json 同构复现 */
   readonly initialItems: string[];
   readonly themeId: string | undefined;
-  constructor(private readonly content: GameContent, seed: number, charId?: string, private readonly recordReplay = false, initialItems?: string[], themeId?: string) {
+  constructor(private readonly content: GameContent, seed: number, charId?: string, private readonly recordReplay = false, initialItems?: string[],
+    themeId?: string, private readonly enhance?: RunEnhance) {
     this.themeId = resolveRunThemeId(content, themeId);
     content = contentForRunTheme(content, this.themeId);
     this.tideAware = !!(content.obstacles as unknown as { tideAware?: unknown }).tideAware;
@@ -108,7 +106,9 @@ export class RunnerSim {
       addBonus: (n) => { this.bonusScore += n; }, creditCoins: (n) => this.creditCoinsBulk(n),
       onFlightStart: () => { this.mv.flyWasActive = true; },
     }));
-    this.loadout = charId ? buildLoadout(content, charId) : EMPTY_LOADOUT;
+    // 技能等级缩放（可选增强）：只在调用方显式给了 skillScale 时才传 options——缺省路径装配产物逐位一致（保 golden replay）
+    this.loadout = charId
+      ? buildLoadout(content, charId, enhance?.skillScale !== undefined ? { skillScale: enhance.skillScale } : undefined) : EMPTY_LOADOUT;
     this.collectDeps = {
       state: this.state, coins: this.coinsArr, pickups: this.pickupsArr, fx: this.buffs.fx, events: this.events,
       laneWidth: this.laneWidth, coinFront: this.coinFront, creditCoin: () => this.creditCoin(), grantItem: (id) => this.grantItem(id),
@@ -119,16 +119,14 @@ export class RunnerSim {
       tutorial: { protectionS: this.protectionS, take: () => { if (this.usedProtection) return false; this.usedProtection = true; return true; } },
     };
     this.applyPassive();
-    // 装备道具注入（t=0 直接加 buff，不计入 itemPickups 拾取指标）：与局内拾取同一条 buff 通路
+    // 装备道具注入（t=0 直接加 buff，不计入 itemPickups 拾取指标）；时长加成经 itemSpecsWithBonus，缺省零 diff
     this.initialItems = (initialItems ?? []).filter(id => itemEffects(content, id).length > 0).slice(0, 3);
-    for (const id of this.initialItems) this.applyEffects(itemEffects(content, id), id);
+    for (const id of this.initialItems) this.applyEffects(itemSpecsWithBonus(this.content, id, this.enhance?.itemBonusS?.(id)), id);
   }
 
   /** buff 派生视图（渲染/HUD/测试统一从这里读，任何地方不得写） */
   get fx(): FxState { return this.buffs.fx; }
-
   buffList(): BuffView[] { return this.buffs.list(this.hudBuffs); }
-
   drainEvents(): SimEvent[] {
     if (!this.events.length) return this.events;
     const out = this.events.slice();
@@ -174,7 +172,6 @@ export class RunnerSim {
   private applyPassive() {
     if (this.loadout.passive.length) this.applyEffects(this.loadout.passive, this.loadout.talentLabel);
   }
-
   /** 把一组原语规格施加到引擎（技能/被动/道具共用一条通路） */
   private applyEffects(effects: EffectSpec[], fallbackLabel: string) {
     const s = this.state;
@@ -183,7 +180,10 @@ export class RunnerSim {
     for (const eff of effects) this.buffs.add(eff.primitive, eff.params, eff.label || fallbackLabel, this.buffCtx, eff.stackRule);
   }
 
-  private grantItem(itemRef: string) { this.itemPickups++; this.applyEffects(itemEffects(this.content, itemRef), itemRef); }
+  private grantItem(itemRef: string) {
+    this.itemPickups++; this.itemOf[itemRef] = (this.itemOf[itemRef] ?? 0) + 1;
+    this.applyEffects(itemSpecsWithBonus(this.content, itemRef, this.enhance?.itemBonusS?.(itemRef)), itemRef);
+  }
 
   /** 金币入账：coinValueAdd 的百分比加成走小数累计，避免每枚金币四舍五入丢分 */
   private creditCoin() {

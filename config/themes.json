@@ -1,11 +1,11 @@
 {
   "$schema": "../schema/config.schema.json#/themes",
-  "configVersion": "2.1.0",
+  "configVersion": "2.2.1",
   "minEngineVersion": "1.0.0",
-  "updatedAt": "2026-09-29",
+  "updatedAt": "2026-11-14",
   "items": [
     {
-      "id": "theme_seaside_day", "status": "live",
+      "id": "theme_seaside_day", "status": "live", "price": { "coin": 1000 },
       "name": { "zh-CN": "白日海景" },
       "sky": { "shader": "thunder_sky", "baseColor": "#4FA6DE", "flashColor": "#FFFFFF", "flashEveryS": [9999, 9999] },
       "fog": { "color": "#CFE9F6", "density": 0.011 },
@@ -26,7 +26,7 @@
       ]
     },
     {
-      "id": "theme_rain_konbini", "status": "draft",
+      "id": "theme_rain_konbini", "status": "live", "price": { "coin": 1000 },
       "name": { "zh-CN": "雨夜便利店" },
       "sky": { "shader": "thunder_sky", "baseColor": "#1A2340", "flashColor": "#9FD8FF", "flashEveryS": [11, 24] },
       "fog": { "color": "#243050", "density": 0.011 },
@@ -46,7 +46,7 @@
       ]
     },
     {
-      "id": "theme_dusk_harbor", "status": "live",
+      "id": "theme_dusk_harbor", "status": "live", "price": { "coin": 1000 },
       "name": { "zh-CN": "黄昏渔港" },
       "sky": {
         "shader": "thunder_sky",

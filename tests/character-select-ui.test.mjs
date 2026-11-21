@@ -139,15 +139,15 @@ test('shard synthesis is independently enabled and never repeats or bypasses con
   assert.equal(find('select-synthesize-button').disabled, false, 'enough shards');
   find('select-synthesize-button').click();
   assert.equal(find('select-start-button').disabled, false);
-  assert.equal(walletBalance(store, 'shard_ama'), 60);
+  assert.equal(walletBalance(store, 'shard_ama'), 70);
   assert.equal(actions.onSynthesize('char_ama').ok, false);
-  assert.equal(walletBalance(store, 'shard_ama'), 60, 'duplicate action does not spend');
+  assert.equal(walletBalance(store, 'shard_ama'), 70, 'duplicate action does not spend');
   dispose();
   fixture.content.characters.items.find(c => c.id === 'char_kaze').locked = true;
-  grant(store, [{ item: 'shard_kaze', n: 60 }]);
+  grant(store, [{ item: 'shard_kaze', n: 70 }]);
   assert.equal(actions.canSynthesize('char_kaze'), false);
   assert.equal(actions.onSynthesize('char_kaze').ok, false);
-  assert.equal(walletBalance(store, 'shard_kaze'), 60);
+  assert.equal(walletBalance(store, 'shard_kaze'), 70);
   const disposeLocked = createCharacterSelectOverlay(fixture.content, {
     ...actions, onSelect() {}, onStartRun() {}, onShop() {}, onBack() {},
   }, 'char_kaze', 'guest', {});

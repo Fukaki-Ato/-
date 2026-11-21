@@ -1,6 +1,7 @@
 import type { GameContent } from '../core/config/configTypes.js';
 import type { PlatformAdapter } from '@tr/framework/platform/platformAdapter.js';
 import { RunnerSim } from '../core/sim/runnerSim.js';
+import type { RunEnhance } from '../core/sim/character.js';
 import { hashSeed } from '../core/rng.js';
 import { leaderboardRulesId, MAX_RANKED_FRAMES, type LeaderboardService, type RankingFeedback, type RankedTicket, type RankedReplay } from './leaderboard.js';
 import { createRunnerScene } from '../render/runnerScene.js';
@@ -11,12 +12,16 @@ export interface RunSessionDeps {
   adapter: PlatformAdapter; views: GameViews; content: GameContent; charId: string;
   /** 装备消费回调（mainFlow 注入）：休闲局消费装备并注入 buffs；排位局跳过（服务端重放无道具，保确定性） */
   consumeItems?: () => string[];
+  /** 可选增强（mainFlow 注入）：道具时长加成与技能等级缩放。排位局不传——与 items 排位跳过同模式，保服务端重放确定性；缺省零 diff */
+  enhance?: RunEnhance;
   /** 遥测骨架（S16b 前置）：局末记录（环形缓冲在本机，不上报） */
   recordRun?: (state: import('@tr/game/core/sim/simTypes.js').RunnerState, meta: { seed: number; charId: string; items: string[]; cause: 'death' | 'exit' }) => void;
   service?: LeaderboardService; debug?: boolean; test?: boolean; themeId?: string;
   cloudProgress?: boolean;
   createScene?: typeof createRunnerScene;
   trackRun?: (sim: RunnerSim, seed: number, content?: GameContent) => () => void;
+  /** 成就观察器（mainFlow 注入）：sim 创建即装（分道具拾取打点），死亡/退出共用的 dispose 收口结算 */
+  trackAchievements?: (sim: RunnerSim) => () => void;
   onSeed(seed: number): void; onEnd(summary: RunSummary): void;
   onDeath(): void; onCast(): void; onPickup(): void;
   onIntro?(stage: 'start' | 'end'): void;
@@ -39,6 +44,7 @@ export function createRunSession(d: RunSessionDeps): { dispose(): void; finish()
   let activeTicket: RankedTicket | undefined, completed = false;
   let finishTracking: (() => void) | undefined;
   let finishCurrent: (() => boolean) | undefined;
+  let finishAchievements: (() => void) | undefined;
   const release = (ticket?: RankedTicket): void => {
     if (ticket && d.service?.cancel) void d.service.cancel(ticket.runId).catch(() => {});
   };
@@ -52,8 +58,12 @@ export function createRunSession(d: RunSessionDeps): { dispose(): void; finish()
     const seed = ticket?.seed ?? hashSeed('run-' + Date.now());
     d.onSeed(seed);
     const items = ticket ? [] : d.consumeItems?.() ?? [];
-    const sim = new RunnerSim(d.content, seed, d.charId, !!ticket, items, d.themeId);
-    finishTracking = d.trackRun?.(sim, seed, d.content);
+    const enhance = ticket ? undefined : d.enhance;
+    const sim = new RunnerSim(d.content, seed, d.charId, !!ticket, items, d.themeId, enhance);
+    // 任务回放也使用标准规则；不能把使用本机强化的对局按另一个规则重新计分。
+    if (!enhance) finishTracking = d.trackRun?.(sim, seed, d.content);
+    else if (!d.debug && !d.test) ranking.set('本局使用本机强化，不计服务端任务、成就或排行榜');
+    finishAchievements = d.trackAchievements?.(sim);
     const host = { canvas: d.adapter.canvas.mainCanvas(), size: d.adapter.canvas.windowSize() };
     hud = d.views.mountHud();
     hud.update({ score: 0, coins: 0, distance: 0, hits: 0, lives: sim.lives, buffs: [], skill: null });
@@ -116,6 +126,7 @@ export function createRunSession(d: RunSessionDeps): { dispose(): void; finish()
   return { finish: () => finishCurrent?.() ?? false, dispose() {
     cancelled = true;
     finishTracking?.(); finishTracking = undefined;
+    finishAchievements?.(); finishAchievements = undefined; // 死亡与退出共用 funnel：成就按局收口在此
     if (!completed) release(activeTicket);
     scene?.dispose(); hud?.dispose();
     if (d.test) uninstallTestApi();

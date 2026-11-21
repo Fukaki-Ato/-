@@ -38,7 +38,7 @@
 .mobile-lobby .lobby-start { position: relative; display: flex; align-items: center; justify-content: center; width: 100%; min-height: 60px; padding: 12px 66px; font-size: 22px !important; border-radius: 18px; letter-spacing: .06em; }
 .start-arrow { position: absolute; right: 12px; display: grid; place-items: center; width: 38px; height: 32px; border-radius: 12px; background: #ffffff25; font-size: 11px; letter-spacing: 0; }
 .lobby-play-hint { margin: 3px 0 0; font-size: 10px; text-align: center; color: #577579; }
-.lobby-bottom-nav { display: grid; grid-template-columns: repeat(4, 1fr); width: 100%; padding-top: 6px; border-top: 1px solid #cce0d9; }
+.lobby-bottom-nav { display: grid; grid-template-columns: repeat(5, 1fr); width: 100%; padding-top: 6px; border-top: 1px solid #cce0d9; }
 .lobby-nav-button { display: grid; justify-items: center; align-content: center; gap: 2px; min-height: 62px; padding: 3px 2px; border: 0; background: none; color: var(--ui-ink); font-size: 11px !important; font-weight: 800 !important; }
 .lobby-nav-button + .lobby-nav-button { border-left: 1px solid #d9e6df; }
 .lobby-nav-button img { width: 34px; height: 34px; }

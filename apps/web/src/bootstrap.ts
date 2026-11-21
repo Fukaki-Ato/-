@@ -6,6 +6,7 @@ import { createOverlayViews } from '@tr/game/ui/overlayViews.js';
 import { createUiShell } from './uiShell.js';
 import '../style.css';
 import { createCharacterSelectOverlay } from './characterSelectOverlay.js';
+import { createChestOverlay } from './chestOverlay.js';
 import { createShopOverlay } from './shopOverlay.js';
 import { injectObstaclePosters, injectPickupTiles } from './runAssets.js';
 import { injectIntroVideos } from './introVideo.js';
@@ -14,6 +15,7 @@ import { createMissionIntegration } from './missionIntegration.js';
 import { openProfileOverlay } from './profileOverlay.js';
 import { createEventsOverlay } from './eventsOverlay.js';
 import { createMobileSettings, createMobileResult } from './mobilePanels.js';
+import { createMobileAchievements } from './mobileAchievements.js';
 import { createMobileHud } from './mobileHud.js';
 import { createMobileLeaderboard } from './mobileLeaderboard.js';
 import { createLeaderboardClient } from './leaderboardClient.js';
@@ -45,11 +47,13 @@ async function main(): Promise<void> {
     selectRenderer: (content, actions, currentCharId, entry) =>
       createCharacterSelectOverlay(content, actions, currentCharId, entry, shell.fonts),
     shopRenderer: (content, actions) => createShopOverlay(content, actions, shell.fonts),
+    chestRenderer: (content, actions) => createChestOverlay(content, actions, shell.fonts),
     eventsRenderer: (content, actions) => createEventsOverlay(content, actions, shell.fonts),
     lobbyRenderer: missions.lobbyRenderer,
     settingsRenderer: (content, actions, currentThemeId, volumes) =>
       createMobileSettings(content, actions, currentThemeId, volumes,
         () => openProfileOverlay(content, adapter.storage)),
+    achievementsRenderer: createMobileAchievements,
     resultRenderer: createMobileResult,
     hudRenderer: createMobileHud,
     leaderboardRenderer: createMobileLeaderboard,
@@ -65,7 +69,9 @@ async function main(): Promise<void> {
     configResolve,
     debug,
     test: testMode,
+    qa, // QA 口径位：?anim/?ui=demo 等纯演示局与任务门同源地关掉 run 局成就统计
     trackRun: missions.trackRun,
+    achievementsApi: missions.achievementsApi,
     leaderboard: qa ? undefined : createLeaderboardClient(import.meta.env.BASE_URL),
   });
 

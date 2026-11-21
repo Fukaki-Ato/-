@@ -4,7 +4,8 @@
  * Existing wallet keys are lazily migrated; unrelated settings keep their original storage.
  */
 import type { MissionSnapshot } from '../core/missions/types.js';
-import { COINS_KEY, DIAMOND_KEY, KEYS_KEY, SHARD_PREFIX, ITEM_PREFIX, type EconomyStore } from './localEconomy.js';
+import { COINS_KEY, DIAMOND_KEY, KEYS_KEY, SHARD_PREFIX, ITEM_PREFIX, UNLOCKS_KEY,
+  THEME_UNLOCKS_KEY, ITEM_UPGRADE_PREFIX, CHAR_LEVEL_PREFIX, type EconomyStore } from './localEconomy.js';
 import { PLAYER_NAME_KEY, PLAYER_RENAMES_KEY } from '../core/profile/playerProfile.js';
 
 export const REWARD_WALLET_KEY = 'thunderrun:reward-wallet-v1';
@@ -12,12 +13,16 @@ type State = { version: 1 | 2; values: Record<string, string | null>; ledgers: R
   local?: Record<string, string | null> };
 export interface RewardWalletStore extends EconomyStore {
   transaction<T>(operation: (draft: EconomyStore) => T): T;
-  syncRewards(snapshot: MissionSnapshot): void;
+  /** 幂等导入快照钱包：只读 rewardLedgerId（账本游标）+wallet（累计奖励）两个字段，
+   *  任务与成就快照共用同一账本，故参数按这两字段收窄（AchievementsApi 的 onSnapshot 同款直传）。 */
+  syncRewards(snapshot: Pick<MissionSnapshot, 'rewardLedgerId' | 'wallet'>): void;
 }
 const isWalletKey = (key: string): boolean => [COINS_KEY, DIAMOND_KEY, KEYS_KEY].includes(key)
   || key.startsWith(SHARD_PREFIX) || key.startsWith(ITEM_PREFIX);
-const isLocalKey = (key: string): boolean => [PLAYER_NAME_KEY, PLAYER_RENAMES_KEY, 'thunderrun:equipped'].includes(key)
-  || key.startsWith('thunderrun:shop-once:') || key.startsWith('thunderrun:shop-limit:');
+const isLocalKey = (key: string): boolean => [PLAYER_NAME_KEY, PLAYER_RENAMES_KEY, 'thunderrun:equipped',
+  UNLOCKS_KEY, THEME_UNLOCKS_KEY, 'thunderrun:ach-claimed-v1'].includes(key)
+  || key.startsWith(ITEM_UPGRADE_PREFIX) || key.startsWith(CHAR_LEVEL_PREFIX)
+  || key.startsWith('thunderrun:loot-pity:') || key.startsWith('thunderrun:shop-once:') || key.startsWith('thunderrun:shop-limit:');
 const isManagedKey = (key: string): boolean => isWalletKey(key) || isLocalKey(key);
 const keyFor = (id: string): string | null => id === 'coin' ? COINS_KEY : id === 'diamond' ? DIAMOND_KEY
   : id === 'key' ? KEYS_KEY : /^shard_[a-z0-9_]+$/.test(id) ? SHARD_PREFIX + id : null;

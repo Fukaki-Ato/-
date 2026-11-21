@@ -30,12 +30,19 @@ export function createMobileSettings(
   const buttons = new Map<string, HTMLButtonElement>();
   const status = uiText('p', '', 'settings-status ui-muted');
   status.setAttribute('role', 'status');
+  /** 未开放（draft）/未解锁（商店 1000 能量币解锁体系）的锁定文案；null=可选择（流程层同口径校验） */
+  const lockOf = (option: (typeof options)[number]): string | null => {
+    if (option.status !== 'live') return '未开放';
+    return actions.isThemeUnlocked && !actions.isThemeUnlocked(option.id) ? '未解锁' : null;
+  };
   const paint = (): void => {
     for (const [id, button] of buttons) {
       const selected = current === id;
+      const option = options.find(o => o.id === id)!;
+      const lock = selected ? null : lockOf(option);
       button.classList.toggle('is-selected', selected);
       button.setAttribute('aria-pressed', String(selected));
-      button.querySelector('.theme-marker')!.textContent = selected ? '使用中 ✓' : '选择';
+      button.querySelector('.theme-marker')!.textContent = selected ? '使用中 ✓' : lock ?? '选择';
     }
   };
   for (const option of options) {

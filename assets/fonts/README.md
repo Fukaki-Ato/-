@@ -93,3 +93,32 @@ It preserves the combined character coverage (including theme, volume and versio
 copy), without using legacy glyph pixels or outlines. Its CJK atlas is 2048×2404;
 the shared dimension limit is now 4096px, not the earlier 2048px corpus limit.
 See [noto/README.md](noto/README.md) for the reproducible merged-corpus rebuild.
+
+## 2026-11-21 PR #59 recovery merge
+
+Merged `f885409` (deployed first parent) with recovered `5c79e5f` without rebuilding
+the legacy font: all 1,925 first-parent entries retain their glyph bitmap bytes,
+advances, bearings and other non-placement metadata. The 29 second-parent-only
+entries also retain their exact pixels and metrics:
+
+`⇔∖▲亦亨亲兵冗凌售墓富巧师拷携敬礼罄芒袋袭详谢赚赠述邮锋`
+
+Of the 1,561 shared entries, 1,560 have identical pixels and layout metrics in both
+parents. `察` keeps the deployed first-parent Noto OFL supplement rather than the
+second parent's legacy outline. No codepoint from either atlas is dropped.
+Only cell positions/UVs change during packing; the result has 1,954 entries at
+2048×2708 and an empty `missing` list. `charset.txt` is the sorted union of both
+parent charsets and the merged source scan (1,942 characters); historical atlas
+entries outside that scan are retained too.
+
+The independent WX OFL rebuild now has 95 Latin and 1,859 CJK/symbol/format
+entries, CJK 2048×2457. All previous WX glyph pixels and non-placement metadata
+remain identical. Actual achievement, shop, chest and commerce source literals,
+plus achievements/economy/character/theme configuration, have no missing WX
+glyphs. The same pinned Noto source is used; `∖` aliases its backslash outline as
+documented in `noto/provenance.json`. No legacy pixels enter WX. Existing Web
+WOFF2 + supplement OTF cover the new Chinese copy; the OTF was not changed.
+
+Verification: all 5 focused repack/licensed-atlas tests passed; PNG dimensions,
+cell bounds, exact UVs, glyph preservation and representative text layout were
+checked. This merge did not perform new browser or WX device screenshots.

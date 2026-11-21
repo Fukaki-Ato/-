@@ -91,11 +91,13 @@ function updatePeriodProgress(store, userId, period, periodId, metrics, characte
 }
 
 export class MissionService {
-  constructor({ store, content, now = Date.now, limits = {}, minRunSeconds, replaySource, legacyRuleset, trustedReplayRuntimeHashes = [] }) {
+  constructor({ store, content, now = Date.now, limits = {}, minRunSeconds, replaySource, legacyRuleset,
+    trustedReplayRuntimeHashes = [], achievements = null }) {
     this.store = store;
     this.content = content;
     this.now = now;
     this.limits = { ...DEFAULT_LIMITS, ...limits };
+    this.achievements = achievements;
     this.activeReplays = 0;
     const config = content.economy?.params?.missions;
     validateMissionConfig(config);
@@ -160,8 +162,7 @@ export class MissionService {
         missions: current.definitions.map(definition => missionView(definition, current.progress, current.claimed)),
       };
     };
-    // wallet 是本账本累计已领任务奖励，不是扣除本机消费后的可用余额。
-    // 非秘密的持久标识供客户端按账本幂等导入；身份认证仍要求原始会话 cookie。
+    // wallet 为同账本累计奖励；rewardLedgerId 供幂等导入，认证仍要求原始 cookie。
     return { serverTime, rewardLedgerId: userId, daily: makeGroup('daily'), weekly: makeGroup('weekly'), wallet: this.store.getWallet(userId) };
   }
 
@@ -235,16 +236,17 @@ export class MissionService {
     }
     finally { this.activeReplays--; }
     if (replay.frames !== frames) throw new ApiError(400, '回放包含死亡后的额外帧，请按死亡帧结束');
-    // 与排行榜 replay-worker 同口径：有效局必须以死亡帧收尾（endless runner 只有一种终局）。
-    // 不校验 alive 时，脚本可提交任意 ≥minRunSeconds 的存活截断局刷 mruns/mnohit（审查 S-1）。
+    // 有效局必须死亡收尾，防止存活截断局刷 mruns/mnohit（与排行榜同口径，审查 S-1）。
     const validRun = replay.elapsedSeconds + 1e-9 >= definition.minRunSeconds && replay.summary.alive === false;
     const finishedAt = this.now();
     const metrics = {
       distanceM: replay.summary.distance, coins: replay.summary.coins,
       slides: validCount(replay.missionStats?.slides) ? replay.missionStats.slides : 0,
+      jumps: validCount(replay.missionStats?.jumps) ? replay.missionStats.jumps : 0,
       runs: 1, skillCasts: replay.summary.casts, nearMiss: replay.summary.nearMiss,
       cleanRuns: replay.summary.hits === 0 ? 1 : 0, score: replay.summary.score,
       itemPickups: validCount(replay.missionStats?.itemPickups) ? replay.missionStats.itemPickups : 0,
+      itemPickupsById: replay.missionStats?.itemPickupsById ?? {},
     };
     this.store.transaction(() => {
       const latest = this.store.getRun(runId, userId);
@@ -261,6 +263,8 @@ export class MissionService {
           const playedCount = replay.summary.charId ? this.store.addWeeklyCharacter(userId, current.weekly.periodId, replay.summary.charId) : 0;
           updatePeriodProgress(this.store, userId, 'weekly', current.weekly.periodId, metrics, playedCount);
         }
+        // 成就终身进度与任务进度同一事务结算：validRun 门槛（死亡收尾+最短局）与任务同口径
+        this.achievements?.applyRunMetrics(userId, metrics);
       }
       if (this.store.markRunFinished(runId, finishedAt, payloadHash, validRun) !== 1) throw new ApiError(409, '跑酷记录已被处理');
     });

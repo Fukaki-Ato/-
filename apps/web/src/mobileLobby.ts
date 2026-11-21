@@ -46,7 +46,9 @@ export function createMobileLobby(content: GameContent, actions: SelectActions, 
   const shortcuts = uiText('nav', '', 'lobby-shortcuts');
   shortcuts.setAttribute('aria-label', '更多玩法');
   for (const [label, icon] of [['活动', 'event'], ['任务', 'task'], ['成就', 'achievement'], ['排行榜', 'rank']] as const) {
-    const action = label === '排行榜' ? actions.onLeaderboard : label === '任务' ? actions.onTasks : undefined;
+    const action = label === '排行榜' ? actions.onLeaderboard
+      : label === '任务' ? actions.onTasks
+      : label === '成就' ? actions.onAchievements : actions.onEvents;
     const button = uiButton('', 'lobby-shortcut', action ?? comingSoon);
     button.append(coastalIcon(icon), uiText('span', label, 'shortcut-label'));
     shortcuts.append(button);
@@ -71,8 +73,9 @@ export function createMobileLobby(content: GameContent, actions: SelectActions, 
   const nav = uiText('nav', '', 'lobby-bottom-nav');
   nav.setAttribute('aria-label', '主菜单导航');
   for (const [label, icon, action] of [
-    ['商店', 'shop', actions.onShop ?? comingSoon], ['福利手册', 'handbook', comingSoon],
-    ['仓库', 'chest', comingSoon], ['角色', 'character', openCharacters],
+    ['商店', 'shop', actions.onShop ?? comingSoon], ['福利手册', 'handbook', actions.onHandbook ?? comingSoon],
+    ['仓库', 'chest', actions.onInventory ?? comingSoon], ['宝箱', 'chest', actions.onChest ?? comingSoon],
+    ['角色', 'character', openCharacters],
   ] as const) {
     const button = uiButton('', 'lobby-nav-button', action);
     button.append(coastalIcon(icon), uiText('span', label));

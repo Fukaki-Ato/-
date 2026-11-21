@@ -330,6 +330,7 @@ test('流程：设置入口 → 设置页（当前＝默认主题）→ 点选�
   assert.ok(page.content, '设置页拿到配置');
   assert.equal(page.currentThemeId, 'theme_seaside_day', '未存过 → 首个 live 主题');
 
+  store.set('thunderrun:theme-unlocks', JSON.stringify(['theme_demo_night'])); // 先在商店解锁
   assert.equal(page.actions.onSelectTheme('theme_demo_night'), true);
   assert.equal(store.get(THEME_KEY), 'theme_demo_night');
   assert.ok(seen.toasts.at(-1)?.includes('演示夜景') && seen.toasts.at(-1)?.includes('下一局生效'),
@@ -380,7 +381,7 @@ test('流程：脏存档（主题已删）在 boot 时清除回默认，不把�
 });
 
 test('流程：合法存档进局时注入所选主题；切换后下一局生效', async () => {
-  const { flow, seen, key } = makeFlow({ themes: themesWithDemo(), storedTheme: 'theme_demo_night' });
+  const { flow, store, seen, key } = makeFlow({ themes: themesWithDemo(), storedTheme: 'theme_demo_night' });
   await flow.boot();
 
   seen.select.at(-1).actions.onStartRun(DEFAULT_CHAR);
@@ -389,6 +390,7 @@ test('流程：合法存档进局时注入所选主题；切换后下一局生�
   key('Escape'); // 中途退出回大厅
   assert.equal(flow.machine.current(), 'select');
   seen.select.at(-1).actions.onSettings();
+  store.set('thunderrun:theme-unlocks', JSON.stringify(['theme_seaside_day'])); // 先在商店解锁
   seen.settings.at(-1).actions.onSelectTheme('theme_seaside_day');
   seen.settings.at(-1).actions.onBack();
   seen.select.at(-1).actions.onStartRun(DEFAULT_CHAR);

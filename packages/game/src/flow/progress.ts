@@ -1,8 +1,8 @@
 import type { SyncStorage } from '@tr/framework/platform/platformAdapter.js';
 import type { PlayerAccount } from '../core/playerProfile.js';
+import { bestScore as readBestScore, BEST_KEY } from './bestScore.js';
 
-export const BEST_KEY = 'thunderrun:best';
-const LEGACY_BEST_KEY = 'thunderrun:b\u2026st';
+export { BEST_KEY } from './bestScore.js';
 export const CHAR_KEY = 'thunderrun:character';
 export const DEFAULT_CHAR = 'char_volt';
 export const COINS_KEY = 'thunderrun:coins-total';
@@ -14,14 +14,7 @@ export function createFlowProgress(storage: SyncStorage, account?: PlayerAccount
     const n = Number(storage.get(key) ?? '0');
     return Number.isFinite(n) && n > 0 ? n : 0;
   };
-  const bestScore = (): number => {
-    if (account) return account.read().stats?.bestScore ?? 0;
-    if (storage.get(BEST_KEY) !== null) return count(BEST_KEY);
-    const best = count(LEGACY_BEST_KEY);
-    if (storage.get(LEGACY_BEST_KEY) !== null) storage.remove(LEGACY_BEST_KEY);
-    if (best > 0) storage.set(BEST_KEY, String(best));
-    return best;
-  };
+  const bestScore = (): number => account ? account.read().stats?.bestScore ?? 0 : readBestScore(storage);
   return {
     bestScore,
     initialCharacter: () => account?.read().preferences.characterId ?? storage.get(CHAR_KEY) ?? DEFAULT_CHAR,

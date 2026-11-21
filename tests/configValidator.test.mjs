@@ -23,6 +23,40 @@ test('真实配置跨文件引用检查全绿', () => {
   assert.deepEqual(validateRefs(content), []);
 });
 
+test('宝箱配置允许钻石产出并校验件数、钥匙价、引用与保底', () => {
+  const table = {
+    id: 'loot_chest_bronze', draws: 1, cost: { key: 1 },
+    entries: [{ ref: 'diamond:1', weight: 1, rarity: 'sr' }],
+    pity: { everyN: 8, guarantee: 'rarity:sr+' },
+  };
+  const content = {
+    characters: { items: [] }, skills: { items: [] }, items: { items: [] },
+    themes: { items: [] }, events: { items: [] }, obstacles: {},
+    economy: { params: { lootTables: [table] } },
+  };
+  assert.deepEqual(validateRefs(content), []);
+
+  table.draws = 0;
+  table.cost.key = 0;
+  table.entries[0].ref = 'item_ghost';
+  table.pity = { everN: 8, guarantee: 'rarity:sr+' };
+  const errors = validateRefs(content);
+  for (const issue of ['draws', 'cost.key', 'item_ghost', 'everN', 'pity.guarantee']) {
+    assert.ok(errors.some(e => e.includes(issue)), `${issue}: ${errors.join('\n')}`);
+  }
+});
+
+test('旧奖池无 draws/cost/pity 仍兼容；货币、道具、角色与碎片引用保持校验', () => {
+  const content = Object.fromEntries(NAMES.map(n => [n, load(n)]));
+  content.economy.params.lootTables.push({ id: 'loot_legacy', entries: [
+    { ref: 'coin:100' }, { ref: 'key:1' }, { ref: 'diamond:1' },
+    { ref: 'item_magnet' }, { ref: 'char_volt' }, { ref: 'shard_volt:10' },
+  ] });
+  assert.deepEqual(validateRefs(content), []);
+  content.economy.params.lootTables.at(-1).entries.push({ ref: 'shard_ghost:10' });
+  assert.ok(validateRefs(content).some(e => e.includes('奖池引用不存在') && e.includes('shard_ghost')));
+});
+
 test('数组不能冒充配置或技术段对象', () => {
   assert.ok(validateFile('game', []).some(e => e.includes('不是 JSON 对象')));
   assert.ok(validateFile('game', { configVersion: '1', params: [] }).some(e => e.includes('params 对象')));

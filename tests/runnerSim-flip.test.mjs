@@ -188,3 +188,28 @@ test('倒挂收集：天花板带金币（y=ceilH−0.65）被翻转身体中心
   for (let i = 0; i < 600 && sim.state.distance < 160; i++) sim.step();
   assert.equal(sim.state.coins, 1, '只吃天花板带币：地面币与倒挂身体中心差 |3.7−0.65|=3.05 > 容差 1.3');
 });
+
+test('倒挂真实跳跃与落地缓冲跳各计一次，同帧重复输入不加计；跳跃初速保留镜像方向', () => {
+  const sim = new RunnerSim(blankContent(), 7, undefined, false, [], 'theme_library');
+  sim.gen.nextZoneZ = Infinity;
+  sim.gen.zones.push({ startM: 60, endM: 150, ceilH: CEIL });
+  sim.state.t = 20; sim.state.distance = 62; sim.gen.genZ = 10000;
+  sim.step();
+  for (let i = 0; i < 100 && sim.state.y < CEIL; i++) sim.step();
+  assert.equal(sim.state.y, CEIL);
+  sim.applyAction('jump'); sim.applyAction('jump');
+  assert.equal(sim.missionStats.jumps, 1);
+  assert.ok(sim.state.vy < 0, '倒挂跳跃向地面');
+  sim.step();
+  let buffered = false;
+  for (let i = 0; i < 100 && sim.missionStats.jumps === 1; i++) {
+    if (!buffered && sim.state.vy > 0 && sim.state.y > CEIL - 0.5) {
+      sim.applyAction('jump'); buffered = true;
+      assert.equal(sim.missionStats.jumps, 1, '缓冲输入本身不计跳');
+    }
+    sim.step();
+  }
+  assert.equal(buffered, true);
+  assert.equal(sim.missionStats.jumps, 2);
+  assert.ok(sim.state.vy < 0, '缓冲跳也保留镜像方向');
+});

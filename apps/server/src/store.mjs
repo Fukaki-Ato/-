@@ -40,6 +40,16 @@ export class MissionStore {
       CREATE INDEX IF NOT EXISTS runs_by_user ON runs(user_id, started_at);
       CREATE TABLE IF NOT EXISTS replay_rulesets (id TEXT PRIMARY KEY, definition_json TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS service_metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+      CREATE TABLE IF NOT EXISTS achievement_stats (
+        user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        stat TEXT NOT NULL, value INTEGER NOT NULL DEFAULT 0 CHECK(value >= 0),
+        PRIMARY KEY(user_id, stat)
+      );
+      CREATE TABLE IF NOT EXISTS achievement_claims (
+        user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        achievement_id TEXT NOT NULL, claimed_at INTEGER NOT NULL,
+        PRIMARY KEY(user_id, achievement_id)
+      );
     `);
     // 旧行保留 NULL：无装备、主题走默认；迁移失败需在启动时暴露。
     const columns = new Set(this.db.prepare('PRAGMA table_info(runs)').all().map(column => column.name));
@@ -70,6 +80,14 @@ export class MissionStore {
       legacyMarker: this.db.prepare("SELECT value FROM service_metadata WHERE key = 'legacy-replay-baseline'"),
       saveLegacyMarker: this.db.prepare("INSERT INTO service_metadata(key, value) VALUES('legacy-replay-baseline', ?)"),
       bindLegacyRuns: this.db.prepare("UPDATE runs SET rules_id = ? WHERE status = 'open' AND rules_id IS NULL"),
+      addStat: this.db.prepare(`INSERT INTO achievement_stats(user_id, stat, value) VALUES(?, ?, ?)
+        ON CONFLICT(user_id, stat) DO UPDATE SET value = value + excluded.value`),
+      bestStat: this.db.prepare(`INSERT INTO achievement_stats(user_id, stat, value) VALUES(?, ?, ?)
+        ON CONFLICT(user_id, stat) DO UPDATE SET value = MAX(value, excluded.value)`),
+      stats: this.db.prepare('SELECT stat, value FROM achievement_stats WHERE user_id = ?'),
+      claims: this.db.prepare('SELECT achievement_id FROM achievement_claims WHERE user_id = ?'),
+      addClaim: this.db.prepare(`INSERT OR IGNORE INTO achievement_claims(user_id, achievement_id, claimed_at)
+        VALUES(?, ?, ?)`),
       countOpen: this.db.prepare(`SELECT COUNT(*) AS count FROM runs WHERE user_id = ? AND status = 'open' AND started_at >= ?`),
       run: this.db.prepare('SELECT * FROM runs WHERE id = ? AND user_id = ?'),
       finishRun: this.db.prepare(`UPDATE runs SET status = 'finished', finished_at = ?,
@@ -85,7 +103,8 @@ export class MissionStore {
         AND NOT EXISTS (SELECT 1 FROM wallets WHERE user_id = users.id AND amount > 0)
         AND NOT EXISTS (SELECT 1 FROM mission_periods WHERE user_id = users.id
           AND (progress_json != '{}' OR claimed_json != '{}'))
-        AND NOT EXISTS (SELECT 1 FROM weekly_characters WHERE user_id = users.id)`),
+        AND NOT EXISTS (SELECT 1 FROM weekly_characters WHERE user_id = users.id)
+        AND NOT EXISTS (SELECT 1 FROM achievement_stats WHERE user_id = users.id)`),
     };
   }
 
@@ -131,6 +150,16 @@ export class MissionStore {
     return Object.fromEntries(this.statements.wallet.all(userId).map(row => [row.item, row.amount]));
   }
   addWallet(userId, item, amount) { this.statements.addWallet.run(userId, item, amount); }
+  /** 成就终身进度：value→累加（addStat），单局最佳→MAX（bestStat）；itemOf 以 itemOf:<itemId> 为键 */
+  achievementStats(userId) {
+    return Object.fromEntries(this.statements.stats.all(userId).map(row => [row.stat, Number(row.value)]));
+  }
+  achievementClaims(userId) {
+    return new Set(this.statements.claims.all(userId).map(row => row.achievement_id));
+  }
+  addStat(userId, stat, value) { this.statements.addStat.run(userId, stat, value); }
+  bestStat(userId, stat, value) { this.statements.bestStat.run(userId, stat, value); }
+  addClaim(userId, achievementId, claimedAt) { this.statements.addClaim.run(userId, achievementId, claimedAt); }
   createRun(run) {
     this.statements.addRun.run(run.id, run.userId, run.startedAt, run.dailyId, run.weeklyId, run.seed, run.charId,
       run.items?.length ? JSON.stringify(run.items) : null, run.themeId ?? null, run.rulesId ?? null);

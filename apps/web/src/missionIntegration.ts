@@ -4,12 +4,14 @@ import type { GameFlowDeps } from '@tr/game/flow/mainFlow.js';
 import type { OverlayViewsDeps } from '@tr/game/ui/overlayViews.js';
 import { recordMissionRun } from '@tr/game/core/missions/recorder.js';
 import { MissionApi } from './missionApi.js';
+import { AchievementsApi } from './achievementsApi.js';
 import { createMobileLobby } from './mobileLobby.js';
 import { createMissionPanel } from './missionPanel.js';
 
 export function createMissionIntegration(testMode: boolean, wallet?: RewardWalletStore): {
   lobbyRenderer: NonNullable<OverlayViewsDeps['lobbyRenderer']>;
   trackRun: NonNullable<GameFlowDeps['trackRun']>;
+  achievementsApi: AchievementsApi;
 } {
   const api = new MissionApi(wallet);
   const lobbyRenderer: NonNullable<OverlayViewsDeps['lobbyRenderer']> = (content, actions, charId, extras) => {
@@ -44,5 +46,6 @@ export function createMissionIntegration(testMode: boolean, wallet?: RewardWalle
       } catch (error) { api.feedback = (error as Error).message; }
     };
   };
-  return { lobbyRenderer, trackRun };
+  // 成就 API 与任务 API 共享会话与钱包（漏传 wallet 只会让奖励入账延迟到下次任务 load，不丢失）
+  return { lobbyRenderer, trackRun, achievementsApi: new AchievementsApi(api, wallet) };
 }

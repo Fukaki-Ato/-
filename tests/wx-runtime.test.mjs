@@ -196,7 +196,8 @@ test('WX 启动使用包内配置；实际大厅→选角弹层→跑局→结�
   assert.equal(app.flow.machine.current(), 'select');
   assert.equal(resources.jsonPaths.filter(p => p === 'pkg-assets/config/gameplay.json').length, 1);
   assert.ok(!resources.jsonPaths.includes('pkg-assets/config/game.json'), '启动读取与构建期保留名别名一致');
-  assert.equal(resources.jsonPaths.filter(p => p.startsWith('pkg-assets/config/')).length, 8);
+  assert.equal(resources.jsonPaths.filter(p => p.startsWith('pkg-assets/config/')).length, 9);
+  assert.ok(resources.jsonPaths.includes('pkg-assets/config/achievements.json'));
   assert.ok(resources.jsonPaths.includes('assets/fonts/noto/latin.metrics.json'));
   assert.ok(resources.jsonPaths.includes('assets/fonts/noto/cjk.metrics.json'));
   assert.ok(!resources.jsonPaths.includes('assets/fonts/cjk.metrics.json'),'legacy mixed-font atlas is not a WX runtime input');

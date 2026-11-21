@@ -16,6 +16,10 @@ export function generateLicensedAtlases({fontPath,outDir,root=repoRoot()}) {
   if(sha256!==SOURCE_SHA256)throw Error('Font input differs from the documented OFL source');
   if(existsSync(outDir)&&readdirSync(outDir).length)throw Error('Output must be a new or empty task-owned directory');
   const {font}=loadFontSource(fontPath),codepoints=collectCharset(root),symbols=originalSymbolsFont();
+  // Noto has no U+2216 set-minus (used in a source comment); reuse its own backslash outline.
+  const outlineAliases=codepoints.includes(0x2216)?[{codepoint:0x2216,char:'∖',sourceCodepoint:0x5c,sourceChar:'\\'}]:[];
+  const charToGlyph=font.charToGlyph.bind(font);
+  font.charToGlyph=char=>charToGlyph(char==='∖'?'\\':char);
   const license=readFileSync(join(root,'assets/fonts/NotoSansSC-OFL.txt'));
   const result=[];
   for(const [name,select] of [['latin',isAsciiPrintable],['cjk',cp=>!isAsciiPrintable(cp)]]) {
@@ -31,6 +35,8 @@ export function generateLicensedAtlases({fontPath,outDir,root=repoRoot()}) {
     // A 3-decimal UV can shift a 2K atlas by 1–2px. Preserve actual cell-edge ratios.
     for(const glyph of metrics.glyphs){const r=glyph.cell;glyph.uv={x0:r.x/data.width,y0:r.y/data.height,
       x1:(r.x+r.w)/data.width,y1:(r.y+r.h)/data.height};}
+    for(const alias of outlineAliases){const glyph=metrics.glyphs.find(g=>g.codepoint===alias.codepoint);
+      if(glyph)glyph.outlineAlias={codepoint:alias.sourceCodepoint,char:alias.sourceChar};}
     metrics.generator='tools/fontgen/licensed.mjs (Noto OFL + original geometric marks)';
     result.push({name,...data});
   }
@@ -46,6 +52,7 @@ export function generateLicensedAtlases({fontPath,outDir,root=repoRoot()}) {
     rebuild:'node tools/fontgen/licensed.mjs --font <documented-Noto.otf> --out <new-directory>',
     outputs:result.map(d=>({name:d.name,glyphs:d.metrics.glyphs.length,width:d.width,height:d.height,bytes:d.png.length})),
     note:'Old atlases and Microsoft/Segoe fonts are not inputs. Source font itself is not distributed.'};
+  if(outlineAliases.length)provenance.outlineAliases=outlineAliases;
   writeFileSync(join(outDir,'provenance.json'),JSON.stringify(provenance,null,2)+'\n',{flag:'wx'});
   return provenance;
 }

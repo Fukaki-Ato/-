@@ -64,13 +64,15 @@ export function buildCoastalLobby(host: UiHost, d: CoastalLobbyDeps): { view: Ui
     ['角色', characters, '选择出战'], ['商店', d.actions.onShop, '俱乐部兑换'],
     ['仓库', d.actions.onInventory, '查看已拥有'], ['任务', d.actions.onTasks, '每日与每周'],
     ['免费福利手册', d.actions.onHandbook, '海岸之旅'], ['榜单', d.actions.onLeaderboard, '查看跑酷成绩'],
+    ['宝箱', d.actions.onChest, '使用钥匙开启'], ['成就', d.actions.onAchievements, '查看解锁进度'],
   ] as const;
   for (let i = 0; i < entries.length; i += 2) {
     const row = new Box({ direction: 'row', gap: 8 });
     for (const [title, action, subtitle] of entries.slice(i, i + 2)) {
+      if (i >= 6 && !action) continue;
       row.add(coastalCell(new CoastalAction(host, title, action, { subtitle })));
     }
-    content.add(row);
+    if (row.children.length) content.add(row);
   }
   content.add(coastalCard(host, [text('操作指南', 15, coast.sea),
     text('左右划切换车道，上划跳跃，下划滑铲。', 13, coast.muted),

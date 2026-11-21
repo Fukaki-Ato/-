@@ -6,6 +6,7 @@ import { DEFAULT_LIMITS } from './limits.mjs';
 import { ApiError } from './errors.mjs';
 import { loadMissionContent } from './content.mjs';
 import { MissionService } from './mission-service.mjs';
+import { AchievementService } from './achievement-service.mjs';
 import { MissionStore } from './store.mjs';
 import { fileURLToPath } from 'node:url';
 import { isIP } from 'node:net';
@@ -142,9 +143,11 @@ export function createMissionHttpServer(options = {}) {
   const trustedProxy = options.trustedProxy ?? process.env.TRUSTED_PROXY_IP;
   if (trustedProxy && !isIP(trustedProxy)) throw new Error('TRUSTED_PROXY_IP must be one exact proxy IP address');
   const store = new MissionStore(options.dbPath ?? process.env.MISSIONS_DB_PATH ?? fileURLToPath(new URL('../data/missions.sqlite', import.meta.url)));
-  let service;
+  let service, achievements;
   try {
-    service = new MissionService({ store, content: options.content ?? loadMissionContent(), now, limits, minRunSeconds: options.minRunSeconds,
+    const content = options.content ?? loadMissionContent();
+    achievements = new AchievementService({ store, content, now });
+    service = new MissionService({ store, content, now, limits, minRunSeconds: options.minRunSeconds, achievements,
       replaySource: options.replaySource, legacyRuleset: options.legacyRuleset,
       trustedReplayRuntimeHashes: options.trustedReplayRuntimeHashes ?? (process.env.TRUSTED_REPLAY_RUNTIME_HASHES ?? '').split(',').map(value => value.trim()).filter(Boolean) });
   } catch (error) { store.close(); throw error; }
@@ -222,6 +225,20 @@ export function createMissionHttpServer(options = {}) {
         const body = await readJson(request, limits.bodyBytes);
         assertKeys(body, ['period', 'periodId', 'missionId']);
         sendJson(response, 200, service.claim(userId, body));
+        return;
+      }
+      // 成就端点与 missions 端点同构：同一鉴权/限流/同源/body 三件套；错误方法不设守卫，
+      // 落到下方通用 404（与 missions 端点口径一致）
+      if (pathname === '/api/achievements' && request.method === 'GET') {
+        const userId = authenticate(request);
+        sendJson(response, 200, achievements.snapshot(userId));
+        return;
+      }
+      if (pathname === '/api/achievements/claim' && request.method === 'POST') {
+        const userId = authenticate(request);
+        const body = await readJson(request, limits.bodyBytes);
+        assertKeys(body, ['achievementId']);
+        sendJson(response, 200, achievements.claim(userId, body));
         return;
       }
       if (pathname.startsWith('/api/missions/')) throw new ApiError(404, '找不到该任务接口');

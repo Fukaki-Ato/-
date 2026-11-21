@@ -21,6 +21,8 @@ export interface ButtonOptions {
   variant?: 'normal' | 'primary';
   /** 覆盖主题皮肤 */
   skin?: NinePatchSource;
+  /** 覆盖底色乘色（固定语义色场景，如成就「可领取=绿」）；press 态仍走 pressedTint，禁用走半透明 */
+  backgroundColor?: string;
   padding?: EdgesInput;
   width?: Length;
   height?: Length;
@@ -84,7 +86,7 @@ export class Button extends Widget {
     if (!this.bg || !this.env) return;
     const pressed = this.machine.state === 'pressed';
     const disabled = this.machine.state === 'disabled';
-    this.bg.setColor(pressed ? this.env.theme.pressedTint : '#ffffff');
+    this.bg.setColor(pressed ? this.env.theme.pressedTint : this.opts.backgroundColor ?? '#ffffff');
     this.bg.setOpacity(disabled ? 0.45 : 1);
     this.label.setOpacity(disabled ? 0.45 : 1);
   }

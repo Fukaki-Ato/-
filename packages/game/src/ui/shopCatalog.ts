@@ -1,60 +1,73 @@
 /**
- * 商店目录构建（从 shopView 拆出：该文件要容纳购买交互，300 行上限两侧吃紧）。
- * 只读地把 economy.shop.offers + 预览卡收敛成 ShopListing 列表；购买交互在 shopView（canvas）
- * 与 apps/web shopOverlay（DOM）。statusText=null 的 listing 视为可直接购买。
+ * 商店目录构建（从 shopView 拆出；动态卡构造在 shopCards.ts）。
+ * 只读地把 economy.shop.offers + 动态卡（场景/道具强化/角色本体/角色碎片）+ 预览卡收敛成 ShopListing；
+ * 购买交互在 shopView（canvas）与 apps/web shopOverlay（DOM）。上架态以 availability 结构化字段为准
+ * （purchasable 才有购买按钮），statusText 仅作展示文案；限购/进度/解锁态不在此层（依赖 store，
+ * 见 localEconomy.offerPurchaseState、itemUpgradeState、themeCardState 与 unlock.characterCardState）。
  */
 import type { GameContent } from '@tr/game/core/config/configTypes.js';
 import type { ShopArtwork } from './shopImage.js';
 import { canUseEquippedItem } from '../flow/itemAvailability.js';
+import { buildDynamicCards } from './shopCards.js';
 
-export type ShopCategory = 'all' | 'currency' | 'items' | 'shards' | 'skins';
-export type ShopFilterCategory = 'all' | 'currency' | 'items' | 'special';
+export type ShopCategory = 'scene' | 'currency' | 'items' | 'shards' | 'skins' | 'character';
+export type ShopFilterCategory = 'scene' | 'currency' | 'items' | 'special';
+/** 结构化上架态：purchasable=可购买；coming-soon=有购买入口但暂不可买（活动/素材未就绪）；browse=纯配置展示不走购买 */
+export type ShopAvailability = 'purchasable' | 'coming-soon' | 'browse';
+/** 卡片类型：offer=配置商品；itemUpgrade=道具强化；shard=角色碎片卡；theme=场景卡；character=角色本体卡 */
+export type ShopListingKind = 'offer' | 'itemUpgrade' | 'shard' | 'theme' | 'character';
 export interface ShopListing {
   id: string;
-  category: Exclude<ShopCategory, 'all'>;
-  categories: Array<Exclude<ShopCategory, 'all'>>;
+  kind: ShopListingKind;
+  /** itemUpgrade→itemId；shard/character→charId；theme→themeId；offer 无需（id 即 offerId） */
+  refId?: string;
+  category: ShopCategory;
+  categories: ShopCategory[];
   rewardText: string;
   description: string;
   priceText: string;
   priceIcon?: 'coinIcon' | 'gemIcon';
   statusText: string | null;
+  availability: ShopAvailability;
   illustration?: ShopArtwork;
 }
 export const SHOP_PAGE_SIZE = 6;
+/** 首分类=场景（默认选中，商店打开即浏览场景）；special=角色（本体+碎片+皮肤） */
 export const SHOP_CATEGORIES: Array<{ id: ShopFilterCategory; label: string }> = [
-  { id: 'all', label: '全部' },
+  { id: 'scene', label: '场景' },
   { id: 'currency', label: '货币' },
   { id: 'items', label: '道具' },
   { id: 'special', label: '角色' },
 ];
-type Entry = Record<string, unknown>;
-function isEntry(value: unknown): value is Entry {
+export type Entry = Record<string, unknown>;
+export function isEntry(value: unknown): value is Entry {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
-function entries(value: unknown): Entry[] {
+export function entries(value: unknown): Entry[] {
   return Array.isArray(value) ? value.filter(isEntry) : [];
 }
-function textOf(entry: Entry | undefined, field: string): string {
+export function textOf(entry: Entry | undefined, field: string): string {
   if (!entry) return '';
   const localized = entry[field];
   if (isEntry(localized) && typeof localized['zh-CN'] === 'string') return localized['zh-CN'];
   return '';
 }
-function entryName(entry: Entry | undefined, fallback: string): string {
+export function entryName(entry: Entry | undefined, fallback: string): string {
   return textOf(entry, 'name') || fallback;
 }
-const CATEGORY_LABELS: Record<Exclude<ShopCategory, 'all'>, string> = {
-  currency: '货币', items: '道具', shards: '碎片', skins: '皮肤',
+const CATEGORY_LABELS: Record<ShopCategory, string> = {
+  scene: '场景', currency: '货币', items: '道具', shards: '碎片', skins: '皮肤', character: '角色',
 };
-export const shopCategoryLabel = (category: Exclude<ShopCategory, 'all'>): string => CATEGORY_LABELS[category];
+export const shopCategoryLabel = (category: ShopCategory): string => CATEGORY_LABELS[category];
 export const shopListingBadgeText = (listing: ShopListing): string => {
   const category = shopCategoryLabel(listing.category);
-  return listing.statusText === '待开放' || listing.statusText === '待补充'
-    ? `${category} · ${listing.statusText}` : listing.statusText ?? category;
+  if (listing.availability === 'coming-soon') return `${category} · ${listing.statusText}`;
+  return listing.statusText ?? category;
 };
 export const filterShopCatalog = (catalog: ShopListing[], category: ShopFilterCategory): ShopListing[] =>
-  category === 'all' ? catalog : catalog.filter(listing => category === 'special'
-    ? listing.categories.some(id => id === 'shards' || id === 'skins') : listing.categories.includes(category));
+  category === 'scene' ? catalog.filter(listing => listing.categories.includes('scene'))
+    : category === 'special' ? catalog.filter(listing => listing.categories.some(id => id === 'shards' || id === 'skins' || id === 'character'))
+      : catalog.filter(listing => listing.categories.includes(category));
 
 export function buildShopCatalog(content: GameContent): ShopListing[] {
   const items = entries(content.items.items);
@@ -126,7 +139,7 @@ export function buildShopCatalog(content: GameContent): ShopListing[] {
     };
   };
 
-  const configuredOffers = offers.flatMap(offer => {
+  const configuredOffers: ShopListing[] = offers.flatMap(offer => {
     const rewardRows = entries(offer.give);
     if (!rewardRows.length || typeof offer.id !== 'string') return [];
     const rewards = rewardRows.map(reward => {
@@ -142,54 +155,56 @@ export function buildShopCatalog(content: GameContent): ShopListing[] {
     const hasUnavailableReference = Boolean(eventRef && event?.status !== 'live');
     const hasUnavailableReward = rewards.some(reward => reward.status === 'draft' || reward.status === 'retired'
       || (reward.itemId.startsWith('item_') && !canUseEquippedItem(content, reward.itemId)));
+    const blocked = hasUnavailableReference || hasUnavailableReward;
     return [{
       id: offer.id,
+      kind: 'offer',
       category,
       categories,
       rewardText: rewards.map(reward => `${reward.name} ×${reward.count}`).join(' · '),
       description: rewards.map(reward => reward.description).filter(Boolean).join(' · '),
       ...price,
-      statusText: hasUnavailableReference || hasUnavailableReward ? '待开放' : null,
+      statusText: blocked ? '待开放' : null,
+      availability: blocked ? 'coming-soon' : 'purchasable',
       illustration: rewards.length === 1 ? rewards[0]!.illustration : undefined,
     }];
   });
   if (!configuredOffers.length) return [];
 
-  const itemPreviews: ShopListing[] = [
-    ['item_magnet', 'magnet'], ['item_boots', 'boots'], ['item_shield', 'shield'],
-  ].flatMap(([id, illustration]) => {
-    const item = items.find(candidate => candidate.id === id);
-    if (!item) return [];
-    return [{
-      id: `preview_${id}`, category: 'items', categories: ['items'],
-      rewardText: entryName(item, id), description: textOf(item, 'desc'), priceText: '',
-      statusText: '道具 · 非商店', illustration: illustration as ShopArtwork,
-    }];
-  });
-
-  const lootTables = entries(content.economy.params.lootTables).map(table => {
+  const lootTables: ShopListing[] = entries(content.economy.params.lootTables).map(table => {
     const tableId = typeof table.id === 'string' ? table.id : 'loot';
-    const name = tableId === 'loot_coin_chest' ? '金币箱' : tableId === 'loot_thunder_box' ? '雷霆箱' : tableId;
+    // 宝箱三档已有专属开启页（chest 场景），商店里只作配置导览
+    const name = tableId === 'loot_coin_chest' ? '金币箱' : tableId === 'loot_thunder_box' ? '雷霆箱'
+      : tableId === 'loot_chest_bronze' ? '铜宝箱' : tableId === 'loot_chest_silver' ? '银宝箱'
+        : tableId === 'loot_chest_gold' ? '金宝箱' : tableId;
+    const isChestTier = tableId.startsWith('loot_chest_');
     const price = priceInfo(table.cost);
     return {
-      id: `preview_${tableId}`, category: 'items' as const, categories: ['items' as const],
+      id: `preview_${tableId}`, kind: 'offer', category: 'items' as const, categories: ['items' as const],
       rewardText: `${name}（配置）`,
       description: `配置内容 · ${entries(table.entries).length} 项`,
-      ...price, statusText: '仅浏览配置', illustration: 'chest' as const,
+      ...price, statusText: isChestTier ? '宝箱页开启' : '仅浏览配置', availability: 'browse', illustration: 'chest' as const,
     };
   });
+
+  const dynamic = buildDynamicCards(content);
   const coinOffers = configuredOffers.filter(listing => listing.illustration === 'coinBag');
-  const otherOffers = configuredOffers.filter(listing => listing.illustration !== 'coinBag');
+  // 碎片 offer 已由碎片卡承载（带进度条/合成态），不再以普通商品卡重复出现
+  const otherOffers = configuredOffers.filter(listing =>
+    listing.illustration !== 'coinBag' && !listing.id.startsWith('offer_shard_'));
 
   return [
+    ...dynamic.sceneCards,
     ...coinOffers,
-    ...itemPreviews,
+    ...dynamic.itemUpgradeCards,
+    ...dynamic.characterCards,
+    ...dynamic.shardCards,
     ...otherOffers,
     ...lootTables,
     {
-      id: 'preview_compass', category: 'items', categories: ['items'],
+      id: 'preview_compass', kind: 'offer', category: 'items', categories: ['items'],
       rewardText: '方向标（素材）', description: '合成图图像，配置未提供',
-      priceText: '', statusText: '待补充', illustration: 'compass',
+      priceText: '', statusText: '待补充', availability: 'coming-soon', illustration: 'compass',
     },
   ];
 }

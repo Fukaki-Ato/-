@@ -23,9 +23,18 @@ test('unimplemented experience cards cannot be bought or consumed, including sav
   assert.deepEqual(buyOffer(s, content, 'offer_xp_card', new Date()), { ok: false, message: '道具未开放' });
   assert.deepEqual([...s.values], before, 'no charge, grant, equipment, or limit mutation');
   assert.equal(buildShopCatalog(content).find(offer => offer.id === 'offer_xp_card').statusText, '待开放');
+  assert.equal(buildShopCatalog(content).find(offer => offer.id === 'offer_xp_card').availability, 'coming-soon');
   assert.deepEqual(consumeEquipped(s, content), ['item_helmet']);
   assert.equal(walletBalance(s, 'item_xp_card'), 2, 'previously obtained cards remain in inventory');
   assert.equal(walletBalance(s, 'item_helmet'), 0, 'supported equipment is consumed only once');
+});
+
+test('preserved cloud character offers cannot charge the local wallet for free shipped roles', () => {
+  const s = store({ 'thunderrun:coins-total': '100000' }), before = [...s.values];
+  for (const id of ['offer_character_rina', 'offer_character_niu', 'offer_character_bolt']) {
+    assert.equal(buyOffer(s, content, id, new Date()).ok, false);
+    assert.deepEqual([...s.values], before);
+  }
 });
 
 test('shop daily limits reset at the device-local midnight under UTC, Shanghai, and Los Angeles', () => {
@@ -34,13 +43,13 @@ test('shop daily limits reset at the device-local midnight under UTC, Shanghai, 
     import assert from 'node:assert/strict';
     import { buyOffer } from ${JSON.stringify(moduleUrl)};
     const content = ${JSON.stringify(content)};
-    const values = new Map([['thunderrun:coins-total', '12000']]);
+    const values = new Map([['thunderrun:keys-total', '10']]);
     const store = { get: k => values.get(k) ?? null, set: (k, v) => values.set(k, v), remove: k => values.delete(k) };
-    for (let i = 0; i < 5; i++) assert.equal(buyOffer(store, content, 'offer_shard_volt', new Date(2026, 10, 5, 12)).ok, true);
-    assert.equal(buyOffer(store, content, 'offer_shard_volt', new Date(2026, 10, 5, 23, 59, 59)).ok, false);
-    assert.equal(buyOffer(store, content, 'offer_shard_volt', new Date(2026, 10, 6, 0, 0, 1)).ok, true);
-    assert.equal(values.get('thunderrun:shop-limit:offer_shard_volt:2026-11-05'), '5');
-    assert.equal(values.get('thunderrun:shop-limit:offer_shard_volt:2026-11-06'), '1');
+    for (let i = 0; i < 5; i++) assert.equal(buyOffer(store, content, 'offer_refill_coin', new Date(2026, 10, 5, 12)).ok, true);
+    assert.equal(buyOffer(store, content, 'offer_refill_coin', new Date(2026, 10, 5, 23, 59, 59)).ok, false);
+    assert.equal(buyOffer(store, content, 'offer_refill_coin', new Date(2026, 10, 6, 0, 0, 1)).ok, true);
+    assert.equal(values.get('thunderrun:shop-limit:offer_refill_coin:2026-11-05'), '5');
+    assert.equal(values.get('thunderrun:shop-limit:offer_refill_coin:2026-11-06'), '1');
   `;
   for (const TZ of ['UTC', 'Asia/Shanghai', 'America/Los_Angeles']) {
     // Send the fixture through stdin instead of exceeding Windows' command-line limit.

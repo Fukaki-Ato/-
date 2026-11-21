@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { MissionStore } from '../apps/server/src/store.mjs';
 import { MissionService } from '../apps/server/src/mission-service.mjs';
+import { AchievementService } from '../apps/server/src/achievement-service.mjs';
 import { loadMissionContent } from '../apps/server/src/content.mjs';
 import { RunnerSim } from '@tr/game/core/sim/runnerSim.js';
 import { getMissionPeriods } from '../apps/server/src/periods.mjs';
@@ -189,6 +190,43 @@ test('a retained publication needs explicit runtime trust without losing its pen
   current = f.restart(f.content, { replaySource: newerRuntime, trustedReplayRuntimeHashes: [replaySourceHash(otherRuntime)] });
   const result = await current.finishRun('rule-user', runId, { frames: 60, actions: [] });
   assert.equal(result.daily.missions.find(mission => mission.id === 'score').progress, 54321);
+});
+
+test('old ABI-1 metrics settle once after upgrade without inventing jumps or per-item pickups', async t => {
+  const store = new MissionStore(':memory:');
+  t.after(() => store.close());
+  const content = contentFixture();
+  content.achievements.items = [
+    { id: 'ach_old_runs', source: 'run', stat: 'runs', target: 10, reward: { coin: 1 } },
+    { id: 'ach_old_jumps', source: 'run', stat: 'jumps', target: 10, reward: { coin: 1 } },
+    { id: 'ach_old_item', source: 'run', stat: 'itemOf', statRef: 'item_magnet', target: 10, reward: { coin: 1 } },
+    { id: 'ach_old_score', source: 'run', stat: 'score', target: 100000, reward: { coin: 1 } },
+  ];
+  let now = Date.UTC(2026, 10, 11, 4);
+  store.createUser('old-metrics', now);
+  const oldService = new MissionService({ store, content, now: () => now, replaySource: otherRuntime });
+  const finished = oldService.startRun('old-metrics', { seed: 123, charId: 'char_volt' });
+  now += 2500;
+  await oldService.finishRun('old-metrics', finished.runId, { frames: 60, actions: [] });
+  const pending = oldService.startRun('old-metrics', { seed: 123, charId: 'char_volt' });
+  const achievements = new AchievementService({ store, content, now: () => now });
+  const options = { store, content, now: () => now, achievements, replaySource: otherRuntime.replace('54321', '12345') };
+  let upgraded = new MissionService(options);
+  now += 2500;
+  const payload = { frames: 60, actions: [{ frame: 0, action: 'jump' }] };
+  await assert.rejects(upgraded.finishRun('old-metrics', pending.runId, payload), error => error.status === 503);
+  assert.equal(store.getRun(pending.runId, 'old-metrics').status, 'open');
+  assert.deepEqual(store.achievementStats('old-metrics'), {});
+  upgraded = new MissionService({ ...options, trustedReplayRuntimeHashes: [replaySourceHash(otherRuntime)] });
+  await Promise.all([0, 1].map(() => upgraded.finishRun('old-metrics', pending.runId, payload)));
+  assert.equal(store.achievementStats('old-metrics').runs, 1);
+  assert.equal(store.achievementStats('old-metrics').score, 54321, 'issued runtime still supplies the score');
+  assert.equal(achievements.snapshot('old-metrics').achievements.find(item => item.stat === 'jumps').progress, 0,
+    'attempted inputs cannot reconstruct successful jumps from a runtime that did not measure them');
+  assert.equal(achievements.snapshot('old-metrics').achievements.find(item => item.stat === 'itemOf').progress, 0);
+  await upgraded.finishRun('old-metrics', finished.runId, { frames: 60, actions: [] });
+  assert.equal(store.achievementStats('old-metrics').runs, 1, 'a pre-upgrade finished ticket is not backfilled on retry');
+  await assert.rejects(upgraded.finishRun('old-metrics', pending.runId, { frames: 60, actions: [] }), error => error.status === 409);
 });
 
 test('legacy NULL tickets adopt the verified pre-binding baseline once, not a later publication', async t => {

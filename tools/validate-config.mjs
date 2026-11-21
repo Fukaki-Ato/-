@@ -80,8 +80,8 @@ for (const f of files) {
   if (schema[name]) checkNode(schema[name], data, name, errors);
   else errors.push(`schema: 缺少 ${name} 段（schema/config.schema.json 与 config/ 不同步）`);
 }
-// 8 个文件齐备才能做跨文件引用检查
-const missing = ['game', 'characters', 'skills', 'items', 'obstacles', 'themes', 'events', 'economy'].filter(n => !content[n]);
+// 全部文件齐备才能做跨文件引用检查
+const missing = ['game', 'characters', 'skills', 'items', 'obstacles', 'themes', 'events', 'economy', 'achievements'].filter(n => !content[n]);
 for (const m of missing) errors.push(`缺少配置文件: ${m}.json`);
 if (missing.length === 0) errors.push(...validateRefs(content));
 

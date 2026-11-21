@@ -9,6 +9,7 @@ import { Box, Button, Label, type NinePatchSource } from '@tr/framework/ui/index
 export const BADGE_NAMES = [
   'avatar', 'coin', 'gem', 'settings', 'event', 'achieve', 'task', 'rank',
   'start', 'castle', 'shop', 'handbook', 'chest', 'character',
+ 'key',
   // 档案面板的 10 枚二次元头像（5 女 5 男，与 avatar 同一套金框风格）
   'ava_01', 'ava_02', 'ava_03', 'ava_04', 'ava_05',
   'ava_06', 'ava_07', 'ava_08', 'ava_09', 'ava_10',

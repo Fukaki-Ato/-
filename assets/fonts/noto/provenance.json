@@ -24,13 +24,21 @@
     },
     {
       "name": "cjk",
-      "glyphs": 1830,
+      "glyphs": 1859,
       "width": 2048,
-      "height": 2404,
-      "bytes": 1077751
+      "height": 2457,
+      "bytes": 1094020
     }
   ],
   "note": "Old atlases and Microsoft/Segoe fonts are not inputs. Source font itself is not distributed. Merged coverage retains codepoints from both legacy atlases and the previous WX charset; no legacy outlines or pixels. U+FE0F is zero-width with no ink.",
+  "outlineAliases": [
+    {
+      "codepoint": 8726,
+      "char": "∖",
+      "sourceCodepoint": 92,
+      "sourceChar": "\\"
+    }
+  ],
   "defaultIgnorables": [
     {
       "codepoint": 65039,

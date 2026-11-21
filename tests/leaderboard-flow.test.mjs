@@ -160,3 +160,21 @@ test('云账户取票失败的普通跑局明确提示奖励和任务也不保�
   assert.match(f.seen.summary.ranking.message, /不计奖励、任务和排行榜/);
   f.session.dispose();
 });
+
+test('本机强化只进休闲模拟，任务与排位复用标准规则', async () => {
+  const track = [];
+  const deps = { enhance: { skillScale: 2 }, trackRun: sim => { track.push(sim); return () => {}; } };
+  const ranked = fixture(deps);
+  await tick();
+  assert.equal(track[0], ranked.seen.sim, '标准排位局仍可追踪任务');
+  const duration = sim => sim.loadout.skill.effects.find(effect => effect.primitive === 'invincible').params.durationS;
+  assert.equal(duration(ranked.seen.sim), 2.5);
+  ranked.session.dispose();
+
+  const local = fixture({ ...deps, service: undefined });
+  assert.equal(duration(local.seen.sim), 5);
+  assert.equal(track.length, 1, '强化后的回放不交给标准任务校验');
+  local.seen.callbacks.onEnd(local.seen.sim.summary());
+  assert.match(local.seen.summary.ranking.message, /本机强化/);
+  local.session.dispose();
+});

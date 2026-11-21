@@ -182,7 +182,7 @@ test('coin unlock and shard exchange grant once, retain welfare, and never charg
   assert.deepEqual(f.profile().welfare, privateWelfare); assert.equal(f.profile()._id, undefined);
   assert.equal(result.market.profile.commerce, undefined);
   assert.equal(error(await f.buy('unlock_shard_char_ama', 'already-owned')), 'ALREADY_OWNED');
-  f.profile().inventory.items.shard_kaze = 60;
+  f.profile().inventory.items.shard_kaze = 50; // 恢复的商店配置统一 50 碎片兑换。
   const shard = await f.buy('unlock_shard_char_kaze', 'shard-unlock'); assert.equal(shard.ok, true);
   assert.equal(shard.market.profile.inventory.items.shard_kaze, 0);
   assert.ok(shard.market.profile.inventory.characters.includes('char_kaze'));

@@ -7,10 +7,11 @@
  */
 import type { GameContent } from '@tr/game/core/config/configTypes.js';
 import type {
-  BootHandle, CharacterSelectPageActions, EventsActions, GameViews, HudHandle, ResultActions,
-  RunSummary, SelectActions, SelectExtras, SettingsActions, ShopActions, StartActions, StartHandle,
-  VolumeSettings,
+  AchievementsActions, AchievementsPageView, BootHandle, CharacterSelectPageActions, EventsActions,
+  GameViews, HudHandle, ResultActions, RunSummary, SelectActions, SelectExtras, SettingsActions,
+  ShopActions, StartActions, StartHandle, VolumeSettings,
 } from '../flow/views.js';
+import type { ChestActions } from '../flow/chest.js';
 import { DEFAULT_MUSIC_VOLUME, DEFAULT_SFX_VOLUME } from '../core/audio/audioDirector.js';
 import type { EntryMethod } from '../flow/session.js';
 import type { LeaderboardService } from '../flow/leaderboard.js';
@@ -21,8 +22,10 @@ import { buildLobbyPage } from './lobbyView.js';
 import { buildHudPage } from './hudView.js';
 import { buildResultPage } from './resultView.js';
 import { buildShopPage } from './shopView.js';
+import { buildChestPage } from './chestView.js';
 import { buildEventsPage } from './eventsView.js';
 import { buildSettingsPage } from './settingsView.js';
+import { buildAchievementsPage } from './achievementsView.js';
 import { createMenuBackdrop, type BackdropSet, type MenuBackdrop } from './menuBackdrop.js';
 import type { BadgeSet } from './badges.js';
 
@@ -38,11 +41,14 @@ export interface OverlayViewsDeps {
    */
   onLobbyVisible?(visible: boolean): void;
   shopRenderer?: (content: GameContent, actions: ShopActions) => () => void;
+  /** 宝箱页 DOM renderer（web 壳注入）；缺省走 canvas 版 buildChestPage */
+  chestRenderer?: (content: GameContent, actions: ChestActions) => () => void;
   eventsRenderer?: (content: GameContent, actions: EventsActions) => () => void;
   lobbyRenderer?: (content: GameContent, actions: SelectActions, currentCharId: string, extras?: SelectExtras) => () => void;
   settingsRenderer?: (
     content: GameContent, actions: SettingsActions, currentThemeId: string | null, volumePrefs?: VolumeSettings,
   ) => () => void;
+  achievementsRenderer?: (content: GameContent, page: AchievementsPageView, actions: AchievementsActions) => () => void;
   resultRenderer?: (summary: RunSummary, best: number, actions: ResultActions) => () => void;
   hudRenderer?: () => HudHandle;
   leaderboardRenderer?: (service: LeaderboardService, actions: { onBack(): void }) => () => void;
@@ -63,10 +69,16 @@ export function createOverlayViews(deps: OverlayViewsDeps): OverlayViews {
   let backdrop: MenuBackdrop | null = null;
   let disposeCharacterSelect: (() => void) | null = null;
   let disposeShopRenderer: (() => void) | null = null;
+  let disposeChestRenderer: (() => void) | null = null;
   let disposePanelRenderer: (() => void) | null = null;
   const clearShopRenderer = (): void => {
     const dispose = disposeShopRenderer;
     disposeShopRenderer = null;
+    dispose?.();
+  };
+  const clearChestRenderer = (): void => {
+    const dispose = disposeChestRenderer;
+    disposeChestRenderer = null;
     dispose?.();
   };
   const clearCharacterSelect = (): void => {
@@ -75,7 +87,7 @@ export function createOverlayViews(deps: OverlayViewsDeps): OverlayViews {
     dispose?.();
   };
   const clearTransient = (): void => {
-    clearCharacterSelect(); clearShopRenderer();
+    clearCharacterSelect(); clearShopRenderer(); clearChestRenderer();
     const dispose = disposePanelRenderer;
     disposePanelRenderer = null;
     dispose?.();
@@ -120,7 +132,8 @@ export function createOverlayViews(deps: OverlayViewsDeps): OverlayViews {
         currentCharId,
         extras: { coins: extras?.coins ?? 0, diamonds: extras?.diamonds ?? 0, badges: deps.badges },
         slots: { onShop: actions.onShop, onSettings: actions.onSettings, onRank: actions.onLeaderboard,
-          onTasks: actions.onTasks, onHandbook: actions.onHandbook, onChest: actions.onInventory },
+          onTasks: actions.onTasks, onHandbook: actions.onHandbook, onEvent: actions.onEvents,
+          onChest: actions.onChest ?? actions.onInventory, onAchievements: actions.onAchievements },
       });
       stopBackdrop();
       let frame: ((t: number) => void) | undefined;
@@ -159,6 +172,17 @@ export function createOverlayViews(deps: OverlayViewsDeps): OverlayViews {
       host.mount(buildShopPage(host, content, actions).view);
     },
 
+    renderChest(content: GameContent, actions: ChestActions): void {
+      clearTransient();
+      stopBackdrop();
+      if (deps.chestRenderer) {
+        host.mount(host.makeView(), { transparent: true });
+        disposeChestRenderer = deps.chestRenderer(content, actions);
+        return;
+      }
+      host.mount(buildChestPage(host, content, actions, deps.badges).view);
+    },
+
     renderEvents(content: GameContent, actions: EventsActions): void {
       clearTransient();
       stopBackdrop();
@@ -180,6 +204,18 @@ export function createOverlayViews(deps: OverlayViewsDeps): OverlayViews {
       }
       host.mount(buildSettingsPage(host, { content, actions, currentThemeId, volumePrefs: volumePrefs ?? { music: DEFAULT_MUSIC_VOLUME, sfx: DEFAULT_SFX_VOLUME } }).view);
     },
+
+    renderAchievements(content: GameContent, page: AchievementsPageView, actions: AchievementsActions): void {
+      clearTransient();
+      stopBackdrop();
+      if (deps.achievementsRenderer) {
+        host.mount(host.makeView(), { transparent: true });
+        disposePanelRenderer = deps.achievementsRenderer(content, page, actions);
+        return;
+      }
+      host.mount(buildAchievementsPage(host, { page, actions }).view);
+    },
+
 
     ...(deps.leaderboardRenderer ? {
       renderLeaderboard(service: LeaderboardService, actions: { onBack(): void }): void {
