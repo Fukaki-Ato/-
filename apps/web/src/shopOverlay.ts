@@ -36,7 +36,7 @@ export function createShopOverlay(content: GameContent, actions: ShopActions, _f
   header.querySelector('button')!.classList.add('shop-close-button');
   header.querySelector('button')!.setAttribute('aria-label', '返回上一页');
   const note = uiText('p', '旅途的小帮手，都在这里。', 'shop-intro');
-  const notice = uiText('div', '金币/钥匙商品可直接购买（本机经济）；皮肤暂为展示，宝箱请移步「宝箱」页', 'shop-browse-notice');
+  const notice = uiText('div', '金币/钥匙商品可直接购买；强化在大厅的「休闲酷跑」中生效。皮肤暂为展示。', 'shop-browse-notice');
   const walletBar = uiText('p', '', 'shop-wallet');
   const status = uiText('p', '', 'shop-feedback');
   status.setAttribute('role', 'status');

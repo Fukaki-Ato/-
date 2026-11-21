@@ -4,6 +4,7 @@ import { loadContent } from '../tools/replay/runner.mjs';
 import { leaderboardRulesId } from '../packages/game/dist/flow/leaderboard.js';
 import { createRunSession } from '../packages/game/dist/flow/runSession.js';
 import { createGameFlow } from '../packages/game/dist/flow/mainFlow.js';
+import { EQUIP_KEY, ITEM_PREFIX, ITEM_UPGRADE_PREFIX } from '../packages/game/dist/flow/localEconomy.js';
 
 const content = loadContent(), tick = () => new Promise(r => setImmediate(r));
 const ticket = { runId: 'ticket', seed: 101, rulesId: leaderboardRulesId(content) };
@@ -177,4 +178,27 @@ test('本机强化只进休闲模拟，任务与排位复用标准规则', async
   local.seen.callbacks.onEnd(local.seen.sim.summary());
   assert.match(local.seen.summary.ranking.message, /本机强化/);
   local.session.dispose();
+});
+
+test('正常联网时大厅可显式进强化休闲局，重开保持模式，标准按钮仍取排位票', async () => {
+  let select, result, begin = 0;
+  const scenes = [];
+  const stock = new Map([[EQUIP_KEY, '["item_magnet"]'], [ITEM_PREFIX + 'item_magnet', '1'], [ITEM_UPGRADE_PREFIX + 'item_magnet', '1']]);
+  const adapter = { storage: { get: k => stock.get(k) ?? null, set: (k, v) => stock.set(k, v), remove: k => stock.delete(k) },
+    fetchJson: async name => content[name], onInput: () => () => {}, canvas: { mainCanvas: () => ({}), windowSize: () => ({}) } };
+  const views = { renderBoot: () => ({ setStatus() {} }), renderSelect: (_c, actions) => { select = actions; },
+    mountHud: () => ({ update() {}, dispose() {} }), renderResult: (_s, _best, actions) => { result = actions; }, toast() {} };
+  const flow = createGameFlow({ adapter, views, configResolve: name => name,
+    leaderboard: { begin: async () => { begin++; return ticket; }, submit: async () => ({ accepted: true }) },
+    createScene: (_host, _adapter, sim, _c, callbacks) => { scenes.push({ sim, callbacks }); return { dispose() {} }; } });
+  await flow.boot();
+  select.onStartCasual('char_volt');
+  assert.equal(begin, 0);
+  assert.equal(scenes[0].sim.buffs.left('magnet'), 10.5);
+  scenes[0].sim.state.alive = false; scenes[0].callbacks.onEnd(scenes[0].sim.summary());
+  result.onRetry();
+  assert.equal(scenes.length, 2); assert.equal(begin, 0);
+  flow.machine.go('select'); select.onStartRun('char_volt');
+  await tick(); assert.equal(scenes.length, 3); assert.equal(begin, 1);
+  flow.dispose();
 });

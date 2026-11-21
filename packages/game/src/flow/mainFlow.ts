@@ -72,6 +72,7 @@ export function createGameFlow(deps: GameFlowDeps): GameFlow {
   let content: GameContent | null = null;
   let scene: ReturnType<typeof createRunSession> | null = null;
   let lastSeed = 0;
+  let casual = false;
   const telemetry = new TelemetryRecorder(adapter.storage);
   const tracker = createAchievementTracker(adapter.storage, () => content);
   const trackAchievements: RunSessionDeps['trackAchievements'] = deps.account || deps.debug || deps.test || deps.qa
@@ -129,6 +130,7 @@ export function createGameFlow(deps: GameFlowDeps): GameFlow {
     audio?.stopDeathMusic();
     if (content) views.renderSelect(content, {
       onStartRun: id => { if (rememberCharacter(id)) machine.go('run'); },
+      onStartCasual: !deps.account && deps.leaderboard ? id => { if (rememberCharacter(id)) machine.go('run', 'casual'); } : undefined,
       onChooseCharacter: id => rememberCharacter(id), onBack: () => machine.go('start'),
       onCharacterSelect: views.renderCharacterSelectPage ? () => machine.go('characterSelect') : undefined,
       onShop: () => machine.go('shop', { returnTo: 'select' }), onSettings: () => machine.go('settings'),
@@ -198,13 +200,14 @@ export function createGameFlow(deps: GameFlowDeps): GameFlow {
       else machine.go('select');
     } },
     run: {
-      onEnter: () => {
+      onEnter: mode => {
         if (!content) return;
         if (!availableCharacter(charId)) normalizeCharacter();
         if (!charId || !availableCharacter(charId)) { views.toast('暂无可用角色'); return; }
+        casual = !deps.account && mode === 'casual';
         audio?.enterRun(charId, themeMusic(adapter.storage, content)); // 按当前主题选 BGM，缺省回退全局 run
         scene = createRunSession({
-          adapter, views, content, charId, service: deps.leaderboard,
+          adapter, views, content, charId, service: casual ? undefined : deps.leaderboard,
           cloudProgress: !!deps.account,
           createScene: deps.createScene, debug: deps.debug, test: deps.test,
           trackRun: deps.trackRun, trackAchievements,
@@ -229,7 +232,7 @@ export function createGameFlow(deps: GameFlowDeps): GameFlow {
         progress.recordLocal(summary);
         const lbEntry = deps.leaderboard && views.renderLeaderboard ? () => machine.go('leaderboard') : undefined;
         views.renderResult(summary, best, {
-          onRetry: () => { if (rememberCharacter(charId)) machine.go('run'); },
+          onRetry: () => { if (rememberCharacter(charId)) machine.go('run', casual ? 'casual' : undefined); },
           onSelect: () => machine.go('select'), onLeaderboard: lbEntry,
         });
       },

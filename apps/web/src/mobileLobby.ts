@@ -69,6 +69,15 @@ export function createMobileLobby(content: GameContent, actions: SelectActions, 
   start.disabled = !character;
   start.setAttribute('aria-label', '开始酷跑');
   start.append(uiText('span', '开始酷跑'), uiText('span', 'GO →', 'start-arrow'));
+  let play: HTMLElement = start;
+  if (actions.onStartCasual) {
+    const casual = uiButton('休闲酷跑', 'lobby-casual', () => { if (character) actions.onStartCasual?.(character.id); });
+    casual.disabled = !character;
+    casual.title = '使用本机强化，不参与排行榜';
+    const modes = uiText('div', '', 'lobby-run-modes');
+    modes.append(start, casual);
+    play = modes;
+  }
   const hint = uiText('p', '左右滑动换道 · 上滑跳跃 · 下滑翻滚', 'lobby-play-hint');
   const nav = uiText('nav', '', 'lobby-bottom-nav');
   nav.setAttribute('aria-label', '主菜单导航');
@@ -81,7 +90,7 @@ export function createMobileLobby(content: GameContent, actions: SelectActions, 
     button.append(coastalIcon(icon), uiText('span', label));
     nav.append(button);
   }
-  dock.append(runner, start, hint, nav, toast);
+  dock.append(runner, play, hint, nav, toast);
   frame.append(header, brand, hero, dock);
   const dispose = pageLifecycle(root);
   return () => { window.clearTimeout(toastTimer); dispose(); };
