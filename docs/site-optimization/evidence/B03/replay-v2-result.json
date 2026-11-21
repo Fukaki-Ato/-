@@ -1,0 +1,41 @@
+{
+  "version": 2,
+  "seed": 777,
+  "charId": "char_volt",
+  "dtMs": 16.666666666666668,
+  "maxFrames": 1200,
+  "themeId": "theme_library",
+  "initialItems": [
+    "item_helmet"
+  ],
+  "inputCount": 1,
+  "result": {
+    "frames": 1200,
+    "summary": {
+      "t": 20,
+      "distance": 244.37,
+      "coins": 8,
+      "nearMiss": 0,
+      "hits": 0,
+      "score": 2480,
+      "alive": true,
+      "casts": 0,
+      "charId": "char_volt",
+      "revives": 0
+    },
+    "eventCounts": {
+      "coin": 8,
+      "helmetSave": 1,
+      "hit": 1,
+      "protected": 1
+    },
+    "eventsSha256": "0cd91ca37ab8ddbb60c31d557928ffa9e2c9c6e9e82008c45938689a01b1679d",
+    "inputsSha256": "4c3edb47420e234076ffd1d9eab6d12654a9fc0f45652373907675c83f0410f1",
+    "context": {
+      "themeId": "theme_library",
+      "initialItems": [
+        "item_helmet"
+      ]
+    }
+  }
+}

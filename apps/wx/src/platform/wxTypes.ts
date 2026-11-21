@@ -20,6 +20,14 @@ export interface WxTouchEvent {
   timeStamp: number;
 }
 
+export interface WxImage {
+  width: number;
+  height: number;
+  src: string;
+  onload: (() => void) | null;
+  onerror: (() => void) | null;
+}
+
 /** wx.createCanvas() 返回的原生画布（首次=上屏；后续=离屏）。垫片前形态。 */
 export interface WxRawCanvas {
   width: number;
@@ -90,14 +98,19 @@ export interface WxInnerAudioContext {
 /** 本包实际用到的 wx API 面（S10 §6 表；wx.onTouchMove 故意不接——判定内核只用 down/up/cancel）。 */
 export interface WxLike {
   createCanvas(): WxRawCanvas;
-  getWindowInfo(): { windowWidth: number; windowHeight: number; pixelRatio: number };
+  createImage(): WxImage;
+  getWindowInfo(): { windowWidth: number; windowHeight: number; pixelRatio: number; screenTop?: number;
+    safeArea?: { top: number; bottom: number; left: number; right: number; width: number; height: number } };
+  getMenuButtonBoundingClientRect?(): { top: number; bottom: number; left: number; right: number; width: number; height: number };
   onWindowResize(cb: (res: { windowWidth: number; windowHeight: number }) => void): void;
   offWindowResize(cb: (res: { windowWidth: number; windowHeight: number }) => void): void;
 
   onTouchStart(cb: (e: WxTouchEvent) => void): void;
+  onTouchMove(cb: (e: WxTouchEvent) => void): void;
   onTouchEnd(cb: (e: WxTouchEvent) => void): void;
   onTouchCancel(cb: (e: WxTouchEvent) => void): void;
   offTouchStart(cb: (e: WxTouchEvent) => void): void;
+  offTouchMove(cb: (e: WxTouchEvent) => void): void;
   offTouchEnd(cb: (e: WxTouchEvent) => void): void;
   offTouchCancel(cb: (e: WxTouchEvent) => void): void;
 
@@ -127,6 +140,12 @@ export interface WxLike {
   cloud?: WxCloud;
 
   createInnerAudioContext(): WxInnerAudioContext;
+  showLoading(opts: { title: string; mask: boolean }): void;
+  hideLoading(): void;
+  showModal(opts: {
+    title: string; content: string; confirmText: string; cancelText: string;
+    success?(result: { confirm: boolean }): void;
+  }): void;
 }
 
 /** 全包唯一读取运行时 `wx` 全局的落点（createWxAdapter 默认值；测试用显式注入绕开）。 */

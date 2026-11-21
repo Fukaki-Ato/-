@@ -10,9 +10,9 @@ import { createFontAtlas, createFontSet } from '../packages/framework/dist/ui/in
 
 export const repoRoot = join(fileURLToPath(import.meta.url), '..', '..');
 
-export function loadTestFontSet() {
-  const latin = JSON.parse(readFileSync(join(repoRoot, 'assets/fonts/latin.metrics.json'), 'utf8'));
-  const cjk = JSON.parse(readFileSync(join(repoRoot, 'assets/fonts/cjk.metrics.json'), 'utf8'));
+export function loadTestFontSet(dir = 'assets/fonts') {
+  const latin = JSON.parse(readFileSync(join(repoRoot, dir, 'latin.metrics.json'), 'utf8'));
+  const cjk = JSON.parse(readFileSync(join(repoRoot, dir, 'cjk.metrics.json'), 'utf8'));
   return createFontSet([createFontAtlas(latin, null), createFontAtlas(cjk, null)]);
 }
 

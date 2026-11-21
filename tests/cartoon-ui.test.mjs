@@ -59,22 +59,26 @@ test('illustrated lobby keeps side shortcuts accessible and native labels separa
   const dispose = createMobileLobby(content, {
     onStartRun: id => calls.push(id), onChooseCharacter: () => true, onBack() {},
     onShop: () => calls.push('shop'), onSettings: () => calls.push('settings'), onCharacterSelect: () => calls.push('characters'),
+    onLeaderboard: () => calls.push('leaderboard'),
   }, 'char_volt', { coins: 123, diamonds: 4 });
   const root = body.children[0];
   const hero = byClass(root, 'lobby-hero')[0];
   assert.notEqual(hero.getAttribute('aria-hidden'), 'true', 'interactive side nav must not live under aria-hidden');
   const shortcuts = byClass(hero, 'lobby-shortcut');
   assert.deepEqual(shortcuts.map(button => button.textContent), ['活动','任务','成就','排行榜']);
-  assert.ok(shortcuts.every(button => button.children[0].tagName === 'img' && button.children[0].src.endsWith('.webp')));
+  assert.ok(shortcuts.every(button => button.children[0].tagName === 'img' && button.children[0].src.startsWith('data:image/svg+xml,')));
+  assert.ok(shortcuts.every(button => button.children[0].alt === ''), 'decorative coastal art does not repeat accessible labels');
   assert.ok(shortcuts.every(button => button.children[1].tagName === 'span'), 'labels are live text, not baked controls');
-  assert.equal(byClass(root, 'shortcut-symbol').length, 0, 'generic text symbols were replaced by old illustrated art');
+  assert.equal(byClass(root, 'shortcut-symbol').length, 0, 'coastal icons do not depend on font symbols');
   shortcuts[0].click();
   assert.match(byClass(root, 'lobby-toast')[0].textContent, /准备中/);
+  assert.equal(byClass(root, 'lobby-toast')[0].parent, byClass(root, 'lobby-dock')[0]);
+  shortcuts[3].click();
   all(root).find(node => node.getAttribute('aria-label') === '设置').click();
   byClass(root, 'lobby-runner')[0].click();
   byClass(root, 'lobby-start')[0].click();
   byClass(root, 'lobby-nav-button').find(button => button.textContent === '商店').click();
-  assert.deepEqual(calls, ['settings','characters','char_volt','shop']);
+  assert.deepEqual(calls, ['leaderboard','settings','characters','char_volt','shop']);
   dispose();
   assert.equal(body.children.length, 0);
 });

@@ -4,6 +4,8 @@
  * 本模块零宿主 API——fetch/localStorage 的缺省封装在 apps/web/src/missionApi.ts。
  */
 import type { MissionPeriod, MissionSnapshot, ReplayAction } from '../core/missions/types.js';
+import type { GameContent } from '../core/config/configTypes.js';
+import { missionClientRulesId } from './clientVersion.js';
 
 type PendingRun = { runId: string; frames: number; actions: ReplayAction[] };
 
@@ -50,7 +52,7 @@ export class MissionApiCore {
       throw new Error('任务服务暂时不可用，请稍后重试');
     }
     if (status >= 400) {
-      if (status === 401) this.session = null;
+      if (status === 401) this.invalidateSession();
       throw Object.assign(new Error((data as { error?: string } | null)?.error ?? '任务服务暂时不可用，请稍后重试'), { status });
     }
     if (!data || typeof data !== 'object') throw new Error('任务服务返回无效数据');
@@ -61,11 +63,17 @@ export class MissionApiCore {
       this.session = null; throw error;
     });
   }
-  async start(seed: number, charId: string, items: string[] = []): Promise<string> {
+  /** 共享会话入口（成就 API 复用同一游客 cookie 会话）：幂等，已连接即直接返回缓存 promise */
+  ensureConnected(): Promise<void> { return this.connect(); }
+  /** 共享会话失效复位（成就 API 401 自愈共用，语义与 request 的 401 分支一致）：下次请求重走 connect() */
+  invalidateSession(): void { this.session = null; }
+  async start(seed: number, charId: string, items: string[] = [], themeId?: string, content?: GameContent): Promise<string> {
     if (this.queue.length >= 10) throw new Error('待同步记录已满，请先在任务页同步；本局不计入任务进度');
     await this.connect();
     const body: Record<string, unknown> = { seed: seed >>> 0, charId };
     if (items.length) body.items = items; // 装备道具随票提交：server 重放按同清单注入（确定性）
+    if (themeId !== undefined) body.themeId = themeId;
+    if (content !== undefined) body.clientRulesId = missionClientRulesId(content);
     return (await this.request<{ runId: string }>('/runs', 'POST', body)).runId;
   }
   private saveQueue(): void {

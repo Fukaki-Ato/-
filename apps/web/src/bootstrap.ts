@@ -6,6 +6,7 @@ import { createOverlayViews } from '@tr/game/ui/overlayViews.js';
 import { createUiShell } from './uiShell.js';
 import '../style.css';
 import { createCharacterSelectOverlay } from './characterSelectOverlay.js';
+import { createChestOverlay } from './chestOverlay.js';
 import { createShopOverlay } from './shopOverlay.js';
 import { injectObstaclePosters, injectPickupTiles } from './runAssets.js';
 import { injectIntroVideos } from './introVideo.js';
@@ -14,10 +15,13 @@ import { createMissionIntegration } from './missionIntegration.js';
 import { openProfileOverlay } from './profileOverlay.js';
 import { createEventsOverlay } from './eventsOverlay.js';
 import { createMobileSettings, createMobileResult } from './mobilePanels.js';
+import { createMobileAchievements } from './mobileAchievements.js';
 import { createMobileHud } from './mobileHud.js';
 import { createMobileLeaderboard } from './mobileLeaderboard.js';
 import { createLeaderboardClient } from './leaderboardClient.js';
 import { DEBUG_TOOLS_ENABLED, runtimeDebugFlags, runtimeDebugParams } from './debugPolicy.js';
+import './coastalSkins.css';
+import './coastalFrames.css';
 
 const mount = document.getElementById('screen')!;
 const { debug, test: testMode, qa } = runtimeDebugFlags(location.search);
@@ -41,16 +45,15 @@ async function main(): Promise<void> {
     host: shell.host, badges: shell.badges, backdrop: shell.backdrop,
     onLobbyVisible: v => shell.setBackgroundVisible(v), // 背景视频只在大厅解码
     selectRenderer: (content, actions, currentCharId, entry) =>
-      createCharacterSelectOverlay(content, actions, currentCharId, entry, shell.fonts, () =>
-        // 档案弹层（M4-5）：改名扣钻后即时回写大厅顶栏钻石数字
-        openProfileOverlay(content, adapter.storage, left => {
-          document.querySelectorAll<HTMLElement>('.lobby-diamond-amount')
-            .forEach(el => { el.textContent = left.toLocaleString(); });
-        })),
+      createCharacterSelectOverlay(content, actions, currentCharId, entry, shell.fonts),
     shopRenderer: (content, actions) => createShopOverlay(content, actions, shell.fonts),
+    chestRenderer: (content, actions) => createChestOverlay(content, actions, shell.fonts),
     eventsRenderer: (content, actions) => createEventsOverlay(content, actions, shell.fonts),
     lobbyRenderer: missions.lobbyRenderer,
-    settingsRenderer: createMobileSettings,
+    settingsRenderer: (content, actions, currentThemeId, volumes) =>
+      createMobileSettings(content, actions, currentThemeId, volumes,
+        () => openProfileOverlay(content, adapter.storage)),
+    achievementsRenderer: createMobileAchievements,
     resultRenderer: createMobileResult,
     hudRenderer: createMobileHud,
     leaderboardRenderer: createMobileLeaderboard,
@@ -66,7 +69,9 @@ async function main(): Promise<void> {
     configResolve,
     debug,
     test: testMode,
+    qa, // QA 口径位：?anim/?ui=demo 等纯演示局与任务门同源地关掉 run 局成就统计
     trackRun: missions.trackRun,
+    achievementsApi: missions.achievementsApi,
     leaderboard: qa ? undefined : createLeaderboardClient(import.meta.env.BASE_URL),
   });
 

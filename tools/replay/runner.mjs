@@ -1,5 +1,5 @@
 /**
- * tools/replay/runner.mjs — 输入重放格式 v1 的解析/校验 + 无头复跑（S19a，规范见 docs/replay-format.md）
+ * tools/replay/runner.mjs — 输入重放 v1/v2 的解析/校验 + 无头复跑（规范见 docs/replay.md）
  * 定位：golden-master 与 S18 云函数复跑防作弊共用的「重放执行器」，只依赖 core 的 dist 产物。
  * 模块 API：loadContent / parseReplay / loadReplayFile / eventToAction / runReplay / canonicalJson / sha256Hex
  * CLI：node tools/replay/runner.mjs <replay.json> [--json]   （需先 npm run build）
@@ -13,9 +13,11 @@ import { STEP_DT } from '../../packages/game/dist/core/sim/simTypes.js';
 import { CONTENT_NAMES } from '../../packages/game/dist/core/config/configTypes.js';
 import { formatResult } from './report.mjs';
 
-/** 本实现支持的唯一重放格式版本；未知版本一律拒绝加载（docs/replay-format.md §5） */
+/** 默认录制格式保持 v1，避免改变既有 golden 的输入与默认上下文。 */
 export const REPLAY_VERSION = 1;
-/** v1 锁定 60fps 固定步长（core STEP_DT=1/60 秒）；dtMs 与之不符即拒绝 */
+/** v2 额外携带主题与初始道具；旧 v1 读取器会拒绝它，避免静默丢失上下文。 */
+export const CONTEXT_REPLAY_VERSION = 2;
+/** 两个格式都锁定 60fps 固定步长；dtMs 与之不符即拒绝 */
 export const DT_MS = STEP_DT * 1000;
 /** 未显式给出 maxFrames 时的兜底帧数上限（3 分钟） */
 export const DEFAULT_MAX_FRAMES = 60 * 180;
@@ -46,7 +48,7 @@ export function sha256Hex(text) {
 const SWIPE_DIRS = new Set(['up', 'down', 'left', 'right']);
 
 /**
- * 重放事件 → SimAction。映射与 packages/render/src/runnerScene.ts 的输入路由逐条对齐
+ * 重放事件 → SimAction。映射与 packages/game/src/render/runnerScene.ts 的输入路由逐条对齐
  * （swipe/双击手势 + KeyboardEvent.code），保证「录制的操作」与「真机操作」驱动 sim 的方式一致。
  * tap 与未映射按键是合法记录事件但不驱动 sim，返回 null。
  */
@@ -84,19 +86,19 @@ function normalizeEvent(ev, at, fail) {
     if (typeof p.code !== 'string' || !p.code) fail(`${at}.payload.code 必须是非空字符串（KeyboardEvent.code）`);
     return { frame: ev.frame, type: 'key', payload: { code: p.code } };
   }
-  fail(`${at}.type=${JSON.stringify(ev.type)} 不是 v${REPLAY_VERSION} 已知事件（swipe|tap|doubleTap|key），未知类型必须拒绝`);
+  fail(`${at}.type=${JSON.stringify(ev.type)} 不是支持的输入事件（swipe|tap|doubleTap|key），未知类型必须拒绝`);
 }
 
 /**
  * 校验并规范化重放数据；任何不合法字段抛 Error（宁可拒绝也不含糊——防作弊语义）。
- * 未知的顶层字段被忽略（v1 内的加法式演进，见 docs/replay-format.md §5）。
+ * 未知的顶层字段被忽略；仅 v2 识别 themeId/initialItems，v1 的默认语义保持不变。
  */
 export function parseReplay(data) {
-  const fail = (msg) => { throw new Error(`[replay v${REPLAY_VERSION}] ${msg}`); };
+  const fail = (msg) => { throw new Error(`[replay] ${msg}`); };
   if (!data || typeof data !== 'object' || Array.isArray(data)) fail('顶层必须是 JSON 对象');
-  if (data.version !== REPLAY_VERSION) {
+  if (data.version !== REPLAY_VERSION && data.version !== CONTEXT_REPLAY_VERSION) {
     const got = data.version === undefined ? '缺失' : JSON.stringify(data.version);
-    fail(`version=${got}：仅支持整数 ${REPLAY_VERSION}，未知版本必须拒绝加载（见 docs/replay-format.md §5）`);
+    fail(`version=${got}：仅支持整数 ${REPLAY_VERSION} 或 ${CONTEXT_REPLAY_VERSION}，未知版本必须拒绝加载（见 docs/replay.md）`);
   }
   if (!Number.isInteger(data.seed) || data.seed < 0 || data.seed > 0xffffffff) {
     fail(`seed 必须是 32 位无符号整数，实际 ${JSON.stringify(data.seed)}`);
@@ -105,7 +107,7 @@ export function parseReplay(data) {
     fail(`charId 必须是字符串（空串=默认装备无角色），实际 ${JSON.stringify(data.charId)}`);
   }
   if (typeof data.dtMs !== 'number' || Math.abs(data.dtMs - DT_MS) > 1e-9) {
-    fail(`dtMs 必须是 ${DT_MS}（v1 锁定 core STEP_DT=1/60s 固定步长），实际 ${JSON.stringify(data.dtMs)}`);
+    fail(`dtMs 必须是 ${DT_MS}（core STEP_DT=1/60s 固定步长），实际 ${JSON.stringify(data.dtMs)}`);
   }
   let maxFrames = DEFAULT_MAX_FRAMES;
   if (data.maxFrames !== undefined) {
@@ -121,7 +123,15 @@ export function parseReplay(data) {
     prevFrame = norm.frame;
     inputs.push(norm);
   });
-  return { version: REPLAY_VERSION, seed: data.seed, charId: data.charId, dtMs: DT_MS, maxFrames, inputs };
+  const replay = { version: data.version, seed: data.seed, charId: data.charId, dtMs: DT_MS, maxFrames, inputs };
+  if (data.version === CONTEXT_REPLAY_VERSION) {
+    if (data.themeId !== undefined && (typeof data.themeId !== 'string' || !data.themeId)) fail('themeId 必须是非空字符串');
+    if (data.initialItems !== undefined && (!Array.isArray(data.initialItems)
+      || data.initialItems.some(id => typeof id !== 'string' || !id))) fail('initialItems 必须是非空字符串组成的数组');
+    if (data.themeId !== undefined) replay.themeId = data.themeId;
+    replay.initialItems = [...(data.initialItems ?? [])];
+  }
+  return replay;
 }
 
 /** 从磁盘加载重放文件（JSON 解析失败给出带路径的可读错误） */
@@ -142,11 +152,11 @@ export function loadReplayFile(path) {
 /**
  * 无头执行一份重放：逐帧「按数组序 applyAction 该帧输入 → step() → drainEvents() 归属该帧」。
  * 停机：step 后首次 !alive（含该帧），或跑满 maxFrames。同 build 同配置下结果逐字节确定。
- * @returns {frames, summary, eventCounts, eventsSha256, inputsSha256}
+ * @returns {frames, summary, eventCounts, eventsSha256, inputsSha256, context?}（仅 v2 输出实际上下文）
  */
 export function runReplay(content, data) {
   const replay = parseReplay(data);
-  const sim = new RunnerSim(content, replay.seed, replay.charId || undefined);
+  const sim = new RunnerSim(content, replay.seed, replay.charId || undefined, false, replay.initialItems, replay.themeId);
   const eventLog = [];
   const counts = {};
   let cursor = 0;
@@ -171,6 +181,8 @@ export function runReplay(content, data) {
     eventCounts,
     eventsSha256: sha256Hex(canonicalJson(eventLog)),
     inputsSha256: sha256Hex(canonicalJson(replay.inputs)),
+    ...(replay.version === CONTEXT_REPLAY_VERSION
+      ? { context: { themeId: sim.themeId ?? null, initialItems: sim.initialItems } } : {}),
   };
 }
 

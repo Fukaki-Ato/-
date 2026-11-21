@@ -68,20 +68,27 @@ export const RIDE_TOP_EPS = 0.30;
  *  （inDepthWindow 有 DEPTH_SLACK 前瞻，没有平顶会在坡中段被判「撞前脸」） */
 export const RAMP_TOP_FLAT_M = 0.8;
 
+/** B-4 反重力碰撞上下文（调用侧构造一次复用、每步就地改写：零分配）。
+ *  flip=-1 时以天花板为镜面地面：yEff=ceilH−s.y 代入全部既有谓词（零新增障碍类，
+ *  区内障碍即「倒挂在天花板上」的同一套几何）；缺省/flip=1 时 yEff=s.y 与原判定逐字节同轨。 */
+export interface FlipCtx { flip: 1 | -1; ceilH: number }
+
 /** 纵向判定：低障要跳够、高杆要钻或跃顶、电弧地面要跳起、满格与载具只能换道。
  *  @param clearance 角色站立净空高（米，sim 传 loadout.clearance）：高杆门按它判「头过不过杆」，
- *    矮个角色（char_mambo 1.19 < BAR_BOTTOM 1.2）可不滑铲直接钻过；缺省 STAND_H=1.7 保持老角色行为。 */
-export function hitsRunner(o: ObstacleEntity, s: RunnerState, laneWidth: number, clearance: number = STAND_H): boolean {
+ *    矮个角色（char_mambo 1.19 < BAR_BOTTOM 1.2）可不滑铲直接钻过；缺省 STAND_H=1.7 保持老角色行为。
+ *  @param flip 反重力上下文（B-4，可省略=正常重力）：倒挂时高度取镜像 yEff=ceilH−s.y。 */
+export function hitsRunner(o: ObstacleEntity, s: RunnerState, laneWidth: number, clearance: number = STAND_H, flip?: FlipCtx): boolean {
   if (lateralGap(o, s, laneWidth) > 0) return false;
   // 防呆：配置脏数据（NaN/非正）回落标准身高，绝不让碰撞判定因一个坏字段失效
   const standH = Number.isFinite(clearance) && clearance > 0 ? clearance : STAND_H;
   const playerH = s.sliding ? SLIDE_H : standH;
-  if (o.cls === 'low') return s.y < o.h * 0.75;
+  const yEff = flip && flip.flip === -1 ? flip.ceilH - s.y : s.y;
+  if (o.cls === 'low') return yEff < o.h * 0.75;
   if (o.cls === 'step') return false; // 板子：纯支撑面，永不判负（用于无弹跳鞋登火车）
-  if (o.cls === 'high') return s.y < o.h && s.y + playerH > BAR_BOTTOM;
-  if (o.cls === 'hazard') return s.y < HAZARD_HIT_Y;
-  if (o.cls === 'moving') return o.jumpable ? s.y < o.h * 0.75 : true; // 摆锤 jumpable=true：跳够高度即可越过
-  if (o.cls === 'vehicle') return !(o.rideTop === true && s.y >= o.h - RIDE_TOP_EPS); // 列车顶可落可站
+  if (o.cls === 'high') return yEff < o.h && yEff + playerH > BAR_BOTTOM;
+  if (o.cls === 'hazard') return yEff < HAZARD_HIT_Y;
+  if (o.cls === 'moving') return o.jumpable ? yEff < o.h * 0.75 : true; // 摆锤 jumpable=true：跳够高度即可越过
+  if (o.cls === 'vehicle') return !(o.rideTop === true && yEff >= o.h - RIDE_TOP_EPS); // 列车顶可落可站（RIDE_TOP_EPS 镜像同式）
   return true; // full：满格墙只能换道
 }
 

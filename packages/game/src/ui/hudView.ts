@@ -6,10 +6,12 @@
 import { Box, Label, Panel, type UiView } from '@tr/framework/ui/index.js';
 import type { UiHost } from '@tr/framework/ui/host.js';
 import type { HudData, HudHandle } from '../flow/views.js';
+import { buildTouchHudPage } from './coastalHud.js';
 
 export interface HudPage { view: UiView; handle: HudHandle }
 
-export function buildHudPage(host: UiHost): HudPage {
+export function buildHudPage(host: UiHost, options: { touchOnly?: boolean } = {}): HudPage {
+  if (options.touchOnly) return buildTouchHudPage(host);
   const c = host.theme.colors;
   // maxWidthPx 显式给定：Label 的 hintWidth 两遍收敛只增不减，auto 宽面板会被首帧短文本锁宽；
   // 注意不可配 align:center——行内对齐以 maxWidthPx 为基准会把文本推离面板中心。

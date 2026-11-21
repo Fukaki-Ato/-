@@ -1,0 +1,44 @@
+{
+  "scope": "isolated temporary SQLite / trusted publication fixtures; no production database mutation",
+  "codeCommit": "a6548842916dcccb39f994de0923b7ddae953727",
+  "before": [
+    {
+      "issueScore": 3075,
+      "settledScore": 8835,
+      "status": "finished"
+    },
+    {
+      "issueAlive": false,
+      "settledValid": 0,
+      "status": "finished"
+    }
+  ],
+  "after": [
+    {
+      "issueScore": 3075,
+      "settledScore": 3075,
+      "status": "finished"
+    },
+    {
+      "issueAlive": false,
+      "settledValid": 1,
+      "status": "finished"
+    }
+  ],
+  "focusedTests": 56,
+  "tests": 852,
+  "passed": 852,
+  "failed": 0,
+  "runtimeBytes": 38353,
+  "runtimeSha256": "f7c2364650a30483067bf7763f21925a9846c1903ee39209585893a967c3d257",
+  "baselineRulesId": "cf208d8372846afee6104249e8a794a0a08d7d5c4d5ce0ee8219aa238b00deaa",
+  "baselineLabel": "38d5116",
+  "deployedConfigFilesMatched": 8,
+  "qualification": {
+    "minRunSeconds": 10,
+    "maxFrames": 108000,
+    "maxActions": 20000
+  },
+  "frontendEntry": "index-F94mlmqe.js",
+  "frontendEntryUnchanged": true
+}

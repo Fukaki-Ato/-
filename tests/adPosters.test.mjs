@@ -30,11 +30,14 @@ function build(o, dist = o.worldZ) {
   const scene = new THREE.Scene();
   const layer = createObstacleLayer(scene, 2.2);
   layer.update([o], dist, 0);
-  const boxes = scene.children.filter(m => m.isMesh && m.visible && m.geometry.type === 'BoxGeometry');
+  // B-7 起整层障碍挂镜像根组（scene 直接子节点是 Group）：网格收集 traverse 下钻，断言口径不变
+  const meshes = [];
+  scene.traverse(m => { if (m.isMesh) meshes.push(m); });
+  const boxes = meshes.filter(m => m.visible && m.geometry.type === 'BoxGeometry');
   return {
     scene, layer, o,
     bar: boxes.sort((a, b) => b.scale.x - a.scale.x)[0],   // 立柱也是 BoxGeometry，取最宽那个
-    poster: scene.children.find(m => m.isMesh && m.geometry.type === 'PlaneGeometry'),
+    poster: meshes.find(m => m.geometry.type === 'PlaneGeometry'),
   };
 }
 

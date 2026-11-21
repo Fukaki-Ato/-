@@ -3,15 +3,7 @@ import type { SelectActions, SelectExtras } from '@tr/game/flow/views.js';
 import { buildLoadout, isCharacterLocked, playableCharacters } from '@tr/game/core/sim/character.js';
 import { createCharacterPortrait } from './characterArt.js';
 import { mountMobilePage, pageLifecycle, uiButton, uiText } from './mobileUi.js';
-import shopIcon from './assets/mobile-ui/nav-shop.webp';
-import handbookIcon from './assets/mobile-ui/nav-handbook.webp';
-import chestIcon from './assets/mobile-ui/nav-chest.webp';
-import characterIcon from './assets/mobile-ui/nav-character.webp';
-import eventIcon from './assets/mobile-ui/icon-event.webp';
-import taskIcon from './assets/mobile-ui/icon-task.webp';
-import achievementIcon from './assets/mobile-ui/icon-achieve.webp';
-import rankIcon from './assets/mobile-ui/icon-rank.webp';
-import settingsIcon from './assets/mobile-ui/icon-settings.webp';
+import { coastalIcon } from './coastalIcons.js';
 import './mobileLobby.css';
 
 export function createMobileLobby(content: GameContent, actions: SelectActions, currentCharId: string, extras?: SelectExtras): () => void {
@@ -45,24 +37,20 @@ export function createMobileLobby(content: GameContent, actions: SelectActions, 
   };
   currency.append(amount('金币', extras?.coins ?? 0, 'icon_gold.png'), amount('钻石', extras?.diamonds ?? 0, 'icon_diamond.png', 'lobby-diamond-amount'));
   const settings = uiButton('', 'ui-icon-button lobby-settings', actions.onSettings ?? comingSoon);
-  const gear = document.createElement('img');
-  gear.src = settingsIcon;
-  gear.alt = '';
-  settings.append(gear);
+  settings.append(coastalIcon('settings'));
   settings.setAttribute('aria-label', '设置');
   header.append(currency, settings);
 
   const brand = uiText('div', '', 'lobby-brand');
-  brand.append(uiText('h1', '雷霆酷跑'));
+  brand.append(uiText('span', 'SEASIDE RUN CLUB', 'lobby-edition'), uiText('h1', '雷霆酷跑'));
   const shortcuts = uiText('nav', '', 'lobby-shortcuts');
   shortcuts.setAttribute('aria-label', '更多玩法');
-  for (const [label, icon] of [['活动', eventIcon], ['任务', taskIcon], ['成就', achievementIcon], ['排行榜', rankIcon]]) {
-    const action = label === '排行榜' ? actions.onLeaderboard : label === '任务' ? actions.onTasks : undefined;
+  for (const [label, icon] of [['活动', 'event'], ['任务', 'task'], ['成就', 'achievement'], ['排行榜', 'rank']] as const) {
+    const action = label === '排行榜' ? actions.onLeaderboard
+      : label === '任务' ? actions.onTasks
+      : label === '成就' ? actions.onAchievements : actions.onEvents;
     const button = uiButton('', 'lobby-shortcut', action ?? comingSoon);
-    const image = document.createElement('img');
-    image.src = icon!;
-    image.alt = '';
-    button.append(image, uiText('span', label!, 'shortcut-label'));
+    button.append(coastalIcon(icon), uiText('span', label, 'shortcut-label'));
     shortcuts.append(button);
   }
 
@@ -81,22 +69,29 @@ export function createMobileLobby(content: GameContent, actions: SelectActions, 
   start.disabled = !character;
   start.setAttribute('aria-label', '开始酷跑');
   start.append(uiText('span', '开始酷跑'), uiText('span', 'GO →', 'start-arrow'));
+  let play: HTMLElement = start;
+  if (actions.onStartCasual) {
+    const casual = uiButton('休闲酷跑', 'lobby-casual', () => { if (character) actions.onStartCasual?.(character.id); });
+    casual.disabled = !character;
+    casual.title = '使用本机强化，不参与排行榜';
+    const modes = uiText('div', '', 'lobby-run-modes');
+    modes.append(start, casual);
+    play = modes;
+  }
   const hint = uiText('p', '左右滑动换道 · 上滑跳跃 · 下滑翻滚', 'lobby-play-hint');
   const nav = uiText('nav', '', 'lobby-bottom-nav');
   nav.setAttribute('aria-label', '主菜单导航');
   for (const [label, icon, action] of [
-    ['商店', shopIcon, actions.onShop ?? comingSoon], ['福利手册', handbookIcon, comingSoon],
-    ['仓库', chestIcon, comingSoon], ['角色', characterIcon, openCharacters],
+    ['商店', 'shop', actions.onShop ?? comingSoon], ['福利手册', 'handbook', actions.onHandbook ?? comingSoon],
+    ['仓库', 'chest', actions.onInventory ?? comingSoon], ['宝箱', 'chest', actions.onChest ?? comingSoon],
+    ['角色', 'character', openCharacters],
   ] as const) {
     const button = uiButton('', 'lobby-nav-button', action);
-    const image = document.createElement('img');
-    image.src = icon;
-    image.alt = '';
-    button.append(image, uiText('span', label));
+    button.append(coastalIcon(icon), uiText('span', label));
     nav.append(button);
   }
-  dock.append(runner, start, hint, nav);
-  frame.append(header, brand, hero, dock, toast);
+  dock.append(runner, play, hint, nav, toast);
+  frame.append(header, brand, hero, dock);
   const dispose = pageLifecycle(root);
   return () => { window.clearTimeout(toastTimer); dispose(); };
 }

@@ -76,8 +76,8 @@ test('inputs 允许空数组（挂机重放）', () => {
 
 // ---------- 拒绝非法输入（宁可拒绝不可含糊） ----------
 
-test('未知/非法版本一律拒绝（含数字字符串 "1" 与未来版本 2）', () => {
-  assertRejects((r) => { r.version = 2; }, 'version=2');
+test('未知/非法版本一律拒绝（含数字字符串 "1" 与未来版本 3）', () => {
+  assertRejects((r) => { r.version = 3; }, 'version=3');
   assertRejects((r) => { r.version = '1'; }, 'version="1"');
   assertRejects((r) => { delete r.version; }, 'version=缺失');
 });

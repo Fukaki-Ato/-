@@ -30,6 +30,8 @@ export interface ThemeOption {
   /** 场景配色预览（sky.baseColor / groundColor；字段缺失时回渲染层同款兜底色） */
   sky: string;
   ground: string;
+  /** 上架态（themes.json status；非 live=未开放，设置页不可切换） */
+  status: string;
 }
 
 /** 主题条目 → 设置页选项；id 缺失的条目跳过（不维护 id 白名单，删/加主题只动配置） */
@@ -37,7 +39,7 @@ export function themeOptions(content: GameContent): ThemeOption[] {
   const items = (content.themes.items ?? []) as Record<string, unknown>[];
   return items.flatMap(item => {
     const id = typeof item['id'] === 'string' ? item['id'] : '';
-    if (!id) return [];
+    if (!id || (item['status'] !== 'live' && item['status'] !== 'draft')) return [];
     const name = (item['name'] as Record<string, string> | undefined)?.['zh-CN'];
     const sky = (item['sky'] as Record<string, string> | undefined)?.['baseColor'];
     return [{
@@ -45,6 +47,7 @@ export function themeOptions(content: GameContent): ThemeOption[] {
       name: name ?? id,
       sky: sky ?? '#8ED0F2',
       ground: (item['groundColor'] as string | undefined) ?? '#E3CFA4',
+      status: String(item['status'] ?? 'live'),
     }];
   });
 }
@@ -54,11 +57,18 @@ export function buildSettingsPage(host: UiHost, d: SettingsPageDeps): SettingsPa
   const options = themeOptions(d.content);
   let current = d.currentThemeId ?? options[0]?.id ?? null;
   const markers = new Map<string, Label>();
+  /** 未开放/未解锁（商店 1000 能量币解锁体系，流程层同口径校验）文案；null=可选择 */
+  const lockOf = (id: string): string | null => {
+    const option = options.find(o => o.id === id);
+    if (!option || option.status !== 'live') return '未开放';
+    return d.actions.isThemeUnlocked && !d.actions.isThemeUnlocked(id) ? '未解锁' : null;
+  };
   const paint = (): void => {
     for (const [id, marker] of markers) {
       const on = id === current;
-      marker.setText(on ? '使用中' : '选择');
-      marker.setColor(on ? c.gold : c.muted);
+      const lock = on ? null : lockOf(id);
+      marker.setText(on ? '使用中' : lock ?? '选择');
+      marker.setColor(on || lock ? c.gold : c.muted);
     }
   };
   const select = (id: string): void => {

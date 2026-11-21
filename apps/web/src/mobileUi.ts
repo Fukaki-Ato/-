@@ -1,5 +1,4 @@
 import './mobileUi.css';
-import './cartoonSkins.css';
 
 /** Shared DOM primitives. Labels stay live and never scale with a background image. */
 export function uiText<K extends keyof HTMLElementTagNameMap>(tag: K, text: string, className = ''): HTMLElementTagNameMap[K] {

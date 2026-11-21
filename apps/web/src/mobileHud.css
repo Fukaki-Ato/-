@@ -1,4 +1,4 @@
-.mobile-hud { position: fixed; inset: 0; z-index: 8; pointer-events: none; color: var(--ui-ink); font-family: 'Thunder Sans', 'PingFang SC', system-ui, sans-serif; padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(24px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)); }
+.mobile-hud { position: fixed; inset: 0; z-index: 8; pointer-events: none; color: var(--ui-ink); font-family: 'Thunder Sans', 'Thunder CJK Supplement', 'PingFang SC', system-ui, sans-serif; padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(24px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)); }
 .hud-top { display: flex; justify-content: space-between; align-items: start; gap: 16px; }
 .hud-score-card { display: grid; gap: 2px; padding: 12px 18px; border: 1px solid #fff9; border-radius: 20px; background: #fffdf3eb; box-shadow: 0 4px 20px #164e5710; }
 .hud-label { font-size: 9px; font-weight: 750; letter-spacing: .16em; color: var(--ui-teal); }

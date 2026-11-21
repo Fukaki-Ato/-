@@ -1,5 +1,5 @@
 /**
- * 牢大（char_volt → 原篮球小子 assets/characters/bball.glb）GLB 装配回归。
+ * 牢大（char_volt → assets/characters/coastal/bball.glb）GLB 装配回归。
  *
  * 为什么单独立文件：它的 clip 集与奶蛙不同源——没有 Laugh、多一个 Basketball（投篮）。
  * 头号阻塞就是 animClips 旧契约「CLIP_NAMES 缺一即不合格」会让整条 GLB 路径静默回退
@@ -75,16 +75,16 @@ async function drive(glb, sec, speed = 12, urlParams = 'debug', footfall = null)
   return { events, feet, log };
 }
 
-test('牢大装配成功：配置接入 bball.glb，10 个核心 clip 齐全', async () => {
+test('牢大装配成功：真实配置接入 coastal/bball.glb，10 个核心 clip 齐全', async () => {
   assert.equal(volt.charId, 'char_volt');
-  assert.equal(BBALL, 'assets/characters/bball.glb');
+  assert.equal(BBALL, 'assets/characters/coastal/bball.glb');
   const { log } = await drive(BBALL, 0.2);
   assert.ok(log.length >= 1, '应有 clip 切换记录');
 });
 
 test('QA 锁表：Run/Slide/Death/Basketball 的时长与循环口径（?anim= 同路径）', async () => {
   const cases = [
-    ['anim=Run', 'Run', 0.75, true],
+    ['anim=Run', 'Run', 0.8, true],
     ['anim=Slide', 'Slide', 0.7, true],
     ['anim=Fly', 'Fly', 2.0, true],
     ['anim=Death', 'Death', 1.1, false],
@@ -122,7 +122,7 @@ test('无锁状态机：牢大贴地前进时 Idle→Run 一次切换后持续�
   assert.equal(feet.at(-1).act.clip, 'Run');
 });
 
-test('脚部探针：Run 期间双脚世界坐标合法且持续摆动（amplify 与落脚探测命中骨骼）', async () => {
+test('脚部探针：Run 期间双脚世界坐标合法且持续摆动（离线步态与落脚探测命中骨骼）', async () => {
   const { events, feet } = await drive(BBALL, 4, 12, 'debug', true);
   assert.ok(feet.length > 200, '采样不足');
   for (const f of feet) {
@@ -133,8 +133,8 @@ test('脚部探针：Run 期间双脚世界坐标合法且持续摆动（amplify
     }
   }
   const zs = feet.map(f => f.L[2]);
-  assert.ok(Math.max(...zs) - Math.min(...zs) > 0.15, '左脚应有可观测的前后行程（摆腿放大生效）');
-  // 落脚探测：cadence ≈ clip 0.75s / TS_MAX 1.4 ≈ 1.93Hz，4s × 2 脚 ≈ 15 次
+  assert.ok(Math.max(...zs) - Math.min(...zs) > 0.15, '左脚应有可观测的前后行程（真实离线步态生效）');
+  // 落脚探测：cadence ≈ clip 0.8s / TS_MAX 1.4 ≈ 1.75Hz，4s × 2 脚 ≈ 14 次
   assert.ok(events.length >= 8, `落脚事件 ${events.length} 次过少：FootL/FootR 骨骼探测没命中`);
 });
 

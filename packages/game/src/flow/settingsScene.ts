@@ -10,9 +10,8 @@ import type { GameContent } from '@tr/game/core/config/configTypes.js';
 import type { SceneDef } from '@tr/game/core/scene/sceneMachine.js';
 import type { SyncStorage } from '@tr/framework/platform/platformAdapter.js';
 import type { GameViews, VolumeKind, VolumeSettings } from './views.js';
-
-/** 设置页「切换场景」所选主题 id（点选即写，run 进局时消费——下一局生效） */
-export const THEME_KEY = 'thunderrun:theme';
+import { isThemeUnlocked, markThemeUnlocked, THEME_KEY } from './localEconomy.js';
+export { THEME_KEY } from './localEconomy.js';
 
 /** 音量偏好存储键（0..100 整数百分比字符串；设置页写，音频导演每次播放时读） */
 export const MUSIC_VOLUME_KEY = 'thunderrun:volume-music';
@@ -24,7 +23,7 @@ type Entry = Record<string, unknown>;
 
 /** 配置里的主题条目（顺序即设置页展示顺序） */
 function themeEntries(content: GameContent | null): Entry[] {
-  return content ? ((content.themes.items ?? []) as Entry[]) : [];
+  return content ? ((content.themes.items ?? []) as Entry[]).filter(t => t['status'] === 'live' || t['status'] === 'draft') : [];
 }
 
 /** 主题显示名（name.zh-CN；缺省回 id——提示文案不硬编码，主题改名不漏改） */
@@ -107,11 +106,17 @@ export function createSettingsScene(d: SettingsSceneDeps): SceneDef {
       d.views.renderSettings(content, {
         onBack: () => d.goSelect(),
         onSelectTheme: id => {
-          if (!themeEntries(content).some(t => t['id'] === id)) return false;
+          const theme = themeEntries(content).find(t => t['id'] === id);
+          if (!theme) return false;
+          if (!isThemeUnlocked(d.storage, id, content)) { d.views.toast('场景需先在商店用能量币解锁'); return false; }
+          // 保存曾使用的场景：换到免费场景后仍能切回原先的存量主题。
+          const previous = currentThemeId(d.storage, content);
+          if (previous) markThemeUnlocked(d.storage, previous);
           d.storage.set(THEME_KEY, id);
           d.views.toast(`已切到「${themeName(content, id)}」，下一局生效`);
           return true;
         },
+        isThemeUnlocked: id => isThemeUnlocked(d.storage, id, content),
         // 音量按 0..100 整数百分比落盘；音频导演经 volumes 提供者读同一存储，下一次播放即用新值
         onSetVolume: (kind, value) => {
           if (kind !== 'music' && kind !== 'sfx') return false;

@@ -1,0 +1,16 @@
+{
+  "phase": "after",
+  "scope": "candidate production bundle; fresh profile; synthetic empty mission API",
+  "metrics": {
+    "viewportHeight": 568,
+    "panelBottom": 551.984375,
+    "panelHeight": 529.265625,
+    "scrollHeight": 764,
+    "clientHeight": 527,
+    "actualScrollTop": 237,
+    "lastRowBottom": 532.265625,
+    "horizontalOverflow": false,
+    "walletVersion": 2
+  },
+  "errors": []
+}

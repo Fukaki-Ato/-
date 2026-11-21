@@ -47,6 +47,7 @@ export function fakeDom(t) {
     getClientRects() { for (let node = this; node; node = node.parent) if (node.removed || node.hidden || node.inert) return []; return [{}]; }
     scrollTo(options) { this.scrollLeft = Math.max(0, options.left); }
     click() { if (!this.disabled) this.dispatchEvent(new Event('click')); }
+    querySelector(selector) { return this.querySelectorAll(selector)[0] ?? null; }
     querySelectorAll(selector) {
       if (selector.includes('button:not')) return all(this).filter(node => node.tagName === 'button' && !node.disabled);
       if (selector.startsWith('.')) return byClass(this, selector.slice(1));

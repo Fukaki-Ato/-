@@ -5,8 +5,8 @@ import { RunnerSim } from '../packages/game/dist/core/sim/runnerSim.js';
 const content = workerData.content ?? loadContent();
 parentPort.postMessage({ type: 'ready' });
 
-function replay({ seed, charId, frames, inputs }) {
-  const sim = new RunnerSim(content, seed, charId);
+function replay({ seed, charId, themeId, frames, inputs }) {
+  const sim = new RunnerSim(content, seed, charId, false, [], themeId);
   let inputIndex = 0;
   for (let frame = 0; frame < frames; frame++) {
     while (inputIndex < inputs.length && inputs[inputIndex].frame === frame) {

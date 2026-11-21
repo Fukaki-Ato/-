@@ -11,6 +11,8 @@
  *   - 位置由 animAvatar 的落脚探测给出（脚世界 x/z + 支撑面 y），本模块只管演。
  *   - 随赛道一起向 +z 平流（实体口径 z = worldZ - dist，dist 增大即朝相机方向涌），
  *     速度由调用方按 sim 步长精确给出，尘土才像贴在地面上而不是飘在半空。
+ *   - 反重力（B-7）：flip=-1 时把支撑面读作天花板——生成位镜像 y'=2·ceilH−y（贴在顶面
+ *     下侧），微粒初速与重力随 gDir 反相（向顶面「回落」），冲击环本就双面平放无需转。
  */
 import * as THREE from 'three';
 
@@ -27,8 +29,8 @@ const SPECK_N = 3, SPECK_UP = [0.45, 1.05], SPECK_BACK = [0.3, 1.1], SPECK_G = 6
 const PUFF_COLOR = 0xdbeafe, PUFF_OPACITY = 0.5;
 
 export interface FootDust {
-  /** 在支撑面上放一圈尘土（x/z 为脚的世界位置，y 为支撑面高度） */
-  spawn(x: number, y: number, z: number): void;
+  /** 在支撑面上放一圈尘土（x/z 为脚的世界位置，y 为支撑面高度+抬升）；flip=-1 时镜像贴天花板（B-7） */
+  spawn(x: number, y: number, z: number, flip?: 1 | -1, ceilH?: number): void;
   /** @param dt 帧间隔（秒） @param scrollSpeed 赛道滚动速度（m/s），尘土与之同速向 +z 平流 */
   update(dt: number, scrollSpeed: number): void;
   dispose(): void;
@@ -37,7 +39,7 @@ export interface FootDust {
 export function createFootDust(scene: THREE.Scene): FootDust {
   const ringGeo = new THREE.RingGeometry(RING_IN, RING_OUT, 20);
   const speckGeo = new THREE.SphereGeometry(0.032, 6, 5);
-  interface Puff { g: THREE.Group; ring: THREE.Mesh; mat: THREE.MeshBasicMaterial; specks: THREE.Mesh[]; vel: THREE.Vector3[]; t: number }
+  interface Puff { g: THREE.Group; ring: THREE.Mesh; mat: THREE.MeshBasicMaterial; specks: THREE.Mesh[]; vel: THREE.Vector3[]; t: number; gDir: 1 | -1 }
   const pool: Puff[] = [];
   for (let i = 0; i < PUFF_POOL; i++) {
     const mat = new THREE.MeshBasicMaterial({
@@ -60,16 +62,20 @@ export function createFootDust(scene: THREE.Scene): FootDust {
       vel.push(new THREE.Vector3());
     }
     scene.add(g);
-    pool.push({ g, ring, mat, specks, vel, t: PUFF_T });
+    pool.push({ g, ring, mat, specks, vel, t: PUFF_T, gDir: 1 });
   }
 
   return {
-    spawn(x, y, z) {
+    spawn(x, y, z, flip = 1, ceilH = 0) {
       const b = pool.find(s => !s.g.visible); // 池满则丢弃：尘土是纯反馈，不缺这一次
       if (!b) return;
+      // B-7 倒挂镜像：绕天花板平面翻 y（探测口径 y=支撑面+抬升 → 镜像后贴在顶面下侧同抬升处）；
+      // gDir 记进本粒尘（生成时定）：微粒初速反相、update 里重力朝天花板回落，与倒挂位形自洽
+      const inv = flip === -1 && ceilH > 0;
       b.t = 0;
+      b.gDir = inv ? -1 : 1;
       b.g.visible = true;
-      b.g.position.set(x, y, z);
+      b.g.position.set(x, inv ? 2 * ceilH - y : y, z);
       b.ring.scale.setScalar(RING_SCALE0);
       b.mat.opacity = PUFF_OPACITY;
       for (let s = 0; s < SPECK_N; s++) {
@@ -77,7 +83,7 @@ export function createFootDust(scene: THREE.Scene): FootDust {
         const a = Math.random() * Math.PI * 2;
         b.vel[s].set(
           Math.cos(a) * (0.2 + Math.random() * 0.4),
-          SPECK_UP[0] + Math.random() * (SPECK_UP[1] - SPECK_UP[0]),
+          (SPECK_UP[0] + Math.random() * (SPECK_UP[1] - SPECK_UP[0])) * b.gDir,
           Math.sin(a) * (0.2 + Math.random() * 0.4) - (SPECK_BACK[0] + Math.random() * (SPECK_BACK[1] - SPECK_BACK[0])),
         );
       }
@@ -94,7 +100,7 @@ export function createFootDust(scene: THREE.Scene): FootDust {
         b.g.position.z += scrollSpeed * dt; // 与赛道同速涌向相机，才像贴地
         for (let s = 0; s < SPECK_N; s++) {
           const v = b.vel[s];
-          v.y -= SPECK_G * dt;
+          v.y -= SPECK_G * dt * b.gDir; // 倒挂尘（gDir=-1）：重力朝天花板「回落」，与贴顶生成自洽
           b.specks[s].position.addScaledVector(v, dt);
         }
       }

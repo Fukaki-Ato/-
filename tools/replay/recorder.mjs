@@ -1,15 +1,15 @@
 /**
- * tools/replay/recorder.mjs — 程序化生成重放格式 v1 文件（S19a）
+ * tools/replay/recorder.mjs — 程序化生成重放；默认 v1，有主题/道具上下文时使用 v2。
  * 编排规则：伪随机但同 (seed, charId) 逐字节确定——随机源用 core 的 RunRng（禁 Math.random），
  * 派生种子 = hashSeed(`replay-inputs:v1:${seed}:${charId}`)，与赛道 seed 同源但互不影响。
  * 动作以 platform 事件形状落盘（swipe/doubleTap/键盘 code 随机取一，覆盖两种输入通道），
- * 由 runner.mjs 按 docs/replay-format.md §3 的映射表驱动 sim。
+ * 由 runner.mjs 按 docs/replay.md 的输入映射驱动 sim。
  * CLI：node tools/replay/recorder.mjs --seed=777 --char=char_volt [--frames=3600] [--out=path.json]
  */
 import { writeFileSync } from 'node:fs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { RunRng, hashSeed } from '../../packages/game/dist/core/rng.js';
-import { DEFAULT_MAX_FRAMES, DT_MS, REPLAY_VERSION } from './runner.mjs';
+import { CONTEXT_REPLAY_VERSION, DEFAULT_MAX_FRAMES, DT_MS, REPLAY_VERSION, parseReplay } from './runner.mjs';
 
 /** SimAction → 候选平台事件形状（对齐 packages/platform 的 Gesture 与 onKey code） */
 const FORMS = {
@@ -52,17 +52,22 @@ export function scriptInputs(seed, charId = '', opts = {}) {
   return inputs;
 }
 
-/** 组装一份完整的重放格式 v1 对象（可直接 JSON 落盘 / 喂给 runReplay） */
+/** 保留默认 v1；opts.themeId/initialItems 任一提供时构造带上下文的 v2。 */
 export function makeReplay(seed, charId = '', opts = {}) {
   const maxFrames = opts.maxFrames ?? DEFAULT_MAX_FRAMES;
-  return {
-    version: REPLAY_VERSION,
+  const context = opts.themeId !== undefined || opts.initialItems !== undefined;
+  const replay = {
+    version: context ? CONTEXT_REPLAY_VERSION : REPLAY_VERSION,
     seed,
     charId,
     dtMs: DT_MS,
     maxFrames,
     inputs: scriptInputs(seed, charId, { ...opts, maxFrames }),
   };
+  if (!context) return replay;
+  if (opts.themeId !== undefined) replay.themeId = opts.themeId;
+  replay.initialItems = opts.initialItems === undefined ? [] : opts.initialItems;
+  return parseReplay(replay);
 }
 
 function parseArgs(argv) {
@@ -78,10 +83,14 @@ function main() {
   const opts = parseArgs(process.argv.slice(2));
   const seed = Number(opts.seed);
   if (!opts.seed || !Number.isInteger(seed) || seed < 0 || seed > 0xffffffff) {
-    console.error('用法: node tools/replay/recorder.mjs --seed=<uint32> [--char=char_volt] [--frames=3600] [--out=path.json]');
+    console.error('用法: node tools/replay/recorder.mjs --seed=<uint32> [--char=char_volt] [--frames=3600] [--theme=theme_library] [--items=item_helmet] [--out=path.json]');
     process.exit(2);
   }
-  const replay = makeReplay(seed, opts.char ?? '', opts.frames ? { maxFrames: Number(opts.frames) } : {});
+  const replay = makeReplay(seed, opts.char ?? '', {
+    ...(opts.frames ? { maxFrames: Number(opts.frames) } : {}),
+    ...(opts.theme !== undefined ? { themeId: opts.theme } : {}),
+    ...(opts.items !== undefined ? { initialItems: opts.items ? opts.items.split(',').map(id => id.trim()) : [] } : {}),
+  });
   const text = `${JSON.stringify(replay, null, 2)}\n`;
   if (opts.out) {
     writeFileSync(opts.out, text, 'utf8');

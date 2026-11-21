@@ -10,9 +10,19 @@ export function createMobileSettings(
   actions: SettingsActions,
   currentThemeId: string | null,
   volumePrefs?: VolumeSettings,
+  onProfile?: () => () => void,
 ): () => void {
   const { root, frame } = mountMobilePage('设置', 'mobile-settings');
   frame.append(pageHeader('旅途设置', 'MAKE IT YOURS / 设置', actions.onBack));
+  let closeProfile: (() => void) | undefined;
+  if (onProfile) {
+    const profile = uiButton('', 'settings-profile ui-panel', () => { closeProfile = onProfile(); });
+    profile.setAttribute('aria-label', '打开玩家档案');
+    const arrow = uiText('span', '›');
+    arrow.setAttribute('aria-hidden', 'true');
+    profile.append(uiText('strong', '玩家档案'), arrow);
+    frame.append(profile);
+  }
   const panel = uiText('section', '', 'settings-panel ui-panel');
   panel.append(uiText('h2', '下一站，想去哪里？'), uiText('p', '点选即保存，下一局生效', 'ui-muted'));
   const options = themeOptions(content);
@@ -20,12 +30,19 @@ export function createMobileSettings(
   const buttons = new Map<string, HTMLButtonElement>();
   const status = uiText('p', '', 'settings-status ui-muted');
   status.setAttribute('role', 'status');
+  /** 未开放（draft）/未解锁（商店 1000 能量币解锁体系）的锁定文案；null=可选择（流程层同口径校验） */
+  const lockOf = (option: (typeof options)[number]): string | null => {
+    if (option.status !== 'live') return '未开放';
+    return actions.isThemeUnlocked && !actions.isThemeUnlocked(option.id) ? '未解锁' : null;
+  };
   const paint = (): void => {
     for (const [id, button] of buttons) {
       const selected = current === id;
+      const option = options.find(o => o.id === id)!;
+      const lock = selected ? null : lockOf(option);
       button.classList.toggle('is-selected', selected);
       button.setAttribute('aria-pressed', String(selected));
-      button.querySelector('.theme-marker')!.textContent = selected ? '使用中 ✓' : '选择';
+      button.querySelector('.theme-marker')!.textContent = selected ? '使用中 ✓' : lock ?? '选择';
     }
   };
   for (const option of options) {
@@ -97,7 +114,8 @@ export function createMobileSettings(
   }
   frame.append(panel, volumePanel, uiText('p', '海风会记得你的选择。', 'mobile-page-note'));
   paint();
-  return pageLifecycle(root, actions.onBack);
+  const disposePage = pageLifecycle(root, actions.onBack);
+  return () => { closeProfile?.(); disposePage(); };
 }
 
 export function createMobileResult(summary: RunSummary, best: number, actions: ResultActions): () => void {

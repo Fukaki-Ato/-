@@ -1,0 +1,235 @@
+TAP version 13
+# (node:3288676) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: a run keeps its issued scoring rules when content changes and the server restarts
+ok 1 - a run keeps its issued scoring rules when content changes and the server restarts
+  ---
+  duration_ms: 315.989889
+  type: 'test'
+  ...
+# {"issueScore":3075,"settledScore":3075,"status":"finished"}
+# Subtest: a physics update must not mark a previously valid death replay invalid
+ok 2 - a physics update must not mark a previously valid death replay invalid
+  ---
+  duration_ms: 262.969598
+  type: 'test'
+  ...
+# {"issueAlive":false,"settledValid":1,"status":"finished"}
+# (node:3288683) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: actual config only assigns achievable daily missions and retains all weekly tasks
+ok 3 - actual config only assigns achievable daily missions and retains all weekly tasks
+  ---
+  duration_ms: 40.199687
+  type: 'test'
+  ...
+# Subtest: legacy unclaimed task migrates once, preserving identity/reward and unrelated state
+ok 4 - legacy unclaimed task migrates once, preserving identity/reward and unrelated state
+  ---
+  duration_ms: 45.569399
+  type: 'test'
+  ...
+# Subtest: already claimed legacy tasks never reset or pay twice
+ok 5 - already claimed legacy tasks never reset or pay twice
+  ---
+  duration_ms: 22.274535
+  type: 'test'
+  ...
+# Subtest: migration compare-and-swap cannot overwrite a concurrent claim or progress update
+ok 6 - migration compare-and-swap cannot overwrite a concurrent claim or progress update
+  ---
+  duration_ms: 22.289929
+  type: 'test'
+  ...
+# Subtest: in-flight legacy run migrates before scoring, and live truncation still earns nothing
+ok 7 - in-flight legacy run migrates before scoring, and live truncation still earns nothing
+  ---
+  duration_ms: 154.739919
+  type: 'test'
+  ...
+# Subtest: configuration fails early if a daily tier has no achievable alternative
+ok 8 - configuration fails early if a daily tier has no achievable alternative
+  ---
+  duration_ms: 23.892905
+  type: 'test'
+  ...
+# Subtest: migration retries with fresh state when another writer updates the period
+ok 9 - migration retries with fresh state when another writer updates the period
+  ---
+  duration_ms: 21.146689
+  type: 'test'
+  ...
+# Subtest: completed but unclaimed legacy tasks retain their earned reward and original progress
+ok 10 - completed but unclaimed legacy tasks retain their earned reward and original progress
+  ---
+  duration_ms: 21.473439
+  type: 'test'
+  ...
+# Subtest: persistent migration conflicts fail safely after bounded retries
+ok 11 - persistent migration conflicts fail safely after bounded retries
+  ---
+  duration_ms: 21.445436
+  type: 'test'
+  ...
+# (node:3288690) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: Beijing periods reset at midnight; weekly period starts on Monday
+ok 12 - Beijing periods reset at midnight; weekly period starts on Monday
+  ---
+  duration_ms: 2.130535
+  type: 'test'
+  ...
+# Subtest: session cookie, stable daily tiers, all weekly missions, and SQLite persistence
+ok 13 - session cookie, stable daily tiers, all weekly missions, and SQLite persistence
+  ---
+  duration_ms: 287.959183
+  type: 'test'
+  ...
+# Subtest: server replays runs, rejects early time, settles once, and atomically claims reward
+ok 14 - server replays runs, rejects early time, settles once, and atomically claims reward
+  ---
+  duration_ms: 367.951243
+  type: 'test'
+  ...
+# Subtest: weekly character progress deduplicates a runner, while daily stale runs never enter a new day
+ok 15 - weekly character progress deduplicates a runner, while daily stale runs never enter a new day
+  ---
+  duration_ms: 376.567134
+  type: 'test'
+  ...
+# Subtest: invalid inputs, forged summaries, CSRF, stale claims, and body caps fail as JSON errors
+not ok 16 - invalid inputs, forged summaries, CSRF, stale claims, and body caps fail as JSON errors
+  ---
+  duration_ms: 164.789613
+  type: 'test'
+  location: '/tmp/opencode/thunder-run-site-optimization-20261111/tests/missions-server.test.mjs:215:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    
+    201 !== 400
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 400
+  actual: 201
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///tmp/opencode/thunder-run-site-optimization-20261111/tests/missions-server.test.mjs:238:12)
+    process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: too-short runs finish but never add mission progress; economy sets the 10-second threshold
+ok 17 - too-short runs finish but never add mission progress; economy sets the 10-second threshold
+  ---
+  duration_ms: 167.925242
+  type: 'test'
+  ...
+# Subtest: rate limits expire and configured public origin controls Secure cookies
+ok 18 - rate limits expire and configured public origin controls Secure cookies
+  ---
+  duration_ms: 275.542384
+  type: 'test'
+  ...
+# Subtest: trusted proxy uses only an overwritten single client IP, untrusted headers cannot bypass limits
+ok 19 - trusted proxy uses only an overwritten single client IP, untrusted headers cannot bypass limits
+  ---
+  duration_ms: 267.206945
+  type: 'test'
+  ...
+# Subtest: concurrent finish credits once; rewards and claim flags survive restart; other visitors cannot settle ticket
+ok 20 - concurrent finish credits once; rewards and claim flags survive restart; other visitors cannot settle ticket
+  ---
+  duration_ms: 254.600239
+  type: 'test'
+  ...
+# Subtest: weekly rollover rejects old claims and does not carry an old run into the new week
+ok 21 - weekly rollover rejects old claims and does not carry an old run into the new week
+  ---
+  duration_ms: 195.422846
+  type: 'test'
+  ...
+# Subtest: replay wall-clock timeout, open-run cap, and data purge guardrails
+ok 22 - replay wall-clock timeout, open-run cap, and data purge guardrails
+  ---
+  duration_ms: 215.158907
+  type: 'test'
+  ...
+# Subtest: 装备道具随票提交：重放同清单注入则 validRun 成立；无效/重复道具 400（道具闭环 M）
+ok 23 - 装备道具随票提交：重放同清单注入则 validRun 成立；无效/重复道具 400（道具闭环 M）
+  ---
+  duration_ms: 257.4076
+  type: 'test'
+  ...
+# Subtest: purge retains earned wallets and progress when their last run expires
+ok 24 - purge retains earned wallets and progress when their last run expires
+  ---
+  duration_ms: 2.534333
+  type: 'test'
+  ...
+# Subtest: expired tickets release open-run slots before purge and respect a configured TTL
+ok 25 - expired tickets release open-run slots before purge and respect a configured TTL
+  ---
+  duration_ms: 177.94896
+  type: 'test'
+  ...
+# (node:3288698) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: theme mappings participate in the existing v2 leaderboard rules hash
+ok 26 - theme mappings participate in the existing v2 leaderboard rules hash
+  ---
+  duration_ms: 11.783901
+  type: 'test'
+  ...
+# Subtest: RunSession passes selected theme to simulation, ranking begin and renderer; omitted theme resolves default
+ok 27 - RunSession passes selected theme to simulation, ranking begin and renderer; omitted theme resolves default
+  ---
+  duration_ms: 24.467521
+  type: 'test'
+  ...
+# Subtest: Web ranking and shared mission clients carry optional start theme without adding it to finish
+ok 28 - Web ranking and shared mission clients carry optional start theme without adding it to finish
+  ---
+  duration_ms: 42.884795
+  type: 'test'
+  ...
+# Subtest: Web mission integration sends the simulation-resolved theme
+ok 29 - Web mission integration sends the simulation-resolved theme
+  ---
+  duration_ms: 35.698554
+  type: 'test'
+  ...
+# Subtest: WX mission transport carries the simulation-resolved theme in the shared start contract
+ok 30 - WX mission transport carries the simulation-resolved theme in the shared start contract
+  ---
+  duration_ms: 2.758939
+  type: 'test'
+  ...
+# Subtest: leaderboard HTTP validates available themes and binds the ticket to the local replay worker theme
+ok 31 - leaderboard HTTP validates available themes and binds the ticket to the local replay worker theme
+  ---
+  duration_ms: 191.60816
+  type: 'test'
+  ...
+# Subtest: mission HTTP validates themes, persists resolved selection and rejects finish-time replacement
+ok 32 - mission HTTP validates themes, persists resolved selection and rejects finish-time replacement
+  ---
+  duration_ms: 241.675642
+  type: 'test'
+  ...
+# Subtest: legacy mission SQLite schema migrates nullable theme_id, replays default, and preserves selected themes on reopen
+ok 33 - legacy mission SQLite schema migrates nullable theme_id, replays default, and preserves selected themes on reopen
+  ---
+  duration_ms: 126.774648
+  type: 'test'
+  ...
+1..33
+# tests 33
+# suites 0
+# pass 32
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 5388.296287

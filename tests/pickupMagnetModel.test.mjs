@@ -1,12 +1,11 @@
 /**
- * 磁铁道具 3D 化回归（item_magnet → assets/pickups/magnet.glb）。
+ * 道具 3D 化回归（items.json model.prefab → assets/pickups/*.glb + assets/consumables/xp_card.glb）。
  *
- * 背景：items.json 里 10 个道具都预留了 model.prefab，但仓库里只有磁铁一个文件，且渲染层
- * 从未消费过 model.prefab/spin——道具视觉一直是 entityLayers 的贴图箱。本批次：
- *   1. pickupModels.ts：照 animAvatar 模式按 itemRef 异步加载 GLB，任何失败返回 null
- *      （8 个预留路径里 7 个没文件，绝不能集体报错或空白——回退铁律）
- *   2. entityLayers.createPickupLayer：近距换模（进 35m / 出 40m 滞回）+ spin 消费，
- *      箱槽与模型槽分离，每帧零分配；捞取判定/数值/音效零改动
+ * 背景：items.json 里 10 个道具都预留了 model.prefab 但仓库长期只有磁铁一个文件。本批次：
+ *   1. pickupModels.ts：照 animAvatar 模式按 itemRef 异步加载 GLB，任何失败返回 null（回退铁律）
+ *   2. pickupLayer：近距换模（进 35m / 出 40m 滞回）+ spin 消费，箱槽与模型槽分离，每帧零分配
+ *   3. 全部 10 个 prefab 文件入库，七件模型使用海滨美术，加载失败仍回信标箱，捞取判定零改动
+ *   4. pickupGlow：道具正下方地面的光圈（见 pickupGlow.test.mjs）
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -26,6 +25,7 @@ if (typeof URL.revokeObjectURL !== 'function') URL.revokeObjectURL = () => {};
 const { createPickupModelLoader } = await import('../packages/game/dist/render/pickupModels.js');
 const { createPickupLayer } = await import('../packages/game/dist/render/pickupLayer.js');
 const { PICKUP_CENTER_Y } = await import('../packages/game/dist/core/sim/collect.js');
+const { uBendX, uBendY } = await import('../packages/game/dist/render/stormspire/worldBend.js');
 
 const root = join(fileURLToPath(import.meta.url), '..', '..');
 const NAMES = ['game', 'characters', 'skills', 'items', 'obstacles', 'themes', 'events', 'economy'];
@@ -40,7 +40,7 @@ const realAdapter = { extras: { readBinary: async (p) => {
 const garbageAdapter = { extras: { readBinary: async () => new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8]).buffer } };
 const flush = () => new Promise(r => setTimeout(r, 60));
 
-test('加载器：磁铁 GLB 加载成功（尺寸/原点/双网格/自转口径）', async () => {
+test('加载器：原创海滨磁铁GLB加载成功（尺寸/原点/合批/自转口径）', async () => {
   const loader = createPickupModelLoader(content, realAdapter);
   assert.equal(loader.hasPrefab('item_magnet'), true);
   assert.equal(loader.spins('item_magnet'), true, 'items.json model.spin=true 应被消费');
@@ -51,35 +51,55 @@ test('加载器：磁铁 GLB 加载成功（尺寸/原点/双网格/自转口径
   const box = new THREE.Box3().setFromObject(m);
   const size = box.getSize(new THREE.Vector3());
   assert.ok(Math.abs(size.x - 0.8196) < 0.01 && Math.abs(size.y - 0.70) < 0.01 && Math.abs(size.z - 0.2471) < 0.01,
-    `尺寸应 0.8196×0.70×0.2471，实测 ${size.toArray().map(v => v.toFixed(3)).join('×')}`);
-  assert.ok(box.getCenter(new THREE.Vector3()).length() < 0.01, '几何中心应在原点（与道具箱同锚点）');
+    '保留原创海滨磁铁的尺寸口径');
+  const maxdim = Math.max(size.x, size.y, size.z);
+  assert.ok(maxdim > 0.5 && maxdim < 0.9, `最大边应在 0.5–0.9m 规格带，实测 ${size.toArray().map(v => v.toFixed(3)).join('×')}`);
+  assert.ok(Math.min(size.x, size.y, size.z) > 0.05, `最薄处不应塌成薄片，实测 ${size.toArray().map(v => v.toFixed(3)).join('×')}`);
+  assert.ok(box.getCenter(new THREE.Vector3()).length() < 0.02, '几何中心应在原点附近（与道具箱同锚点）');
   let meshes = 0;
   m.traverse(o => { if (o.isMesh) meshes++; });
-  assert.equal(meshes, 2, ' magnet_red + magnet_blue 两个 primitive');
+  assert.equal(meshes, 4, '原创红蓝极、触点与槽四种材质合批');
   // 夜间可见性补偿：源资产无 emissive，加载后补了同色弱发光
   m.traverse(o => {
     if (!o.isMesh) return;
     const mat = o.material;
     assert.ok(mat.emissive.getHexString() !== '000000', '加载后应补了 emissive');
     assert.ok(Math.abs(mat.emissiveIntensity - 0.18) < 1e-6, 'emissive 强度 0.18');
+    const shader = { uniforms: {}, vertexShader: '#include <project_vertex>' };
+    mat.onBeforeCompile(shader);
+    assert.equal(shader.uniforms.uBendX, uBendX, '近距模型与箱、光圈共用弯道');
+    assert.equal(shader.uniforms.uBendY, uBendY);
   });
   assert.equal(loader.model('item_magnet'), m, '重复取应返回同一实例（不重复加载）');
 });
 
-test('加载器回退铁律：预留路径文件缺失/垃圾字节/无适配器/未配置道具全部返回 null', async () => {
+test('加载器：十件 GLB 全部加载成功（居中/规格带），异常路径仍回 null', async () => {
   const ok = createPickupModelLoader(content, realAdapter);
+  const ids = ['item_shield', 'item_jetpack', 'item_coin', 'item_key', 'item_boots', 'item_helmet', 'item_board', 'item_multiplier', 'item_magnet', 'item_xp_card'];
+  for (const id of ids) {
+    assert.equal(ok.hasPrefab(id), true, `${id} 配了 prefab`);
+    ok.model(id); // 触发异步加载（首帧同步返回 null 是契约）
+  }
   await flush();
-  for (const id of ['item_shield', 'item_jetpack', 'item_coin', 'item_key', 'item_boots', 'item_helmet', 'item_board', 'item_multiplier']) {
-    assert.equal(ok.hasPrefab(id), true, `${id} 配了 prefab（预留路径）`);
-    assert.equal(ok.model(id), null, `${id} 文件不存在 → null（保持贴图箱）`);
+  for (const id of ids) {
+    const model = ok.model(id);
+    assert.ok(model, `${id} 文件已入库 → 应加载成功（不再回落贴图箱）`);
+    const size = new THREE.Box3().setFromObject(model).getSize(new THREE.Vector3());
+    const maxdim = Math.max(size.x, size.y, size.z);
+    assert.ok(maxdim > 0.5 && maxdim < 0.9, `${id} 最大边应在 0.5–0.9m，实测 ${maxdim.toFixed(3)}`);
+    const ctr = new THREE.Box3().setFromObject(model).getCenter(new THREE.Vector3());
+    assert.ok(ctr.length() < 0.03, `${id} 几何中心应在原点附近，实测 ${ctr.toArray().map(v => v.toFixed(3))}`);
   }
   assert.equal(ok.hasPrefab('item_nope'), false, '未配置道具');
   assert.equal(ok.model('item_nope'), null);
 
   const bad = createPickupModelLoader(content, garbageAdapter);
   bad.model('item_magnet');
+  const missing = createPickupModelLoader(content, { extras: { readBinary: async () => { throw new Error('not found'); } } });
+  missing.model('item_magnet');
   await flush();
   assert.equal(bad.model('item_magnet'), null, '解析失败 → null');
+  assert.equal(missing.model('item_magnet'), null, '资源读取失败/文件缺失 → null，仍回信标箱');
 
   const noAdapter = createPickupModelLoader(content, undefined);
   assert.equal(noAdapter.model('item_magnet'), null, '无 adapter（wx）→ null，不抛');
@@ -104,11 +124,26 @@ function fakeLoader(opts = {}) {
 }
 const pickup = (itemRef, worldZ, lane = 0, taken = false) => ({ itemRef, worldZ, lane, taken });
 
+test('层：无贴图信标的箱与几何标志共用 world-bend，远距不会与弯道分离', () => {
+  const scene = new THREE.Scene();
+  const layer = createPickupLayer(scene, 2.2);
+  layer.update([pickup('item_magnet', 100)], 0, 1);
+  const box = scene.children.find(c => c.isMesh && c.geometry?.type === 'BoxGeometry');
+  assert.equal(box.visible, true);
+  assert.equal(box.children[0].visible, true);
+  for (const material of [box.material, box.children[0].material]) {
+    const shader = { uniforms: {}, vertexShader: '#include <project_vertex>' };
+    material.onBeforeCompile(shader);
+    assert.equal(shader.uniforms.uBendX, uBendX);
+    assert.equal(shader.uniforms.uBendY, uBendY);
+  }
+});
+
 test('层：近距换模（35m 内 3D / 远距贴图箱）与滞回（进 -35 出 -40 不跳变）', () => {
   const { loader } = fakeLoader();
   const scene = new THREE.Scene();
   const layer = createPickupLayer(scene, 2.2, loader);
-  const boxes = scene.children.filter(c => c.isMesh);
+  const boxes = scene.children.filter(c => c.isMesh && c.geometry?.type === 'BoxGeometry');
   const groups = scene.children.filter(c => c.isGroup);
   assert.equal(boxes.length, 8, '箱槽 8 个');
   assert.equal(groups.length, 8, '模型槽 8 个');
@@ -157,7 +192,7 @@ test('层：spin 消费（item_magnet 绕 Y 递进 / 不转道具恒 0）与浮�
 test('层：无加载器（wx/无 extras）与文件缺失道具都走贴图箱，不抛不空白', () => {
   const scene = new THREE.Scene();
   const layer = createPickupLayer(scene, 2.2); // 不传 loader
-  const boxes = scene.children.filter(c => c.isMesh);
+  const boxes = scene.children.filter(c => c.isMesh && c.geometry?.type === 'BoxGeometry');
   layer.update([pickup('item_magnet', 10), pickup('item_shield', 12, 1)], 0, 1);
   assert.equal(boxes[0].visible, true, '磁铁近距也走箱');
   assert.equal(boxes[1].visible, true, '护盾走箱');
@@ -165,7 +200,7 @@ test('层：无加载器（wx/无 extras）与文件缺失道具都走贴图箱�
   const { loader } = fakeLoader();
   const scene2 = new THREE.Scene();
   const layer2 = createPickupLayer(scene2, 2.2, loader);
-  const boxes2 = scene2.children.filter(c => c.isMesh);
+  const boxes2 = scene2.children.filter(c => c.isMesh && c.geometry?.type === 'BoxGeometry');
   const groups2 = scene2.children.filter(c => c.isGroup);
   layer2.update([pickup('item_shield', 10)], 0, 1);
   assert.equal(boxes2[0].visible, true, '文件缺失道具回箱');
@@ -176,7 +211,7 @@ test('层：taken 不占槽、混合近远各走各路、槽位复用不串味',
   const { loader } = fakeLoader();
   const scene = new THREE.Scene();
   const layer = createPickupLayer(scene, 2.2, loader);
-  const boxes = scene.children.filter(c => c.isMesh);
+  const boxes = scene.children.filter(c => c.isMesh && c.geometry?.type === 'BoxGeometry');
   const groups = scene.children.filter(c => c.isGroup);
   // 近磁铁 + 远磁铁 + taken 磁铁：模型槽 0 给近的，箱槽 0 给远的，taken 不占
   layer.update([pickup('item_magnet', 10), pickup('item_magnet', 100), pickup('item_magnet', 12, 1, true)], 0, 1);

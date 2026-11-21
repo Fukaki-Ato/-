@@ -126,11 +126,38 @@ function findEntry(content: GameContent, ref: unknown): NamedEntry | undefined {
   return inSkills ?? (content.characters.items ?? []).find(c => c.id === ref);
 }
 
+/** buildLoadout 可选参数（缺省零 diff）：技能数值按等级缩放，比例由调用方按 growth.effectPerLevel 算好传入 */
+export interface LoadoutOptions {
+  /** 技能数值缩放比例：有限正数且 ≠1 才生效；缺省或 1 时产物与不缩放逐位一致（保 golden replay） */
+  skillScale?: number;
+}
+
+/**
+ * 技能数值按比例缩放（growth.effectPerLevel 的消费端）：只动 effects.params 里的有限数值字段。
+ * 原本为整数的字段（layers/charges/lookaheadM 这类离散量）缩放后四舍五入保持整数，
+ * durationS/radiusM/mul 等小数保持小数；cooldownS/chargeSlides 不在 params 里，天然不受影响。
+ * scale 缺省/为 1/脏值时原样返回同一数组——缺省路径产物逐位一致（golden replay 零 diff 的前提）。
+ */
+function scaleSkillEffects(effects: EffectSpec[], scale: number | undefined): EffectSpec[] {
+  if (scale === undefined || !Number.isFinite(scale) || scale <= 0 || scale === 1) return effects;
+  return effects.map(eff => {
+    const params: EffectParams = {};
+    for (const [k, v] of Object.entries(eff.params)) {
+      // 只缩放有限数值；整数缩放后取整（离散量不出现 2.3 层这种半层数）
+      params[k] = typeof v === 'number' && Number.isFinite(v)
+        ? (Number.isInteger(v) ? Math.round(v * scale) : v * scale)
+        : v;
+    }
+    return { ...eff, params };
+  });
+}
+
 /**
  * 装配角色。找不到 id 时返回空装备（默认手感），绝不抛错——
  * 启动路径上任何配置问题都应在 configValidator 里先被报出来。
+ * options 缺省（或 skillScale=1）时不做任何缩放，产物与本函数历史版本逐位一致。
  */
-export function buildLoadout(content: GameContent, charId: string): Loadout {
+export function buildLoadout(content: GameContent, charId: string, options?: LoadoutOptions): Loadout {
   const chars = playableCharacters(content);
   const c = chars.find(x => x.id === charId) ?? chars[0];
   const base: Loadout = {
@@ -184,7 +211,8 @@ export function buildLoadout(content: GameContent, charId: string): Loadout {
       // 仅支持下滑积攒（slides）；配置写了别的 mode 就退回「只看冷却」
       chargeSlides: charge['type'] === 'slideCount' ? Math.max(0, Math.round(number(charge['slides'], 0))) : 0,
       trigger: String(skillEntry['trigger'] ?? 'double_tap'),
-      effects: toSpecs(skillEntry, 'refresh'),
+      // 技能等级缩放（可选增强）：只在调用方显式给了 skillScale 时生效，缺省零 diff
+      effects: scaleSkillEffects(toSpecs(skillEntry, 'refresh'), options?.skillScale),
     };
   }
 
@@ -203,4 +231,27 @@ export function itemEffects(content: GameContent, itemId: string): EffectSpec[] 
   if (!it) return [];
   const rule = String(it['stackRule'] ?? 'refresh') as StackRule;
   return toSpecs(it, rule === 'stack' || rule === 'replace' ? rule : 'refresh');
+}
+
+/** 可选增强（RunnerSim 第 7 参，缺省零 diff）：休闲局的道具时长加成与技能等级缩放。
+ *  排位/任务/云回放使用标准规则；调用方仅向本机局传入增强。 */
+export interface RunEnhance {
+  /** 每个道具的额外时长（秒，可为 0）：开局装备注入与局内拾取两条路径的 durationS 都加上它 */
+  itemBonusS?: (itemId: string) => number;
+  /** 技能数值缩放比例：透传给 buildLoadout（缺省不传 options，装配产物与旧签名逐位一致） */
+  skillScale?: number;
+}
+
+/** 道具规格 + 可选时长加成：开局注入与局内拾取两条路径共用，保证加成口径一致。
+ *  bonus 缺省/非有限/为 0 时原样返回同一引用——不重算 durationS + 0，避免 -0/浮点噪声（golden replay 逐位一致）。 */
+export function itemSpecsWithBonus(content: GameContent, itemId: string, bonus: number | undefined): EffectSpec[] {
+  const specs = itemEffects(content, itemId);
+  const b = bonus ?? 0;
+  if (specs.length === 0 || !Number.isFinite(b) || b === 0) return specs;
+  return specs.map(eff => {
+    const d = eff.params['durationS'];
+    // 仅 durationS 为有限数值的道具参与加成；永久/按里程到期的规格原样保留
+    if (typeof d !== 'number' || !Number.isFinite(d)) return eff;
+    return { ...eff, params: { ...eff.params, durationS: d + b } };
+  });
 }

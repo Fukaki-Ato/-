@@ -16,6 +16,7 @@ import {
 } from './animClips.js';
 import { RUN_BONE_AMPS, amplifyClipSwing } from './animAmplify.js';
 import { createFootfallProbe } from './animFootfall.js';
+import { disposeModel, type ModelLoaderFactory } from './modelLoader.js';
 
 /** 换动作的交叉淡化时长（秒）：clip 间切换统一用它，turn→run 的回淡也是它。
  *  0.12→0.08：玩家高频换道时 Run 被 Turn 反复顶掉，更短的淡化让回切更利落，
@@ -44,7 +45,7 @@ export interface AnimAvatar {
   get chestY(): number;
   /** @param dt 帧间隔（秒）；@param s @param fx 只读的 sim 状态与原语视图 */
   update(dt: number, s: RunnerState, fx: FxState): void;
-  /** 落脚事件订阅：Run（贴地前进）期间脚掌每次离开触地区时上报世界坐标，render 层放尘土。
+  /** 落脚事件订阅：Run（贴地前进）期间按资产步态的接地/蹬地沿上报世界坐标，render 层放尘土。
    *  传 null 退订。为什么需要：脚行程被腿长锁死在 0.65m/周期，而 12 m/s 下一个周期身体前进
    *  6.7m——脚相对地面 90% 在滑，没有落地反馈观众读不出「在跑」（tests/renderFootDust）。 */
   setFootfallHandler(fn: ((x: number, y: number, z: number) => void) | null): void;
@@ -62,7 +63,7 @@ export interface AnimAvatar {
  */
 export function createAnimAvatar(
   adapter: PlatformAdapter, prefabPath: string, scale = 1, urlParams?: QueryParamsView | null,
-  isDead?: () => boolean,
+  isDead?: () => boolean, createModelLoader?: ModelLoaderFactory,
 ): Promise<AnimAvatar | null> {
   if (!adapter.extras) {
     console.warn('[avatarRig] 平台无 extras（v2 契约 D7），跳过 GLB 角色（保留程序化模型）:', prefabPath);
@@ -72,10 +73,13 @@ export function createAnimAvatar(
   const nowMs = () => (typeof adapter.now === 'function' ? adapter.now() : 0);
   return adapter.extras.readBinary(prefabPath)
     .then(buf => new Promise<AnimAvatar | null>(resolve => {
-      new GLTFLoader().parse(buf, '', gltf => {
+      (createModelLoader?.() ?? new GLTFLoader()).parse(buf, '', gltf => {
         try {
-          resolve(build(gltf.scene, gltf.animations, scale, urlParams, isDead, nowMs));
+          const avatar = isDead?.() ? null : build(gltf.scene, gltf.animations, scale, urlParams, nowMs);
+          if (!avatar) disposeModel(gltf.scene);
+          resolve(avatar);
         } catch (e) {
+          disposeModel(gltf.scene);
           console.warn('[avatarRig] GLB 装配失败（回退程序化模型）', prefabPath, e);
           resolve(null);
         }
@@ -92,7 +96,7 @@ export function createAnimAvatar(
 
 function build(
   root: THREE.Group, clips: THREE.AnimationClip[], scale: number, urlParams?: QueryParamsView | null,
-  isDead?: () => boolean, nowMs?: () => number,
+  nowMs?: () => number,
 ): AnimAvatar | null {
   // 核心 clip（10 个）缺一即判资产不合格：半套动作比没有更糟（会静默少播受击/死亡等关键反馈）。
   // 表演 clip 按存在性装配：各模型不同源，缺一个不判失败，缺失由 play() 回落 Run。
@@ -117,10 +121,11 @@ function build(
     mixer.stopAllAction();
     return null;
   }
-  // Run 步态放大（render 层解释，资产文件零改动）：v8 Run 是慢跑规格（脚行程 ~0.45m/周期），
-  // baseSpeed 12 m/s 下一步覆盖 2.5m、timeScale 又被 TS_MAX 钳住，原样播就是「原地倒腾短腿+滑步」。
-  // 只放大 Run 的四肢摆动，循环口径不受影响；RUN_BONE_AMPS 十骨（LegUpperL/R…ArmLowerL/R）奶蛙与篮球小子实测命中。
-  const runAct = mixer.clipAction(amplifyClipSwing(clips.find(c => c.name === 'Run')!, RUN_BONE_AMPS));
+  let authoredMotion = false;
+  root.traverse(node => { if (node.userData.thunderMotionVersion === 2) authoredMotion = true; });
+  // 新离线步态已包含接地/收腿/反摆，不能再叠加旧资产的临时摆幅放大。
+  const runClip = clips.find(c => c.name === 'Run')!;
+  const runAct = mixer.clipAction(authoredMotion ? runClip : amplifyClipSwing(runClip, RUN_BONE_AMPS));
   actions.Run = runAct;
 
   root.scale.setScalar(scale);
@@ -130,11 +135,12 @@ function build(
 
   const ctx: ClipContext = createClipContext();
   let current: ClipName | null = null;
+  let runPhase = 0;
   let tsSmooth = 1;                  // timeScale 平滑值，防帧位移抖动让跑步抽风
   let ticks = 0;                     // update() 累计次数（探针 __trAnim.ticks：死实例停止增长）
-  /** 落脚探测（阈值自适应 + 进入/离开判定，见 animFootfall.ts）：短腿角色（企鹅）按本资产
-   *  Run 脚程取阈值中点兜底，长腿角色保持默认 0.24——只有设了 handler 才逐帧判定 */
-  const footfall = createFootfallProbe(mixer, runAct, root, bones);
+  // 旧资产用自适应蹬地探针；新离线步态按接地进入沿触发，不能套旧摆腿方向判据。
+  const footfall = authoredMotion ? null : createFootfallProbe(mixer, runAct, root, bones);
+  const inContact = { L: false, R: false };
   let footfallHandler: ((x: number, y: number, z: number) => void) | null = null;
   /** 表演 clip 锁播累计秒与当前 clip：满一期交还状态机（LoopRepeat 的 time 会归零，不能靠 time 判） */
   let perfLockT = 0;
@@ -150,12 +156,10 @@ function build(
   const chestV = new THREE.Vector3();
   const footV = new THREE.Vector3();
   const footV2 = new THREE.Vector3();
-  /**
-   * Idle 的双实例交替：Idle 首末姿差 110°（建模侧实测，不可直接循环），按契约 LoopOnce 播一次，
-   * 播完后用第二个 action 做 0.12s 交叉淡化交回自身首帧，抹掉硬跳。
-   * 第二个实例必须建在 clone 的 clip 上：three 按 clip+root 缓存 action，对同一 clip 再调
-   * clipAction 只会拿回同一个实例，fadeOut 会被紧随的 reset() 取消，交叉退化成一帧瞬跳。
-   */
+  const contactY = (side: string): number =>
+    (bones.get(`Foot${side}`)?.getWorldPosition(footV).y ?? 0.12 * scale) + 0.055 * scale;
+  const footEnter = { L: contactY('L'), R: contactY('R') };
+  /** 旧 Idle 首末差很大：双实例交叉淡化；新离线 Idle 首末一致，直接循环。 */
   const idleClip = clips.find(c => c.name === 'Idle');
   const idleAltClip = idleClip?.clone() ?? null;
   let idleAct = actions.Idle as THREE.AnimationAction; // CORE 必存在（上面缺一即 return null）
@@ -184,6 +188,7 @@ function build(
     if (current === clip && !restart) return;
     if (current && current !== clip) actions[current]!.fadeOut(XFADE);
     next.reset();
+    if (authoredMotion && clip === 'Run') next.time = runPhase % runClip.duration;
     if (current !== clip) next.fadeIn(XFADE);
     next.play();
     current = clip;
@@ -192,13 +197,6 @@ function build(
   }
   // 装载完成到首帧 update 之间是待机，不是 T-pose；Idle 按契约只播一次（播完交回首帧）
   play('Idle', loopsForever('Idle'), false);
-
-  // 迟到装配防护（见 createAnimAvatar 的 isDead 注释）：场景已销毁就整体放弃，
-  // 绝不把 __trAnim 探针/几何体留给一个永远不会再 update 的实例。
-  if (isDead?.()) {
-    mixer.stopAllAction();
-    return null;
-  }
 
   // QA 探针（?debug/?test）：与 __trRun 同生命周期，只读快照，不影响播放
   if (urlParams?.has('debug') || urlParams?.has('test')) {
@@ -213,7 +211,7 @@ function build(
       /** update() 累计调用次数：>0 且持续增长=探针所属实例活着（死实例的 ticks 停止增长） */
       get ticks() { return ticks; },
       /** 本资产实际生效的落脚触地区阈值（默认 0.24；短腿角色自适应兜底，QA 取证用） */
-      get footEnterY() { return +footfall.enterY.toFixed(3); },
+      get footEnterY() { return +(footfall?.enterY ?? footEnter.L).toFixed(3); },
       /** 当前生效的 QA 锁（自动解锁后为 null；测试面板据此显示提示） */
       get lock() { return lock; },
       get act() {
@@ -239,12 +237,13 @@ function build(
     update(dt, s, fx) {
       ticks++;
       const pick = pickClip(s, fx, ctx, dt, lock);
-      play(pick.clip, pick.loop, pick.restart === true);
+      play(pick.clip, pick.loop || (authoredMotion && pick.clip === 'Idle'), pick.restart === true);
       mixer.update(dt);
+      runPhase = (runPhase + dt * tsSmooth) % runClip.duration;
       // 一次性 clip 播完的收尾：只有 Idle 交回自身首帧（首末差 110°，用交叉淡化抹掉硬跳）；
       // Jump/Hit/Land/TurnLeft/TurnRight/Death 一律保持末帧，等状态切换时自然淡出
       const act = actions[pick.clip];
-      if (!pick.loop && pick.clip === 'Idle' && act && act.time >= act.getClip().duration - 1e-4) {
+      if (!authoredMotion && !pick.loop && pick.clip === 'Idle' && act && act.time >= act.getClip().duration - 1e-4) {
         idleCrossfadeToHead();
       }
       // QA 锁的一次性 clip 播完自动解锁：放完投篮/死亡演示就交还状态机，角色继续跑/滑。
@@ -266,32 +265,29 @@ function build(
       const target = Math.min(TS_MAX, Math.max(TS_MIN, speed / STRIDE_M));
       tsSmooth += (target - tsSmooth) * Math.min(1, dt * 8);
       runAct.setEffectiveTimeScale(tsSmooth);
-      // 落脚探测：只在 Run（贴地且前进）时做；判定与阈值自适应都在 animFootfall.ts。
-      // y 用支撑面高度（s.y，车顶/坡道也正确），x/z 取本帧脚世界坐标。
-      if (footfallHandler && pick.clip === 'Run') {
+      // y 用支撑面高度（车顶/坡道也正确）；倒挂由 avatarRig 合成贴顶尘，避免重复触发。
+      if (footfallHandler && pick.clip === 'Run' && s.flip !== -1) {
         const feet = { L: footV, R: footV2 };
         const l = bones.get('FootL'), r = bones.get('FootR');
         if (l) feet.L = l.getWorldPosition(footV);
         if (r) feet.R = r.getWorldPosition(footV2);
-        footfall.update(dt, s.y, feet, footfallHandler);
+        if (footfall) footfall.update(dt, s.y, feet, footfallHandler);
+        else {
+          for (const key of ['L', 'R'] as const) {
+            const p = feet[key], touching = p.y < s.y + footEnter[key];
+            if (touching && !inContact[key]) footfallHandler(p.x, s.y + 0.03, p.z);
+            inContact[key] = touching;
+          }
+        }
       } else {
-        footfall.reset(); // 非 Run 帧清记忆，回来时不补发过期蹬地
+        footfall?.reset(); // 非 Run 帧清记忆，回来时不补发过期蹬地
+        inContact.L = false; inContact.R = false;
       }
     },
     setFootfallHandler(fn) { footfallHandler = fn; },
     dispose() {
       mixer.stopAllAction();
-      const textures = new Set<THREE.Texture>();
-      root.traverse(o => {
-        const m = o as THREE.Mesh;
-        if (m.geometry) m.geometry.dispose();
-        if (m.material) (Array.isArray(m.material) ? m.material : [m.material]).forEach(mat => {
-          // material.dispose() 不释放贴图；GLB 贴图是本实例独占（GLTFLoader 每次加载新建），不释放=逐局泄漏（审查 P1-2）
-          for (const v of Object.values(mat)) if ((v as THREE.Texture | null)?.isTexture) textures.add(v as THREE.Texture);
-          mat.dispose();
-        });
-      });
-      for (const t of textures) t.dispose();
+      disposeModel(root);
     },
   };
 }

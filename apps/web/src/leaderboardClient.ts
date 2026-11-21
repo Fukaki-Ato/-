@@ -12,13 +12,18 @@ export function createLeaderboardClient(base: string, request: typeof fetch = fe
         headers: body ? { 'Content-Type': 'application/json' } : {},
         body: body ? JSON.stringify(body) : undefined, signal: controller.signal,
       });
-      if (!response.ok) throw new Error(`leaderboard ${response.status}`);
+      if (!response.ok) {
+        const details = await response.json().catch(() => null) as { error?: { code?: string } } | null;
+        const code = details?.error?.code;
+        throw Object.assign(new Error(code === 'rules_mismatch' ? '游戏规则已更新，请刷新页面后重新开局' : `leaderboard ${response.status}`),
+          { code, status: response.status });
+      }
       return await response.json() as T;
     } finally { window.clearTimeout(timer); }
   };
   return {
     list: () => call<LeaderboardData>('leaderboard'),
-    begin: (charId, rulesId) => call<RankedTicket>('runs', { charId, rulesId, pageId }),
+    begin: (charId, rulesId, themeId) => call<RankedTicket>('runs', { charId, rulesId, pageId, themeId }),
     submit: (replay: RankedReplay) => call<{ accepted: boolean }>('runs/submit', { ...replay, pageId }),
     cancel: async runId => { await call('runs/cancel', { runId }); },
   };

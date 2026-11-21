@@ -12,6 +12,8 @@ export function createMissionPanel(api: MissionApi, content: GameContent, onBack
   let busy = false;
   let disposed = false;
   let timer = 0;
+  let reloadPending = false;
+  let rows: { key: string; card: HTMLElement; claim: HTMLButtonElement }[] = [];
   const status = uiText('p', '正在同步任务…', 'mission-status');
   status.setAttribute('role', 'status');
   const tabs = uiText('div', '', 'mission-tabs');
@@ -54,6 +56,8 @@ export function createMissionPanel(api: MissionApi, content: GameContent, onBack
     return name ? `${name}碎片` : id;
   }
   function render(): void {
+    const focused = rows.find(row => row.card === document.activeElement || row.claim === document.activeElement)?.key;
+    rows = [];
     tabButtons.forEach((button, index) => {
       const selected = index === (period === 'daily' ? 0 : 1);
       button.setAttribute('aria-selected', String(selected));
@@ -61,7 +65,8 @@ export function createMissionPanel(api: MissionApi, content: GameContent, onBack
     });
     list.setAttribute('aria-labelledby', `mission-tab-${period}`);
     list.setAttribute('aria-busy', String(busy));
-    refresh.disabled = busy;
+    // Keep the refresh control in the keyboard sequence while its request is running.
+    refresh.setAttribute('aria-disabled', String(busy));
     list.replaceChildren();
     if (!snapshot) return;
     wallet.hidden = false;
@@ -72,8 +77,11 @@ export function createMissionPanel(api: MissionApi, content: GameContent, onBack
     reset.textContent = `${period === 'daily' ? '每日零点' : '每周一零点'}更新 · 下次 ${date}（北京时间）`;
     for (const mission of group.missions) {
       const card = uiText('article', '', 'mission-card ui-panel');
+      const state = mission.claimed ? '已领取' : mission.progress >= mission.target ? '可领取' : '进行中';
+      card.tabIndex = -1;
+      card.setAttribute('aria-label', `${mission.title}：${state}`);
       const heading = uiText('div', '', 'mission-card-heading');
-      heading.append(uiText('h2', mission.title), uiText('span', mission.claimed ? '已领取' : mission.progress >= mission.target ? '可领取' : '进行中', 'mission-state'));
+      heading.append(uiText('h2', mission.title), uiText('span', state, 'mission-state'));
       const progress = document.createElement('progress');
       progress.max = mission.target;
       progress.value = Math.min(mission.progress, mission.target);
@@ -82,36 +90,48 @@ export function createMissionPanel(api: MissionApi, content: GameContent, onBack
       const bottom = uiText('div', '', 'mission-card-bottom');
       const claim = uiButton(mission.claimed ? '已领取' : '领取奖励', 'ui-primary mission-claim', () => {
         if (busy) return;
-        busy = true; status.textContent = '正在领取…'; render();
+        busy = true; status.textContent = `正在领取“${mission.title}”的奖励…`; render();
         void api.claim(period, group.periodId, mission.id).then(value => {
           if (disposed) return;
-          snapshot = value; status.textContent = '领取成功，奖励已存入本机钱包';
+          snapshot = value; status.textContent = `“${mission.title}”领取成功，奖励已存入本机钱包`;
         }).catch((error: Error) => {
-          if (!disposed) status.textContent = `${error.message}；可刷新后重试`;
-        }).finally(() => { if (!disposed) { busy = false; render(); } });
+          if (!disposed) status.textContent = `“${mission.title}”领取失败：${error.message}；可刷新后重试`;
+        }).finally(() => {
+          if (disposed) return;
+          busy = false; render();
+          if (reloadPending) void load(status.textContent ?? '');
+        });
       });
       claim.disabled = busy || mission.claimed || mission.progress < mission.target;
       claim.setAttribute('aria-label', `${mission.title}：${mission.claimed ? '已领取' : '领取奖励'}`);
       bottom.append(uiText('span', rewardLabel(mission.reward), 'mission-reward'), claim);
       card.append(heading, progress, counts, bottom);
       list.append(card);
+      rows.push({ key: `${period}:${group.periodId}:${mission.id}`, card, claim });
     }
     wallet.replaceChildren(uiText('strong', '任务累计奖励'));
     wallet.append(uiText('p', Object.entries(snapshot.wallet).filter(([, n]) => n > 0)
       .map(([id, n]) => `${itemName(id)} ${n.toLocaleString()}`).join(' · ') || '完成任务领取第一份奖励', 'ui-muted'));
+    if (focused) {
+      const row = rows.find(entry => entry.key === focused);
+      (row ? row.claim.disabled ? row.card : row.claim : tabButtons[period === 'daily' ? 0 : 1])!.focus({ preventScroll: true });
+    }
   }
-  async function load(): Promise<void> {
+  async function load(notice = ''): Promise<void> {
     if (busy || disposed) return;
-    busy = true; status.textContent = '正在同步任务…'; render();
+    reloadPending = false;
+    window.clearTimeout(timer); timer = 0;
+    busy = true; status.textContent = notice ? `${notice}；正在同步新周期…` : '正在同步任务…'; render();
     try {
       const value = await api.load();
       if (disposed) return;
       snapshot = value;
-      status.textContent = api.feedback || '进度以服务端结算为准，完成后记得领取奖励';
-      window.clearTimeout(timer);
-      timer = window.setTimeout(() => { void load(); }, Math.max(1000, Math.min(value.daily.resetsAt, value.weekly.resetsAt) - value.serverTime + 1000));
+      status.textContent = notice ? `${notice}；${api.feedback || '已同步最新任务'}` : api.feedback || '进度以服务端结算为准，完成后记得领取奖励';
+      timer = window.setTimeout(() => {
+        timer = 0; reloadPending = true; void load();
+      }, Math.max(1000, Math.min(value.daily.resetsAt, value.weekly.resetsAt) - value.serverTime + 1000));
     } catch (error) {
-      if (!disposed) status.textContent = `${(error as Error).message}；请点击重试`;
+      if (!disposed) status.textContent = `${notice ? `${notice}；同步失败：` : ''}${(error as Error).message}；请点击重试`;
     } finally { if (!disposed) { busy = false; render(); } }
   }
   frame.append(pageHeader('任务手册', 'RUN • COLLECT • REPEAT', onBack), tabs, reset, status, list, refresh, wallet,

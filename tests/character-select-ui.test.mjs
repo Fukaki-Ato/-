@@ -26,6 +26,7 @@ test('selection showcase uses portrait cutouts and page-scoped keyboard/cycle co
   assert.equal(all(root).filter(node => node.classList.contains('select-roster-card')).length, 10);
   assert.equal(all(root).some(node => node.dataset.charId === 'char_bball'), false);
   assert.equal(all(root).filter(node => node.tagName === 'canvas').length, 0, 'selection does not start another mobile renderer');
+  assert.equal(find('select-profile-button'), undefined, '档案入口已移至设置页');
   find('select-next').click();
   assert.equal(find('select-name').textContent, '阿玛拉');
   assert.equal(calls.at(-1)[1], 'char_ama');
@@ -58,7 +59,9 @@ test('removed basketball role falls back to 牢大 and starts with its audio ide
 });
 
 test('locked-role preview shows correct data, keeps start disabled, and forwards the preview to shop', t => {
-  const { root, byClass, find, calls, dispose } = setup(t, 'char_volt', content => { content.characters.items.find(item => item.id === 'char_ama').locked = true; });
+  const { root, byClass, find, calls, dispose } = setup(t, 'char_volt', content => {
+    Object.assign(content.characters.items.find(item => item.id === 'char_ama'), { locked: true, unlock: { type: 'coin', cost: 4500 } });
+  });
   byClass(root,'select-roster-card').find(card => card.dataset.charId === 'char_ama').click();
   assert.equal(find('select-name').textContent, '阿玛拉');
   assert.match(find('select-state').textContent, /锁定/);
@@ -122,6 +125,7 @@ test('shard synthesis is independently enabled and never repeats or bypasses con
   const { selectUnlockActions } = await import('../packages/game/dist/flow/unlock.js');
   const { grant, walletBalance } = await import('../packages/game/dist/flow/localEconomy.js');
   const fixture = fakeDom(t);
+  fixture.content.characters.items.find(role => role.id === 'char_ama').unlock = { type: 'coin', cost: 4500 };
   const map = new Map();
   const store = { get: k => map.get(k) ?? null, set: (k, v) => map.set(k, v) };
   grant(store, [{ item: 'shard_ama', n: 120 }]);
@@ -135,15 +139,15 @@ test('shard synthesis is independently enabled and never repeats or bypasses con
   assert.equal(find('select-synthesize-button').disabled, false, 'enough shards');
   find('select-synthesize-button').click();
   assert.equal(find('select-start-button').disabled, false);
-  assert.equal(walletBalance(store, 'shard_ama'), 60);
+  assert.equal(walletBalance(store, 'shard_ama'), 70);
   assert.equal(actions.onSynthesize('char_ama').ok, false);
-  assert.equal(walletBalance(store, 'shard_ama'), 60, 'duplicate action does not spend');
+  assert.equal(walletBalance(store, 'shard_ama'), 70, 'duplicate action does not spend');
   dispose();
   fixture.content.characters.items.find(c => c.id === 'char_kaze').locked = true;
-  grant(store, [{ item: 'shard_kaze', n: 60 }]);
+  grant(store, [{ item: 'shard_kaze', n: 70 }]);
   assert.equal(actions.canSynthesize('char_kaze'), false);
   assert.equal(actions.onSynthesize('char_kaze').ok, false);
-  assert.equal(walletBalance(store, 'shard_kaze'), 60);
+  assert.equal(walletBalance(store, 'shard_kaze'), 70);
   const disposeLocked = createCharacterSelectOverlay(fixture.content, {
     ...actions, onSelect() {}, onStartRun() {}, onShop() {}, onBack() {},
   }, 'char_kaze', 'guest', {});
@@ -165,10 +169,10 @@ test('selection actions reserve a full-width start row with or without unlock ac
       onSelect() {}, onStartRun() {}, onShop() {}, onBack() {},
       isGated: () => gated, canUnlock: () => false, canSynthesize: () => false,
       onUnlock: () => ({ ok: false, message: '' }), onSynthesize: () => ({ ok: false, message: '' }),
-    }, 'char_ama', 'guest', {}, () => {});
+    }, 'char_ama', 'guest', {});
     const row = fixture.byClass(fixture.body.children[0], 'select-action-row')[0];
     const visible = row.children.filter(child => child.style.display !== 'none');
-    assert.equal(visible.length, gated ? 5 : 3);
+    assert.equal(visible.length, gated ? 4 : 2);
     assert.equal(visible.at(-1).classList.contains('select-start-button'), true);
     dispose();
   }

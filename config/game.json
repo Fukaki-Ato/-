@@ -30,7 +30,8 @@
       "perMeter": 10,
       "perCoin": 5,
       "perSkillCast": 150,
-      "perNearMiss": 25
+      "perNearMiss": 25,
+      "perCrossing": 50
     },
     "profile": {
       "idDigits": 10,

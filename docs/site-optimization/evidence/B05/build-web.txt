@@ -1,0 +1,53 @@
+
+> thunder-run@0.1.0 build:web
+> npm run build && npm run build --workspace @tr/web
+
+
+> thunder-run@0.1.0 build
+> tsc -b && node tools/build-replay-runtime.mjs
+
+Replay ABI-1 bundle: 38353 bytes
+Replay runtime SHA-256: f7c2364650a30483067bf7763f21925a9846c1903ee39209585893a967c3d257
+
+> @tr/web@0.1.0 build
+> vite build
+
+vite v8.3.5 building client environment for production...
+transforming...
+✓ 275 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                                      0.71 kB │ gzip:   0.56 kB
+dist/assets/button-green-BWO-4jWf.webp               4.76 kB
+dist/assets/nav-shop-q5XIc7Eg.webp                   5.13 kB
+dist/assets/nav-character-C1hPjZ2_.webp              5.39 kB
+dist/assets/nav-chest-3W6Uiplu.webp                  5.58 kB
+dist/assets/icon-settings-C9TvXf9h.webp              6.89 kB
+dist/assets/icon-event-B5uMMTsW.webp                 6.96 kB
+dist/assets/icon-task-DI1rlsPP.webp                  7.62 kB
+dist/assets/icon-achieve-S1f4gyU0.webp               7.69 kB
+dist/assets/penguin-C7vpZKJg.webp                    9.87 kB
+dist/assets/icon-rank-BLj1K4DG.webp                 10.55 kB
+dist/assets/frog-rUsN-0JP.webp                      17.04 kB
+dist/assets/whale-D9GxPxlM.webp                     17.64 kB
+dist/assets/mambo-mKDKguqA.webp                     18.28 kB
+dist/assets/bball-DXLNsXai.webp                     19.07 kB
+dist/assets/title-plaque-BOuwOriS.webp              27.00 kB
+dist/assets/niu-cljpPH31.webp                       42.62 kB
+dist/assets/bolt-DKNu1l2H.webp                      49.08 kB
+dist/assets/ama-L6ZTD3GA.webp                       50.38 kB
+dist/assets/rina-DrpFc2tO.webp                      63.32 kB
+dist/assets/kaze-DwnNIWks.webp                      64.94 kB
+dist/assets/seaside-BQbRiLk1.webp                  134.62 kB
+dist/assets/thunder-sans-SQSqRcRr.woff2            449.55 kB
+dist/assets/runners-sheet-centered-DwrPq8yC.png  1,056.77 kB
+dist/assets/index-P7Nzyv-W.css                      54.83 kB │ gzip:  15.83 kB
+dist/assets/testPanel-C0eZT8Cc.js                    5.20 kB │ gzip:   2.11 kB
+dist/assets/index-mrnydf6x.js                    1,144.94 kB │ gzip: 336.00 kB
+
+[plugin builtin:vite-reporter]
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 1.04s

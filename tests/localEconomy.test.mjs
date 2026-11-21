@@ -8,10 +8,12 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
-  buyOffer, canAfford, consumeEquipped, equipItem, equippedItems, grant, spend, walletBalance, UNLOCKS_KEY,
+  buyItemUpgrade, buyOffer, canAfford, characterLevel, consumeEquipped, equipItem, equippedItems, grant, itemDurationBonusS,
+  itemUpgradeCount, itemUpgradePrice, offerPurchaseState, runEnhance, spend, walletBalance, UNLOCKS_KEY,
 } from '../packages/game/dist/flow/localEconomy.js';
 import {
-  canUnlockCharacter, isCharacterGated, synthesizeCharacter, unlockCharacter, unlockedCharacterIds,
+  buyShardPack, canUnlockCharacter, isCharacterGated, shardCardState, syncShardAutoSynth,
+  synthesizeCharacter, unlockCharacter, unlockedCharacterIds, upgradeCharacter,
 } from '../packages/game/dist/flow/unlock.js';
 import { claimSignIn, signInState } from '../packages/game/dist/flow/signIn.js';
 
@@ -32,6 +34,17 @@ const AT = new Date(2026, 10, 5, 12); // Device-local calendar, independent of t
 function shopContent() {
   const c = structuredClone(content);
   c.economy.params.shop.offers.push({ id: 'offer_helmet', give: [{ item: 'item_helmet', n: 1 }], price: { coin: 1200 }, limit: { perDay: 3 } });
+  return c;
+}
+
+// 当前版本角色免费开放；显式构造门槛，继续验证以后恢复解锁时的扣价/合成规则。
+function gatedContent() {
+  const c = structuredClone(content);
+  c.characters.items.find(role => role.id === 'char_ama').unlock = { type: 'coin', cost: 4500 };
+  c.characters.items.find(role => role.id === 'char_kaze').unlock = { type: 'coin', cost: 4500 };
+  c.characters.items.find(role => role.id === 'char_frog').unlock = { type: 'coin', cost: 4500 };
+  c.characters.items.find(role => role.id === 'char_mambo').unlock = { type: 'coin', cost: 7000 };
+  c.characters.items.find(role => role.id === 'char_bolt').unlock = { type: 'event', eventRef: 'event_thunder_beast_siege' };
   return c;
 }
 
@@ -79,22 +92,41 @@ test('商店购买：perDay 用尽后当日拒绝、次日放行', () => {
   assert.equal(nextDay.ok, true, '次日重新计数');
 });
 
+test('商店限购快照：offerPurchaseState 只读反映 once/perDay 余量', () => {
+  const s = store({ 'thunderrun:coins-total': '120000' });
+  const helmet = offerPurchaseState(s, shopContent(), 'offer_helmet', AT);
+  assert.deepEqual(helmet, { remaining: 3, perDay: 3, boughtToday: 0, oncePurchased: false }, '未购时余量=每日上限');
+  const skin = offerPurchaseState(s, content, 'offer_skin_bolt_storm', AT);
+  assert.deepEqual(skin, { remaining: null, perDay: null, boughtToday: 0, oncePurchased: false }, 'once 未购=不限量');
+  assert.equal(offerPurchaseState(s, shopContent(), 'offer_missing', AT), null, '未知商品给 null');
+  assert.equal(buyOffer(s, shopContent(), 'offer_helmet', AT).ok, true);
+  assert.equal(offerPurchaseState(s, shopContent(), 'offer_helmet', AT).remaining, 2, '购买后余量递减');
+  const nextDay = offerPurchaseState(s, shopContent(), 'offer_helmet', new Date(2026, 10, 6, 0, 0, 1));
+  assert.equal(nextDay.boughtToday, 0, '次日计数清零');
+  const onceContent = shopContent();
+  onceContent.economy.params.shop.offers.push({ id: 'offer_once', give: [{ item: 'key', n: 1 }], price: { coin: 1 }, limit: { once: true } });
+  assert.equal(buyOffer(s, onceContent, 'offer_once', AT).ok, true);
+  assert.deepEqual(offerPurchaseState(s, onceContent, 'offer_once', AT),
+    { remaining: 0, perDay: null, boughtToday: 0, oncePurchased: true }, 'once 购买后售罄');
+});
+
 test('角色解锁门槛：gated 判定 + coin 解锁扣价', () => {
+  const c = gatedContent();
   const s = store({ 'thunderrun:coins-total': '4500' });
-  assert.equal(isCharacterGated(content, 'char_volt', s), false, 'free 角色不受门槛');
-  assert.equal(isCharacterGated(content, 'char_ama', s), true, 'coin 型默认未解锁');
-  assert.match(canUnlockCharacter(s, content, 'char_mambo', AT).message, /7000金币/, '余额不足的角色给出价格');
-  const r = unlockCharacter(s, content, 'char_ama', AT);
+  assert.equal(isCharacterGated(c, 'char_volt', s), false, 'free 角色不受门槛');
+  assert.equal(isCharacterGated(c, 'char_ama', s), true, 'coin 型默认未解锁');
+  assert.match(canUnlockCharacter(s, c, 'char_mambo', AT).message, /7000金币/, '余额不足的角色给出价格');
+  const r = unlockCharacter(s, c, 'char_ama', AT);
   assert.deepEqual(r, { ok: true, message: '解锁成功' });
   assert.equal(walletBalance(s, 'coin'), 0);
   assert.ok(unlockedCharacterIds(s).has('char_ama'));
-  assert.equal(isCharacterGated(content, 'char_ama', s), false, '解锁后不再受门槛');
-  assert.equal(unlockCharacter(s, content, 'char_ama', AT).ok, false, '重复解锁拒绝');
+  assert.equal(isCharacterGated(c, 'char_ama', s), false, '解锁后不再受门槛');
+  assert.equal(unlockCharacter(s, c, 'char_ama', AT).ok, false, '重复解锁拒绝');
 });
 
 test('角色解锁门槛：余额不足拒绝且不扣款', () => {
   const s = store({ 'thunderrun:coins-total': '100' });
-  const r = unlockCharacter(s, content, 'char_ama', AT);
+  const r = unlockCharacter(s, gatedContent(), 'char_ama', AT);
   assert.equal(r.ok, false);
   assert.match(r.message, /4500金币/);
   assert.equal(walletBalance(s, 'coin'), 100, '拒绝不扣款');
@@ -102,26 +134,115 @@ test('角色解锁门槛：余额不足拒绝且不扣款', () => {
 });
 
 test('碎片合成：达标扣碎片解锁，不足给进度文案', () => {
+  const c = gatedContent();
   const shard = content.economy.params.shards.find(s => s.grants === 'char_ama');
   const need = shard.need['1'];
   const s = store();
   grant(s, [{ item: 'shard_ama', n: need - 1 }]);
-  const short = synthesizeCharacter(s, content, 'char_ama');
+  const short = synthesizeCharacter(s, c, 'char_ama');
   assert.equal(short.ok, false);
   assert.match(short.message, new RegExp(`${need - 1}/${need}`));
   grant(s, [{ item: 'shard_ama', n: 1 }]);
-  const ok = synthesizeCharacter(s, content, 'char_ama');
+  const ok = synthesizeCharacter(s, c, 'char_ama');
   assert.deepEqual(ok, { ok: true, message: '合成成功' });
   assert.equal(walletBalance(s, 'shard_ama'), 0, '合成扣碎片');
   assert.ok(unlockedCharacterIds(s).has('char_ama'));
 });
 
 test('活动型解锁：活动 draft 时拒绝并提示活动未开放', () => {
+  const c = gatedContent();
   const s = store({});
-  const r = canUnlockCharacter(s, content, 'char_bolt', AT);
+  const r = canUnlockCharacter(s, c, 'char_bolt', AT);
   assert.equal(r.ok, false);
   assert.match(r.message, /活动未开放/);
-  assert.equal(unlockCharacter(s, content, 'char_bolt', AT).ok, false);
+  assert.equal(unlockCharacter(s, c, 'char_bolt', AT).ok, false);
+});
+
+// ---------------- 商店扩展：道具强化 / 碎片卡（自动合成 + 升级） ----------------
+
+test('道具强化：阶梯价 1000 起每次 +2000，上限 10 次，时长加成落键', () => {
+  const s = store({ 'thunderrun:coins-total': '100000' });
+  assert.equal(itemUpgradePrice(0), 1000, '首购 1000');
+  assert.equal(itemUpgradePrice(1), 3000, '第二次 3000');
+  assert.deepEqual(buyItemUpgrade(s, content, 'item_nope'), { ok: false, message: '该道具无法强化' }, '未知道具拒绝');
+  assert.equal(buyItemUpgrade(s, content, 'item_coin').ok, false, '非时长道具拒绝');
+  assert.equal(buyItemUpgrade(s, content, 'item_magnet').ok, true, '第 1 次可强化');
+  assert.equal(itemUpgradeCount(s, 'item_magnet'), 1);
+  assert.equal(itemDurationBonusS(s, 'item_magnet'), 0.5, '时长加成 +0.5s');
+  assert.equal(walletBalance(s, 'coin'), 99000, '扣首购价');
+  assert.equal(buyItemUpgrade(s, content, 'item_magnet').ok, true);
+  assert.equal(walletBalance(s, 'coin'), 96000, '第二次扣 3000');
+  s.set('thunderrun:item-upgrade:item_magnet', '10');
+  assert.equal(itemDurationBonusS(s, 'item_magnet'), 5, '满级 +5s');
+  assert.equal(buyItemUpgrade(s, content, 'item_magnet').ok, false, '上限拒绝');
+  assert.match(buyItemUpgrade(s, content, 'item_magnet').message, /上限/);
+});
+
+test('碎片卡：买碎片包发货，攒满 50 自动合成解锁并触发成就钩子', () => {
+  const c = gatedContent();
+  const s = store({ 'thunderrun:coins-total': '100000' });
+  let unlockedCount = 0;
+  const hooks = { onUnlocked: () => { unlockedCount++; } };
+  const r = buyShardPack(s, c, 'char_kaze', AT, hooks);
+  assert.equal(r.ok, true, '碎片包可买');
+  assert.equal(walletBalance(s, 'shard_kaze'), 5, '发货 5 枚');
+  assert.equal(walletBalance(s, 'coin'), 98800, 'SR 档扣 1200');
+  assert.equal(unlockCharacter(s, c, 'char_kaze', AT).ok, true, '金币解锁后不再走合成');
+  // 直接堆到门槛：syncShardAutoSynth 扫描解锁（50 碎片）
+  grant(s, [{ item: 'shard_frog', n: 45 }]);
+  assert.deepEqual(syncShardAutoSynth(s, c, hooks), [], '未达标不合成');
+  grant(s, [{ item: 'shard_frog', n: 5 }]);
+  assert.deepEqual(syncShardAutoSynth(s, c, hooks), ['char_frog'], '攒满 50 自动合成');
+  assert.equal(unlockedCount, 1, 'onUnlocked 触发一次');
+  assert.equal(walletBalance(s, 'shard_frog'), 0, '合成扣 50');
+  assert.ok(unlockedCharacterIds(s).has('char_frog'));
+  // 买满一包直接跨过门槛：buyShardPack 内部自动扫描
+  grant(s, [{ item: 'shard_mambo', n: 45 }]);
+  assert.equal(buyShardPack(s, c, 'char_mambo', AT, hooks).ok, true);
+  assert.ok(unlockedCharacterIds(s).has('char_mambo'), '买包凑满即自动解锁');
+  assert.equal(unlockedCount, 2);
+});
+
+test('碎片卡：upgradeCharacter 扣 50 升级、碎片不足拒绝、满级封顶', () => {
+  const c = gatedContent();
+  const s = store({ 'thunderrun:coins-total': '999999' });
+  assert.equal(upgradeCharacter(s, c, 'char_ama').ok, false, '未解锁拒绝');
+  assert.ok(unlockCharacter(s, c, 'char_ama', AT).ok, '金币解锁');
+  grant(s, [{ item: 'shard_ama', n: 49 }]);
+  assert.match(upgradeCharacter(s, content, 'char_ama').message, /49\/50/, '碎片不足给进度');
+  grant(s, [{ item: 'shard_ama', n: 1 }]);
+  const ok = upgradeCharacter(s, content, 'char_ama');
+  assert.deepEqual(ok, { ok: true, message: '升级成功：Lv.2' });
+  assert.equal(characterLevel(s, 'char_ama'), 2);
+  assert.equal(walletBalance(s, 'shard_ama'), 0, '升级扣 50');
+  s.set('thunderrun:char-level:char_ama', '10');
+  assert.equal(upgradeCharacter(s, content, 'char_ama').ok, false, '满级封顶');
+  assert.match(upgradeCharacter(s, content, 'char_ama').message, /最高等级/);
+});
+
+test('碎片卡：shardCardState 快照与 runEnhance 缩放', () => {
+  const c = gatedContent();
+  const s = store();
+  const card = shardCardState(s, c, 'char_bolt');
+  assert.ok(card, '活动角色也有碎片卡');
+  assert.equal(card.owned, false);
+  assert.equal(card.step, 50);
+  assert.equal(card.packPriceCoin, 2400, 'SSR 档定价');
+  assert.equal(card.packSize, 5);
+  assert.equal(shardCardState(s, content, 'char_nope'), null, '未知角色无卡');
+  // 活动角色走碎片自动合成解锁（活动 draft 时 buyOffer/解锁被挡，攒满碎片即可）
+  grant(s, [{ item: 'shard_bolt', n: 50 }]);
+  assert.deepEqual(syncShardAutoSynth(s, c), ['char_bolt'], '攒满 50 自动合成活动角色');
+  const owned = shardCardState(s, content, 'char_bolt');
+  assert.equal(owned.owned, true, '解锁后显示已拥有');
+  // runEnhance：技能缩放按等级 × paramScalePerLevel(0.05)，道具加成按强化次数 × 0.5
+  const e1 = runEnhance(s, content, 'char_bolt');
+  assert.equal(e1, undefined, '1 级且无道具强化时不注入增强，也不剥夺权威任务资格');
+  s.set('thunderrun:char-level:char_bolt', '3');
+  s.set('thunderrun:item-upgrade:item_magnet', '2');
+  const e3 = runEnhance(s, content, 'char_bolt');
+  assert.equal(e3.skillScale, 1.1, '3 级 = 1 + 0.05×2');
+  assert.equal(e3.itemBonusS('item_magnet'), 1, '2 次 × 0.5s');
 });
 
 // ---------------- 登录签到（审查 M4-6） ----------------

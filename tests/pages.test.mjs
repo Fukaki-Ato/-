@@ -175,10 +175,10 @@ test('select 页（主界面）：参考图板块齐全且等比不裁出、角�
   view2Pass(host);
 
   const t0 = texts(host); // 徽标带不可见名牌 Label，texts 可断言板块名
-  for (const s of ['商店', '角色', '仓库', '福利手册', '成就', '任务', '活动', '排行榜', '设置', '开始酷跑']) {
+  for (const s of ['商店', '角色', '宝箱', '福利手册', '成就', '任务', '活动', '排行榜', '设置', '开始酷跑']) {
     assert.ok(t0.includes(s), `主界面板块 ${s} 可见，实得 ${JSON.stringify(t0)}`);
   }
-  for (const gone of ['宝箱', '场景切换', '登录方式']) {
+  for (const gone of ['仓库', '场景切换', '登录方式']) {
     assert.ok(!t0.some(x => x.includes(gone)), `旧板块 ${gone} 已下线`);
   }
 
@@ -293,15 +293,16 @@ test('select 页（主界面）：未定义入口仅按压反馈（无 toast/无
   views.renderSelect(report.content, { onStartRun() {}, onChooseCharacter: () => true, onBack: () => {} }, chars[0].id, 'wechat');
   view2Pass(host);
   const t = texts(host);
-  assert.ok(t.includes('仓库') && !t.some(x => x.includes('宝箱')), '底栏第四格＝仓库');
+  assert.ok(t.includes('宝箱') && !t.some(x => x.includes('仓库')), '底栏第四格＝宝箱');
   assert.ok(!t.some(x => x.includes('登录方式')), '游客态不显示登录方式');
   assert.equal(findButton(host, '清除本机缓存'), null, '无清缓存按钮');
   assert.equal(findButton(host, '返回'), null, '主界面不带旧返回按钮');
   assert.equal(findButton(host, '开始 · 跑酷！'), null, '旧文字按钮已换牌匾徽标');
 
-  // 未定义入口：点一遍全部板块，不得产生任何文案/弹窗/导航（仅 glow 帧按压反馈）
+  // 未定义入口：点一遍全部板块，不得产生任何文案/弹窗/导航（仅 glow 帧按压反馈）；
   const before = texts(host).join('|');
-  for (const tag of ['成就', '任务', '活动', '排行榜', '设置', '商店', '福利手册', '仓库']) {
+  assert.equal(findWidget(host, cellOf('邮件')), null, '不引入另外分支的邮件入口');
+  for (const tag of ['成就', '任务', '活动', '排行榜', '设置', '商店', '福利手册', '宝箱']) {
     clickWidget(host, findWidget(host, cellOf(tag)), host.overlay.current.relayout());
   }
   assert.equal(texts(host).join('|'), before, '未定义入口零副作用');
@@ -354,7 +355,7 @@ function tapBelowPanel(host, panelBottom) {
 
 const cellOf = (text) => (w) => w instanceof Box && w.children.some(ch => ch instanceof Label && ch.getText() === text);
 
-test('档案弹层：toggle 从顶边滑下，含 ID/最高记录/两组候选，点下方空白收回', async () => {
+test('档案弹层：toggle 从顶边滑下，含本机 ID/最高得分/两组候选，点下方空白收回', async () => {
   const { host, adapter } = hostFixture();
   const report = await loadContent();
   adapter.storage.set(BEST_KEY, '1234');
@@ -370,8 +371,9 @@ test('档案弹层：toggle 从顶边滑下，含 ID/最高记录/两组候选�
   assert.equal(box.rect.h, Math.round(H * 55 / 100), '面板高 = params.profile.panelHeightPct');
   assert.ok(box.rect.y >= 0 && box.rect.y <= 8, `滑到位贴屏幕上沿，实得 y=${box.rect.y}`);
   const t = texts(host);
-  assert.ok(t.some(x => x.startsWith('账号 ID：') && /^[1-9]\d{9}$/.test(x.slice(6))), `10 位账号 ID 可见，实得 ${JSON.stringify(t)}`);
-  assert.ok(t.includes('最高记录：1234 米'), '最高记录读自 BEST_KEY');
+  const idPrefix = '本机档案 ID：';
+  assert.ok(t.some(x => x.startsWith(idPrefix) && /^[1-9]\d{9}$/.test(x.slice(idPrefix.length))), `10 位本机档案 ID 可见，实得 ${JSON.stringify(t)}`);
+  assert.ok(t.includes('最高得分：1234 分'), 'BEST_KEY 的分数不能标成距离');
   assert.ok(t.some(x => x.includes('点头像换一个')) && t.some(x => x.includes('点名字改一个')), '头像/昵称两组候选');
   assert.ok(allButtons(host).includes('闪电少年'), '昵称候选以按钮呈现');
   assert.ok(t.includes('点击下方空白处返回'), '返回提示');
@@ -427,10 +429,10 @@ test('档案弹层：候选头像写本机，改名先免费后扣钻、余额�
   assert.equal(adapter.storage.get(PLAYER_RENAMES_KEY), '2');
 
   // 6) 关掉再开：档案与 ID 都还在（本机记忆，不是每次重新发号）
-  const idShown = texts(host).find(x => x.startsWith('账号 ID：'));
+  const idShown = texts(host).find(x => x.startsWith('本机档案 ID：'));
   tapBelowPanel(host, findBox(host.overlay.current.relayout(), slide.id).rect.h);
   openProfile(host, ov);
-  assert.equal(texts(host).find(x => x.startsWith('账号 ID：')), idShown, '重开面板 ID 不变');
+  assert.equal(texts(host).find(x => x.startsWith('本机档案 ID：')), idShown, '重开面板 ID 不变');
   assert.equal(texts(host).includes('椰子骑士'), true, '重开面板名字读回本机记忆');
 });
 

@@ -1,0 +1,39 @@
+{
+  "mode": "isolated local production bundle; API deliberately returns 503",
+  "captures": "/tmp/opencode/thunder-run-integration-20261113-gRBgr7/repo/docs/review-evidence/2026-11-13-integration-LLXt3X",
+  "errors": [],
+  "models": [
+    {
+      "url": "/thunder-run/assets/characters/coastal/bball.glb",
+      "status": 200
+    },
+    {
+      "url": "/thunder-run/assets/characters/coastal/bball.glb",
+      "status": 200
+    },
+    {
+      "url": "/thunder-run/assets/characters/coastal/bball.glb",
+      "status": 200
+    }
+  ],
+  "scenes": [
+    {
+      "name": "白日海景",
+      "distance": "9 m"
+    },
+    {
+      "name": "天穹雷脊",
+      "distance": "9 m"
+    },
+    {
+      "name": "失重图书馆",
+      "distance": "9 m"
+    }
+  ],
+  "roster": {
+    "total": 10,
+    "unlocked": 10,
+    "penguinSelectable": true
+  },
+  "profile": "settings entry opens and Escape returns"
+}

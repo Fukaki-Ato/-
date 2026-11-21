@@ -76,7 +76,7 @@
 .island-select .select-action-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 .island-select .select-action-row > button { min-width: 0; overflow-wrap: anywhere; }
 .island-select .select-action-row > button:not(.select-start-button) { min-height: 44px; padding: 8px; font-size: 13px; }
-.island-select .select-shop-button { min-height: 44px; padding: 8px; color: #79552e; font-size: 13px; font-weight: 800; }
+.island-select .select-shop-button { grid-column: 1 / -1; min-height: 44px; padding: 8px; color: #79552e; font-size: 13px; font-weight: 800; }
 .island-select .select-start-button { grid-column: 1 / -1; display: flex; align-items: center; justify-content: center; gap: 18px; min-height: 54px; padding: 12px 16px; font-weight: 850; }
 .island-select .select-button-label { font-size: 17px; }
 .island-select .select-start-arrow { font-size: 20px; }

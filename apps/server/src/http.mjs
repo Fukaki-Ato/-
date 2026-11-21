@@ -1,9 +1,12 @@
 import { createServer } from 'node:http';
+import { missionClientRulesId } from '@tr/game/flow/clientVersion.js';
+import { replaySourceHash } from './rules.mjs';
 import { randomBytes, createHash } from 'node:crypto';
 import { DEFAULT_LIMITS } from './limits.mjs';
 import { ApiError } from './errors.mjs';
 import { loadMissionContent } from './content.mjs';
 import { MissionService } from './mission-service.mjs';
+import { AchievementService } from './achievement-service.mjs';
 import { MissionStore } from './store.mjs';
 import { fileURLToPath } from 'node:url';
 import { isIP } from 'node:net';
@@ -140,7 +143,14 @@ export function createMissionHttpServer(options = {}) {
   const trustedProxy = options.trustedProxy ?? process.env.TRUSTED_PROXY_IP;
   if (trustedProxy && !isIP(trustedProxy)) throw new Error('TRUSTED_PROXY_IP must be one exact proxy IP address');
   const store = new MissionStore(options.dbPath ?? process.env.MISSIONS_DB_PATH ?? fileURLToPath(new URL('../data/missions.sqlite', import.meta.url)));
-  const service = new MissionService({ store, content: options.content ?? loadMissionContent(), now, limits, minRunSeconds: options.minRunSeconds });
+  let service, achievements;
+  try {
+    const content = options.content ?? loadMissionContent();
+    achievements = new AchievementService({ store, content, now });
+    service = new MissionService({ store, content, now, limits, minRunSeconds: options.minRunSeconds, achievements,
+      replaySource: options.replaySource, legacyRuleset: options.legacyRuleset,
+      trustedReplayRuntimeHashes: options.trustedReplayRuntimeHashes ?? (process.env.TRUSTED_REPLAY_RUNTIME_HASHES ?? '').split(',').map(value => value.trim()).filter(Boolean) });
+  } catch (error) { store.close(); throw error; }
   const limiter = new RateLimiter(limits, now);
 
   // 定期数据清理（runs/users 无限增长审查 S-3）；unref 不阻止进程退出，close 时显式清除
@@ -195,7 +205,10 @@ export function createMissionHttpServer(options = {}) {
       if (pathname === '/api/missions/runs' && request.method === 'POST') {
         const userId = authenticate(request);
         const body = await readJson(request, limits.bodyBytes);
-        assertKeys(body, ['seed', 'charId', 'items']);
+        assertKeys(body, ['seed', 'charId', 'items', 'themeId', 'clientRulesId']);
+        if (body.clientRulesId !== missionClientRulesId(service.content, replaySourceHash(service.replaySource))) {
+          throw new ApiError(409, '游戏规则已更新，请刷新页面后重新开局');
+        }
         sendJson(response, 201, service.startRun(userId, body));
         return;
       }
@@ -212,6 +225,20 @@ export function createMissionHttpServer(options = {}) {
         const body = await readJson(request, limits.bodyBytes);
         assertKeys(body, ['period', 'periodId', 'missionId']);
         sendJson(response, 200, service.claim(userId, body));
+        return;
+      }
+      // 成就端点与 missions 端点同构：同一鉴权/限流/同源/body 三件套；错误方法不设守卫，
+      // 落到下方通用 404（与 missions 端点口径一致）
+      if (pathname === '/api/achievements' && request.method === 'GET') {
+        const userId = authenticate(request);
+        sendJson(response, 200, achievements.snapshot(userId));
+        return;
+      }
+      if (pathname === '/api/achievements/claim' && request.method === 'POST') {
+        const userId = authenticate(request);
+        const body = await readJson(request, limits.bodyBytes);
+        assertKeys(body, ['achievementId']);
+        sendJson(response, 200, achievements.claim(userId, body));
         return;
       }
       if (pathname.startsWith('/api/missions/')) throw new ApiError(404, '找不到该任务接口');

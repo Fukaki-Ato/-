@@ -4,6 +4,7 @@ import { loadContent } from '../tools/replay/runner.mjs';
 import { leaderboardRulesId } from '../packages/game/dist/flow/leaderboard.js';
 import { createRunSession } from '../packages/game/dist/flow/runSession.js';
 import { createGameFlow } from '../packages/game/dist/flow/mainFlow.js';
+import { EQUIP_KEY, ITEM_PREFIX, ITEM_UPGRADE_PREFIX } from '../packages/game/dist/flow/localEconomy.js';
 
 const content = loadContent(), tick = () => new Promise(r => setImmediate(r));
 const ticket = { runId: 'ticket', seed: 101, rulesId: leaderboardRulesId(content) };
@@ -89,7 +90,7 @@ test('debug/test 不向排行榜取票或提交，配置不匹配不入榜', asy
   const f = fixture({ service: { begin: async () => ({ ...ticket, rulesId: 'old' }) } });
   await tick(); assert.equal(f.seen.scenes, 1);
   f.seen.callbacks.onEnd(f.seen.sim.summary());
-  assert.match(f.seen.summary.ranking.message, /服务不可用/); f.session.dispose();
+  assert.match(f.seen.summary.ranking.message, /规则已更新.*刷新/); f.session.dispose();
 });
 
 test('大厅与结算排行榜入口接场景，返回与 Escape 回大厅', async () => {
@@ -112,4 +113,92 @@ test('大厅与结算排行榜入口接场景，返回与 Escape 回大厅', asy
   assert.equal(flow.machine.current(), 'select');
   flow.machine.go('result', { score: 0, coins: 0 }); seen.result.onLeaderboard();
   assert.equal(flow.machine.current(), 'leaderboard');
+});
+
+test('上传失败可显式重试原票据和回放，连点不并发上传，成功后取消重试入口', async () => {
+  const payloads = []; let complete;
+  const service = {
+    begin: async () => ticket,
+    submit(replay) {
+      payloads.push(structuredClone(replay));
+      if (payloads.length === 1) return Promise.reject(new Error('response lost'));
+      return new Promise(resolve => { complete = resolve; });
+    },
+  };
+  const { seen, session } = fixture({ service });
+  await tick(); seen.sim.step(); seen.callbacks.onEnd(seen.sim.summary());
+  await tick();
+  const retry = seen.summary.ranking.retry;
+  assert.equal(typeof retry, 'function'); retry(); retry();
+  assert.equal(payloads.length, 2); assert.deepEqual(payloads[0], payloads[1]);
+  assert.equal(seen.summary.ranking.retry, undefined);
+  complete({ accepted: true }); await tick();
+  assert.match(seen.summary.ranking.message, /已入全服榜/);
+  assert.equal(seen.summary.ranking.retry, undefined); session.dispose();
+});
+
+test('主动结束使用quit回放，落定最后一次手势帧，收到未入榜成功也明确已同步', async () => {
+  const payloads = [];
+  const f = fixture({ service: { begin: async () => ticket, submit: async replay => {
+    payloads.push(replay); return { accepted: false };
+  } } });
+  assert.equal(f.session.finish(), false, 'ticket is not ready');
+  await tick(); f.seen.sim.step();
+  f.seen.sim.applyAction('jump');
+  assert.equal(f.session.finish(), true);
+  assert.equal(f.session.finish(), false, 'finish once only');
+  await tick();
+  assert.equal(payloads[0].finishReason, 'quit'); assert.equal(payloads[0].frames, 2);
+  assert.deepEqual(payloads[0].inputs, [{ frame: 1, action: 'jump' }]);
+  assert.equal(f.seen.summary.alive, true);
+  assert.match(f.seen.summary.ranking.message, /进度已同步/);
+  f.session.dispose();
+});
+
+test('云账户取票失败的普通跑局明确提示奖励和任务也不保存', async () => {
+  const f = fixture({ cloudProgress: true, service: { begin: async () => { throw Error('offline'); } } });
+  await tick(); f.seen.sim.step(); f.seen.callbacks.onEnd(f.seen.sim.summary());
+  assert.match(f.seen.summary.ranking.message, /不计奖励、任务和排行榜/);
+  f.session.dispose();
+});
+
+test('本机强化只进休闲模拟，任务与排位复用标准规则', async () => {
+  const track = [];
+  const deps = { enhance: { skillScale: 2 }, trackRun: sim => { track.push(sim); return () => {}; } };
+  const ranked = fixture(deps);
+  await tick();
+  assert.equal(track[0], ranked.seen.sim, '标准排位局仍可追踪任务');
+  const duration = sim => sim.loadout.skill.effects.find(effect => effect.primitive === 'invincible').params.durationS;
+  assert.equal(duration(ranked.seen.sim), 2.5);
+  ranked.session.dispose();
+
+  const local = fixture({ ...deps, service: undefined });
+  assert.equal(duration(local.seen.sim), 5);
+  assert.equal(track.length, 1, '强化后的回放不交给标准任务校验');
+  local.seen.callbacks.onEnd(local.seen.sim.summary());
+  assert.match(local.seen.summary.ranking.message, /本机强化/);
+  local.session.dispose();
+});
+
+test('正常联网时大厅可显式进强化休闲局，重开保持模式，标准按钮仍取排位票', async () => {
+  let select, result, begin = 0;
+  const scenes = [];
+  const stock = new Map([[EQUIP_KEY, '["item_magnet"]'], [ITEM_PREFIX + 'item_magnet', '1'], [ITEM_UPGRADE_PREFIX + 'item_magnet', '1']]);
+  const adapter = { storage: { get: k => stock.get(k) ?? null, set: (k, v) => stock.set(k, v), remove: k => stock.delete(k) },
+    fetchJson: async name => content[name], onInput: () => () => {}, canvas: { mainCanvas: () => ({}), windowSize: () => ({}) } };
+  const views = { renderBoot: () => ({ setStatus() {} }), renderSelect: (_c, actions) => { select = actions; },
+    mountHud: () => ({ update() {}, dispose() {} }), renderResult: (_s, _best, actions) => { result = actions; }, toast() {} };
+  const flow = createGameFlow({ adapter, views, configResolve: name => name,
+    leaderboard: { begin: async () => { begin++; return ticket; }, submit: async () => ({ accepted: true }) },
+    createScene: (_host, _adapter, sim, _c, callbacks) => { scenes.push({ sim, callbacks }); return { dispose() {} }; } });
+  await flow.boot();
+  select.onStartCasual('char_volt');
+  assert.equal(begin, 0);
+  assert.equal(scenes[0].sim.buffs.left('magnet'), 10.5);
+  scenes[0].sim.state.alive = false; scenes[0].callbacks.onEnd(scenes[0].sim.summary());
+  result.onRetry();
+  assert.equal(scenes.length, 2); assert.equal(begin, 0);
+  flow.machine.go('select'); select.onStartRun('char_volt');
+  await tick(); assert.equal(scenes.length, 3); assert.equal(begin, 1);
+  flow.dispose();
 });

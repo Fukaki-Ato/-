@@ -1,14 +1,15 @@
 /**
  * 玩家档案 DOM 弹层（Web 壳）：大头像 + 10 枚候选头像（点击即换）、账号 ID、最高记录、
- * 点候选名改名（免费次数用完后扣钻石，余额即时回写大厅顶栏）。
- * 数据全走 core/profile/playerProfile（与 canvas 版 buildProfileOverlay 同一份数据逻辑）；
- * 入口挂选角页底栏「档案」（docs/main-menu-handoff.md 建议的位置），bootstrap 装配。
+ * 点候选名改名（免费次数用完后扣钻石，余额在当前档案内同步显示）。
+ * 规则走 core/profile/playerProfile，改名关联保存走 flow/localProfileActions（与 canvas 版共用）；
+ * 入口位于设置页「玩家档案」，bootstrap 装配；关闭后回到设置页。
  */
 import type { GameContent } from '@tr/game/core/config/configTypes.js';
 import type { SyncStorage } from '@tr/framework/platform/platformAdapter.js';
 import { AVATAR_KEYS } from '@tr/game/ui/profileView.js';
-import { loadProfile, profileParamsFrom, saveProfile, tryRename } from '@tr/game/core/profile/playerProfile.js';
-import { DIAMOND_KEY, walletBalance } from '@tr/game/flow/localEconomy.js';
+import { loadProfile, profileParamsFrom, saveProfile, type RenameResult } from '@tr/game/core/profile/playerProfile.js';
+import { walletBalance } from '@tr/game/flow/localEconomy.js';
+import { renameLocalProfile } from '@tr/game/flow/localProfileActions.js';
 import { pageLifecycle, uiButton, uiText } from './mobileUi.js';
 import './profileOverlay.css';
 
@@ -45,8 +46,9 @@ export function openProfileOverlay(
   big.alt = '当前头像';
   const paint = (): void => { big.src = avatarUrl(AVATAR_KEYS[prof.avatar] ?? AVATAR_KEYS[0]!); };
   const nameL = uiText('strong', prof.name, 'profile-name');
-  const idL = uiText('p', `账号 ID：${prof.id}`, 'profile-id');
-  const bestL = uiText('p', `最高记录：${readCount(storage, BEST_KEY)} 米`, 'profile-best');
+  const idL = uiText('p', `本机档案 ID：${prof.id}`, 'profile-id');
+  const bestL = uiText('p', `最高得分：${readCount(storage, BEST_KEY)} 分`, 'profile-best');
+  const scope = uiText('p', '仅保存在当前浏览器，清除网站数据可能丢失档案与本机余额。改名不影响榜单游客名。旧页面提示存档异常时请刷新，不要清除存档。', 'profile-scope');
   const hintL = uiText('p', '', 'profile-hint');
   const hint = (): string => {
     const freeLeft = Math.max(0, params.freeRenames - prof.renames);
@@ -55,6 +57,7 @@ export function openProfileOverlay(
       : `点候选名字改一个 · 每次 ${params.renameCostDiamonds} 钻（余额 ${walletBalance(storage, 'diamond')}）`;
   };
   hintL.textContent = hint();
+  const inventory = buildInventory(content, storage);
 
   const pickers = uiText('div', '', 'profile-avatars');
   pickers.setAttribute('aria-label', '候选头像');
@@ -77,7 +80,12 @@ export function openProfileOverlay(
   names.setAttribute('aria-label', '候选昵称');
   for (const candidate of params.nameCandidates) {
     names.append(uiButton(candidate, 'profile-name-pick', () => {
-      const r = tryRename(prof, params, candidate, walletBalance(storage, 'diamond'));
+      let r: RenameResult;
+      try { r = renameLocalProfile(storage, prof, params, candidate); }
+      catch (error) {
+        hintL.textContent = `改名未完成：${error instanceof Error ? error.message : String(error)}`;
+        return;
+      }
       if (!r.ok) {
         hintL.textContent = r.reason === 'need-diamonds'
           ? `改名需要 ${r.cost} 钻石，钻石不足`
@@ -85,15 +93,14 @@ export function openProfileOverlay(
         return;
       }
       prof = r.profile;
-      saveProfile(storage, prof);
-      storage.set(DIAMOND_KEY, String(r.diamondsLeft));
       nameL.textContent = prof.name;
       hintL.textContent = hint();
+      inventory.replaceChildren(...Array.from(buildInventory(content, storage).children));
       onDiamonds?.(r.diamondsLeft);
     }));
   }
 
-  panel.append(big, nameL, idL, bestL, hintL, pickers, names, buildInventory(content, storage));
+  panel.append(big, nameL, idL, bestL, scope, hintL, pickers, names, inventory);
 
   function buildInventory(c: GameContent, s: SyncStorage): HTMLElement {
     // 仓库 MVP（审查 M4-6）：档案内直接列钱包库存——货币 + 碎片 + 持有道具；正式独立页待元游戏扩展
@@ -121,8 +128,28 @@ export function openProfileOverlay(
   }
   root.append(panel);
   root.addEventListener('click', e => { if (e.target === root) dismiss(); });
+  root.addEventListener('keydown', event => {
+    if (event.key === 'Escape') { event.stopPropagation(); return; }
+    if (event.key !== 'Tab') return;
+    const buttons = Array.from(root.querySelectorAll<HTMLButtonElement>('button:not([disabled])'));
+    const index = buttons.indexOf(document.activeElement as HTMLButtonElement);
+    if (event.shiftKey && index <= 0) {
+      event.preventDefault(); buttons[buttons.length - 1]!.focus();
+    } else if (!event.shiftKey && (index < 0 || index === buttons.length - 1)) {
+      event.preventDefault(); buttons[0]!.focus();
+    }
+  });
   document.body.append(root);
-  disposeBox.dispose = pageLifecycle(root, dismiss);
+  const background = Array.from(document.body.children)
+    .filter((element): element is HTMLElement => element instanceof HTMLElement && element !== root)
+    .map(element => ({ element, inert: element.inert }));
+  const disposePage = pageLifecycle(root, dismiss);
+  for (const { element } of background) element.inert = true;
+  disposeBox.dispose = () => {
+    delete disposeBox.dispose;
+    for (const { element, inert } of background) element.inert = inert;
+    disposePage();
+  };
   paint();
   return () => disposeBox.dispose?.();
 }

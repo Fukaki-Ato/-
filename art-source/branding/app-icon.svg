@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+<title>雷霆酷跑：海湾雷霆图标候选</title>
+<desc>Original hand-authored geometry. Candidate only; not submitted or approved. No external fonts or images.</desc>
+<rect id="sea-field" x="0" y="0" width="1024" height="1024" fill="#287d86"/>
+<circle id="warm-sun" cx="766" cy="236" r="118" fill="#f5aa83"/>
+<path id="bay-swell" d="M 0 678 C 228 598 316 661 487 717 C 697 789 865 668 1024 701 L 1024 1024 L 0 1024 Z " fill="#b7ddd5"/>
+<path id="deep-water" d="M 0 754 C 230 671 350 725 514 766 C 706 815 887 756 1024 755 L 1024 1024 L 0 1024 Z " fill="#153e52"/>
+<path id="near-lane" d="M 150 1050 C 233 877 443 853 614 857 C 813 860 885 839 1034 814" fill="none" stroke="#fff8e6" stroke-width="25" stroke-linejoin="round"/>
+<path id="far-lane" d="M 444 1050 C 522 950 670 946 810 936 C 909 930 968 917 1040 901" fill="none" stroke="#b7ddd5" stroke-width="18" stroke-linejoin="round"/>
+<path id="bolt-edge" d="M 580 140 L 266 568 L 455 568 L 359 831 L 807 395 L 604 395 L 722 140 Z " fill="#153e52"/>
+<path id="thunder-stride" d="M 562 119 L 247 547 L 436 547 L 340 810 L 788 374 L 585 374 L 703 119 Z " fill="#f3d58d"/>
+<path id="bolt-light" d="M 562 119 L 247 547 L 436 547 L 465 495 L 342 495 L 618 119 Z " fill="#fff8e6"/>
+</svg>

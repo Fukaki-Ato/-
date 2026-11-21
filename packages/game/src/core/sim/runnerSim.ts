@@ -1,23 +1,24 @@
 /**
- * 跑酷玩法模拟（core/sim 层，纯逻辑、固定步长、确定性）——docs/01 §2-§9、docs/02 §5、docs/08 §2。
- * 运动/碰撞/拾取/buff/世界/回收各自独立；这里做输入路由、推进与结算。
  * 渲染层只读状态、消费 drainEvents；玩法数值来自 config/*.json。
  */
-import { RunRng } from '../rng.js';
-import { MAX_RANKED_INPUTS, type ReplayInput } from '../leaderboard.js';
+import { RunRng } from '../rng.js'; import { MAX_RANKED_INPUTS, type ReplayInput } from '../leaderboard.js';
 import type { GameContent } from '../config/configTypes.js';
 import { BuffEngine, type BuffView, type CastContext, type FxState } from '../effects/buffEngine.js';
-import { buildLoadout, itemEffects, type EffectSpec, type Loadout } from './character.js';
+import { buildLoadout, itemEffects, type EffectSpec, type Loadout, itemSpecsWithBonus, type RunEnhance } from './character.js';
 import { collectCoins, collectPickups, type CollectDeps } from './collect.js';
-import { hitsRunner, inDepthWindow, isNearMiss, relZ, safestLane } from './collision.js';
+import { hitsRunner, inDepthWindow, isNearMiss, relZ, safestLane, type FlipCtx } from './collision.js';
 import { clearSkyCoins } from './landing.js';
+import { applySurgeStep, level } from './tide.js';
+import { CROSSING_DEFAULTS, cullCrossings, stepCrossings } from './crossings.js';
 import { Movement } from './movement.js';
 import { parseReviveConfig, tryRevive, type ReviveState } from './revive.js';
 import { resolveHit, type HitCtx } from './resolveHit.js';
-import { TrackGen, type CloudEntity, type CoinEntity, type ObstacleEntity, type PickupEntity } from './trackGen.js';
+import { TrackGen, type CloudEntity, type CoinEntity, type CrossingEntity, type ObstacleEntity, type PickupEntity } from './trackGen.js';
+import { zoneAt } from './zones.js';
+import { contentForRunTheme, resolveRunThemeId } from './themeRules.js';
 import { createSimWorld } from './simWorld.js';
 import { FirstCoinRecord, scoreForState } from './firstCoinRecord.js';
-import { cullByWorldZ, cullObstacles, smashAhead } from './entitySweep.js';
+import { advanceMovingObstacles, cullByWorldZ, cullObstacles } from './entitySweep.js';
 import {
   EMPTY_LOADOUT, FLY_SPEED_CAP, STEP_DT, initialRunnerState,
   type RunnerState, type SimAction, type SimEvent,
@@ -29,22 +30,21 @@ const GEN_AHEAD_M = 320;
 const CULL_BEHIND_M = 14;
 /** 受击后的速度惩罚、倒地动画推进系数与上限 */
 const STUN_SPEED_MUL = 0.6, TOPPLE_RATE = 2.2, TOPPLE_MAX = 1.4;
-
 export class RunnerSim {
   readonly obstacles: ObstacleEntity[] = [];
   readonly coinsArr: CoinEntity[] = [];
   readonly pickupsArr: PickupEntity[] = [];
   readonly cloudsArr: CloudEntity[] = [];
+  readonly crossings: CrossingEntity[] = []; // M4 穿越判定体（crossings 配置出生，cross 事件计分）
   readonly events: SimEvent[] = [];
+  private surgeFired = false; readonly tideAware: boolean; // M4 喷发判定化：tideAware=obstacles.json 有 tideAware 块
   readonly state: RunnerState;
   /** 生命数（game.json runner.lives，默认 1：一撞即出局，新手保护仍生效） */
   readonly lives: number;
   /** 本局装配的角色（docs/09 T2.4）；未指定时为空装备=默认手感 */
   readonly loadout: Loadout;
   readonly buffs: BuffEngine;
-  /** 金币收集判定面（角色中心前方 coinCollectM 米处触发，取负号用于 z 轴）。
-   *  推导：盒深一半 0.4 + 金币最大半径(含磁铁 1.25 倍放大) 0.43 + 步进余量 ≈ 1.1。
-   *  数值在 game.json runner.coinCollectM，玩家看着仍偏就微调这一格。 */
+  /** 金币收集判定面（角色中心前方 coinCollectM 米处触发，取负号用于 z 轴）。推导：盒深一半 0.4 + 金币最大半径(含磁铁 1.25 倍放大) 0.43 + 步进余量 ≈ 1.1。数值在 game.json runner.coinCollectM，玩家看着仍偏就微调这一格。 */
   private readonly coinFront: number;
   private readonly gen: TrackGen;
   private readonly mv: Movement;
@@ -61,25 +61,28 @@ export class RunnerSim {
   private revive: ReviveState = { left: 0, invincibleS: 3 };
   /** 命中结算上下文（resolveHit 用；构造一次复用，教程保护消耗标志在闭包里） */
   private readonly hitCtx: HitCtx;
-  /** 金币收益的小数累计（coinValueAdd 的 +5% / ×2 靠它凑整，不逐枚四舍五入） */
+  /** B-4 碰撞镜像上下文（构造一次复用，collide 每步就地改写：零分配） */
+  private readonly flipCtx: FlipCtx = { flip: 1, ceilH: 0 };
   private coinCarry = 0;
-  /** 传给 buff 引擎的可复用上下文（里程/车道）：每步就地改写，避免热路径分配 */
+  /** 传给 buff 引擎的可复用上下文（里程/车道）：每步就地改写，避免热路径分配（合并注释守上限） */
   private readonly buffCtx: CastContext = { distance: 0, lane: 0 };
-  /** scoreAdd 原语与技能释放奖励的额外分 */
   private bonusScore = 0;
   private itemPickups = 0;
+  private readonly itemOf: Record<string, number> = {};
   /** 任务遥测不改变历史 summary / golden 回放结构。 */
-  get missionStats() { return { slides: this.mv.totalSlides, itemPickups: this.itemPickups }; }
-  /** Actual pickups (before currency multipliers). */
-  collectedCoins = 0;
+  get missionStats() { return { slides: this.mv.totalSlides, jumps: this.mv.totalJumps, itemPickups: this.itemPickups, itemOf: { ...this.itemOf } }; }
+  /** Actual pickups (before currency multipliers). */ collectedCoins = 0;
   readonly firstCoinRecord = new FirstCoinRecord();
   replayFrames = 0;
-  readonly replayInputs: ReplayInput[] = [];
-  replayOverflow = false;
-
+  readonly replayInputs: ReplayInput[] = []; replayOverflow = false;
   /** 开局注入的道具：购买自动装备→开局消费→server 重放按 run.items_json 同构复现 */
   readonly initialItems: string[];
-  constructor(private readonly content: GameContent, seed: number, charId?: string, private readonly recordReplay = false, initialItems?: string[]) {
+  readonly themeId: string | undefined;
+  constructor(private readonly content: GameContent, seed: number, charId?: string, private readonly recordReplay = false, initialItems?: string[],
+    themeId?: string, private readonly enhance?: RunEnhance) {
+    this.themeId = resolveRunThemeId(content, themeId);
+    content = contentForRunTheme(content, this.themeId);
+    this.tideAware = !!(content.obstacles as unknown as { tideAware?: unknown }).tideAware;
     const p = content.game.params;
     this.R = (p.runner ?? {}) as Record<string, number>;
     this.SC = (p.score ?? {}) as Record<string, number>;
@@ -94,42 +97,36 @@ export class RunnerSim {
     this.state = initialRunnerState();
     this.gen = new TrackGen(content, new RunRng(seed));
     this.mv = new Movement({
-      laneWidth: this.laneWidth, gravity: this.R.gravity ?? -38, jumpVelocity: this.R.jumpVelocity ?? 15.2,
+      laneWidth: this.laneWidth, gravity: this.R.gravity ?? -38, jumpVelocity: this.R.jumpVelocity ?? 15.2, // 参数块合并行守 300 行上限
       slideS: this.R.slideS ?? 0.6, slideCooldownS: this.R.slideCooldownS ?? 0.3, laneChangeS: this.R.laneChangeS ?? 0.18,
     }, { heightM: this.fly.heightM, glideS: this.fly.glideS }, this.obstacles);
     this.buffs = new BuffEngine(createSimWorld({
       state: this.state, obstacles: this.obstacles, coins: this.coinsArr, pickups: this.pickupsArr,
-      clouds: this.cloudsArr, events: this.events, gen: this.gen, fly: this.fly,
-      coinSpacing: ((p.coins ?? {}) as Record<string, number>).spacingM ?? 1.5,
-      addBonus: (n) => { this.bonusScore += n; },
-      creditCoins: (n) => this.creditCoinsBulk(n),
+      clouds: this.cloudsArr, events: this.events, gen: this.gen, fly: this.fly, coinSpacing: ((p.coins ?? {}) as Record<string, number>).spacingM ?? 1.5,
+      addBonus: (n) => { this.bonusScore += n; }, creditCoins: (n) => this.creditCoinsBulk(n),
       onFlightStart: () => { this.mv.flyWasActive = true; },
     }));
-    this.loadout = charId ? buildLoadout(content, charId) : EMPTY_LOADOUT;
+    // 技能等级缩放（可选增强）：只在调用方显式给了 skillScale 时才传 options——缺省路径装配产物逐位一致（保 golden replay）
+    this.loadout = charId
+      ? buildLoadout(content, charId, enhance?.skillScale !== undefined ? { skillScale: enhance.skillScale } : undefined) : EMPTY_LOADOUT;
     this.collectDeps = {
-      state: this.state, coins: this.coinsArr, pickups: this.pickupsArr, fx: this.buffs.fx,
-      events: this.events, laneWidth: this.laneWidth, coinFront: this.coinFront,
-      creditCoin: () => this.creditCoin(), grantItem: (id) => this.grantItem(id),
+      state: this.state, coins: this.coinsArr, pickups: this.pickupsArr, fx: this.buffs.fx, events: this.events,
+      laneWidth: this.laneWidth, coinFront: this.coinFront, creditCoin: () => this.creditCoin(), grantItem: (id) => this.grantItem(id),
     };
     this.hitCtx = {
       s: this.state, fx: this.buffs.fx, buffs: this.buffs, events: this.events,
-      lives: this.lives, invulnS: this.invulnS, hitStunS: this.R.hitStunS ?? 0.8,
-      tutorial: { protectionS: this.protectionS,
-        take: () => { if (this.usedProtection) return false; this.usedProtection = true; return true; } },
+      lives: this.lives, invulnS: this.invulnS, hitStunS: this.R.hitStunS ?? 0.8, // 合并行守 300 行上限
+      tutorial: { protectionS: this.protectionS, take: () => { if (this.usedProtection) return false; this.usedProtection = true; return true; } },
     };
     this.applyPassive();
-    // 装备道具注入（t=0 直接加 buff，不计入 itemPickups 拾取指标）：与局内拾取同一条 buff 通路
+    // 装备道具注入（t=0 直接加 buff，不计入 itemPickups 拾取指标）；时长加成经 itemSpecsWithBonus，缺省零 diff
     this.initialItems = (initialItems ?? []).filter(id => itemEffects(content, id).length > 0).slice(0, 3);
-    for (const id of this.initialItems) this.applyEffects(itemEffects(content, id), id);
+    for (const id of this.initialItems) this.applyEffects(itemSpecsWithBonus(this.content, id, this.enhance?.itemBonusS?.(id)), id);
   }
 
   /** buff 派生视图（渲染/HUD/测试统一从这里读，任何地方不得写） */
   get fx(): FxState { return this.buffs.fx; }
-
-  /** HUD 用的 buff 列表（名称来自配置，含剩余秒数） */
   buffList(): BuffView[] { return this.buffs.list(this.hudBuffs); }
-
-  /** 取走并清空事件（渲染/音效每帧调用） */
   drainEvents(): SimEvent[] {
     if (!this.events.length) return this.events;
     const out = this.events.slice();
@@ -144,8 +141,7 @@ export class RunnerSim {
       if (this.replayInputs.length < MAX_RANKED_INPUTS) this.replayInputs.push({ frame: this.replayFrames, action: a });
       else this.replayOverflow = true;
     }
-    if (a === 'laneL') s.lane = Math.max(-1, s.lane - 1); // 换道（含空中与滑翔，滑翔时可变向）
-    else if (a === 'laneR') s.lane = Math.min(1, s.lane + 1);
+    if (a === 'laneL') s.lane = Math.max(-1, s.lane - 1); else if (a === 'laneR') s.lane = Math.min(1, s.lane + 1); // 换道（含空中与滑翔，滑翔时可变向）
     else if (a === 'skill') this.castSkill();
     else if (this.fx.flyT > 0 || s.gliding) return;        // 飞行/滑翔期间跳铲无效，落地恢复
     else if (a === 'jump') this.mv.jumpInput(s, this.fx);
@@ -176,7 +172,6 @@ export class RunnerSim {
   private applyPassive() {
     if (this.loadout.passive.length) this.applyEffects(this.loadout.passive, this.loadout.talentLabel);
   }
-
   /** 把一组原语规格施加到引擎（技能/被动/道具共用一条通路） */
   private applyEffects(effects: EffectSpec[], fallbackLabel: string) {
     const s = this.state;
@@ -185,7 +180,10 @@ export class RunnerSim {
     for (const eff of effects) this.buffs.add(eff.primitive, eff.params, eff.label || fallbackLabel, this.buffCtx, eff.stackRule);
   }
 
-  private grantItem(itemRef: string) { this.itemPickups++; this.applyEffects(itemEffects(this.content, itemRef), itemRef); }
+  private grantItem(itemRef: string) {
+    this.itemPickups++; this.itemOf[itemRef] = (this.itemOf[itemRef] ?? 0) + 1;
+    this.applyEffects(itemSpecsWithBonus(this.content, itemRef, this.enhance?.itemBonusS?.(itemRef)), itemRef);
+  }
 
   /** 金币入账：coinValueAdd 的百分比加成走小数累计，避免每枚金币四舍五入丢分 */
   private creditCoin() {
@@ -215,38 +213,39 @@ export class RunnerSim {
     this.buffCtx.lane = s.lane;
     this.buffs.tick(STEP_DT, this.buffCtx); // 周期被动、按米数到期的效果都要知道当前里程
     const fx = this.fx;
-    s.stunT = Math.max(0, s.stunT - STEP_DT);
-    s.invulnT = Math.max(0, s.invulnT - STEP_DT);
-    s.skillCd = Math.max(0, s.skillCd - STEP_DT);
-    this.mv.slideCd = Math.max(0, this.mv.slideCd - STEP_DT);
+    s.stunT = Math.max(0, s.stunT - STEP_DT); s.invulnT = Math.max(0, s.invulnT - STEP_DT); // 计时衰减合并行守 300 行上限
+    s.skillCd = Math.max(0, s.skillCd - STEP_DT); this.mv.slideCd = Math.max(0, this.mv.slideCd - STEP_DT);
 
-    // 速度：基础值随距离提升；飞行 ×speedMul、滑翔 ×glideSpeedMul、受击 ×0.6；
-    // 再叠 buff 乘区（speedMul 提速；timeSlow 让世界变慢而操作不变慢 = 更多反应时间）
-    const base = this.R.baseSpeed ?? 12;
-    const max = this.R.maxSpeed ?? 26;
-    const ramp = this.R.speedRampPer100M ?? 0.18;
+    // 速度：基础值随距离提升（飞行/滑翔/受击各有乘区），再叠 buff 乘区（timeSlow=世界变慢操作不变）
+    const base = this.R.baseSpeed ?? 12; const max = this.R.maxSpeed ?? 26; const ramp = this.R.speedRampPer100M ?? 0.18;
     const modeMul = fx.flyT > 0 ? this.fly.speedMul : s.gliding ? this.fly.glideSpeedMul : s.stunT > 0 ? STUN_SPEED_MUL : 1;
     const raw = Math.min(max, base + ramp * s.distance / 100) * modeMul * fx.speedMul * fx.timeSlowMul;
     // 飞行/滑翔段允许超过地面 max（2.5 倍巡航），但单步位移仍有绝对上限（FLY_SPEED_CAP）
     const cap = fx.flyT > 0 || s.gliding ? FLY_SPEED_CAP : max;
     const dm = Math.min(raw, cap) * STEP_DT;
     s.distance += dm;
+    if (this.tideAware) this.surgeFired = applySurgeStep(s, dm, this.events, this.surgeFired); else s.surgeWarn = 0;
+    cullCrossings(this.crossings, s.distance, CULL_BEHIND_M); s.tideLevel = level(s.distance); // M4 潮位单源：全主题算（~4 op），潮汐主题消费其余忽略
 
     // 纵向漂移障碍（moveZ<0=向玩家冲来的冲撞体）：推进 worldZ，并把沿途同车道障碍撞开
-    for (const o of this.obstacles) {
-      if (!o.moveZ || o.done) continue;
-      o.worldZ += o.moveZ * STEP_DT;
-      if (o.moveZ < 0) smashAhead(this.obstacles, o, s.t);
-    }
+    advanceMovingObstacles(this.obstacles, this.gen.zones, s.t);
+    // B-2/B-3 反重力上下文：zoneAt 纯查询（二分零分配）推导 flip/ceilH 写 state（渲染只读不反写）。
+    // 单向门：flyT>0 / 滑翔 / 燃料耗尽过渡帧（flyWasActive）不翻转——按正常重力落地后才翻（brief §11.2 B-3）
+    const zone = zoneAt(this.gen.zones, s.distance);
+    const zFlip: 1 | -1 = zone && fx.flyT <= 0 && !s.gliding && !this.mv.flyWasActive ? -1 : 1;
+    const zCeil = zone ? zone.ceilH : 0;
+    if (zFlip !== s.flip) { s.flip = zFlip; s.ceilH = zCeil; this.events.push({ type: 'flip', flip: zFlip, ceilH: zCeil }); } // B-6：进区/出区各发一次
+    else if (zCeil !== s.ceilH) s.ceilH = zCeil;
 
     if (fx.avoidLookahead > 0) s.lane = safestLane(this.obstacles, s, fx.avoidLookahead);
     this.mv.advanceLateral(s, STEP_DT);
     this.mv.advanceVertical(s, fx, STEP_DT);
     if (this.mv.landedThisStep) clearSkyCoins(this.coinsArr); // 着陆回收空中金币带（用户反馈：回地面后天上的金币应消失）
 
-    this.gen.ensure(s.distance, GEN_AHEAD_M, this.obstacles, this.coinsArr, this.pickupsArr);
+    this.gen.ensure(s.distance, GEN_AHEAD_M, this.obstacles, this.coinsArr, this.pickupsArr, this.crossings);
     this.collide();
     if (s.alive) {
+      this.bonusScore += stepCrossings(this.crossings, s.distance, s.y, CROSSING_DEFAULTS, this.events) * (this.SC.perCrossing ?? CROSSING_DEFAULTS.scorePer);
       collectCoins(this.collectDeps);
       collectPickups(this.collectDeps);
     }
@@ -259,11 +258,11 @@ export class RunnerSim {
   private collide() {
     const s = this.state;
     if (this.fx.flyT > 0 || s.gliding) return; // 飞行/滑翔段都跳过判负：空中在障碍上方；滑翔是有控降落演出（不清障），净空由落地帧清道保证
+    this.flipCtx.flip = s.flip; this.flipCtx.ceilH = s.ceilH; // B-4：镜像视图每步就地改写（零分配）
     for (const o of this.obstacles) {
       if (o.done) continue;
       const z = relZ(o, s.distance);
-      // 电弧地面不用 DEPTH_SLACK 前瞻：4m 弧 + 2×0.4 前瞻 = 4.8m 判定期，
-      // 「跳过弧心但擦到边缘判死」的体感根因之一（与判定线过高叠加，见 collision.HAZARD_HIT_Y）。
+      // 电弧地面不用 DEPTH_SLACK 前瞻：4m 弧 + 2×0.4 前瞻 = 4.8m 判定期，「跳过弧心但擦到边缘判死」的体感根因之一（与判定线过高叠加，见 collision.HAZARD_HIT_Y）。
       if (o.cls === 'hazard' && o.zap !== true) {
         if (Math.abs(z) > o.d / 2) continue;
       } else if (!inDepthWindow(o, z)) continue;
@@ -271,8 +270,8 @@ export class RunnerSim {
         o.passed = true;
         if (isNearMiss(o, s, this.laneWidth)) { s.nearMiss++; this.events.push({ type: 'nearMiss' }); }
       }
-      // 高杆门按角色净空判（loadout.clearance）：char_mambo 站立可钻过，其余角色仍必须滑铲
-      if (hitsRunner(o, s, this.laneWidth, this.loadout.clearance)) {
+      // 高杆门按角色净空判（loadout.clearance）：char_mambo 站立可钻过；区内传入镜像上下文（B-4）
+      if (hitsRunner(o, s, this.laneWidth, this.loadout.clearance, this.flipCtx)) {
         resolveHit(o, this.hitCtx);
         if (!s.alive) this.revive = tryRevive(this.revive, s, this.gen, this.obstacles, this.events);
         if (!s.alive) return;

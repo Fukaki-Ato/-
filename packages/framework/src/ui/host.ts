@@ -93,6 +93,7 @@ export class UiHost {
   private last = 0;
   private clock = 0;
   private disposed = false;
+  private subscriptions: (() => void)[] = [];
 
   constructor(opts: UiHostOptions) {
     this.opts = opts;
@@ -102,7 +103,7 @@ export class UiHost {
     const solid = createSkinTexture({ fill: '#ffffff', border: null, radiusPx: 10, borderPx: 0, fillAlpha: 1 });
     this.solidSkin = { texture: solid.texture, insets: solid.insets, texSize: { w: solid.sizePx, h: solid.sizePx } };
     // 视口变化：overlay/UiView 尺寸走 WindowSize（CSS 逻辑像素，与输入坐标同基准）
-    opts.adapter.canvas.onResize(s => { this.resize(s); });
+    this.subscriptions.push(opts.adapter.canvas.onResize(s => { this.resize(s); }));
     if ((opts.inputMode ?? 'gesture') === 'gesture') this.wireGestureInput();
   }
 
@@ -191,6 +192,8 @@ export class UiHost {
     this.disposed = true;
     if (this.raf) this.adapter.cancelFrame(this.raf);
     this.raf = 0;
+    for (const unsubscribe of this.subscriptions) unsubscribe();
+    this.subscriptions = [];
     this.clear();
     const t = this.solidSkin.texture;
     if (t) t.dispose();
@@ -207,7 +210,7 @@ export class UiHost {
   }
 
   private wireGestureInput(): void {
-    this.adapter.onInput(e => {
+    this.subscriptions.push(this.adapter.onInput(e => {
       if (e.type === 'key') return; // 键盘不参与命中分发（页面 keymap 由壳转发）
       const t = this.adapter.now() / 1000;
       for (const input of gestureToInputs(e, t)) this.overlay.handleInput(input);
@@ -217,6 +220,6 @@ export class UiHost {
         this.view.root.visit(w => { if (w instanceof List || w instanceof ScrollView) scrolls.push(w.physics); });
         for (const p of scrolls) applySwipeScroll(e, p, 'y');
       }
-    });
+    }));
   }
 }

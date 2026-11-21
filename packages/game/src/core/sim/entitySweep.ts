@@ -5,6 +5,18 @@
  */
 import { relZ } from './collision.js';
 import type { ObstacleEntity } from './trackGen.js';
+import { skipCell, type Zone } from './zones.js';
+import { STEP_DT } from './simTypes.js';
+
+/** 移动体的实际轨迹也必须遵守反重力净空；在区界消散，不等撞到玩家才过滤。 */
+export function advanceMovingObstacles(obstacles: ObstacleEntity[], zones: Zone[], nowT: number): void {
+  for (const o of obstacles) {
+    if (!o.moveZ || o.done) continue;
+    o.worldZ += o.moveZ * STEP_DT;
+    if (skipCell(zones, o.worldZ, o.cls)) { o.done = true; o.passed = true; o.clearT = nowT; continue; }
+    if (o.moveZ < 0) smashAhead(obstacles, o, nowT);
+  }
+}
 
 /** 清理已掠过角色身后 behindM 的障碍（用碰撞同款深度窗口径，保证与判负一致） */
 export function cullObstacles(obstacles: ObstacleEntity[], distance: number, behindM: number): void {

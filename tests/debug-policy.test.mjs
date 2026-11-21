@@ -102,6 +102,7 @@ function bootstrapMocks() {
     './uiShell.js': ['createUiShell'],
     './characterSelectOverlay.js': ['createCharacterSelectOverlay'],
     './shopOverlay.js': ['createShopOverlay'],
+    './chestOverlay.js': ['createChestOverlay'],
     './runAssets.js': ['injectObstaclePosters', 'injectPickupTiles'],
     './introVideo.js': ['injectIntroVideos'],
     './startupConfig.js': ['preloadStartupConfig'],
@@ -110,6 +111,7 @@ function bootstrapMocks() {
     './eventsOverlay.js': ['createEventsOverlay'],
     './mobileLobby.js': ['createMobileLobby'],
     './mobilePanels.js': ['createMobileSettings', 'createMobileResult'],
+    './mobileAchievements.js': ['createMobileAchievements'],
     './mobileHud.js': ['createMobileHud'],
     './mobileLeaderboard.js': ['createMobileLeaderboard'],
     './leaderboardClient.js': ['createLeaderboardClient'],
@@ -161,20 +163,28 @@ test('production bootstrap strips URL QA extras and does not construct the test 
       this.missionQa = qa;
       this.missionWallet = wallet;
       this.trackMissions = () => () => undefined;
-      return { lobbyRenderer: this.createMobileLobby, trackRun: this.trackMissions };
+      this.achievementsApi = {};
+      return { lobbyRenderer: this.createMobileLobby, trackRun: this.trackMissions, achievementsApi: this.achievementsApi };
     },
     async createUiShell(adapter) {
       this.adapter = adapter;
-      return { host: { start() {} }, badges: {}, backdrop: {}, setBackgroundVisible() {}, fonts: {} };
+      return { host: { start() {} }, badges: {}, backdrop: {}, setBackgroundVisible() {}, fonts: this.fonts };
     },
-    createOverlayViews() { return {}; },
+    fonts: {},
+    createOverlayViews(options) { this.overlayOptions = options; return {}; },
     createCharacterSelectOverlay() {},
     createShopOverlay() {},
+    createChestOverlay(...args) { this.chestArgs = args; return this.disposeChest; },
+    disposeChest() {},
     injectObstaclePosters: async () => {},
     injectPickupTiles: async () => {},
     injectIntroVideos: async () => {},
     createMobileLobby() {},
-    createMobileSettings() {},
+    createMobileSettings(...args) { this.settingsArgs = args; return this.disposeSettings; },
+    disposeSettings() {},
+    openProfileOverlay(...args) { this.profileArgs = args; },
+    createMobileAchievements(...args) { this.achievementArgs = args; return this.disposeAchievements; },
+    disposeAchievements() {},
     createMobileResult() {},
     createMobileHud() {},
     createMobileLeaderboard() {},
@@ -208,6 +218,20 @@ test('production bootstrap strips URL QA extras and does not construct the test 
     assert.equal(capture.flowOptions.adapter.storage, capture.wallet, 'flow spending uses the same wallet');
     assert.equal(capture.missionWallet, capture.wallet, 'mission rewards enter the wallet used by the flow');
     assert.equal(capture.flowOptions.trackRun, capture.trackMissions, 'normal mission tracking survives the merge');
+    assert.equal(capture.flowOptions.achievementsApi, capture.achievementsApi, 'achievements share mission session/wallet wiring');
+    const content = {};
+    const achievementPage = { rows: [] }, achievementActions = { onBack() {} };
+    assert.equal(capture.overlayOptions.achievementsRenderer(content, achievementPage, achievementActions), capture.disposeAchievements);
+    assert.deepEqual(capture.achievementArgs, [content, achievementPage, achievementActions]);
+    const chestActions = { onBack() {} };
+    assert.equal(capture.overlayOptions.chestRenderer(content, chestActions), capture.disposeChest);
+    assert.deepEqual(capture.chestArgs, [content, chestActions, capture.fonts]);
+    const settingsActions = {};
+    const volumes = { music: 0.7, sfx: 1 };
+    assert.equal(capture.overlayOptions.settingsRenderer(content, settingsActions, 'theme_seaside', volumes), capture.disposeSettings);
+    assert.deepEqual(capture.settingsArgs.slice(0, 4), [content, settingsActions, 'theme_seaside', volumes]);
+    capture.settingsArgs[4]();
+    assert.deepEqual(capture.profileArgs, [content, capture.wallet], 'profile entry keeps the spendable wallet wrapper');
     assert.equal(capture.panelCreations, 0);
     assert.equal(capture.storageWrites.length, 0, 'production ignores the QA character preset');
     assert.equal(Object.hasOwn(globalThis, '__trTestPanel'), false);

@@ -1,6 +1,7 @@
 # Build output
 dist/
 /apps/*/build/
+/apps/wx/cloud-dist/
 *.tsbuildinfo
 /out/
 
@@ -28,3 +29,4 @@ Desktop.ini
 # E2E 冒烟截图留档（本地产物）
 tools/e2e-last-run.png
 tools/fontgen/node_modules/
+.zcode-tmp-*.png

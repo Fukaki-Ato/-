@@ -18,8 +18,9 @@ authors supply assets and the `game.json` entries.
 - `dispose()`
 
 Implementations: Web `apps/web/src/platform/webAudio.ts` (HTMLAudioElement), WX
-`apps/wx/src/platform/audio.ts` (InnerAudioContext). Both swallow failures by contract —
-audio never blocks gameplay.
+`apps/wx/src/platform/audio.ts` (InnerAudioContext). Playback errors are intended to be
+non-blocking; WX handles asynchronous error callbacks but does not catch every synchronous
+platform API exception. Do not treat this as a guarantee for arbitrary failing adapters.
 
 The game wires it through `packages/game/src/core/audio/audioDirector.ts`, created after
 config load in `packages/game/src/flow/mainFlow.ts`. Sim `cast` / `pickup` / `death` events

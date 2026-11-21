@@ -34,16 +34,21 @@ test('触发雷击：闪白立即拉满并随时间衰减归零', () => {
   assert.equal(fx.update(1 / 60, 100), 0, '之后保持无闪白');
 });
 
-test('落点锚定赛道：闪电组 z 跟随 worldZ - dist 滚动，播完自动隐藏', () => {
+test('落点锚定赛道：闪电与障碍同向，从前方 -Z 经过玩家后向 +Z 滚动', () => {
   const scene = new THREE.Scene();
   const fx = createLightningFx(scene);
   fx.strike(1, 200, 2.2);
-  fx.update(1 / 60, 200);
+  fx.update(1 / 60, 190);
   const group = scene.children.find(c => c instanceof THREE.Group && c.visible);
   assert.ok(group, '应有一个可见的闪电组');
+  const light = scene.children.find(c => c.isPointLight);
+  assert.equal(group.position.z, -10, '前方 10m 的落点必须在 -Z');
+  assert.equal(light.position.z, -10, '落点灯与雷击几何对齐');
+  fx.update(1 / 60, 200);
   assert.equal(group.position.z, 0, 'dist=worldZ 时落点在角色处');
   fx.update(1 / 60, 203);
-  assert.equal(group.position.z, -3, '赛道前进 3m 后闪电相对后退 3m（锚定落点）');
+  assert.equal(group.position.z, 3, '越过落点 3m 后闪电应在身后 +Z');
+  assert.equal(light.position.z, 3);
   for (let i = 0; i < 30; i++) fx.update(1 / 60, 203 + i * 0.4); // 播完整个寿命
   assert.equal(group.visible, false, '播放结束后闪电组应隐藏');
 });

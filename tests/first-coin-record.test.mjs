@@ -99,6 +99,6 @@ test('recorded input replay reproduces the exact first-coin checkpoint with late
 
 test('new metric gets a different rules identity even with unchanged gameplay configuration', () => {
   const rules = leaderboardRulesId(content);
-  assert.match(rules,/^first-coin-v2-/);
+  assert.match(rules,/^first-coin-v3:/);
   assert.notEqual(rules,'coinless-v1-'+rules.split('-').at(-1));
 });

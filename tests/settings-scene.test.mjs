@@ -19,14 +19,15 @@ import { MUSIC_VOLUME_KEY, SFX_VOLUME_KEY, themeMusic } from '../packages/game/d
 import { loadTestFontSet } from './ui-helpers.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
-const W = 800, H = 600;
+const W = 800, H = 720; // 7 主题后设置页内容长于 600：sfx 滑条被排到 601~613 落在 600 视口外（hit-test 整树不可命中）
+// 视口抬高到 720 贴近真机竖屏高度；页面内容溢出的长期解法是设置页滚动化（见 settingsView 布局碰撞记录）
 
 const readConfig = name => JSON.parse(readFileSync(join(root, 'config', `${name}.json`), 'utf8'));
 
-test('当前主题配置让设置页提供白日海景、雨夜便利店与黄昏渔港', () => {
+test('当前主题配置让设置页提供白日海景、雨夜便利店、黄昏渔港、天穹雷脊、沉眠泰坦、熔炉巨兽与失重图书馆', () => {
   const options = themeOptions({ themes: readConfig('themes') });
-  assert.deepEqual(options.map(option => option.id), ['theme_seaside_day', 'theme_rain_konbini', 'theme_dusk_harbor']);
-  assert.deepEqual(options.map(option => option.name), ['白日海景', '雨夜便利店', '黄昏渔港']);
+  assert.deepEqual(options.map(option => option.id), ['theme_seaside_day', 'theme_rain_konbini', 'theme_dusk_harbor', 'theme_stormspire', 'theme_titan', 'theme_forgeheart', 'theme_library']);
+  assert.deepEqual(options.map(option => option.name), ['白日海景', '雨夜便利店', '黄昏渔港', '天穹雷脊', '沉眠泰坦', '熔炉巨兽', '失重图书馆']);
 
   const glyphs = new Set(JSON.parse(readFileSync(join(root, 'assets/fonts/cjk.metrics.json'), 'utf8')).glyphs.map(g => g.char));
   for (const label of [...options.map(option => option.name), '龙']) {
@@ -257,6 +258,7 @@ test('设置页：滑条拖动 1% 粒度回传流程、与百分比和步进按�
   assert.equal(Math.round(musicSlider.value * 100), 37);
 
   allow = false;
+
   dragSlider(host, sfxSlider, 0.5, 0.5);
   assert.deepEqual(calls.at(-1), ['sfx', 0.5], '按下仍回传流程');
   assert.equal(Math.round(sfxSlider.value * 100), 100, '被拒绝的滑条保持原值');
@@ -328,6 +330,7 @@ test('流程：设置入口 → 设置页（当前＝默认主题）→ 点选�
   assert.ok(page.content, '设置页拿到配置');
   assert.equal(page.currentThemeId, 'theme_seaside_day', '未存过 → 首个 live 主题');
 
+  store.set('thunderrun:theme-unlocks', JSON.stringify(['theme_demo_night'])); // 先在商店解锁
   assert.equal(page.actions.onSelectTheme('theme_demo_night'), true);
   assert.equal(store.get(THEME_KEY), 'theme_demo_night');
   assert.ok(seen.toasts.at(-1)?.includes('演示夜景') && seen.toasts.at(-1)?.includes('下一局生效'),
@@ -378,7 +381,7 @@ test('流程：脏存档（主题已删）在 boot 时清除回默认，不把�
 });
 
 test('流程：合法存档进局时注入所选主题；切换后下一局生效', async () => {
-  const { flow, seen, key } = makeFlow({ themes: themesWithDemo(), storedTheme: 'theme_demo_night' });
+  const { flow, store, seen, key } = makeFlow({ themes: themesWithDemo(), storedTheme: 'theme_demo_night' });
   await flow.boot();
 
   seen.select.at(-1).actions.onStartRun(DEFAULT_CHAR);
@@ -387,6 +390,7 @@ test('流程：合法存档进局时注入所选主题；切换后下一局生�
   key('Escape'); // 中途退出回大厅
   assert.equal(flow.machine.current(), 'select');
   seen.select.at(-1).actions.onSettings();
+  store.set('thunderrun:theme-unlocks', JSON.stringify(['theme_seaside_day'])); // 先在商店解锁
   seen.settings.at(-1).actions.onSelectTheme('theme_seaside_day');
   seen.settings.at(-1).actions.onBack();
   seen.select.at(-1).actions.onStartRun(DEFAULT_CHAR);
