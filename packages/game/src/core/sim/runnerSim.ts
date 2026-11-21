@@ -230,7 +230,7 @@ export class RunnerSim {
     // M4/M7a 效果步进（surge/crossings/潮位/追击者/弹跳垫，见 stepFx.ts）
     this.fxCtx.surgeFired = this.surgeFired;
     this.surgeFired = stepFx(s, dm, this.events, this.obstacles, this.fxCtx);
-    advanceMovingObstacles(this.obstacles, this.gen.zones, s.t);
+    advanceMovingObstacles(this.obstacles, this.gen.zones, s.t, this.gen.warps);
     // B-2/B-3 反重力上下文：zoneAt 纯查询（二分零分配）推导 flip/ceilH 写 state（渲染只读不反写）。
     // 单向门：flyT>0 / 滑翔 / 燃料耗尽过渡帧（flyWasActive）不翻转——按正常重力落地后才翻（brief §11.2 B-3）
     const zone = zoneAt(this.gen.zones, s.distance);

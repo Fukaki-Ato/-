@@ -5,7 +5,7 @@ import { RunnerSim } from '../packages/game/dist/core/sim/runnerSim.js';
 import { TrackGen } from '../packages/game/dist/core/sim/trackGen.js';
 import { hitsRunner, laserOn } from '../packages/game/dist/core/sim/collision.js';
 import { initialRunnerState } from '../packages/game/dist/core/sim/simTypes.js';
-import { layRainCoins, parseRainCfg } from '../packages/game/dist/core/sim/warps.js';
+import { inWarpClear, layRainCoins, parseRainCfg, WARP_CLEAR_M } from '../packages/game/dist/core/sim/warps.js';
 import { contentForRunTheme } from '../packages/game/dist/core/sim/themeRules.js';
 import { buildObstacleEntity } from '../packages/game/dist/core/sim/trackDefs.js';
 import { RunRng } from '../packages/game/dist/core/rng.js';
@@ -94,6 +94,26 @@ test('真实配置增量生成：上下游预注册覆盖候选末端和余量�
   const bulk = new TrackGen(structuredClone(raw), new RunRng(108));
   bulk.ensure(10000, 320, [], []);
   for (const key of ['zones', 'warps', 'lows', 'rains']) assert.deepEqual(gen[key], bulk[key], `${key} 不依赖 ensure 分批大小`);
+});
+
+test('隧道外生成的冲撞障碍进入净空边界即消散，逐帧不能闯进奖励段', () => {
+  const content = blank();
+  content.obstacles.warp = structuredClone(raw.obstacles.warp);
+  const sim = new RunnerSim(content, 108, 'char_volt', false, [], 'theme_stormspire');
+  const end = raw.obstacles.warp.fromM + raw.obstacles.warp.lengthM;
+  const charge = raw.obstacles.patterns.find(p => p.id === 'pat_easy_cube_charge');
+  sim.gen.genZ = end + WARP_CLEAR_M - 7; // 模板首个移动障碍距模板起点 10m，合法出生在净空窗外。
+  sim.gen.pickPattern = () => charge;
+  sim.gen.ensure(0, end + WARP_CLEAR_M, sim.obstacles, sim.coinsArr, sim.pickupsArr, sim.crossings);
+  const moving = sim.obstacles.find(o => o.moveZ < 0);
+  assert.ok(moving && !inWarpClear(sim.gen.warps, moving.worldZ));
+  sim.gen.pickPattern = () => content.obstacles.patterns[0];
+  Object.assign(sim.state, { distance: raw.obstacles.warp.fromM + 20, t: 20 });
+  for (let frame = 0; frame < 60; frame++) sim.step();
+  assert.equal(moving.done, true, '真实逐帧运动触及净空边界即不再参与碰撞');
+  assert.equal(moving.passed, true);
+  assert.ok(inWarpClear(sim.gen.warps, moving.worldZ) && moving.worldZ > end, '到达实际隧道前停止');
+  assert.equal(sim.state.hits, 0);
 });
 
 test('金币雨真实 24 枚均可经普通跳跃与收集链路入账，最高币站立不能吃', () => {
