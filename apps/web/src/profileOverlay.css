@@ -1,5 +1,6 @@
 /* 玩家档案弹层：半屏面板 + 背板点击关闭（视觉沿用大厅棕系） */
 .tr-profile-overlay {
+  font-family: 'Thunder Sans', 'Thunder CJK Supplement', 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
   position: fixed;
   inset: 0;
   z-index: 60;
@@ -9,6 +10,8 @@
   background: rgba(8, 22, 38, 0.55);
   padding: 4dvh 12px 16px;
 }
+
+.tr-profile-overlay button { font-family: inherit; }
 
 .profile-panel {
   box-sizing: border-box;
