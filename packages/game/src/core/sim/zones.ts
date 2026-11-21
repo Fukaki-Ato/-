@@ -17,8 +17,8 @@ export interface Zone { startM: number; endM: number; ceilH: number }
 /** obstacles.json antigrav 段（B-8 数值地板：lengthM 60~120 / everyM 400~600 / fromM 600 / ceilingH 4.6） */
 export interface ZoneCfg { lengthM: number; everyM: number; fromM: number; ceilingH: number }
 
-/** 区内禁放类别（B-1 v1：区内只放 low/high/full/hazard，天然规避倒挂列车/摆锤/斜坡的体验验收成本） */
-const ZONE_SKIP_CLASSES = new Set(['vehicle', 'moving', 'step']);
+/** 区内保留可镜像的 low/high/full/hazard/laser；列车、摆锤、斜坡和正向弹跳垫不在倒挂区出生。 */
+const ZONE_SKIP_CLASSES = new Set(['vehicle', 'moving', 'step', 'bounce']);
 
 /** 解析 obstacles.json 的 antigrav 段：任一字段缺失/非法（非有限正数）一律返回 null（=zones 恒空，全主题零变化） */
 export function parseZoneCfg(ob: unknown): ZoneCfg | null {
@@ -44,7 +44,7 @@ export function inNoPlantWindow(zn: Zone, z: number): boolean {
 }
 
 /** ensure 落 cell 的统一过滤（B-1 预注册法配套）：禁铺窗内任何 cell 都跳过；区体内只拦
- *  vehicle/moving/step 障碍格（金币格保留，铺设后由 trackGen 统一改写到天花板带）。 */
+ *  vehicle/moving/step/bounce 障碍格（金币格保留，铺设后由 trackGen 统一改写到天花板带）。 */
 export function skipCell(zones: Zone[], z: number, cls: string): boolean {
   // 按扩展后的出口二分定位：zoneAt 只查区体，查询不到区外净空。
   let lo = 0, hi = zones.length;

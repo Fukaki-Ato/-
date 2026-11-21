@@ -33,13 +33,17 @@ export interface ObstaclesFile {
   configVersion: string;
   defs: NamedEntry[];
   patterns: Array<{ id: string; minDifficulty: number; weight: number; lengthSegments: number;
-    cells: Array<{ segment: number; lane: number; offsetM: number; obsRef?: string; coins?: number; surface?: string; pickupRef?: string }>;
+    cells: Array<{ segment: number; lane: number; offsetM: number; obsRef?: string; coins?: number; surface?: string; pickupRef?: string; laser?: { phase: number } }>;
     guarantee?: { safeLanePattern: number[] } }>;
   difficultyCurve: Array<{ by: number; poolWeights: Record<string, number>; coinDensity: number; pickupRate: number }>;
   dropTable: { pickupBoxRatePerSeg: number; weights: Record<string, number> };
   tideAware?: { lowMax: number; coinCount: number };
-  crossings?: { ring?: { everyM: number; fromM: number; yMin: number; yMax: number } };
+  crossings?: Partial<Record<'ring' | 'rib', { everyM: number; fromM: number; yMin: number; yMax: number }>>;
   antigrav?: { lengthM: number; everyM: number; fromM: number; ceilingH: number };
+  /** 特殊事件块：未配置时对应事件表恒空。 */
+  warp?: { lengthM: number; everyM: number; fromM: number };
+  coinRain?: { spanM: number; everyM: number; fromM: number; count: number; ampY: number };
+  lowGrav?: { lengthM: number; everyM: number; fromM: number; gMul: number };
 }
 
 /**

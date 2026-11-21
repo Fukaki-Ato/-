@@ -8,13 +8,13 @@ import { buildLoadout, itemEffects, type EffectSpec, type Loadout, itemSpecsWith
 import { collectCoins, collectPickups, type CollectDeps } from './collect.js';
 import { hitsRunner, inDepthWindow, isNearMiss, relZ, safestLane, type FlipCtx } from './collision.js';
 import { clearSkyCoins } from './landing.js';
-import { applySurgeStep, level } from './tide.js';
-import { CROSSING_DEFAULTS, cullCrossings, stepCrossings } from './crossings.js';
+import { stepFx, type FxCtx } from './stepFx.js';
+import { CROSSING_DEFAULTS, stepCrossings } from './crossings.js';
 import { Movement } from './movement.js';
 import { parseReviveConfig, tryRevive, type ReviveState } from './revive.js';
 import { resolveHit, type HitCtx } from './resolveHit.js';
 import { TrackGen, type CloudEntity, type CoinEntity, type CrossingEntity, type ObstacleEntity, type PickupEntity } from './trackGen.js';
-import { zoneAt } from './zones.js';
+import { zoneAt, type Zone } from './zones.js';
 import { contentForRunTheme, resolveRunThemeId } from './themeRules.js';
 import { createSimWorld } from './simWorld.js';
 import { FirstCoinRecord, scoreForState } from './firstCoinRecord.js';
@@ -36,8 +36,10 @@ export class RunnerSim {
   readonly pickupsArr: PickupEntity[] = [];
   readonly cloudsArr: CloudEntity[] = [];
   readonly crossings: CrossingEntity[] = []; // M4 穿越判定体（crossings 配置出生，cross 事件计分）
+  get zones(): Zone[] { return this.gen.zones; } // B-9 渲染层事件门读区表（gen 私有、zones 数组引用稳定；只读不反写）
   readonly events: SimEvent[] = [];
-  private surgeFired = false; readonly tideAware: boolean; // M4 喷发判定化：tideAware=obstacles.json 有 tideAware 块
+  private surgeFired = false;
+  private readonly fxCtx: FxCtx = { tideAware: false, surgeFired: false, crossings: this.crossings, lastHits: 0, laneWidth: 0, zones: [], warps: [], rains: [], lows: [], lastRain: -1, lastWarp: 0, lowGravMulNow: 1 }; readonly tideAware: boolean; // M4 喷发判定化：tideAware=obstacles.json 有 tideAware 块；Stormspire 四表空数组=恒零变化（硬门）
   readonly state: RunnerState;
   /** 生命数（game.json runner.lives，默认 1：一撞即出局，新手保护仍生效） */
   readonly lives: number;
@@ -83,10 +85,11 @@ export class RunnerSim {
     this.themeId = resolveRunThemeId(content, themeId);
     content = contentForRunTheme(content, this.themeId);
     this.tideAware = !!(content.obstacles as unknown as { tideAware?: unknown }).tideAware;
+    this.fxCtx.tideAware = this.tideAware;
     const p = content.game.params;
     this.R = (p.runner ?? {}) as Record<string, number>;
     this.SC = (p.score ?? {}) as Record<string, number>;
-    this.laneWidth = this.R.laneWidth ?? 2.2;
+    this.laneWidth = this.R.laneWidth ?? 2.2; this.fxCtx.laneWidth = this.laneWidth;
     this.lives = this.R.lives ?? 1;
     this.invulnS = this.R.invulnS ?? 1.4;
     this.coinFront = -(this.R.coinCollectM ?? 1.1);
@@ -96,6 +99,8 @@ export class RunnerSim {
     this.fly = { heightM: fl.heightM ?? 4.6, speedMul: fl.speedMul ?? 2.5, glideSpeedMul: fl.glideSpeedMul ?? 1.6, glideS: fl.glideS ?? 1.8 };
     this.state = initialRunnerState();
     this.gen = new TrackGen(content, new RunRng(seed));
+    this.fxCtx.zones = this.gen.zones; this.fxCtx.warps = this.gen.warps; this.fxCtx.rains = this.gen.rains; this.fxCtx.lows = this.gen.lows; // A-2/Stormspire：四表引用注入（gen 公开只读数组、引用稳定；stepFx 每步派生读）
+    const hs = (this.R as Record<string, number>).headstartM ?? 0; if (hs > 0) this.state.distance = hs;
     this.mv = new Movement({
       laneWidth: this.laneWidth, gravity: this.R.gravity ?? -38, jumpVelocity: this.R.jumpVelocity ?? 15.2, // 参数块合并行守 300 行上限
       slideS: this.R.slideS ?? 0.6, slideCooldownS: this.R.slideCooldownS ?? 0.3, laneChangeS: this.R.laneChangeS ?? 0.18,
@@ -123,7 +128,6 @@ export class RunnerSim {
     this.initialItems = (initialItems ?? []).filter(id => itemEffects(content, id).length > 0).slice(0, 3);
     for (const id of this.initialItems) this.applyEffects(itemSpecsWithBonus(this.content, id, this.enhance?.itemBonusS?.(id)), id);
   }
-
   /** buff 派生视图（渲染/HUD/测试统一从这里读，任何地方不得写） */
   get fx(): FxState { return this.buffs.fx; }
   buffList(): BuffView[] { return this.buffs.list(this.hudBuffs); }
@@ -220,15 +224,13 @@ export class RunnerSim {
     const base = this.R.baseSpeed ?? 12; const max = this.R.maxSpeed ?? 26; const ramp = this.R.speedRampPer100M ?? 0.18;
     const modeMul = fx.flyT > 0 ? this.fly.speedMul : s.gliding ? this.fly.glideSpeedMul : s.stunT > 0 ? STUN_SPEED_MUL : 1;
     const raw = Math.min(max, base + ramp * s.distance / 100) * modeMul * fx.speedMul * fx.timeSlowMul;
-    // 飞行/滑翔段允许超过地面 max（2.5 倍巡航），但单步位移仍有绝对上限（FLY_SPEED_CAP）
     const cap = fx.flyT > 0 || s.gliding ? FLY_SPEED_CAP : max;
     const dm = Math.min(raw, cap) * STEP_DT;
     s.distance += dm;
-    if (this.tideAware) this.surgeFired = applySurgeStep(s, dm, this.events, this.surgeFired); else s.surgeWarn = 0;
-    cullCrossings(this.crossings, s.distance, CULL_BEHIND_M); s.tideLevel = level(s.distance); // M4 潮位单源：全主题算（~4 op），潮汐主题消费其余忽略
-
-    // 纵向漂移障碍（moveZ<0=向玩家冲来的冲撞体）：推进 worldZ，并把沿途同车道障碍撞开
-    advanceMovingObstacles(this.obstacles, this.gen.zones, s.t);
+    // M4/M7a 效果步进（surge/crossings/潮位/追击者/弹跳垫，见 stepFx.ts）
+    this.fxCtx.surgeFired = this.surgeFired;
+    this.surgeFired = stepFx(s, dm, this.events, this.obstacles, this.fxCtx);
+    advanceMovingObstacles(this.obstacles, this.gen.zones, s.t, this.gen.warps);
     // B-2/B-3 反重力上下文：zoneAt 纯查询（二分零分配）推导 flip/ceilH 写 state（渲染只读不反写）。
     // 单向门：flyT>0 / 滑翔 / 燃料耗尽过渡帧（flyWasActive）不翻转——按正常重力落地后才翻（brief §11.2 B-3）
     const zone = zoneAt(this.gen.zones, s.distance);
@@ -239,7 +241,7 @@ export class RunnerSim {
 
     if (fx.avoidLookahead > 0) s.lane = safestLane(this.obstacles, s, fx.avoidLookahead);
     this.mv.advanceLateral(s, STEP_DT);
-    this.mv.advanceVertical(s, fx, STEP_DT);
+    this.mv.lowGravMul = this.fxCtx.lowGravMulNow; this.mv.advanceVertical(s, fx, STEP_DT); // 低重力带倍率透传（stepFx 每步写，表空恒 1 ⇒ 与原式逐字节同轨）
     if (this.mv.landedThisStep) clearSkyCoins(this.coinsArr); // 着陆回收空中金币带（用户反馈：回地面后天上的金币应消失）
 
     this.gen.ensure(s.distance, GEN_AHEAD_M, this.obstacles, this.coinsArr, this.pickupsArr, this.crossings);
@@ -262,7 +264,6 @@ export class RunnerSim {
     for (const o of this.obstacles) {
       if (o.done) continue;
       const z = relZ(o, s.distance);
-      // 电弧地面不用 DEPTH_SLACK 前瞻：4m 弧 + 2×0.4 前瞻 = 4.8m 判定期，「跳过弧心但擦到边缘判死」的体感根因之一（与判定线过高叠加，见 collision.HAZARD_HIT_Y）。
       if (o.cls === 'hazard' && o.zap !== true) {
         if (Math.abs(z) > o.d / 2) continue;
       } else if (!inDepthWindow(o, z)) continue;

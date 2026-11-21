@@ -5,6 +5,10 @@ import { createTrackVisuals } from '../packages/game/dist/render/trackVisuals.js
 import { createCoinField } from '../packages/game/dist/render/coinField.js';
 import { uBendX, uBendY } from '../packages/game/dist/render/stormspire/worldBend.js';
 import { createLandmarks } from '../packages/game/dist/render/stormspire/landmarks.js';
+import { createObstacleLayer } from '../packages/game/dist/render/entityLayers.js';
+import { createZoneGates } from '../packages/game/dist/render/zoneGates.js';
+import { createWarpTunnel } from '../packages/game/dist/render/warpTunnel.js';
+import { createTowers } from '../packages/game/dist/render/library/towers.js';
 
 function assertBend(material) {
   const shader = { uniforms: {}, vertexShader: '#include <project_vertex>' };
@@ -55,4 +59,24 @@ for (const scenery of ['stormspire', 'titan', 'forgeheart', 'library']) {
     }
     for (const coin of coins.children) assertBend(coin.material);
   });
+
+  test(`${scenery}: 默认障碍残件、激光和事件门/隧道保持同一道路弯曲`, t => {
+    const scene = new THREE.Scene();
+    createObstacleLayer(scene, 2.2, scenery);
+    const gates = createZoneGates(scene, 2.2, [], scenery);
+    const tunnel = createWarpTunnel(scene, 2.2, scenery);
+    t.after(() => {
+      gates.dispose(); tunnel.dispose();
+      scene.traverse(o => { o.geometry?.dispose(); for (const m of o.material ? [o.material].flat() : []) m.dispose(); });
+    });
+    scene.traverse(o => { for (const m of o.material ? [o.material].flat() : []) assertBend(m); });
+  });
 }
+
+test('图书馆新增天花板跑道细分并弯曲，透明材质也与道路对齐', t => {
+  const scene = new THREE.Scene(), towers = createTowers(scene);
+  t.after(() => towers.dispose());
+  const runway = scene.children.filter(o => o.geometry?.type === 'PlaneGeometry' && o.material.transparent);
+  assert.equal(runway.length, 2);
+  for (const mesh of runway) { assert.ok(mesh.geometry.parameters.heightSegments >= 48); assertBend(mesh.material); }
+});

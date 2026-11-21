@@ -7,6 +7,7 @@
  */
 import * as THREE from 'three';
 import type { RunnerSim } from '@tr/game/core/sim/runnerSim.js';
+import type { RunnerState } from '@tr/game/core/sim/simTypes.js';
 import type { GameContent } from '@tr/game/core/config/configTypes.js';
 import type { InputEvent, PlatformAdapter, Unsubscribe } from '@tr/framework/platform/platformAdapter.js';
 import { FLASH_TINT } from './lightning.js';
@@ -114,6 +115,27 @@ export function deriveRunStage(content: GameContent, opts?: { themeId?: string }
     hemi, keyLight, HEMI_BASE, KEY_BASE, skyBase, fogBase, flashTint, flashGap, scenery,
     grade, wetRoad, env,
   };
+}
+
+export interface RunAlert { text: string; urgency: 1 | 2 | 3 | 4 | 5; fx?: number }
+export type RunAlertState = Pick<RunnerState, 'surgeWarn' | 'flipWarn' | 'zoneRemain' | 'chaserDist' | 'warpRemain' | 'lowGravRemain'>;
+
+/** 安全预警先于区内状态和事件庆祝；颜色类别 urgency 不参与排序。 */
+export function buildSafetyAlert(s: RunAlertState): RunAlert | null {
+  if (s.chaserDist <= 20) return { text: '追击者逼近 · 快跑！', urgency: 3 };
+  if (s.surgeWarn > 0) return { text: '喷发预警', urgency: 1 };
+  if (s.flipWarn > 0 && s.flipWarn <= 60) return { text: '重力翻转区 · ' + Math.ceil(s.flipWarn) + 'm', urgency: 2 };
+  return null;
+}
+
+/** 常态横幅：安全预警 > 隧道剩余 > 反重力剩余 > 低重力剩余；瞬间反馈由 runAlerts 叠加。 */
+export function buildAlert(s: RunAlertState): RunAlert | null {
+  const safety = buildSafetyAlert(s);
+  if (safety) return safety;
+  if (s.warpRemain > 0) return { text: '时空隧道 · 剩余 ' + Math.ceil(s.warpRemain) + 'm', urgency: 4 };
+  if (s.zoneRemain > 0) return { text: '反重力区 · 剩余 ' + Math.ceil(s.zoneRemain) + 'm', urgency: 2 };
+  if (s.lowGravRemain > 0) return { text: '低重力带 · 剩余 ' + Math.ceil(s.lowGravRemain) + 'm', urgency: 5 };
+  return null;
 }
 
 /** 输入 → sim（v2：手势与键盘合并为单个 onInput 订阅，§7.8）；返回退订函数进 dispose。 */

@@ -6,14 +6,17 @@
 import { relZ } from './collision.js';
 import type { ObstacleEntity } from './trackGen.js';
 import { skipCell, type Zone } from './zones.js';
+import { inWarpClear, type WarpSeg } from './warps.js';
 import { STEP_DT } from './simTypes.js';
 
-/** 移动体的实际轨迹也必须遵守反重力净空；在区界消散，不等撞到玩家才过滤。 */
-export function advanceMovingObstacles(obstacles: ObstacleEntity[], zones: Zone[], nowT: number): void {
+/** 移动体须遵守反重力和隧道净空，在边界消散。 */
+export function advanceMovingObstacles(obstacles: ObstacleEntity[], zones: Zone[], nowT: number, warps?: WarpSeg[]): void {
   for (const o of obstacles) {
     if (!o.moveZ || o.done) continue;
     o.worldZ += o.moveZ * STEP_DT;
-    if (skipCell(zones, o.worldZ, o.cls)) { o.done = true; o.passed = true; o.clearT = nowT; continue; }
+    if (skipCell(zones, o.worldZ, o.cls) || (warps && inWarpClear(warps, o.worldZ))) {
+      o.done = true; o.passed = true; o.clearT = nowT; continue;
+    }
     if (o.moveZ < 0) smashAhead(obstacles, o, nowT);
   }
 }

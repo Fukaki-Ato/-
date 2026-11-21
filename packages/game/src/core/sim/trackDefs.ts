@@ -30,7 +30,7 @@ export function normalizeSwing(raw: unknown): SwingSpec | undefined {
  * （jumpable=可跳挡板；rideTop=车顶可站立；moveZ=纵向漂移，负值朝玩家冲来；zap=闪电圈触电结算）。
  * 字段缺失/类型不符时按「最保守」处理，绝不产出 NaN 或未知类别。
  */
-export function buildObstacleEntity(def: NamedEntry, lane: number, worldZ: number): ObstacleEntity {
+export function buildObstacleEntity(def: NamedEntry, lane: number, worldZ: number, laserPhase?: number): ObstacleEntity {
   const size = (def.size as number[] | undefined) ?? [2, 1.2, 1.2];
   const e: ObstacleEntity = {
     obsRef: def.id,
@@ -43,5 +43,14 @@ export function buildObstacleEntity(def: NamedEntry, lane: number, worldZ: numbe
   if (def.rideTop === true) e.rideTop = true;
   if (typeof def.moveZ === 'number' && Number.isFinite(def.moveZ) && def.moveZ !== 0) e.moveZ = def.moveZ;
   if (def.zap === true) e.zap = true;
+  if (typeof def.bounceVY === 'number' && def.bounceVY > 0) e.bounceVY = def.bounceVY;
+  if (typeof def.launchVY === 'number' && def.launchVY > 0) e.launchVY = def.launchVY;
+  const lz = def.laser as Record<string, unknown> | undefined;
+  if (lz && typeof lz.onS === 'number' && typeof lz.offS === 'number')
+    e.laserCfg = { onS: lz.onS, offS: lz.offS, phase: typeof lz.phase === 'number' ? lz.phase : 0 };
+  if (e.laserCfg && typeof laserPhase === 'number' && Number.isFinite(laserPhase)) e.laserCfg.phase = laserPhase;
+  const mo = def.motion as Record<string, unknown> | undefined;
+  if (mo && typeof mo.xSweepM === 'number' && typeof mo.periodS === 'number' && mo.periodS > 0)
+    e.motion = { xSweepM: mo.xSweepM, periodS: mo.periodS, hoverY: typeof mo.hoverY === 'number' ? mo.hoverY : 0, bobAmp: typeof mo.bobAmp === 'number' ? mo.bobAmp : 0 };
   return e;
 }

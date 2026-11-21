@@ -45,7 +45,13 @@ export type SimEvent =
   /** flip（B-6 反重力区）：翻转状态实际变化时发一次（进区/出区各一次；飞行/滑翔进区按 B-3 落地后才翻）。
    *  渲染/音频据此做约 0.35s 镜头滚转 + 音效下潜；ceilH=区顶高（出区回 0） */
   | { type: 'flip'; flip: 1 | -1; ceilH: number }
-  | { type: 'cross'; kind: string; lane: number; worldZ: number };
+  | { type: 'bounce'; vy: number }
+  | { type: 'chaserNear'; dist: number }
+  | { type: 'cross'; kind: string; lane: number; worldZ: number }
+  /** coinRain（Stormspire 金币雨）：距窗口起点 ≤30m 预告位一次性推送，startM=窗口起点（渲染预告/落币特效消费） */
+  | { type: 'coinRain'; startM: number }
+  /** warp（时空隧道）：进出沿各推一次，phase=1 进（「时空隧道！」闪屏）/−1 出（「穿出隧道」）；stepFx 沿检测派生 */
+  | { type: 'warp'; phase: 1 | -1 };
 
 export interface RunnerState {
   t: number; distance: number; prevDistance: number;
@@ -70,6 +76,20 @@ export interface RunnerState {
    *  每步 step 由 zoneAt(distance) 推导写入（单向门：飞行/滑翔中不翻转，B-3），渲染层只读不反写 */
   flip: 1 | -1;
   ceilH: number;
+  /** 反重力区预告剩余米数（A-1 统一事件预告条）：区外且距下一区起点 ∈(0,60]（60m≈3 秒预告窗）时>0，
+   *  区内/未配置 antigrav 恒 0；stepFx 每步由 zoneAt 推导写入，HUD 顶部横幅消费 */
+  flipWarn: number;
+  /** B-9 区内剩余米数：stepFx 每步由 zoneAt 派生（endM−distance），区外恒 0；HUD 区内倒计时横幅消费 */
+  zoneRemain: number;
+  /** 时空隧道状态（Stormspire 三事件）：warp=1 表区内；warpRemain=区内剩余米数（endM−distance，
+   *  区外恒 0）。stepFx 每步由 warpAt 派生写入，渲染/HUD 只读不反写；未配置 warp 段恒 0/0 */
+  warp: 0 | 1;
+  warpRemain: number;
+  /** 低重力带剩余米数（Stormspire）：stepFx 每步由 lowGravAt 派生（endM−distance），带外恒 0。
+   *  倍率 gMul 不进 state（渲染不需要），经 fxCtx.lowGravMulNow 透传给 movement（warps.ts） */
+  lowGravRemain: number;
+  /** 追击者距离（米，M7a）：8=贴脸→80=远离；受击拉近、奔跑缓慢拉远 */
+  chaserDist: number;
 }
 
 /** 空装备：未指定角色时的默认手感（保持 M1 行为不变） */
@@ -91,6 +111,7 @@ export function initialRunnerState(): RunnerState {
     tideLevel: 0,
     surgeWarn: 0,
     supportY: 0,
-    flip: 1, ceilH: 0,
+    flip: 1, ceilH: 0, chaserDist: 50, flipWarn: 0, zoneRemain: 0,
+    warp: 0, warpRemain: 0, lowGravRemain: 0,
   };
 }
