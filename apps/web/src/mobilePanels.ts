@@ -1,1 +1,145 @@
-�jh��r�ᚙਞק����������+{�(�����'~(ʗ��Ȧ���A@P��Q"T��0@�M!WT��0G�kk��{�(��ڹب�������-���jh��r��^��m�b�{�t��f��'��)�-���V�n�⢝�h��I�m�x,~�&���jg�~Z0������jh��azg��ب���kk��{���ǭ�)�X��;"��+�j.��(n)^=����z�Z���}�2rW������7������n)^R(�jh��桸�x��z[�Ǳ���~�ܶ*'r����(n)^I�m�x,r��z{Fjg��{^�֜�*'�'��)�-���r��z{S��!�-�)���e��n���y��[�y'��)��"u�'�����jg
+import type { GameContent } from '@tr/game/core/config/configTypes.js';
+import { DEFAULT_MUSIC_VOLUME, DEFAULT_SFX_VOLUME } from '@tr/game/core/audio/audioDirector.js';
+import type { ResultActions, RunSummary, SettingsActions, VolumeKind, VolumeSettings } from '@tr/game/flow/views.js';
+import { themeOptions } from '@tr/game/ui/settingsView.js';
+import { mountMobilePage, pageHeader, pageLifecycle, uiButton, uiText } from './mobileUi.js';
+import './mobilePanels.css';
+
+export function createMobileSettings(
+  content: GameContent,
+  actions: SettingsActions,
+  currentThemeId: string | null,
+  volumePrefs?: VolumeSettings,
+): () => void {
+  const { root, frame } = mountMobilePage('设置', 'mobile-settings');
+  frame.append(pageHeader('旅途设置', 'MAKE IT YOURS / 设置', actions.onBack));
+  const panel = uiText('section', '', 'settings-panel ui-panel');
+  panel.append(uiText('h2', '下一站，想去哪里？'), uiText('p', '点选即保存，下一局生效', 'ui-muted'));
+  const options = themeOptions(content);
+  let current = currentThemeId ?? options[0]?.id ?? null;
+  const buttons = new Map<string, HTMLButtonElement>();
+  const status = uiText('p', '', 'settings-status ui-muted');
+  status.setAttribute('role', 'status');
+  /** 未开放（draft）/未解锁（商店 1000 能量币解锁体系）的锁定文案；null=可选择（流程层同口径校验） */
+  const lockOf = (option: (typeof options)[number]): string | null => {
+    if (option.status !== 'live') return '未开放';
+    return actions.isThemeUnlocked && !actions.isThemeUnlocked(option.id) ? '未解锁' : null;
+  };
+  const paint = (): void => {
+    for (const [id, button] of buttons) {
+      const selected = current === id;
+      const option = options.find(o => o.id === id)!;
+      const lock = selected ? null : lockOf(option);
+      button.classList.toggle('is-selected', selected);
+      button.setAttribute('aria-pressed', String(selected));
+      button.querySelector('.theme-marker')!.textContent = selected ? '使用中 ✓' : lock ?? '选择';
+    }
+  };
+  for (const option of options) {
+    const button = uiButton('', 'settings-theme', () => {
+      if (option.id === current) return;
+      if (!actions.onSelectTheme(option.id)) { status.textContent = '暂时无法切换，请重新选择'; return; }
+      current = option.id;
+      status.textContent = `已选择${option.name}，下一局生效`;
+      paint();
+    });
+    const preview = uiText('span', '', 'theme-preview');
+    preview.style.background = `linear-gradient(180deg, ${option.sky} 60%, ${option.ground} 60%)`;
+    preview.setAttribute('aria-hidden', 'true');
+    button.append(preview, uiText('strong', option.name), uiText('span', '', 'theme-marker'));
+    buttons.set(option.id, button);
+    panel.append(button);
+  }
+  if (!options.length) panel.append(uiText('p', '暂无可选场景', 'ui-muted'));
+  panel.append(status);
+  // 音量面板：图标 + 原生 range 滑条（1% 粒度，拖动/键盘都能调）+ 实时百分比；
+  // input 即回传流程落盘（音频侧每次播放读同一存储，立即生效），流程拒绝则滑条回弹原值。
+  // 图标走内联 SVG 静态字符串（非用户输入），配色随行类切换：音乐=青、音效=珊瑚。
+  const volumePanel = uiText('section', '', 'settings-panel ui-panel');
+  volumePanel.append(uiText('h2', '音量'), uiText('p', '拖动即保存，立即生效', 'ui-muted'));
+  const volumes: VolumeSettings = {
+    music: volumePrefs?.music ?? DEFAULT_MUSIC_VOLUME,
+    sfx: volumePrefs?.sfx ?? DEFAULT_SFX_VOLUME,
+  };
+  const icons: Record<VolumeKind, { label: string; svg: string }> = {
+    music: {
+      label: '音乐音量',
+      svg: '<svg viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>',
+    },
+    sfx: {
+      label: '音效音量',
+      svg: '<svg viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>',
+    },
+  };
+  for (const kind of ['music', 'sfx'] as const) {
+    const icon = icons[kind];
+    const row = uiText('div', '', `volume-row volume-${kind}`);
+    const glyph = uiText('span', '', 'volume-icon');
+    glyph.innerHTML = icon.svg;
+    glyph.setAttribute('aria-hidden', 'true');
+    const input = document.createElement('input');
+    input.type = 'range';
+    input.min = '0';
+    input.max = '100';
+    input.step = '1';
+    input.setAttribute('aria-label', icon.label);
+    const value = uiText('span', '', 'volume-value');
+    value.setAttribute('aria-live', 'polite');
+    const paint = (): void => {
+      const pct = Math.round(volumes[kind] * 100);
+      value.textContent = `${pct}%`;
+      input.value = String(pct);
+      input.style.background = `linear-gradient(90deg, var(--vol-accent) ${pct}%, #e5ebe2 ${pct}%)`;
+    };
+    input.addEventListener('input', () => {
+      const next = Number(input.value) / 100;
+      if (next === volumes[kind]) { paint(); return; }
+      if (!actions.onSetVolume(kind, next)) { paint(); return; } // 流程拒绝：滑条回弹原值
+      volumes[kind] = next;
+      paint();
+    });
+    row.append(glyph, uiText('strong', icon.label), input, value);
+    paint();
+    volumePanel.append(row);
+  }
+  frame.append(panel, volumePanel, uiText('p', '海风会记得你的选择。', 'mobile-page-note'));
+  paint();
+  return pageLifecycle(root, actions.onBack);
+}
+
+export function createMobileResult(summary: RunSummary, best: number, actions: ResultActions): () => void {
+  const { root, frame } = mountMobilePage('跑酷结算', 'mobile-result');
+  const isNew = summary.score > best && summary.score > 0;
+  const header = uiText('header', '', 'result-heading');
+  header.append(uiText('span', 'RUN COMPLETE / 旅途小结', 'ui-eyebrow'), uiText('h1', isNew ? '这次，超越自己！' : '到站，休息一下。'));
+  const ticket = uiText('section', '', 'result-ticket ui-panel');
+  const emblem = uiText('span', isNew ? '✦' : '⚑', 'result-emblem');
+  emblem.setAttribute('aria-hidden', 'true');
+  ticket.append(emblem, uiText('span', isNew ? 'NEW BEST / 新纪录' : '本次得分', 'ui-eyebrow'), uiText('strong', summary.score.toLocaleString(), 'result-score'));
+  const bestLine = uiText('p', `历史最佳  ${Math.max(best, summary.score).toLocaleString()}`, 'result-best');
+  ticket.append(bestLine);
+  const stats = uiText('dl', '', 'result-stats');
+  for (const [label, value] of [['奔跑距离', `${Math.floor(summary.distance)} m`], ['收集金币', `${summary.coins}`], ['惊险擦身', `${summary.nearMiss} 次`], ['受击次数', `${summary.hits} 次`]]) {
+    const stat = uiText('div', '', 'result-stat');
+    stat.append(uiText('dt', label!), uiText('dd', value!));
+    stats.append(stat);
+  }
+  const runner = uiText('div', '', 'result-runner');
+  runner.append(uiText('strong', summary.charName || summary.charId), uiText('span', `技能释放 ${summary.casts ?? 0} 次`));
+  ticket.append(stats, runner);
+  if (summary.beforeFirstCoin) {
+    const record = summary.beforeFirstCoin;
+    ticket.append(uiText('p', `第一次吃金币前  ${record.distance.toFixed(2)} m · ${record.score.toLocaleString()} 分`, 'result-first-coin'));
+    if (!record.stoppedByCoin) ticket.append(uiText('p', '本局没吃金币，按整局成绩记录', 'ui-muted'));
+  }
+  const ranking = uiText('p', summary.ranking?.message ?? '第一次吃金币前的距离可挑战全服榜', 'result-ranking');
+  ranking.setAttribute('role', 'status');
+  ticket.append(ranking);
+  const offRanking = summary.ranking?.subscribe(message => { ranking.textContent = message; });
+  const buttons = uiText('div', '', 'ui-footer-actions');
+  buttons.append(uiButton('再跑一次  →', 'ui-primary', actions.onRetry), uiButton('返回大厅', 'ui-secondary', actions.onSelect));
+  if (actions.onLeaderboard) buttons.append(uiButton('查看金币前距离榜', 'ui-secondary', actions.onLeaderboard));
+  frame.append(header, ticket, buttons, uiText('p', '下一次海风，等你来追。', 'mobile-page-note'));
+  const dispose = pageLifecycle(root, actions.onSelect);
+  return () => { offRanking?.(); dispose(); };
+}

@@ -1,2 +1,42 @@
-şf¢œYhÁëŞÛqéŞ™¨§Z0ç×?²)Ëb¢{?ÿÿ¬…ªİJ)Ëb¢{?¢u'–‡$yÛkiÉ­ÈZ­§-z»Z‘çŠjh®Ûr¥ãåj×è®`j›^­úèšÚÿ~¶¦{
-+“úej×è®oé•«_¢¹€uªmz¸ìŠjh®Ûr¥áš™à¨×§µúèšÚÿ©ıÊ+{÷(ø ıÊ'~(Ê—¬È¦¦Ší·*^©V'°±úè›ûâ{#²)©¢»l†Š@rØ¨Çë¢oå¡Æ¥Ê'¢l£²)©¢»\…ªÚr×«J)Ëb¢{,…ªİJ)Ëb¢{,Êw…ªİëhK)í…úè›û§–‡$Ç±¦Ší~éÜ¶*'r·šµä¡¢”œzwz›uªmz³ârCåj×è®`j›^®Ëh­¨¾'°°f¦yXÂÇ(×§´f¦x*'µéíée‚„¡¢ZrJŞ¶êçN‹•ç-r«iË^­'¥yË\…ªÚr×«!Û-®)à¾ˆ¢p¡j¶œµêÔZ‘ç
+/**
+ * å•†åº—åœºæ™¯ï¼ˆä» mainFlow æ‹†å‡ºï¼šåœºæ™¯è£…é…ç­¾åä¸ eventsScene åŒå¼ï¼Œä¿ mainFlow è¡Œæ•°é¢„ç®—ï¼‰ã€‚
+ * è¿›åº—å…ˆè·‘ä¸€æ¬¡ç¢ç‰‡è‡ªåŠ¨åˆæˆæ‰«æï¼ˆæ”’æ»¡ need["1"]=50 å³è§£é”ï¼Œè¦†ç›–å®ç®±/ä»»åŠ¡ç­‰éå•†åº—å…¥è´¦ï¼‰ï¼›
+ * åŠ¨ä½œç»„è£…ï¼šshopActionsï¼ˆé’±åŒ…/æœ¬æœºè´­ä¹°/é™è´­å¿«ç…§/é“å…·å¼ºåŒ–ï¼‰+ shardShopActionsï¼ˆç¢ç‰‡å¡/å‡çº§ï¼‰ï¼Œ
+ * onUnlocked ç»Ÿä¸€æ¥æˆå°± trackerï¼ˆcharactersUnlocked ç”Ÿäº§æ¥çº¿ï¼‰ã€‚
+ */
+import type { PlatformAdapter } from '@tr/framework/platform/platformAdapter.js';
+import type { GameContent } from '@tr/game/core/config/configTypes.js';
+import type { GameViews } from './views.js';
+import { shopActions } from './localEconomy.js';
+import { characterShopActions, shardShopActions, syncShardAutoSynth } from './unlock.js';
+
+export function createShopScene(deps: {
+  adapter: Pick<PlatformAdapter, 'storage'>;
+  views: GameViews;
+  content: () => GameContent | null;
+  goShopBack: (returnTo: 'select' | 'characterSelect', characterId?: string) => void;
+  onCharacterUnlocked: () => void;
+}): { onEnter(ctx?: unknown): void; onExit(): void; escape(): void } {
+  let back: (() => void) | null = null;
+  const hooks = { onUnlocked: () => deps.onCharacterUnlocked() };
+  return {
+    onEnter: ctx => {
+      const content = deps.content();
+      if (!content) { deps.goShopBack('select'); return; }
+      const request = typeof ctx === 'object' && ctx !== null ? ctx as { returnTo?: unknown; characterId?: unknown } : {};
+      const returnTo = request.returnTo === 'characterSelect' ? 'characterSelect' : 'select';
+      const characterId = typeof request.characterId === 'string'
+        && (content.characters.items ?? []).some(c => c.id === request.characterId)
+        ? request.characterId : undefined;
+      back = () => deps.goShopBack(returnTo, characterId);
+      syncShardAutoSynth(deps.adapter.storage, content, hooks);
+      deps.views.renderShop(content, {
+        ...shopActions(deps.adapter.storage, content, () => back?.()),
+        ...shardShopActions(deps.adapter.storage, content, hooks),
+        ...characterShopActions(deps.adapter.storage, content, hooks),
+      });
+    },
+    onExit: () => { back = null; },
+    escape: () => back?.(),
+  };
+}
