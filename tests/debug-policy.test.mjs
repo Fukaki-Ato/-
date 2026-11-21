@@ -167,11 +167,14 @@ test('production bootstrap strips URL QA extras and does not construct the test 
     },
     async createUiShell(adapter) {
       this.adapter = adapter;
-      return { host: { start() {} }, badges: {}, backdrop: {}, setBackgroundVisible() {}, fonts: {} };
+      return { host: { start() {} }, badges: {}, backdrop: {}, setBackgroundVisible() {}, fonts: this.fonts };
     },
-    createOverlayViews() { return {}; },
+    fonts: {},
+    createOverlayViews(options) { this.overlayOptions = options; return {}; },
     createCharacterSelectOverlay() {},
     createShopOverlay() {},
+    createChestOverlay(...args) { this.chestArgs = args; return this.disposeChest; },
+    disposeChest() {},
     injectObstaclePosters: async () => {},
     injectPickupTiles: async () => {},
     injectIntroVideos: async () => {},
@@ -210,6 +213,10 @@ test('production bootstrap strips URL QA extras and does not construct the test 
     assert.equal(capture.flowOptions.adapter.storage, capture.wallet, 'flow spending uses the same wallet');
     assert.equal(capture.missionWallet, capture.wallet, 'mission rewards enter the wallet used by the flow');
     assert.equal(capture.flowOptions.trackRun, capture.trackMissions, 'normal mission tracking survives the merge');
+    const content = {};
+    const chestActions = { onBack() {} };
+    assert.equal(capture.overlayOptions.chestRenderer(content, chestActions), capture.disposeChest);
+    assert.deepEqual(capture.chestArgs, [content, chestActions, capture.fonts]);
     assert.equal(capture.panelCreations, 0);
     assert.equal(capture.storageWrites.length, 0, 'production ignores the QA character preset');
     assert.equal(Object.hasOwn(globalThis, '__trTestPanel'), false);

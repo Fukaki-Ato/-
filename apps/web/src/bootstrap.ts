@@ -6,6 +6,7 @@ import { createOverlayViews } from '@tr/game/ui/overlayViews.js';
 import { createUiShell } from './uiShell.js';
 import '../style.css';
 import { createCharacterSelectOverlay } from './characterSelectOverlay.js';
+import { createChestOverlay } from './chestOverlay.js';
 import { createShopOverlay } from './shopOverlay.js';
 import { injectObstaclePosters, injectPickupTiles } from './runAssets.js';
 import { injectIntroVideos } from './introVideo.js';
@@ -49,6 +50,7 @@ async function main(): Promise<void> {
             .forEach(el => { el.textContent = left.toLocaleString(); });
         })),
     shopRenderer: (content, actions) => createShopOverlay(content, actions, shell.fonts),
+    chestRenderer: (content, actions) => createChestOverlay(content, actions, shell.fonts),
     eventsRenderer: (content, actions) => createEventsOverlay(content, actions, shell.fonts),
     lobbyRenderer: missions.lobbyRenderer,
     settingsRenderer: createMobileSettings,

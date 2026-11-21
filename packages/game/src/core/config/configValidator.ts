@@ -5,6 +5,7 @@
  */
 import type { AchievementEntry, ConfigFile, GameContent, NamedEntry, ObstaclesFile, ParamsFile } from './configTypes.js';
 import { validateAchievementEntry, validateAchievementRefs } from './achievementsValidator.js';
+import { validateLootTables, type LootTableEntry } from './lootValidator.js';
 import { isPrimitiveSupported } from '../effects/buffEngine.js';
 
 /** 各文件条目 id 的合法前缀（docs/03 §1.1）；数组表示允许多种 */
@@ -140,21 +141,15 @@ export function validateRefs(content: GameContent): string[] {
   for (const shard of ((content.economy.params?.shards ?? []) as { id: string; grants: string }[])) {
     need(shard.id, shard.grants, chars, 'shards.grants');
   }
-  for (const loot of ((content.economy.params?.lootTables ?? []) as { id: string; entries: { ref: string }[] }[])) {
-    for (const e of loot.entries ?? []) {
-      const base = e.ref.split(':')[0];
-      // coin/key 是货币速记写法；其余必须是道具/角色/碎片 id
-      const ok = base === 'coin' || base === 'key' || items.has(base) || chars.has(base) || shards.has(base);
-      if (!ok) errors.push(`${loot.id}: 奖池引用不存在 -> ${e.ref}`);
-    }
-  }
+  const lootTables = (content.economy.params?.lootTables ?? []) as LootTableEntry[];
+  const walletKeys = new Set(['coin', 'key', 'diamond', ...shards]);
+  errors.push(...validateLootTables(lootTables, walletKeys, items, chars, shards));
   // 成就（achievements.json）：itemOf 的道具引用与 shard 奖励引用；无此文件的旧调用方按空集豁免
   errors.push(...validateAchievementRefs(content.achievements?.items ?? [], items, shards));
   // 商店 offers（审查 T-2）：商业化数据此前只查「params 是对象」，give/price/limit/活动引用
   // 全部无校验——typo 会让付费商品静默不出现或定价错乱直接进包
   const events = idsOf(content.events);
-  const lootIds = new Set(((content.economy.params?.lootTables ?? []) as { id: string }[]).map(l => l.id));
-  const walletKeys = new Set(['coin', 'key', 'diamond', ...shards]);
+  const lootIds = new Set(lootTables.map(l => l.id).filter((id): id is string => typeof id === 'string'));
   const grantKeys = new Set(['coin', 'key', 'diamond', ...items, ...chars, ...shards]);
   const shop = (content.economy.params?.shop ?? {}) as {
     offers?: { id?: unknown; give?: unknown; price?: unknown; requiresEvent?: unknown; limit?: unknown }[];

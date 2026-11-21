@@ -23,6 +23,29 @@ test('真实配置跨文件引用检查全绿', () => {
   assert.deepEqual(validateRefs(content), []);
 });
 
+test('宝箱配置允许钻石产出并校验件数、钥匙价、引用与保底', () => {
+  const table = {
+    id: 'loot_chest_bronze', draws: 1, cost: { key: 1 },
+    entries: [{ ref: 'diamond:1', weight: 1, rarity: 'sr' }],
+    pity: { everyN: 8, guarantee: 'rarity:sr+' },
+  };
+  const content = {
+    characters: { items: [] }, skills: { items: [] }, items: { items: [] },
+    themes: { items: [] }, events: { items: [] }, obstacles: {},
+    economy: { params: { lootTables: [table] } },
+  };
+  assert.deepEqual(validateRefs(content), []);
+
+  table.draws = 0;
+  table.cost.key = 0;
+  table.entries[0].ref = 'item_ghost';
+  table.pity = { everN: 8, guarantee: 'rarity:sr+' };
+  const errors = validateRefs(content);
+  for (const issue of ['draws', 'cost.key', 'item_ghost', 'everN', 'pity.guarantee']) {
+    assert.ok(errors.some(e => e.includes(issue)), `${issue}: ${errors.join('\n')}`);
+  }
+});
+
 test('数组不能冒充配置或技术段对象', () => {
   assert.ok(validateFile('game', []).some(e => e.includes('不是 JSON 对象')));
   assert.ok(validateFile('game', { configVersion: '1', params: [] }).some(e => e.includes('params 对象')));
